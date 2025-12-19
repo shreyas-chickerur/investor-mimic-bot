@@ -37,6 +37,16 @@ Automated investment system that analyzes stocks using multiple factors and prov
 - **Risk Controls** - Automated stop-loss and position limits
 - **Database Integration** - Stores 13F filings and holdings data
 
+### **System Infrastructure**
+
+- **Environment Management** - Separate dev/staging/prod configurations
+- **Rate Limiting** - Token bucket algorithm for API calls
+- **Error Handling** - Centralized error handling with retry logic
+- **Monitoring** - System health checks and performance tracking
+- **Logging** - Structured logging with database persistence
+- **Data Validation** - Input/output validation across all layers
+- **API Client** - Resilient API calls with exponential backoff
+
 ---
 
 ## 🏗️ Architecture
@@ -62,6 +72,17 @@ services/portfolio/    # Position management
 services/execution/    # Trade planning
 services/approval/     # Email approval workflow
 services/monitoring/   # Alerts and notifications
+```
+
+### **Infrastructure Layer**
+```
+utils/environment.py   # Environment configuration manager
+utils/rate_limiter.py  # API rate limiting
+utils/error_handler.py # Centralized error handling
+utils/monitoring.py    # System monitoring and metrics
+utils/enhanced_logging.py # Structured logging
+utils/validators.py    # Data validation layer
+utils/api_client.py    # Resilient API client
 ```
 
 ---
@@ -175,11 +196,14 @@ make optimize-weights   # Train ML models for weight optimization
 ## ⚙️ Technology Stack
 
 - **Backend:** Python, FastAPI
-- **Database:** PostgreSQL
-- **Trading:** Alpaca API
+- **Database:** PostgreSQL with migrations
+- **Trading:** Alpaca API with retry logic
 - **Data Sources:** SEC EDGAR, Alpha Vantage
 - **ML:** scikit-learn, pandas, numpy
 - **Automation:** Cron, launchd
+- **CI/CD:** GitHub Actions
+- **Monitoring:** psutil, custom metrics
+- **Logging:** Structured logging with DB persistence
 
 ---
 
@@ -190,6 +214,9 @@ make optimize-weights   # Train ML models for weight optimization
 - Email approval required for all trades
 - Position limits enforced
 - Stop-loss protection active
+- SQL injection prevention via input sanitization
+- Rate limiting on all API calls
+- Comprehensive error handling and logging
 
 ---
 
