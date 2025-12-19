@@ -5,7 +5,7 @@ Supports Slack, SMS (Twilio), Telegram, and Push notifications.
 """
 
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Dict, List, Optional
 
 import requests
 
@@ -119,7 +119,7 @@ class NotificationManager:
 
             client = Client(self.twilio_sid, self.twilio_token)
 
-            message_obj = client.messages.create(body=message, from_=self.twilio_from, to=to_number)
+            client.messages.create(body=message, from_=self.twilio_from, to=to_number)
 
             logger.info(f"SMS sent to {to_number}: {message[:50]}...")
             return True
