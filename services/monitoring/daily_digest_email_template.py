@@ -53,7 +53,7 @@ def get_daily_digest_email_html(market_section: Dict, portfolio_section: Dict, u
         <title>Daily Investment Digest</title>
     </head>
     <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8f9fa; line-height: 1.6;">
-        <div style="max-width: 900px; margin: 20px auto; background-color: #ffffff; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-radius: 8px; overflow: hidden;">
+        <div style="max-width: 1200px; margin: 20px auto; background-color: #ffffff; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-radius: 8px; overflow: hidden;">
 
             <!-- Header -->
             <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #7e8ba3 100%); padding: 40px 32px; text-align: center; position: relative; overflow: hidden;">
@@ -155,23 +155,25 @@ def _build_market_summary(market_data: Dict) -> str:
 
     html += "</div>"
 
-    # Add market sentiment summary
+    # Add market sentiment summary in table format
     html += """
-    <div style="background: #f8f9fa; padding: 18px 20px; border-radius: 8px; border-left: 4px solid #2196F3;">
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
-            <div style="text-align: center;">
-                <div style="color: #546e7a; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px;">Market Sentiment</div>
-                <div style="color: #2c3e50; font-size: 15px; font-weight: 600; margin-top: 6px;">Moderately Bullish</div>
-            </div>
-            <div style="text-align: center;">
-                <div style="color: #546e7a; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px;">Sector Leaders</div>
-                <div style="color: #2c3e50; font-size: 15px; font-weight: 600; margin-top: 6px;">Technology, Healthcare</div>
-            </div>
-            <div style="text-align: center;">
-                <div style="color: #546e7a; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px;">Volume</div>
-                <div style="color: #2c3e50; font-size: 15px; font-weight: 600; margin-top: 6px;">Above Average</div>
-            </div>
-        </div>
+    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid #2196F3;">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="border-bottom: 2px solid #dee2e6;">
+                    <th style="padding: 12px; text-align: left; color: #546e7a; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Market Sentiment</th>
+                    <th style="padding: 12px; text-align: left; color: #546e7a; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Sector Leaders</th>
+                    <th style="padding: 12px; text-align: left; color: #546e7a; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Volume</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="padding: 16px 12px; color: #2c3e50; font-size: 16px; font-weight: 600;">Moderately Bullish</td>
+                    <td style="padding: 16px 12px; color: #2c3e50; font-size: 16px; font-weight: 600;">Technology, Healthcare</td>
+                    <td style="padding: 16px 12px; color: #2c3e50; font-size: 16px; font-weight: 600;">Above Average</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
     """
 
