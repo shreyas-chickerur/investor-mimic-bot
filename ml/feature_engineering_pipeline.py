@@ -4,8 +4,6 @@ Feature Engineering Pipeline
 Creates comprehensive features from all data sources for ML training.
 """
 
-import pandas as pd
-import numpy as np
 from datetime import datetime, timedelta
 from typing import Dict, List
 import json
@@ -51,7 +49,7 @@ class FeatureEngineer:
         with get_db_session() as session:
             # Get recent 13F data
             query = """
-                SELECT 
+                SELECT
                     COUNT(DISTINCT investor_id) as num_investors,
                     SUM(shares) as total_shares,
                     AVG(shares) as avg_shares,
@@ -113,7 +111,7 @@ class FeatureEngineer:
             # Get recent news sentiment
             for days in [7, 30, 90]:
                 query = """
-                    SELECT 
+                    SELECT
                         AVG(sentiment_score) as avg_sentiment,
                         COUNT(*) as article_count,
                         SUM(CASE WHEN sentiment_label = 'Bullish' THEN 1 ELSE 0 END) as bullish_count,
@@ -148,7 +146,7 @@ class FeatureEngineer:
 
         with get_db_session() as session:
             query = """
-                SELECT 
+                SELECT
                     rsi_14, macd, macd_signal, bollinger_width,
                     atr_14, adx_14, stochastic_k, stochastic_d,
                     volume_ratio, momentum_10, momentum_20,
@@ -191,7 +189,7 @@ class FeatureEngineer:
 
         with get_db_session() as session:
             query = """
-                SELECT 
+                SELECT
                     revenue_growth, earnings_growth, profit_margin,
                     roe, debt_to_equity, pe_ratio, pb_ratio,
                     ps_ratio, peg_ratio, dividend_yield
@@ -230,7 +228,7 @@ class FeatureEngineer:
 
         with get_db_session() as session:
             query = """
-                SELECT 
+                SELECT
                     AVG(sentiment_score) as avg_sentiment,
                     SUM(mention_count) as total_mentions,
                     AVG(trending_score) as avg_trending
@@ -266,8 +264,8 @@ class FeatureEngineer:
         with get_db_session() as session:
             # Get current price
             query = """
-                SELECT close 
-                FROM price_history 
+                SELECT close
+                FROM price_history
                 WHERE ticker = :ticker AND date = :date
             """
             result = session.execute(query, {"ticker": ticker, "date": date})
@@ -282,9 +280,9 @@ class FeatureEngineer:
             for days in [1, 5, 10, 20]:
                 future_date = date + timedelta(days=days)
                 query = """
-                    SELECT close 
-                    FROM price_history 
-                    WHERE ticker = :ticker 
+                    SELECT close
+                    FROM price_history
+                    WHERE ticker = :ticker
                       AND date >= :future_date
                     ORDER BY date ASC
                     LIMIT 1
@@ -350,8 +348,8 @@ class FeatureEngineer:
             try:
                 session.execute(
                     """
-                    INSERT INTO training_data 
-                    (ticker, date, features, target_return_1d, target_return_5d, 
+                    INSERT INTO training_data
+                    (ticker, date, features, target_return_1d, target_return_5d,
                      target_return_10d, target_return_20d)
                     VALUES (:ticker, :date, :features, :t1d, :t5d, :t10d, :t20d)
                     ON CONFLICT (ticker, date) DO UPDATE SET

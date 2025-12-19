@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import ROUND_DOWN, Decimal
-from typing import Dict, Tuple
+from typing import Dict
 
 from services.execution.models import TradeOrder, TradePlan
 

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import date
 from io import StringIO
 from pathlib import Path
-from typing import Dict, Iterable, Optional
+from typing import Optional, List
 
 # Third-party imports
 import numpy as np

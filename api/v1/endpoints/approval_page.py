@@ -2,7 +2,7 @@
 HTML pages for trade approval.
 """
 
-from fastapi import APIRouter, Form, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from services.approval.trade_approval import TradeApprovalManager
@@ -149,7 +149,7 @@ async def approve_page(request_id: str):
         <body>
             <div class="container">
                 <h1>🤖 Trade Approval Required</h1>
-                
+
                 <div class="summary">
                     <div class="summary-item">
                         <strong>Total Investment:</strong> ${request.total_investment:,.2f}
@@ -170,7 +170,7 @@ async def approve_page(request_id: str):
                         <strong>Expires:</strong> {request.expires_at.strftime('%Y-%m-%d %H:%M:%S UTC')}
                     </div>
                 </div>
-                
+
                 <h2>Proposed Trades</h2>
                 <table>
                     <thead>
@@ -186,7 +186,7 @@ async def approve_page(request_id: str):
                         {trade_rows}
                     </tbody>
                 </table>
-                
+
                 <div class="button-container">
                     <button class="approve-btn" onclick="approve()">
                         ✓ Approve Trades
@@ -195,21 +195,21 @@ async def approve_page(request_id: str):
                         ✗ Reject Trades
                     </button>
                 </div>
-                
+
                 <div id="result" style="margin-top: 20px; text-align: center; font-size: 18px;"></div>
             </div>
-            
+
             <script>
                 async function approve() {{
                     const result = document.getElementById('result');
                     result.innerHTML = '⏳ Processing...';
-                    
+
                     try {{
                         const response = await fetch('/api/v1/approvals/{request_id}/approve', {{
                             method: 'POST'
                         }});
                         const data = await response.json();
-                        
+
                         if (data.success) {{
                             result.innerHTML = '<span style="color: #27ae60; font-weight: bold;">✓ Trades Approved! The bot will execute them shortly.</span>';
                             document.querySelector('.approve-btn').disabled = true;
@@ -221,17 +221,17 @@ async def approve_page(request_id: str):
                         result.innerHTML = '<span style="color: #e74c3c;">✗ Error: ' + error.message + '</span>';
                     }}
                 }}
-                
+
                 async function reject() {{
                     const result = document.getElementById('result');
                     result.innerHTML = '⏳ Processing...';
-                    
+
                     try {{
                         const response = await fetch('/api/v1/approvals/{request_id}/reject', {{
                             method: 'POST'
                         }});
                         const data = await response.json();
-                        
+
                         if (data.success) {{
                             result.innerHTML = '<span style="color: #e74c3c; font-weight: bold;">✗ Trades Rejected</span>';
                             document.querySelector('.approve-btn').disabled = true;
@@ -490,16 +490,16 @@ async def submit_bulk_decisions(request_id: str, request: Request):
         </head>
         <body>
             <div class="container">
-                
+
                 <!-- Header -->
                 <div class="header">
                     <h1>✅ Decisions Submitted Successfully!</h1>
                     <p>InvestorMimic Bot</p>
                 </div>
-                
+
                 <!-- Main Content -->
                 <div class="content">
-                    
+
                     <!-- Summary -->
                     <table class="summary-table">
                         <tbody>
@@ -517,7 +517,7 @@ async def submit_bulk_decisions(request_id: str, request: Request):
                             </tr>
                         </tbody>
                     </table>
-                    
+
                     <!-- Trade Details -->
                     <h2 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 18px; font-weight: 600;">Trade Details</h2>
                     <div style="overflow-x: auto;">
@@ -537,21 +537,21 @@ async def submit_bulk_decisions(request_id: str, request: Request):
                             </tbody>
                         </table>
                     </div>
-                    
+
                     <!-- Next Steps -->
                     <div class="next-steps">
                         <p>📋 Next Steps</p>
                         <p>The approved trades will be executed automatically by the bot. You'll receive a confirmation email once the trades are complete.</p>
                     </div>
-                    
+
                 </div>
-                
+
                 <!-- Footer -->
                 <div class="footer">
                     <p>Request ID: {request_id}</p>
                     <p>Approved: {approved_count} | Rejected: {rejected_count}</p>
                 </div>
-                
+
             </div>
         </body>
     </html>

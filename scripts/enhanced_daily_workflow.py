@@ -59,11 +59,11 @@ def main():
     print(f"  ✓ Ticker mapper initialized ({len(ticker_mapper.cusip_to_ticker_cache)} mappings cached)")
 
     # Real insider signal generator
-    insider_generator = RealInsiderSignalGenerator()
+    RealInsiderSignalGenerator()
     print("  ✓ Insider trading analyzer initialized")
 
     # Technical signal generator
-    technical_generator = TechnicalSignalGenerator()
+    TechnicalSignalGenerator()
     print("  ✓ Technical indicators initialized")
 
     # Performance tracker

@@ -12,7 +12,6 @@ Features:
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
 
@@ -245,12 +244,12 @@ class AdvancedRiskManager:
         elif regime.regime == "bear":
             # Reduce exposure in bear market
             adjustment_factor = 0.75  # 25% reduction
-            logger.info(f"Bear market detected, reducing exposure by 25%")
+            logger.info("Bear market detected, reducing exposure by 25%")
 
         elif regime.regime == "bull":
             # Slightly increase in bull market (but stay conservative)
             adjustment_factor = 1.10  # 10% increase
-            logger.info(f"Bull market detected, increasing exposure by 10%")
+            logger.info("Bull market detected, increasing exposure by 10%")
 
         # Apply adjustment
         adjusted = {symbol: size * Decimal(str(adjustment_factor)) for symbol, size in position_sizes.items()}
