@@ -1,112 +1,78 @@
-# Documentation
+# InvestorMimic Bot Documentation
 
-**Investor Mimic Bot - Complete Documentation**
-
----
-
-## Quick Start
-
-- **[System Overview](SYSTEM_OVERVIEW.md)** - Architecture and components
-- **[Setup Guide](SETUP_EMAIL_APPROVAL.md)** - Installation and configuration
+Complete documentation for the AI-powered investment system.
 
 ---
 
-## 📖 Core Documentation
+## 📚 Documentation Structure
 
-### System Architecture
-- **[System Overview](SYSTEM_OVERVIEW.md)** - Complete system architecture
-- **[Complete System Guide](COMPLETE_SYSTEM_GUIDE.md)** - Detailed implementation
-- **[Multi-Signal System](MULTI_SIGNAL_SYSTEM.md)** - Signal generation
+### 🚀 Getting Started
+**Start here:** [user-actions/USER_ACTION_ITEMS.md](user-actions/USER_ACTION_ITEMS.md)
 
-### Features
-- **[Advanced Features](ADVANCED_FEATURES_GUIDE.md)** - Stop-loss, rebalancing, regime detection
-- **[Profit-Maximizing System](PROFIT_MAXIMIZING_SYSTEM.md)** - 8-factor analysis
-- **[Factor Interactions](FACTOR_INTERACTIONS.md)** - How factors work together
+This is your complete 7-phase setup checklist covering everything from environment setup to production deployment.
 
-### Workflows
-- **[Selective Approval](SELECTIVE_APPROVAL.md)** - Trade approval process
-- **[Email Setup](SETUP_EMAIL_APPROVAL.md)** - Email configuration
+### 📖 Core Documentation
+
+**High-Level Overview:**
+- **[INDEX.md](INDEX.md)** - Complete documentation index
+- **[SYSTEM_OVERVIEW.md](SYSTEM_OVERVIEW.md)** - Architecture and components overview
+- **[COMPLETE_SYSTEM_GUIDE.md](COMPLETE_SYSTEM_GUIDE.md)** - Comprehensive system details
+
+**Technical Guides:**
+- **[TESTING_GUIDE.md](TESTING_GUIDE.md)** - How to test the system
+- **[ML_DATA_STRATEGY.md](ML_DATA_STRATEGY.md)** - Data collection and ML strategy
+- **[WEB_DASHBOARD_ARCHITECTURE.md](WEB_DASHBOARD_ARCHITECTURE.md)** - Dashboard design
+
+**Planning:**
+- **[FUTURE_ENHANCEMENTS.md](FUTURE_ENHANCEMENTS.md)** - Planned improvements and roadmap
+
+### 🚀 Features
+**Detailed feature documentation:** [features/](features/)
+
+All guides for specific features like daily digest, causality analysis, continuous learning, etc.
+
+### 📋 User Actions
+**Setup and configuration guides:** [user-actions/](user-actions/)
+
+Everything you need to do to set up and configure the system.
 
 ---
 
-## Usage
+## Quick Links
 
-### Daily Operations
-```bash
-make run-daily          # Run daily workflow
-make run-paper          # Paper trading mode
+**I want to set up the system:**
+→ [user-actions/USER_ACTION_ITEMS.md](user-actions/USER_ACTION_ITEMS.md)
+
+**I want to understand the architecture:**
+→ [SYSTEM_OVERVIEW.md](SYSTEM_OVERVIEW.md)
+
+**I want to learn about a specific feature:**
+→ [features/](features/)
+
+**I want to see what's planned:**
+→ [FUTURE_ENHANCEMENTS.md](FUTURE_ENHANCEMENTS.md)
+
+**I want to test the system:**
+→ [TESTING_GUIDE.md](TESTING_GUIDE.md)
+
+---
+
+## Documentation Organization
+
+```
+docs/
+├── README.md (this file)
+├── INDEX.md (complete index)
+├── SYSTEM_OVERVIEW.md (high-level overview)
+├── COMPLETE_SYSTEM_GUIDE.md (comprehensive guide)
+├── TESTING_GUIDE.md (testing instructions)
+├── ML_DATA_STRATEGY.md (ML and data strategy)
+├── WEB_DASHBOARD_ARCHITECTURE.md (dashboard design)
+├── FUTURE_ENHANCEMENTS.md (roadmap)
+├── features/ (feature-specific guides)
+└── user-actions/ (setup and configuration)
 ```
 
-### Development
-```bash
-make install            # Install dependencies
-make lint               # Check code quality
-make format             # Format code
-make test               # Run tests
-```
-
-### Backtesting
-```bash
-make backtest-optimized # Run backtest
-make optimize-weights   # Train ML models
-```
-
 ---
 
-## Project Structure
-
-```
-services/           # Core system components
-├── strategy/       # 8-factor engine
-├── risk/           # Risk management
-├── portfolio/      # Position management
-├── market/         # Regime detection
-└── technical/      # Indicators
-
-backtesting/        # Backtesting framework
-ml/                 # ML optimization
-scripts/            # Execution scripts
-docs/               # This documentation
-```
-
----
-
-## Key Concepts
-
-### 8-Factor Analysis
-The system analyzes stocks using 8 factors:
-1. 13F Conviction
-2. News Sentiment
-3. Insider Trading
-4. Technical Indicators
-5. Moving Averages
-6. Volume Analysis
-7. Relative Strength
-8. Earnings Momentum
-
-### Market Regimes
-Automatically detects and adapts to:
-- Bull markets
-- Bear markets
-- Sideways markets
-
-### Risk Management
-- Stop-loss protection
-- Position sizing
-- Correlation limits
-- Sector exposure limits
-
----
-
-## 🔒 Security
-
-- API keys in environment variables
-- Email approval required
-- Position limits enforced
-- Stop-loss protection active
-
----
-
-## License
-
-MIT
+**For the complete documentation index, see [INDEX.md](INDEX.md)**
