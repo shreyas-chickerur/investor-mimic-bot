@@ -63,6 +63,11 @@ class AuthService:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
     @staticmethod
+    def verify_token(token: str) -> Dict:
+        """Verify JWT token and return payload. Alias for decode_token."""
+        return AuthService.decode_token(token)
+
+    @staticmethod
     def register_user(email: str, password: str, full_name: str) -> Dict:
         """Register a new user."""
         with get_db_session() as session:
