@@ -105,19 +105,14 @@ def get_daily_digest_email_html(market_section: Dict, portfolio_section: Dict, u
             <!-- Holdings News Section -->
             {holdings_news_html}
 
-            <!-- Approve/Reject All Trades Section -->
+            <!-- Review Trades Section -->
             <div style="padding: 32px 24px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-top: 2px solid #dee2e6; text-align: center;">
                 <h3 style="color: #2c3e50; margin: 0 0 8px 0; font-size: 18px; font-weight: 700;">Ready to Execute?</h3>
-                <p style="color: #7f8c8d; font-size: 14px; margin: 0 0 20px 0;">Review today's recommendations and approve or reject all trades</p>
-                <div style="display: flex; justify-content: center; gap: 16px; flex-wrap: wrap;">
-                    <a href="http://localhost:8000/api/v1/approve/all" style="background: linear-gradient(135deg, #27ae60 0%, #229954 100%); color: #ffffff; padding: 16px 40px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: 700; display: inline-block; box-shadow: 0 4px 12px rgba(39, 174, 96, 0.4); transition: transform 0.2s;">
-                        ✓ Approve All Trades
-                    </a>
-                    <a href="http://localhost:8000/api/v1/approve/reject-all" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: #ffffff; padding: 16px 40px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: 700; display: inline-block; box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4); transition: transform 0.2s;">
-                        ✗ Reject All Trades
-                    </a>
-                </div>
-                <p style="color: #95a5a6; font-size: 12px; margin: 16px 0 0 0;">You can also review each trade individually in the dashboard</p>
+                <p style="color: #7f8c8d; font-size: 14px; margin: 0 0 20px 0;">Review today's recommendations and approve or reject trades</p>
+                <a href="http://localhost:8000/api/v1/approve/today/review" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; padding: 16px 40px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: 700; display: inline-block; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); transition: transform 0.2s;">
+                    📊 Review & Approve Trades
+                </a>
+                <p style="color: #95a5a6; font-size: 12px; margin: 16px 0 0 0;">You can approve or reject each trade individually</p>
             </div>
 
             <!-- Footer -->
