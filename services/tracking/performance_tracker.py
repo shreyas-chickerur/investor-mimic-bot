@@ -229,9 +229,7 @@ class PerformanceTracker:
         if returns:
             avg_return = sum(returns) / len(returns)
             std_return = (sum((r - avg_return) ** 2 for r in returns) / len(returns)) ** 0.5
-            sharpe_ratio = (
-                (avg_return - 0.02 / 252) / std_return * (252**0.5) if std_return > 0 else 0
-            )
+            sharpe_ratio = (avg_return - 0.02 / 252) / std_return * (252**0.5) if std_return > 0 else 0
         else:
             sharpe_ratio = 0
 
@@ -248,9 +246,7 @@ class PerformanceTracker:
 
         # Calculate win rate from trades
         period_trades = [
-            t
-            for t in self.trades
-            if start_snapshot.date <= datetime.fromisoformat(t["timestamp"]) <= end_snapshot.date
+            t for t in self.trades if start_snapshot.date <= datetime.fromisoformat(t["timestamp"]) <= end_snapshot.date
         ]
 
         # Match buy/sell pairs to calculate wins

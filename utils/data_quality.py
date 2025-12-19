@@ -37,9 +37,7 @@ class DataQualityChecker:
 
         return True, "No missing data"
 
-    def check_outliers(
-        self, data: pd.Series, method: str = "iqr", threshold: float = 3.0
-    ) -> Tuple[bool, List[int]]:
+    def check_outliers(self, data: pd.Series, method: str = "iqr", threshold: float = 3.0) -> Tuple[bool, List[int]]:
         """
         Detect outliers in data.
 
@@ -70,9 +68,7 @@ class DataQualityChecker:
 
         return is_clean, outlier_indices
 
-    def check_data_staleness(
-        self, timestamp: datetime, max_age_hours: int = 24
-    ) -> Tuple[bool, str]:
+    def check_data_staleness(self, timestamp: datetime, max_age_hours: int = 24) -> Tuple[bool, str]:
         """Check if data is too old."""
         age = datetime.now() - timestamp
         max_age = timedelta(hours=max_age_hours)
@@ -111,9 +107,7 @@ class DataQualityChecker:
         is_consistent = len(suspicious_tickers) == 0
         return is_consistent, suspicious_tickers
 
-    def check_volume_anomaly(
-        self, current_volume: int, avg_volume: float, threshold: float = 5.0
-    ) -> Tuple[bool, str]:
+    def check_volume_anomaly(self, current_volume: int, avg_volume: float, threshold: float = 5.0) -> Tuple[bool, str]:
         """Check for unusual volume."""
         if avg_volume == 0:
             return True, "No historical volume data"
@@ -151,9 +145,7 @@ class DataQualityChecker:
 
         return True, f"Data complete: {actual_rows}/{expected_rows} rows"
 
-    def run_full_quality_check(
-        self, data: Dict[str, any], config: Dict[str, any]
-    ) -> Tuple[bool, List[str]]:
+    def run_full_quality_check(self, data: Dict[str, any], config: Dict[str, any]) -> Tuple[bool, List[str]]:
         """
         Run comprehensive quality checks on data.
 
@@ -183,9 +175,7 @@ class DataQualityChecker:
 
         # Check timestamps
         if "timestamp" in data:
-            is_fresh, msg = self.check_data_staleness(
-                data["timestamp"], config.get("max_age_hours", 24)
-            )
+            is_fresh, msg = self.check_data_staleness(data["timestamp"], config.get("max_age_hours", 24))
             if not is_fresh:
                 issues.append(f"Stale data: {msg}")
 
