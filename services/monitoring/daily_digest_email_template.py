@@ -6,6 +6,7 @@ Professional, clean email template for daily investment digest.
 
 from datetime import datetime
 from typing import Dict, List
+from services.monitoring.daily_digest_email_template_extended import _build_flow_charts
 
 
 def get_daily_digest_email_html(market_section: Dict, portfolio_section: Dict, user_name: str = "Investor") -> str:
@@ -35,6 +36,9 @@ def get_daily_digest_email_html(market_section: Dict, portfolio_section: Dict, u
 
     # Recommendations Section
     recommendations_html = _build_recommendations(portfolio_section.get("recommendations", []))
+
+    # Flow Charts Section
+    flow_charts_html = _build_flow_charts(portfolio_section.get("recommendations", []))
 
     # Holdings News Section
     holdings_news_html = _build_holdings_news(portfolio_section.get("holdings_news", []))
@@ -91,6 +95,9 @@ def get_daily_digest_email_html(market_section: Dict, portfolio_section: Dict, u
                 <h2 style="color: #2c3e50; margin: 0 0 16px 0; font-size: 20px; font-weight: 700;">Today's Recommendations</h2>
                 {recommendations_html}
             </div>
+            
+            <!-- Flow Charts Section -->
+            {flow_charts_html}
             
             <!-- Holdings News Section -->
             {holdings_news_html}
