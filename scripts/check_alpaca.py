@@ -4,7 +4,6 @@ Simple script to test Alpaca API connection and display account information.
 """
 import os
 import sys
-from decimal import Decimal
 
 from alpaca.trading.client import TradingClient
 from dotenv import load_dotenv
