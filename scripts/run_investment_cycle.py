@@ -29,7 +29,6 @@ sys.path.append(str(Path(__file__).parent.parent))
 from config.risk_controls import RiskControls, default_risk_controls  # noqa: E402
 from services.funding.calculator import FundingCalculator, FundingRule  # noqa: E402
 from services.funding.types import InvestmentDecision  # noqa: E402
-from utils.alerting import AlertManager, alert_manager  # noqa: E402
 from utils.logging_config import setup_logger  # noqa: E402
 
 # Configure logging

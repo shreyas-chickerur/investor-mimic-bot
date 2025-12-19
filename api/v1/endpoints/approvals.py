@@ -5,6 +5,7 @@ API endpoints for trade approval management.
 from typing import Dict, Optional
 
 from fastapi import APIRouter, HTTPException
+from services.approval.models import ApprovalStatus
 from pydantic import BaseModel
 
 from services.approval.trade_approval import ApprovalRequest, TradeApprovalManager
