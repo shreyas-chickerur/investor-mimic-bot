@@ -1,0 +1,86 @@
+{
+  "request_id": "2291e2e9-fab0-4a12-876a-31fee0cadb0b",
+  "created_at": "2025-12-18T05:42:26.051186",
+  "expires_at": "2025-12-19T05:42:26.051138",
+  "status": "PENDING",
+  "total_investment": 45911.66535537724,
+  "cash_buffer": 14282.543,
+  "available_cash": 142825.43,
+  "trades": [
+    {
+      "symbol": "GOOGL",
+      "quantity": 20.836046899662122,
+      "estimated_price": 296.72,
+      "estimated_value": 6182.471836067745,
+      "allocation_pct": 4.809656901566047
+    },
+    {
+      "symbol": "UBER",
+      "quantity": 57.994041547326816,
+      "estimated_price": 100.0,
+      "estimated_value": 5799.4041547326815,
+      "allocation_pct": 4.5116492169128595
+    },
+    {
+      "symbol": "OXY",
+      "quantity": 57.790498885933296,
+      "estimated_price": 100.0,
+      "estimated_value": 5779.049888593329,
+      "allocation_pct": 4.495814605901398
+    },
+    {
+      "symbol": "BN",
+      "quantity": 53.76231510341787,
+      "estimated_price": 100.0,
+      "estimated_value": 5376.231510341787,
+      "allocation_pct": 4.182441857200381
+    },
+    {
+      "symbol": "AMZN",
+      "quantity": 45.100582878718896,
+      "estimated_price": 100.0,
+      "estimated_value": 4510.05828787189,
+      "allocation_pct": 3.5086019873444183
+    },
+    {
+      "symbol": "KHC",
+      "quantity": 40.76906036212391,
+      "estimated_price": 100.0,
+      "estimated_value": 4076.906036212391,
+      "allocation_pct": 3.1716309874169784
+    },
+    {
+      "symbol": "H1467J104",
+      "quantity": 39.19671557561571,
+      "estimated_price": 100.0,
+      "estimated_value": 3919.6715575615713,
+      "allocation_pct": 3.0493103500636103
+    },
+    {
+      "symbol": "META",
+      "quantity": 36.22409039728397,
+      "estimated_price": 100.0,
+      "estimated_value": 3622.409039728397,
+      "allocation_pct": 2.8180548331144895
+    },
+    {
+      "symbol": "MSFT",
+      "quantity": 36.0891934166058,
+      "estimated_price": 100.0,
+      "estimated_value": 3608.91934166058,
+      "allocation_pct": 2.8075605160949744
+    },
+    {
+      "symbol": "QSR",
+      "quantity": 30.36543702606879,
+      "estimated_price": 100.0,
+      "estimated_value": 3036.543702606879,
+      "allocation_pct": 2.3622806158125877
+    }
+  ],
+  "strategy_name": "Conviction Strategy",
+  "max_positions": 10,
+  "approved_at": null,
+  "approved_by": null,
+  "notes": null
+}

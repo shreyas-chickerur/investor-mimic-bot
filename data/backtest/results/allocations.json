@@ -1,0 +1,105 @@
+{
+  "2025-01-01": [],
+  "2025-01-31": [],
+  "2025-03-03": [],
+  "2025-04-01": [],
+  "2025-05-01": [],
+  "2025-06-02": [],
+  "2025-06-30": [],
+  "2025-07-30": [],
+  "2025-08-29": [],
+  "2025-09-29": [],
+  "2025-10-28": [],
+  "2025-11-27": [
+    {
+      "ticker": "732908108",
+      "security_name": "PONY AI INC",
+      "raw_conviction": 0.2024634170236576,
+      "normalized_weight": 0.2237838147178769,
+      "investor_count": 1,
+      "investors": [
+        "Tiger Global Management"
+      ]
+    },
+    {
+      "ticker": "349381103",
+      "security_name": "FIGURE TECHNOLOGY SOLUTIO",
+      "raw_conviction": 0.17698182921299382,
+      "normalized_weight": 0.19561888986790965,
+      "investor_count": 1,
+      "investors": [
+        "Tiger Global Management"
+      ]
+    },
+    {
+      "ticker": "G5279N105",
+      "security_name": "KLARNA GROUP PLC",
+      "raw_conviction": 0.15605130699956546,
+      "normalized_weight": 0.1724842802983648,
+      "investor_count": 1,
+      "investors": [
+        "Tiger Global Management"
+      ]
+    },
+    {
+      "ticker": "G16910120",
+      "security_name": "BULLISH",
+      "raw_conviction": 0.15476786027273215,
+      "normalized_weight": 0.1710656802927926,
+      "investor_count": 1,
+      "investors": [
+        "Tiger Global Management"
+      ]
+    },
+    {
+      "ticker": "316841105",
+      "security_name": "FIGMA INC",
+      "raw_conviction": 0.07572214034598286,
+      "normalized_weight": 0.08369605568420517,
+      "investor_count": 1,
+      "investors": [
+        "Tiger Global Management"
+      ]
+    },
+    {
+      "ticker": "89679E300",
+      "security_name": "TRIUMPH FINANCIAL INC",
+      "raw_conviction": 0.053214937283412284,
+      "normalized_weight": 0.05881873298554012,
+      "investor_count": 1,
+      "investors": [
+        "Tiger Global Management"
+      ]
+    },
+    {
+      "ticker": "36866J105",
+      "security_name": "GEMINI SPACE STA INC",
+      "raw_conviction": 0.04080752322738978,
+      "normalized_weight": 0.04510475695442096,
+      "investor_count": 1,
+      "investors": [
+        "Tiger Global Management"
+      ]
+    },
+    {
+      "ticker": "G00894108",
+      "security_name": "ACCELERANT HOLDINGS",
+      "raw_conviction": 0.027171357956229148,
+      "normalized_weight": 0.0300326361369244,
+      "investor_count": 1,
+      "investors": [
+        "Tiger Global Management"
+      ]
+    },
+    {
+      "ticker": "92556W104",
+      "security_name": "VIA TRANSN INC",
+      "raw_conviction": 0.017547332310752152,
+      "normalized_weight": 0.019395153061965417,
+      "investor_count": 1,
+      "investors": [
+        "Tiger Global Management"
+      ]
+    }
+  ]
+}

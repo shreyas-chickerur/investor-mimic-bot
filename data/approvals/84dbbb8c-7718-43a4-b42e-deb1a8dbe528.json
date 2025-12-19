@@ -1,0 +1,37 @@
+{
+  "request_id": "84dbbb8c-7718-43a4-b42e-deb1a8dbe528",
+  "created_at": "2025-12-18T05:10:45.161407",
+  "expires_at": "2025-12-19T05:10:45.161336",
+  "status": "PENDING",
+  "total_investment": 7537.63,
+  "cash_buffer": 1000.0,
+  "available_cash": 10000.0,
+  "trades": [
+    {
+      "symbol": "AAPL",
+      "quantity": 10.5,
+      "estimated_price": 185.5,
+      "estimated_value": 1947.75,
+      "allocation_pct": 40.0
+    },
+    {
+      "symbol": "GOOGL",
+      "quantity": 5.2,
+      "estimated_price": 142.3,
+      "estimated_value": 739.96,
+      "allocation_pct": 15.0
+    },
+    {
+      "symbol": "MSFT",
+      "quantity": 12.8,
+      "estimated_price": 378.9,
+      "estimated_value": 4849.92,
+      "allocation_pct": 45.0
+    }
+  ],
+  "strategy_name": "Conviction Strategy",
+  "max_positions": 10,
+  "approved_at": null,
+  "approved_by": null,
+  "notes": null
+}

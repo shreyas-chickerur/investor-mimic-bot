@@ -1,0 +1,19 @@
+{
+  "start": "2025-01-01",
+  "end": "2025-12-17",
+  "initial_capital": 1000000.0,
+  "final_value": 969974.169355097,
+  "total_return": -0.03002583064490305,
+  "cagr": -0.03131340313662845,
+  "annualized_volatility": 0.02474759574257093,
+  "sharpe": -1.2653109199922394,
+  "max_drawdown": -0.03002583064490305,
+  "rebalance_days": 30,
+  "lookback_days": 365,
+  "half_life_days": 90,
+  "max_positions": 10,
+  "txn_cost_bps": 10.0,
+  "used_synthetic_prices": true,
+  "unique_tickers": 9,
+  "trades": 9
+}

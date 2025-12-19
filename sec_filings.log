@@ -1,0 +1,114 @@
+2025-12-17 02:35:47,546 - __main__ - INFO - Starting 13F holdings fetch
+2025-12-17 02:35:47,546 - services.sec.client - INFO - Fetching holdings for Berkshire Hathaway (CIK: 0001067983)
+2025-12-17 02:35:47,725 - services.sec.client - ERROR - Failed to fetch JSON https://data.sec.gov/submissions/CIK0001067983.json: Cannot connect to host data.sec.gov:443 ssl:True [SSLCertVerificationError: (1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1108)')]
+2025-12-17 02:35:47,725 - services.sec.client - ERROR - Error fetching filings for CIK 0001067983: Cannot connect to host data.sec.gov:443 ssl:True [SSLCertVerificationError: (1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1108)')]
+2025-12-17 02:35:48,126 - services.sec.client - INFO - Fetching holdings for Pershing Square Capital Management (CIK: 0001336528)
+2025-12-17 02:35:48,190 - services.sec.client - ERROR - Failed to fetch JSON https://data.sec.gov/submissions/CIK0001336528.json: Cannot connect to host data.sec.gov:443 ssl:True [SSLCertVerificationError: (1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1108)')]
+2025-12-17 02:35:48,191 - services.sec.client - ERROR - Error fetching filings for CIK 0001336528: Cannot connect to host data.sec.gov:443 ssl:True [SSLCertVerificationError: (1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1108)')]
+2025-12-17 02:35:48,592 - services.sec.client - INFO - Fetching holdings for Bridgewater Associates (CIK: 0001350694)
+2025-12-17 02:35:48,651 - services.sec.client - ERROR - Failed to fetch JSON https://data.sec.gov/submissions/CIK0001350694.json: Cannot connect to host data.sec.gov:443 ssl:True [SSLCertVerificationError: (1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1108)')]
+2025-12-17 02:35:48,652 - services.sec.client - ERROR - Error fetching filings for CIK 0001350694: Cannot connect to host data.sec.gov:443 ssl:True [SSLCertVerificationError: (1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1108)')]
+2025-12-17 02:35:49,052 - services.sec.client - INFO - Fetching holdings for Tiger Global Management (CIK: 0001167483)
+2025-12-17 02:35:49,121 - services.sec.client - ERROR - Failed to fetch JSON https://data.sec.gov/submissions/CIK0001167483.json: Cannot connect to host data.sec.gov:443 ssl:True [SSLCertVerificationError: (1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1108)')]
+2025-12-17 02:35:49,121 - services.sec.client - ERROR - Error fetching filings for CIK 0001167483: Cannot connect to host data.sec.gov:443 ssl:True [SSLCertVerificationError: (1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1108)')]
+2025-12-17 02:35:49,521 - services.sec.client - INFO - Fetching holdings for Renaissance Technologies (CIK: 0001037389)
+2025-12-17 02:35:49,588 - services.sec.client - ERROR - Failed to fetch JSON https://data.sec.gov/submissions/CIK0001037389.json: Cannot connect to host data.sec.gov:443 ssl:True [SSLCertVerificationError: (1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1108)')]
+2025-12-17 02:35:49,588 - services.sec.client - ERROR - Error fetching filings for CIK 0001037389: Cannot connect to host data.sec.gov:443 ssl:True [SSLCertVerificationError: (1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1108)')]
+2025-12-17 02:35:49,989 - services.sec.client - INFO - Fetching holdings for D1 Capital Partners (CIK: 0001732419)
+2025-12-17 02:35:50,053 - services.sec.client - ERROR - Failed to fetch JSON https://data.sec.gov/submissions/CIK0001732419.json: Cannot connect to host data.sec.gov:443 ssl:True [SSLCertVerificationError: (1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1108)')]
+2025-12-17 02:35:50,054 - services.sec.client - ERROR - Error fetching filings for CIK 0001732419: Cannot connect to host data.sec.gov:443 ssl:True [SSLCertVerificationError: (1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1108)')]
+2025-12-17 02:35:50,454 - services.sec.client - INFO - Fetching holdings for Viking Global Investors (CIK: 0001029159)
+2025-12-17 02:35:50,522 - services.sec.client - ERROR - Failed to fetch JSON https://data.sec.gov/submissions/CIK0001029159.json: Cannot connect to host data.sec.gov:443 ssl:True [SSLCertVerificationError: (1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1108)')]
+2025-12-17 02:35:50,523 - services.sec.client - ERROR - Error fetching filings for CIK 0001029159: Cannot connect to host data.sec.gov:443 ssl:True [SSLCertVerificationError: (1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1108)')]
+2025-12-17 02:35:50,924 - __main__ - INFO - Completed 13F holdings fetch
+2025-12-17 02:37:31,588 - __main__ - INFO - Starting 13F holdings fetch
+2025-12-17 02:37:31,610 - services.sec.client - INFO - Fetching holdings for Berkshire Hathaway (CIK: 0001067983)
+2025-12-17 02:37:31,977 - services.sec.client - ERROR - Failed to fetch JSON https://www.sec.gov/Archives/edgar/data/1067983/000119312525282901/index.json: 0, message='Attempt to decode JSON with unexpected mimetype: text/html', url=URL('https://www.sec.gov/Archives/edgar/data/1067983/000119312525282901/index.json')
+2025-12-17 02:37:31,977 - services.sec.client - ERROR - Error parsing 13F filing index https://www.sec.gov/Archives/edgar/data/1067983/000119312525282901/index.json: 0, message='Attempt to decode JSON with unexpected mimetype: text/html', url=URL('https://www.sec.gov/Archives/edgar/data/1067983/000119312525282901/index.json')
+2025-12-17 02:37:32,379 - services.sec.client - INFO - Fetching holdings for Pershing Square Capital Management (CIK: 0001336528)
+2025-12-17 02:37:32,611 - services.sec.client - ERROR - Failed to fetch JSON https://www.sec.gov/Archives/edgar/data/1336528/000117266125005039/index.json: 0, message='Attempt to decode JSON with unexpected mimetype: text/html', url=URL('https://www.sec.gov/Archives/edgar/data/1336528/000117266125005039/index.json')
+2025-12-17 02:37:32,611 - services.sec.client - ERROR - Error parsing 13F filing index https://www.sec.gov/Archives/edgar/data/1336528/000117266125005039/index.json: 0, message='Attempt to decode JSON with unexpected mimetype: text/html', url=URL('https://www.sec.gov/Archives/edgar/data/1336528/000117266125005039/index.json')
+2025-12-17 02:37:33,012 - services.sec.client - INFO - Fetching holdings for Bridgewater Associates (CIK: 0001350694)
+2025-12-17 02:37:33,262 - services.sec.client - ERROR - Failed to fetch JSON https://www.sec.gov/Archives/edgar/data/1350694/000117266125004777/index.json: 0, message='Attempt to decode JSON with unexpected mimetype: text/html', url=URL('https://www.sec.gov/Archives/edgar/data/1350694/000117266125004777/index.json')
+2025-12-17 02:37:33,263 - services.sec.client - ERROR - Error parsing 13F filing index https://www.sec.gov/Archives/edgar/data/1350694/000117266125004777/index.json: 0, message='Attempt to decode JSON with unexpected mimetype: text/html', url=URL('https://www.sec.gov/Archives/edgar/data/1350694/000117266125004777/index.json')
+2025-12-17 02:37:33,664 - services.sec.client - INFO - Fetching holdings for Tiger Global Management (CIK: 0001167483)
+2025-12-17 02:37:33,866 - services.sec.client - ERROR - Failed to fetch JSON https://www.sec.gov/Archives/edgar/data/1167483/000091957425006931/index.json: 0, message='Attempt to decode JSON with unexpected mimetype: text/html', url=URL('https://www.sec.gov/Archives/edgar/data/1167483/000091957425006931/index.json')
+2025-12-17 02:37:33,866 - services.sec.client - ERROR - Error parsing 13F filing index https://www.sec.gov/Archives/edgar/data/1167483/000091957425006931/index.json: 0, message='Attempt to decode JSON with unexpected mimetype: text/html', url=URL('https://www.sec.gov/Archives/edgar/data/1167483/000091957425006931/index.json')
+2025-12-17 02:37:34,268 - services.sec.client - INFO - Fetching holdings for Renaissance Technologies (CIK: 0001037389)
+2025-12-17 02:37:34,406 - services.sec.client - ERROR - Failed to fetch JSON https://www.sec.gov/Archives/edgar/data/1037389/000103738925000064/index.json: 0, message='Attempt to decode JSON with unexpected mimetype: text/html', url=URL('https://www.sec.gov/Archives/edgar/data/1037389/000103738925000064/index.json')
+2025-12-17 02:37:34,406 - services.sec.client - ERROR - Error parsing 13F filing index https://www.sec.gov/Archives/edgar/data/1037389/000103738925000064/index.json: 0, message='Attempt to decode JSON with unexpected mimetype: text/html', url=URL('https://www.sec.gov/Archives/edgar/data/1037389/000103738925000064/index.json')
+2025-12-17 02:37:34,807 - services.sec.client - INFO - Fetching holdings for D1 Capital Partners (CIK: 0001732419)
+2025-12-17 02:37:35,293 - services.sec.client - INFO - Fetching holdings for Viking Global Investors (CIK: 0001029159)
+2025-12-17 02:37:35,787 - __main__ - INFO - Completed 13F holdings fetch
+2025-12-17 02:39:17,377 - __main__ - INFO - Starting 13F holdings fetch
+2025-12-17 02:39:17,392 - services.sec.client - INFO - Fetching holdings for Berkshire Hathaway (CIK: 0001067983)
+2025-12-17 02:39:19,505 - services.sec.client - INFO - Fetching holdings for Pershing Square Capital Management (CIK: 0001336528)
+2025-12-17 02:39:20,124 - services.sec.client - INFO - Fetching holdings for Bridgewater Associates (CIK: 0001350694)
+2025-12-17 02:39:21,976 - services.sec.client - INFO - Fetching holdings for Tiger Global Management (CIK: 0001167483)
+2025-12-17 02:39:22,726 - services.sec.client - INFO - Fetching holdings for Renaissance Technologies (CIK: 0001037389)
+2025-12-17 02:39:28,026 - services.sec.client - INFO - Fetching holdings for D1 Capital Partners (CIK: 0001732419)
+2025-12-17 02:39:28,543 - services.sec.client - INFO - Fetching holdings for Viking Global Investors (CIK: 0001029159)
+2025-12-17 02:39:29,099 - __main__ - INFO - Saved 115 holdings for Berkshire Hathaway to data/13f_holdings/Berkshire_Hathaway_20251217_083929_holdings.csv
+2025-12-17 02:39:29,102 - __main__ - INFO - Saved 11 holdings for Pershing Square Capital Management to data/13f_holdings/Pershing_Square_Capital_Management_20251217_083929_holdings.csv
+2025-12-17 02:39:29,115 - __main__ - INFO - Saved 1014 holdings for Bridgewater Associates to data/13f_holdings/Bridgewater_Associates_20251217_083929_holdings.csv
+2025-12-17 02:39:29,119 - __main__ - INFO - Saved 56 holdings for Tiger Global Management to data/13f_holdings/Tiger_Global_Management_20251217_083929_holdings.csv
+2025-12-17 02:39:29,157 - __main__ - INFO - Saved 3457 holdings for Renaissance Technologies to data/13f_holdings/Renaissance_Technologies_20251217_083929_holdings.csv
+2025-12-17 02:39:29,158 - __main__ - INFO - Completed 13F holdings fetch
+2025-12-17 03:36:03,175 - __main__ - INFO - Starting 13F holdings fetch
+2025-12-17 03:36:03,190 - services.sec.client - INFO - Fetching holdings for Berkshire Hathaway (CIK: 0001067983)
+2025-12-17 03:36:05,614 - services.sec.client - INFO - Fetching holdings for Pershing Square Capital Management (CIK: 0001336528)
+2025-12-17 03:36:07,465 - services.sec.client - INFO - Fetching holdings for Bridgewater Associates (CIK: 0001350694)
+2025-12-17 03:36:13,553 - services.sec.client - INFO - Fetching holdings for Tiger Global Management (CIK: 0001167483)
+2025-12-17 03:36:16,794 - services.sec.client - INFO - Fetching holdings for Renaissance Technologies (CIK: 0001037389)
+2025-12-17 03:36:38,414 - services.sec.client - INFO - Fetching holdings for D1 Capital Partners (CIK: 0001732419)
+2025-12-17 03:36:39,062 - services.sec.client - INFO - Fetching holdings for Viking Global Investors (CIK: 0001029159)
+2025-12-17 03:36:39,577 - __main__ - INFO - Saved 115 holdings for Berkshire Hathaway to data/13f_holdings/Berkshire_Hathaway_20251217_093639_570373_0001193125-25-282901_holdings.csv
+2025-12-17 03:36:39,581 - __main__ - INFO - Saved 114 holdings for Berkshire Hathaway to data/13f_holdings/Berkshire_Hathaway_20251217_093639_577426_0000950123-25-008343_holdings.csv
+2025-12-17 03:36:39,585 - __main__ - INFO - Saved 110 holdings for Berkshire Hathaway to data/13f_holdings/Berkshire_Hathaway_20251217_093639_581707_0000950123-25-005701_holdings.csv
+2025-12-17 03:36:39,589 - __main__ - INFO - Saved 112 holdings for Berkshire Hathaway to data/13f_holdings/Berkshire_Hathaway_20251217_093639_585841_0000950123-25-002701_holdings.csv
+2025-12-17 03:36:39,592 - __main__ - INFO - Saved 11 holdings for Pershing Square Capital Management to data/13f_holdings/Pershing_Square_Capital_Management_20251217_093639_589742_0001172661-25-005039_holdings.csv
+2025-12-17 03:36:39,595 - __main__ - INFO - Saved 11 holdings for Pershing Square Capital Management to data/13f_holdings/Pershing_Square_Capital_Management_20251217_093639_592937_0001172661-25-003509_holdings.csv
+2025-12-17 03:36:39,599 - __main__ - INFO - Saved 11 holdings for Pershing Square Capital Management to data/13f_holdings/Pershing_Square_Capital_Management_20251217_093639_595955_0001172661-25-002315_holdings.csv
+2025-12-17 03:36:39,602 - __main__ - INFO - Saved 10 holdings for Pershing Square Capital Management to data/13f_holdings/Pershing_Square_Capital_Management_20251217_093639_599650_0001172661-25-001119_holdings.csv
+2025-12-17 03:36:39,616 - __main__ - INFO - Saved 1014 holdings for Bridgewater Associates to data/13f_holdings/Bridgewater_Associates_20251217_093639_602875_0001172661-25-004777_holdings.csv
+2025-12-17 03:36:39,625 - __main__ - INFO - Saved 585 holdings for Bridgewater Associates to data/13f_holdings/Bridgewater_Associates_20251217_093639_616370_0001172661-25-003151_holdings.csv
+2025-12-17 03:36:39,636 - __main__ - INFO - Saved 664 holdings for Bridgewater Associates to data/13f_holdings/Bridgewater_Associates_20251217_093639_625347_0001172661-25-001828_holdings.csv
+2025-12-17 03:36:39,646 - __main__ - INFO - Saved 691 holdings for Bridgewater Associates to data/13f_holdings/Bridgewater_Associates_20251217_093639_636241_0001172661-25-000823_holdings.csv
+2025-12-17 03:36:39,650 - __main__ - INFO - Saved 56 holdings for Tiger Global Management to data/13f_holdings/Tiger_Global_Management_20251217_093639_646975_0000919574-25-006931_holdings.csv
+2025-12-17 03:36:39,654 - __main__ - INFO - Saved 50 holdings for Tiger Global Management to data/13f_holdings/Tiger_Global_Management_20251217_093639_650799_0000919574-25-004870_holdings.csv
+2025-12-17 03:36:39,658 - __main__ - INFO - Saved 45 holdings for Tiger Global Management to data/13f_holdings/Tiger_Global_Management_20251217_093639_654174_0000919574-25-003217_holdings.csv
+2025-12-17 03:36:39,662 - __main__ - INFO - Saved 49 holdings for Tiger Global Management to data/13f_holdings/Tiger_Global_Management_20251217_093639_658324_0000919574-25-001475_holdings.csv
+2025-12-17 03:36:39,709 - __main__ - INFO - Saved 3457 holdings for Renaissance Technologies to data/13f_holdings/Renaissance_Technologies_20251217_093639_662386_0001037389-25-000064_holdings.csv
+2025-12-17 03:36:39,757 - __main__ - INFO - Saved 3522 holdings for Renaissance Technologies to data/13f_holdings/Renaissance_Technologies_20251217_093639_710240_0001037389-25-000034_holdings.csv
+2025-12-17 03:36:39,812 - __main__ - INFO - Saved 3406 holdings for Renaissance Technologies to data/13f_holdings/Renaissance_Technologies_20251217_093639_757664_0001037389-25-000023_holdings.csv
+2025-12-17 03:36:39,889 - __main__ - INFO - Saved 3533 holdings for Renaissance Technologies to data/13f_holdings/Renaissance_Technologies_20251217_093639_813014_0001037389-25-000009_holdings.csv
+2025-12-17 03:36:39,890 - __main__ - INFO - Completed 13F holdings fetch
+2025-12-17 23:03:40,058 - __main__ - INFO - Starting 13F holdings fetch
+2025-12-17 23:03:40,073 - services.sec.client - INFO - Fetching holdings for Berkshire Hathaway (CIK: 0001067983)
+2025-12-17 23:03:42,735 - services.sec.client - INFO - Fetching holdings for Pershing Square Capital Management (CIK: 0001336528)
+2025-12-17 23:03:44,957 - services.sec.client - INFO - Fetching holdings for Bridgewater Associates (CIK: 0001350694)
+2025-12-17 23:03:50,622 - services.sec.client - INFO - Fetching holdings for Tiger Global Management (CIK: 0001167483)
+2025-12-17 23:03:52,523 - services.sec.client - INFO - Fetching holdings for Renaissance Technologies (CIK: 0001037389)
+2025-12-17 23:04:13,094 - services.sec.client - INFO - Fetching holdings for D1 Capital Partners (CIK: 0001732419)
+2025-12-17 23:04:13,671 - services.sec.client - INFO - Fetching holdings for Viking Global Investors (CIK: 0001029159)
+2025-12-17 23:04:14,217 - __main__ - INFO - Saved 115 holdings for Berkshire Hathaway to data/13f_holdings/Berkshire_Hathaway_20251218_050414_208904_0001193125-25-282901_holdings.csv
+2025-12-17 23:04:14,222 - __main__ - INFO - Saved 114 holdings for Berkshire Hathaway to data/13f_holdings/Berkshire_Hathaway_20251218_050414_218136_0000950123-25-008343_holdings.csv
+2025-12-17 23:04:14,226 - __main__ - INFO - Saved 110 holdings for Berkshire Hathaway to data/13f_holdings/Berkshire_Hathaway_20251218_050414_222775_0000950123-25-005701_holdings.csv
+2025-12-17 23:04:14,231 - __main__ - INFO - Saved 112 holdings for Berkshire Hathaway to data/13f_holdings/Berkshire_Hathaway_20251218_050414_226943_0000950123-25-002701_holdings.csv
+2025-12-17 23:04:14,235 - __main__ - INFO - Saved 11 holdings for Pershing Square Capital Management to data/13f_holdings/Pershing_Square_Capital_Management_20251218_050414_232064_0001172661-25-005039_holdings.csv
+2025-12-17 23:04:14,238 - __main__ - INFO - Saved 11 holdings for Pershing Square Capital Management to data/13f_holdings/Pershing_Square_Capital_Management_20251218_050414_235449_0001172661-25-003509_holdings.csv
+2025-12-17 23:04:14,241 - __main__ - INFO - Saved 11 holdings for Pershing Square Capital Management to data/13f_holdings/Pershing_Square_Capital_Management_20251218_050414_238933_0001172661-25-002315_holdings.csv
+2025-12-17 23:04:14,245 - __main__ - INFO - Saved 10 holdings for Pershing Square Capital Management to data/13f_holdings/Pershing_Square_Capital_Management_20251218_050414_242061_0001172661-25-001119_holdings.csv
+2025-12-17 23:04:14,258 - __main__ - INFO - Saved 1014 holdings for Bridgewater Associates to data/13f_holdings/Bridgewater_Associates_20251218_050414_245659_0001172661-25-004777_holdings.csv
+2025-12-17 23:04:14,268 - __main__ - INFO - Saved 585 holdings for Bridgewater Associates to data/13f_holdings/Bridgewater_Associates_20251218_050414_259141_0001172661-25-003151_holdings.csv
+2025-12-17 23:04:14,279 - __main__ - INFO - Saved 664 holdings for Bridgewater Associates to data/13f_holdings/Bridgewater_Associates_20251218_050414_268500_0001172661-25-001828_holdings.csv
+2025-12-17 23:04:14,291 - __main__ - INFO - Saved 691 holdings for Bridgewater Associates to data/13f_holdings/Bridgewater_Associates_20251218_050414_279785_0001172661-25-000823_holdings.csv
+2025-12-17 23:04:14,301 - __main__ - INFO - Saved 56 holdings for Tiger Global Management to data/13f_holdings/Tiger_Global_Management_20251218_050414_291306_0000919574-25-006931_holdings.csv
+2025-12-17 23:04:14,370 - __main__ - INFO - Saved 50 holdings for Tiger Global Management to data/13f_holdings/Tiger_Global_Management_20251218_050414_301582_0000919574-25-004870_holdings.csv
+2025-12-17 23:04:14,381 - __main__ - INFO - Saved 45 holdings for Tiger Global Management to data/13f_holdings/Tiger_Global_Management_20251218_050414_371603_0000919574-25-003217_holdings.csv
+2025-12-17 23:04:14,387 - __main__ - INFO - Saved 49 holdings for Tiger Global Management to data/13f_holdings/Tiger_Global_Management_20251218_050414_381496_0000919574-25-001475_holdings.csv
+2025-12-17 23:04:14,473 - __main__ - INFO - Saved 3457 holdings for Renaissance Technologies to data/13f_holdings/Renaissance_Technologies_20251218_050414_388084_0001037389-25-000064_holdings.csv
+2025-12-17 23:04:14,552 - __main__ - INFO - Saved 3522 holdings for Renaissance Technologies to data/13f_holdings/Renaissance_Technologies_20251218_050414_473881_0001037389-25-000034_holdings.csv
+2025-12-17 23:04:14,621 - __main__ - INFO - Saved 3406 holdings for Renaissance Technologies to data/13f_holdings/Renaissance_Technologies_20251218_050414_552458_0001037389-25-000023_holdings.csv
+2025-12-17 23:04:14,663 - __main__ - INFO - Saved 3533 holdings for Renaissance Technologies to data/13f_holdings/Renaissance_Technologies_20251218_050414_621546_0001037389-25-000009_holdings.csv
+2025-12-17 23:04:14,664 - __main__ - INFO - Completed 13F holdings fetch
