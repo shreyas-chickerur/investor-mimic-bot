@@ -4,8 +4,6 @@ Advanced Feature Engineering
 Creates sophisticated features for ML models to improve prediction accuracy.
 """
 
-from typing import Dict, List
-
 import numpy as np
 import pandas as pd
 

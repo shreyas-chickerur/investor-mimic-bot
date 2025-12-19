@@ -5,7 +5,7 @@ News API Service - Fetch financial news from multiple sources.
 import logging
 import os
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, List, Optional
 
 import requests

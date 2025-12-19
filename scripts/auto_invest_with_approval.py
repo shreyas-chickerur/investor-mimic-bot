@@ -15,9 +15,7 @@ Usage:
 
 import argparse
 import asyncio
-import logging
 import sys
-import time
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path

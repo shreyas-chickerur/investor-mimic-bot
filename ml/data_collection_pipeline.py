@@ -6,11 +6,9 @@ Collects comprehensive data from multiple sources for ML training.
 
 import requests
 import pandas as pd
-import numpy as np
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from utils.enhanced_logging import get_logger
-from utils.cache import cached
 from utils.rate_limiter import RateLimiter
 from db.connection_pool import get_db_session
 
@@ -279,10 +277,10 @@ class EnhancedDataCollector:
                 try:
                     session.execute(
                         """
-                        INSERT INTO news_articles 
-                        (ticker, source, title, content, sentiment_score, sentiment_label, 
+                        INSERT INTO news_articles
+                        (ticker, source, title, content, sentiment_score, sentiment_label,
                          published_at, relevance_score)
-                        VALUES (:ticker, :source, :title, :content, :sentiment_score, 
+                        VALUES (:ticker, :source, :title, :content, :sentiment_score,
                                 :sentiment_label, :published_at, :relevance_score)
                         ON CONFLICT DO NOTHING
                         """,
@@ -302,14 +300,14 @@ class EnhancedDataCollector:
             try:
                 session.execute(
                     """
-                    INSERT INTO fundamentals 
+                    INSERT INTO fundamentals
                     (ticker, quarter, revenue, net_income, eps, revenue_growth, earnings_growth,
-                     profit_margin, roe, debt_to_equity, pe_ratio, pb_ratio, ps_ratio, 
+                     profit_margin, roe, debt_to_equity, pe_ratio, pb_ratio, ps_ratio,
                      peg_ratio, dividend_yield)
                     VALUES (:ticker, :quarter, :revenue, :net_income, :eps, :revenue_growth,
-                            :earnings_growth, :profit_margin, :roe, :debt_to_equity, 
+                            :earnings_growth, :profit_margin, :roe, :debt_to_equity,
                             :pe_ratio, :pb_ratio, :ps_ratio, :peg_ratio, :dividend_yield)
-                    ON CONFLICT (ticker, quarter) 
+                    ON CONFLICT (ticker, quarter)
                     DO UPDATE SET
                         revenue = EXCLUDED.revenue,
                         net_income = EXCLUDED.net_income,
@@ -337,7 +335,7 @@ class EnhancedDataCollector:
             try:
                 session.execute(
                     """
-                    INSERT INTO data_collection_status 
+                    INSERT INTO data_collection_status
                     (data_source, last_collection_time, records_collected, status, error_message)
                     VALUES (:source, :time, :records, :status, :error)
                     """,

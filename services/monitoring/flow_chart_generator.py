@@ -75,24 +75,24 @@ def generate_flow_chart_html(causality_data: Dict) -> str:
                 Signal Score: {signal_score:.2f} | Analyzed: {datetime.now().strftime('%Y-%m-%d %H:%M')}
             </p>
         </div>
-        
+
         <div class="flow-chart">
             {steps_html}
         </div>
-        
+
         <div style="margin-top: 16px; padding: 12px; background: #f8f9fa; border-radius: 6px;">
             <p style="color: #7f8c8d; font-size: 11px; margin: 0; line-height: 1.4;">
-                Click on any step to view detailed reasoning. Analysis based on real-time data from news sources, 
+                Click on any step to view detailed reasoning. Analysis based on real-time data from news sources,
                 SEC filings, earnings reports, and technical indicators.
             </p>
         </div>
     </div>
-    
+
     <script>
         function toggleDetails(stepNum) {{
             var details = document.getElementById('details-' + stepNum);
             var arrow = document.getElementById('arrow-' + stepNum);
-            
+
             if (details.style.display === 'none') {{
                 details.style.display = 'block';
                 arrow.textContent = '▲';
@@ -126,7 +126,7 @@ def generate_all_flow_charts(recommendations: List[Dict]) -> str:
             Recommendation Analysis
         </h2>
         <p style="color: #7f8c8d; font-size: 13px; margin: 0 0 16px 0;">
-            Detailed causal analysis for each recommendation showing the chain of events 
+            Detailed causal analysis for each recommendation showing the chain of events
             and factors that led to our system's decision.
         </p>
     """

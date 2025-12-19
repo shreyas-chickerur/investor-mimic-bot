@@ -3,10 +3,8 @@ Technical Indicators Service - Calculate RSI, MACD, Moving Averages, etc.
 """
 
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
-import numpy as np
 import pandas as pd
 
 logger = logging.getLogger(__name__)

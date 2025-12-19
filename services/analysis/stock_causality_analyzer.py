@@ -8,7 +8,7 @@ a comprehensive flow chart of factors affecting stock price.
 
 import requests
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from dataclasses import dataclass
 from utils.enhanced_logging import get_logger
 from utils.environment import env
@@ -211,7 +211,7 @@ class StockCausalityAnalyzer:
         try:
             with get_db_session() as session:
                 query = """
-                    SELECT 
+                    SELECT
                         transaction_date,
                         insider_name,
                         transaction_type,
@@ -256,7 +256,7 @@ class StockCausalityAnalyzer:
         try:
             with get_db_session() as session:
                 query = """
-                    SELECT 
+                    SELECT
                         filing_date,
                         investor_name,
                         shares,
@@ -307,7 +307,7 @@ class StockCausalityAnalyzer:
         try:
             with get_db_session() as session:
                 query = """
-                    SELECT 
+                    SELECT
                         date,
                         rsi_14,
                         macd,
@@ -327,8 +327,8 @@ class StockCausalityAnalyzer:
                     rsi = float(row[1] or 50)
                     macd = float(row[2] or 0)
                     macd_signal = float(row[3] or 0)
-                    adx = float(row[4] or 0)
-                    volume_ratio = float(row[5] or 1)
+                    float(row[4] or 0)
+                    float(row[5] or 1)
 
                     # RSI signals
                     if rsi > 70:
@@ -382,7 +382,7 @@ class StockCausalityAnalyzer:
         try:
             with get_db_session() as session:
                 query = """
-                    SELECT 
+                    SELECT
                         date,
                         close,
                         volume,

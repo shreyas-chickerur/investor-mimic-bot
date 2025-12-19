@@ -416,3 +416,11 @@
 2025-12-18 19:52:23,126 - services.paper_trading - WARNING - _log_to_database:84 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
 2025-12-18 19:52:23,126 - services.paper_trading - INFO - info:92 - Paper BUY: 100.0 AAPL @ $150.00
 2025-12-18 19:52:23,126 - services.paper_trading - WARNING - _log_to_database:84 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 20:20:54,416 - db.connection_pool - INFO - info:90 - Database connection pool initialized
+2025-12-18 20:20:54,638 - db.connection_pool - WARNING - _log_to_database:82 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 20:20:54,639 - db.connection_pool - ERROR - error:104 - Database session error: Textual SQL expression 'SELECT 1' should be explicitly declared as text('SELECT 1')
+2025-12-18 20:20:54,639 - db.connection_pool - WARNING - _log_to_database:82 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 20:21:02,461 - db.connection_pool - INFO - info:90 - Database connection pool initialized
+2025-12-18 20:21:02,676 - db.connection_pool - WARNING - _log_to_database:82 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 20:21:02,677 - db.connection_pool - ERROR - error:104 - Database session error: greenlet_spawn has not been called; can't call await_only() here. Was IO attempted in an unexpected place? (Background on this error at: https://sqlalche.me/e/20/xd2s)
+2025-12-18 20:21:02,677 - db.connection_pool - WARNING - _log_to_database:82 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
