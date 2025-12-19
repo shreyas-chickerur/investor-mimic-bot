@@ -7,9 +7,37 @@
 ## Getting Started
 
 ### New Users Start Here
-1. **[README](../README.md)** - Quick start and feature overview
-2. **[Complete System Guide](COMPLETE_SYSTEM_GUIDE.md)** - Comprehensive system overview
-3. **[Deployment Guide](DEPLOYMENT_READY.md)** - Production deployment checklist
+1. **[User Action Items](user-actions/USER_ACTION_ITEMS.md)** - Complete setup checklist (START HERE)
+2. **[README](../README.md)** - Quick start and feature overview
+3. **[Complete System Guide](COMPLETE_SYSTEM_GUIDE.md)** - Comprehensive system overview
+4. **[Deployment Guide](DEPLOYMENT_READY.md)** - Production deployment checklist
+
+---
+
+## 📋 User Actions & Setup
+
+**Everything you need to do:** [user-actions/](user-actions/)
+
+- **[USER_ACTION_ITEMS.md](user-actions/USER_ACTION_ITEMS.md)** - Complete setup checklist (7 phases)
+- **[GITHUB_BRANCH_PROTECTION_SETUP.md](user-actions/GITHUB_BRANCH_PROTECTION_SETUP.md)** - CI/CD configuration
+- **[WEB_DASHBOARD_SETUP_GUIDE.md](user-actions/WEB_DASHBOARD_SETUP_GUIDE.md)** - Dashboard setup
+- **[SYSTEM_ANALYSIS_AND_GAPS.md](user-actions/SYSTEM_ANALYSIS_AND_GAPS.md)** - System analysis & gaps
+
+---
+
+## 🚀 Features Documentation
+
+**All feature guides:** [features/](features/)
+
+- **[Advanced Features Guide](features/ADVANCED_FEATURES_GUIDE.md)** - Stop-loss, rebalancing, regime detection
+- **[Daily Digest Guide](features/DAILY_DIGEST_GUIDE.md)** - Morning Brew style email digest
+- **[Stock Causality Flow Charts](features/STOCK_CAUSALITY_FLOW_CHARTS.md)** - Recommendation explanations
+- **[Continuous Learning Guide](features/CONTINUOUS_LEARNING_GUIDE.md)** - ML training & retraining
+- **[Multi-Signal System](features/MULTI_SIGNAL_SYSTEM.md)** - Signal generation and combination
+- **[Selective Approval](features/SELECTIVE_APPROVAL.md)** - Trade approval workflow
+- **[Factor Interactions](features/FACTOR_INTERACTIONS.md)** - How factors work together
+- **[Profit-Maximizing System](features/PROFIT_MAXIMIZING_SYSTEM.md)** - 8-factor system details
+- **[Setup Email Approval](features/SETUP_EMAIL_APPROVAL.md)** - Email configuration
 
 ---
 
@@ -17,22 +45,21 @@
 
 ### System Architecture
 - **[Complete System Guide](COMPLETE_SYSTEM_GUIDE.md)** - Full system architecture and workflow
-- **[Profit-Maximizing System](PROFIT_MAXIMIZING_SYSTEM.md)** - 8-factor system details
-- **[Multi-Signal System](MULTI_SIGNAL_SYSTEM.md)** - Signal generation and combination
+- **[System Overview](SYSTEM_OVERVIEW.md)** - High-level architecture
+- **[Web Dashboard Architecture](WEB_DASHBOARD_ARCHITECTURE.md)** - Dashboard design
 
 ### Performance & Optimization
 - **[Optimization Results Report](OPTIMIZATION_RESULTS_REPORT.md)** - Complete performance analysis
 - **[Tuning Analysis](TUNING_ANALYSIS.md)** - Performance tuning recommendations
 - **[Backtesting & ML Guide](BACKTESTING_AND_ML_GUIDE.md)** - Historical testing and ML optimization
 
-### Advanced Features
-- **[Advanced Features Guide](ADVANCED_FEATURES_GUIDE.md)** - Stop-loss, rebalancing, regime detection
-- **[Factor Interactions](FACTOR_INTERACTIONS.md)** - How factors work together
-- **[Selective Approval](SELECTIVE_APPROVAL.md)** - Trade approval workflow
+### Testing & Quality
+- **[Testing Guide](TESTING_GUIDE.md)** - How to test the system
+- **[ML Data Strategy](ML_DATA_STRATEGY.md)** - Data collection strategy
 
 ### Deployment & Operations
 - **[Deployment Ready](DEPLOYMENT_READY.md)** - Complete deployment guide
-- **[Setup Email Approval](SETUP_EMAIL_APPROVAL.md)** - Email configuration
+- **[Future Enhancements](FUTURE_ENHANCEMENTS.md)** - Planned improvements
 
 ---
 
