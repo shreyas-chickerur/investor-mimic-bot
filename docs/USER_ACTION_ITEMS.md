@@ -8,7 +8,7 @@ Everything you need to do to complete the system setup and deployment.
 
 ### Required Immediately
 
-**1. Alpha Vantage API Key** (FREE - Required)
+**1. Alpha Vantage API Key** (Already have)
 - Sign up: https://www.alphavantage.co/support/#api-key
 - Free tier: 5 API calls per minute, 500 per day
 - Used for: News sentiment, earnings data, fundamentals
