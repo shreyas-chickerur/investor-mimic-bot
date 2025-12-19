@@ -41,7 +41,9 @@ else:
 # Initialize multi-signal engine
 print("Initializing multi-signal engine...")
 engine = MultiSignalEngine(
-    signal_weights=SignalWeights(conviction_13f=0.70, news_sentiment=0.30),  # 70% weight on 13F  # 30% weight on news
+    signal_weights=SignalWeights(
+        conviction_13f=0.70, news_sentiment=0.30
+    ),  # 70% weight on 13F  # 30% weight on news
     alpha_vantage_key=alpha_vantage_key,
 )
 print("✓ Engine initialized")
@@ -91,7 +93,13 @@ try:
             if explanation["recent_headlines"]:
                 print(f"  Recent Headlines:")
                 for headline in explanation["recent_headlines"][:3]:
-                    sentiment_emoji = "📈" if headline["sentiment"] > 0 else "📉" if headline["sentiment"] < 0 else "➡️"
+                    sentiment_emoji = (
+                        "📈"
+                        if headline["sentiment"] > 0
+                        else "📉"
+                        if headline["sentiment"] < 0
+                        else "➡️"
+                    )
                     print(f"    {sentiment_emoji} {headline['title'][:70]}...")
 
     print()

@@ -4,7 +4,7 @@
 
 ---
 
-## 📋 Test Organization
+## Test Organization
 
 Tests are organized by type into separate folders:
 
@@ -18,7 +18,7 @@ tests/
 
 ---
 
-## 🎯 Test Types
+## Test Types
 
 ### **Unit Tests** (`tests/unit/`)
 Test individual modules and functions in isolation.
@@ -61,16 +61,16 @@ Test system performance and efficiency.
 
 ---
 
-## 🚀 Running Tests
+## Running Tests
 
-### **All Tests**
+### All Tests
 ```bash
 make test
 # or
 python3 -m pytest tests/ -v
 ```
 
-### **By Type**
+### By Type
 ```bash
 make test-unit              # Unit tests only
 make test-functional        # Functional tests only
@@ -78,44 +78,44 @@ make test-integration       # Integration tests only
 make test-performance       # Performance tests only
 ```
 
-### **With Coverage**
+### With Coverage
 ```bash
 make test-coverage
 # Generates HTML report in htmlcov/index.html
 ```
 
-### **Quick Tests**
+### Quick Tests
 ```bash
 make test-quick
 # Runs unit tests only, stops on first failure
 ```
 
-### **Specific Test File**
+### Specific Test File
 ```bash
 python3 -m pytest tests/unit/test_cache.py -v
 ```
 
-### **Specific Test**
+### Specific Test
 ```bash
 python3 -m pytest tests/unit/test_cache.py::TestCache::test_set_and_get -v
 ```
 
 ---
 
-## 📊 Test Coverage
+## Test Coverage
 
-### **Current Coverage**
+### Current Coverage
 - **Services:** Core business logic
 - **Backtesting:** Backtest engine and strategies
 - **ML:** Machine learning models
 - **Utils:** Utility modules (cache, validators, etc.)
 
-### **Coverage Goals**
+### Coverage Goals
 - **Target:** 80%+ overall coverage
 - **Critical paths:** 90%+ coverage
 - **New features:** Must include tests
 
-### **Viewing Coverage**
+### Viewing Coverage
 ```bash
 make test-coverage
 open htmlcov/index.html
@@ -123,15 +123,15 @@ open htmlcov/index.html
 
 ---
 
-## ✅ Test Requirements
+## Test Requirements
 
-### **For New Features**
+### For New Features
 1. **Unit tests** for all new functions/classes
 2. **Integration tests** if feature interacts with other components
 3. **Performance tests** if feature affects performance
 4. **Documentation** of test scenarios
 
-### **Test Quality Standards**
+### Test Quality Standards
 - ✅ Tests must be independent (no dependencies between tests)
 - ✅ Tests must be repeatable (same result every time)
 - ✅ Tests must be fast (unit tests < 1s each)
@@ -140,9 +140,9 @@ open htmlcov/index.html
 
 ---
 
-## 🔧 Writing Tests
+## Writing Tests
 
-### **Unit Test Template**
+### Unit Test Template
 ```python
 """
 Unit Tests for Module Name
@@ -175,7 +175,7 @@ class TestClassName:
             obj.method_that_should_fail()
 ```
 
-### **Integration Test Template**
+### Integration Test Template
 ```python
 """
 Integration Tests for Feature
@@ -210,7 +210,7 @@ class TestFeatureIntegration:
         assert result2.is_valid()
 ```
 
-### **Performance Test Template**
+### Performance Test Template
 ```python
 """
 Performance Tests for Module
@@ -243,47 +243,47 @@ class TestPerformance:
 
 ---
 
-## 🐛 Debugging Tests
+## Debugging Tests
 
-### **Run with Verbose Output**
+### Run with Verbose Output
 ```bash
 python3 -m pytest tests/ -v -s
 ```
 
-### **Run with Debugging**
+### Run with Debugging
 ```bash
 python3 -m pytest tests/ -v --pdb
 ```
 
-### **Run Specific Test with Print Statements**
+### Run Specific Test with Print Statements
 ```bash
 python3 -m pytest tests/unit/test_cache.py::TestCache::test_set_and_get -v -s
 ```
 
-### **Show Test Duration**
+### Show Test Duration
 ```bash
 python3 -m pytest tests/ -v --durations=10
 ```
 
 ---
 
-## 🔄 Continuous Integration
+## Continuous Integration
 
 Tests run automatically on:
 - **Every push** to any branch
 - **Every pull request**
 - **Before deployment**
 
-### **CI Requirements**
+### CI Requirements
 - All tests must pass
 - Code coverage must be maintained
 - No linting errors
 
 ---
 
-## 📝 Best Practices
+## Best Practices
 
-### **DO:**
+### DO
 - ✅ Write tests before or with code (TDD)
 - ✅ Test edge cases and error conditions
 - ✅ Use descriptive test names
@@ -291,7 +291,7 @@ Tests run automatically on:
 - ✅ Mock external dependencies
 - ✅ Clean up after tests (fixtures)
 
-### **DON'T:**
+### DON'T
 - ❌ Test implementation details
 - ❌ Write tests that depend on each other
 - ❌ Use sleep() for timing (use mocks)
@@ -301,9 +301,9 @@ Tests run automatically on:
 
 ---
 
-## 🎯 Test Fixtures
+## Test Fixtures
 
-### **Using Fixtures**
+### Using Fixtures
 ```python
 import pytest
 
@@ -317,7 +317,7 @@ def test_with_fixture(sample_data):
     assert sample_data["key"] == "value"
 ```
 
-### **Common Fixtures**
+### Common Fixtures
 ```python
 @pytest.fixture
 def mock_database():
@@ -340,15 +340,15 @@ def sample_portfolio():
 
 ---
 
-## 📊 Test Metrics
+## Test Metrics
 
-### **Key Metrics**
+### Key Metrics
 - **Test Count:** 58+ tests
 - **Coverage:** 80%+ target
 - **Execution Time:** < 30 seconds for all tests
 - **Pass Rate:** 100% required
 
-### **Monitoring**
+### Monitoring
 ```bash
 # Run tests with timing
 python3 -m pytest tests/ -v --durations=0
@@ -362,7 +362,7 @@ python3 -m pytest tests/ --collect-only
 
 ---
 
-## 🔗 Related Commands
+## Related Commands
 
 ```bash
 # Format code before testing
@@ -380,7 +380,7 @@ make test-quick format lint
 
 ---
 
-## ✅ Summary
+## Summary
 
 **Test Organization:**
 - ✅ Tests organized by type (unit/functional/integration/performance)

@@ -121,7 +121,9 @@ class WeightOptimizer:
 
         return optimized_weights
 
-    def compare_with_baseline(self, optimized_weights: Dict[str, Dict[str, float]], baseline_weights: Dict[str, float]):
+    def compare_with_baseline(
+        self, optimized_weights: Dict[str, Dict[str, float]], baseline_weights: Dict[str, float]
+    ):
         """Compare optimized weights with baseline."""
 
         print("\n" + "=" * 80)
@@ -140,7 +142,9 @@ class WeightOptimizer:
 
                 print(f"{factor:<20s} {baseline:>9.1%} {optimized:>9.1%} {change:>+9.1%}")
 
-    def generate_adaptive_weights(self, optimized_weights: Dict[str, Dict[str, float]]) -> Dict[str, Dict[str, float]]:
+    def generate_adaptive_weights(
+        self, optimized_weights: Dict[str, Dict[str, float]]
+    ) -> Dict[str, Dict[str, float]]:
         """
         Generate final adaptive weights with adjustments.
 
@@ -256,7 +260,9 @@ def main():
     data = optimizer.load_backtest_data()
 
     # Analyze factor performance by regime
-    regime_performance = optimizer.analyze_factor_performance_by_regime(data["factor_scores"], data["regime"])
+    regime_performance = optimizer.analyze_factor_performance_by_regime(
+        data["factor_scores"], data["regime"]
+    )
 
     # Optimize weights
     optimized_weights = optimizer.optimize_weights_by_regime(regime_performance)

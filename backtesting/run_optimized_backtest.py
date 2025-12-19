@@ -171,7 +171,9 @@ class OptimizedBacktester:
                 continue
 
             # Get current regime
-            current_regime = regime_df.loc[date, "regime"] if date in regime_df.index else "sideways"
+            current_regime = (
+                regime_df.loc[date, "regime"] if date in regime_df.index else "sideways"
+            )
             regime_counts[current_regime] += 1
 
             # Get regime-specific weights
@@ -213,12 +215,15 @@ class OptimizedBacktester:
                                 signals[symbol] = signal
 
                     # Select top N stocks
-                    top_stocks = sorted(signals.items(), key=lambda x: x[1], reverse=True)[:max_positions]
+                    top_stocks = sorted(signals.items(), key=lambda x: x[1], reverse=True)[
+                        :max_positions
+                    ]
                     target_symbols = [s for s, _ in top_stocks]
 
                     # OPTIMIZED: Regime-adjusted allocation
                     available_capital = self.cash + sum(
-                        qty * current_prices.get(symbol, 0) for symbol, qty in self.positions.items()
+                        qty * current_prices.get(symbol, 0)
+                        for symbol, qty in self.positions.items()
                     )
 
                     target_equity = available_capital * equity_allocation
@@ -262,9 +267,13 @@ class OptimizedBacktester:
                                 )
 
             # Calculate portfolio value
-            positions_value = sum(qty * current_prices.get(symbol, 0) for symbol, qty in self.positions.items())
+            positions_value = sum(
+                qty * current_prices.get(symbol, 0) for symbol, qty in self.positions.items()
+            )
             total_value = self.cash + positions_value
-            self.portfolio_values.append({"date": date, "value": total_value, "regime": current_regime})
+            self.portfolio_values.append(
+                {"date": date, "value": total_value, "regime": current_regime}
+            )
 
             # Progress
             if (i + 1) % 500 == 0:
@@ -285,12 +294,16 @@ class OptimizedBacktester:
 
         return metrics
 
-    def calculate_metrics(self, portfolio_df: pd.DataFrame, spy: pd.DataFrame, spy_return: float) -> Dict:
+    def calculate_metrics(
+        self, portfolio_df: pd.DataFrame, spy: pd.DataFrame, spy_return: float
+    ) -> Dict:
         """Calculate performance metrics."""
 
         portfolio_df["returns"] = portfolio_df["value"].pct_change()
 
-        total_return = (portfolio_df["value"].iloc[-1] - self.initial_capital) / self.initial_capital
+        total_return = (
+            portfolio_df["value"].iloc[-1] - self.initial_capital
+        ) / self.initial_capital
 
         days = len(portfolio_df)
         years = days / 252
@@ -352,7 +365,9 @@ class OptimizedBacktester:
 
         print("=" * 80)
 
-    def create_comparison_visualization(self, baseline_metrics: Dict, optimized_metrics: Dict, output_dir: Path):
+    def create_comparison_visualization(
+        self, baseline_metrics: Dict, optimized_metrics: Dict, output_dir: Path
+    ):
         """Create comparison visualization."""
 
         fig, axes = plt.subplots(2, 2, figsize=(15, 10))
@@ -376,7 +391,9 @@ class OptimizedBacktester:
             alpha=0.7,
         )
         axes[0, 0].axhline(y=self.initial_capital, color="red", linestyle="--", alpha=0.3)
-        axes[0, 0].set_title("Portfolio Value: Baseline vs Optimized", fontsize=14, fontweight="bold")
+        axes[0, 0].set_title(
+            "Portfolio Value: Baseline vs Optimized", fontsize=14, fontweight="bold"
+        )
         axes[0, 0].set_ylabel("Value ($)")
         axes[0, 0].legend()
         axes[0, 0].grid(True, alpha=0.3)
@@ -414,7 +431,9 @@ class OptimizedBacktester:
         baseline_cum = (1 + baseline_returns).cumprod()
         optimized_cum = (1 + optimized_returns).cumprod()
 
-        axes[1, 0].plot(baseline_cum.index.values, baseline_cum.values, linewidth=2, label="Baseline", alpha=0.7)
+        axes[1, 0].plot(
+            baseline_cum.index.values, baseline_cum.values, linewidth=2, label="Baseline", alpha=0.7
+        )
         axes[1, 0].plot(
             optimized_cum.index.values,
             optimized_cum.values,
@@ -447,7 +466,9 @@ class OptimizedBacktester:
             * 100,
         }
 
-        axes[1, 1].barh(list(improvements.keys()), list(improvements.values()), color="green", alpha=0.7)
+        axes[1, 1].barh(
+            list(improvements.keys()), list(improvements.values()), color="green", alpha=0.7
+        )
         axes[1, 1].axvline(x=0, color="black", linestyle="-", linewidth=0.5)
         axes[1, 1].set_title("Improvement (%)", fontsize=14, fontweight="bold")
         axes[1, 1].set_xlabel("Improvement (%)")
@@ -535,10 +556,14 @@ def main():
 
             if fmt == "%":
                 improvement = optimized_val - baseline_val
-                print(f"{label:<25s} {baseline_val:>14.2%} {optimized_val:>14.2%} {improvement:>+14.2%}")
+                print(
+                    f"{label:<25s} {baseline_val:>14.2%} {optimized_val:>14.2%} {improvement:>+14.2%}"
+                )
             else:
                 improvement = optimized_val - baseline_val
-                print(f"{label:<25s} {baseline_val:>15.2f} {optimized_val:>15.2f} {improvement:>+15.2f}")
+                print(
+                    f"{label:<25s} {baseline_val:>15.2f} {optimized_val:>15.2f} {improvement:>+15.2f}"
+                )
 
     print(f"\n✓ Results saved to: {output_dir}")
 

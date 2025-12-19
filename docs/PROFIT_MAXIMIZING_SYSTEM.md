@@ -1,10 +1,10 @@
-# 🚀 Profit-Maximizing Investment System
+# Profit-Maximizing Investment System
 
 **8-Factor Quantitative Trading System**
 
 ---
 
-## 📊 System Overview
+## System Overview
 
 This is a **profit-maximizing investment system** that integrates **8 distinct factors** to generate the highest possible risk-adjusted returns. Each factor has been weighted based on quantitative research and backtesting to maximize profitability.
 
@@ -12,28 +12,28 @@ This is a **profit-maximizing investment system** that integrates **8 distinct f
 
 ## 💰 The 8 Profit-Generating Factors
 
-### **1. 13F Conviction (30% weight)**
+### 1. 13F Conviction (30% weight)
 **What it does:** Tracks what the smartest institutional investors are buying
 - Analyzes SEC 13F filings from top hedge funds
 - Identifies high-conviction positions (large portfolio weights)
 - Applies recency weighting (recent filings weighted higher)
 - **Edge:** Follow the smart money before the market catches on
 
-### **2. News Sentiment (12% weight)**
+### 2. News Sentiment (12% weight)
 **What it does:** Analyzes market psychology through news
 - Sentiment analysis on financial news articles
 - Keyword-based positive/negative scoring
 - Real-time sentiment tracking
 - **Edge:** Capture market sentiment before it's fully priced in
 
-### **3. Insider Trading (12% weight)**
+### 3. Insider Trading (12% weight)
 **What it does:** Tracks what company executives are doing
 - Monitors SEC Form 4 filings (insider transactions)
 - Insider buying = bullish signal
 - Insider selling = bearish signal
 - **Edge:** Insiders know their company best
 
-### **4. Technical Indicators (8% weight)**
+### 4. Technical Indicators (8% weight)
 **What it does:** Analyzes price momentum
 - RSI (Relative Strength Index) - overbought/oversold
 - MACD (Moving Average Convergence Divergence) - momentum
@@ -71,7 +71,7 @@ This is a **profit-maximizing investment system** that integrates **8 distinct f
 
 ---
 
-## 🎯 Optimal Weight Allocation
+## Optimal Weight Allocation
 
 Based on quantitative research, the weights are optimized for maximum profit:
 
@@ -101,7 +101,7 @@ TOTAL                  100%
 
 ---
 
-## 📈 Expected Performance Improvements
+## Expected Performance Improvements
 
 Compared to the old 4-factor system:
 
@@ -122,10 +122,9 @@ Compared to the old 4-factor system:
 
 ---
 
-## 🔄 How the Factors Interact
+## How the Factors Interact
 
-### **Signal Generation Flow:**
-
+### Signal Generation Flow
 ```
 1. 13F Conviction → Identifies WHAT to buy (smart money picks)
 2. Earnings Momentum → Confirms WHY to buy (fundamental catalyst)
@@ -137,8 +136,7 @@ Compared to the old 4-factor system:
 8. Technical Indicators → Fine-tunes entry (momentum)
 ```
 
-### **Example: NVDA Trade Decision**
-
+### Example: NVDA Trade Decision
 ```
 Factor                  Score   Weight   Contribution
 ─────────────────────────────────────────────────────
@@ -165,8 +163,7 @@ COMBINED SCORE                           0.810  → STRONG BUY
 
 ## 💻 Implementation
 
-### **Files Created:**
-
+### Files Created
 1. **`services/technical/advanced_indicators.py`**
    - Moving average calculations
    - Volume analysis
@@ -189,8 +186,7 @@ COMBINED SCORE                           0.810  → STRONG BUY
    - Profit-maximizing signals
    - Advanced risk management
 
-### **Usage:**
-
+### Usage
 ```python
 from services.strategy.profit_maximizing_engine import ProfitMaximizingEngine
 
@@ -204,7 +200,7 @@ signals = engine.get_top_opportunities(
     top_n=20
 )
 
-# Each signal contains:
+# Each signal contains
 # - Combined score (0-1)
 # - Individual factor scores
 # - Recommendation (STRONG BUY, BUY, HOLD, SELL)
@@ -215,25 +211,25 @@ signals = engine.get_top_opportunities(
 
 ## 🎓 Quantitative Research Behind the System
 
-### **Why Moving Averages?**
+### Why Moving Averages?
 - **Academic Research:** 50+ years of proven effectiveness
 - **Golden Cross Strategy:** Historically 70%+ win rate
 - **Trend Following:** Reduces losses by 30-40%
 - **Market Timing:** Improves entry/exit points
 
-### **Why Volume Analysis?**
+### Why Volume Analysis?
 - **Confirmation:** High volume validates price moves
 - **Institutional Activity:** Large volume = institutions
 - **Breakout Validation:** Volume confirms breakouts
 - **False Signal Filter:** Low volume = weak moves
 
-### **Why Relative Strength?**
+### Why Relative Strength?
 - **Momentum Effect:** Leaders keep leading (academic research)
 - **Risk-Adjusted Returns:** Outperformers have better Sharpe ratios
 - **Market Regime:** Works in all market conditions
 - **Sector Rotation:** Identifies sector leaders
 
-### **Why Earnings Momentum?**
+### Why Earnings Momentum?
 - **Fundamental Catalyst:** Earnings drive stock prices
 - **Surprise Effect:** Beats lead to continued outperformance
 - **Institutional Response:** Funds chase earnings winners
@@ -241,10 +237,9 @@ signals = engine.get_top_opportunities(
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
-### **1. Daily Workflow**
-
+### 1. Daily Workflow
 The system runs automatically every day at 10 AM:
 
 ```bash
@@ -260,16 +255,14 @@ python3 scripts/resilient_daily_workflow.py
 5. Waits for your approval
 6. Executes approved trades
 
-### **2. Manual Testing**
-
+### 2. Manual Testing
 Test the system anytime:
 
 ```bash
 python3 scripts/test_profit_maximizing_system.py
 ```
 
-### **3. Review Signals**
-
+### 3. Review Signals
 Check what the system is recommending:
 
 ```python
@@ -287,18 +280,16 @@ signal.confidence      # Confidence level (0-1)
 
 ---
 
-## 📊 Performance Monitoring
+## Performance Monitoring
 
-### **Key Metrics to Track:**
-
+### Key Metrics to Track
 1. **Win Rate:** % of profitable trades (target: 70%)
 2. **Sharpe Ratio:** Risk-adjusted returns (target: 2.5)
 3. **Max Drawdown:** Largest peak-to-trough decline (target: <20%)
 4. **Profit Factor:** Gross profit / Gross loss (target: >2.0)
 5. **Average Win/Loss:** Win size vs loss size (target: >1.5)
 
-### **Factor Performance:**
-
+### Factor Performance
 Monitor which factors are contributing most:
 
 ```python
@@ -331,31 +322,31 @@ The system includes **advanced risk management**:
 
 ---
 
-## 🎯 Best Practices
+## Best Practices
 
-### **1. Trust the System**
+### 1. Trust the System
 - All 8 factors are working together
 - Don't override based on gut feeling
 - The system has quantitative edge
 
-### **2. Review Signals**
+### 2. Review Signals
 - Check individual factor scores
 - Look for factor agreement
 - Higher confidence = better trades
 
-### **3. Manage Risk**
+### 3. Manage Risk
 - Respect position size limits
 - Maintain cash buffer
 - Don't override risk management
 
-### **4. Monitor Performance**
+### 4. Monitor Performance
 - Track win rate and Sharpe ratio
 - Review losing trades
 - Adjust if needed
 
 ---
 
-## 📈 Success Metrics
+## Success Metrics
 
 **The system is working if:**
 
@@ -374,7 +365,7 @@ The system includes **advanced risk management**:
 
 ---
 
-## 🚀 Summary
+## Summary
 
 **You now have a profit-maximizing system with:**
 

@@ -40,7 +40,9 @@ def get_alpaca_account_id(api_key: str, secret_key: str, sandbox: bool = True) -
         return None
 
 
-def get_alpaca_bank_id(api_key: str, secret_key: str, sandbox: bool = True, bank_index: int = 0) -> Optional[str]:
+def get_alpaca_bank_id(
+    api_key: str, secret_key: str, sandbox: bool = True, bank_index: int = 0
+) -> Optional[str]:
     """
     Fetch Alpaca bank account ID via API.
 
@@ -86,7 +88,9 @@ def get_alpaca_bank_id(api_key: str, secret_key: str, sandbox: bool = True, bank
         return None
 
 
-def get_alpaca_ids(api_key: str, secret_key: str, sandbox: bool = True) -> Tuple[Optional[str], Optional[str]]:
+def get_alpaca_ids(
+    api_key: str, secret_key: str, sandbox: bool = True
+) -> Tuple[Optional[str], Optional[str]]:
     """
     Fetch both Alpaca account ID and bank ID via API.
 

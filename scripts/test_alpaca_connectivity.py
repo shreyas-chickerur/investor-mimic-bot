@@ -40,7 +40,9 @@ def main() -> int:
     if base_url_env:
         base_url = base_url_env.strip()
     else:
-        base_url = "https://paper-api.alpaca.markets" if paper_trading else "https://api.alpaca.markets"
+        base_url = (
+            "https://paper-api.alpaca.markets" if paper_trading else "https://api.alpaca.markets"
+        )
 
     # alpaca-py internally appends /v2; if the user provides a URL that already ends with /v2,
     # requests can become .../v2/v2/.... Sanitize a trailing /v2.

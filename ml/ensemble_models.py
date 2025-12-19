@@ -4,12 +4,14 @@ Ensemble Models for Factor Weight Optimization
 Combines multiple ML models for more robust predictions.
 """
 
+from typing import Any, Dict, List, Tuple
+
 import numpy as np
 import pandas as pd
-from typing import List, Dict, Any, Tuple
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.linear_model import Ridge
 from sklearn.model_selection import TimeSeriesSplit
+
 from utils.enhanced_logging import get_logger
 
 logger = get_logger(__name__)
@@ -28,11 +30,15 @@ class EnsembleOptimizer:
         """Create ensemble of models."""
         return (
             [
-                RandomForestRegressor(n_estimators=100, max_depth=10, min_samples_split=5, random_state=42 + i)
+                RandomForestRegressor(
+                    n_estimators=100, max_depth=10, min_samples_split=5, random_state=42 + i
+                )
                 for i in range(self.n_models)
             ]
             + [
-                GradientBoostingRegressor(n_estimators=100, max_depth=5, learning_rate=0.1, random_state=42 + i)
+                GradientBoostingRegressor(
+                    n_estimators=100, max_depth=5, learning_rate=0.1, random_state=42 + i
+                )
                 for i in range(self.n_models)
             ]
             + [Ridge(alpha=1.0, random_state=42)]
@@ -79,7 +85,11 @@ class EnsembleOptimizer:
         # Calculate model weights based on CV performance
         cv_scores = np.array(cv_scores)
         cv_scores = np.maximum(cv_scores, 0)  # Ensure non-negative
-        self.weights = cv_scores / cv_scores.sum() if cv_scores.sum() > 0 else np.ones(len(cv_scores)) / len(cv_scores)
+        self.weights = (
+            cv_scores / cv_scores.sum()
+            if cv_scores.sum() > 0
+            else np.ones(len(cv_scores)) / len(cv_scores)
+        )
 
         # Calculate feature importance
         self._calculate_feature_importance(X)
@@ -117,7 +127,8 @@ class EnsembleOptimizer:
         if importances:
             # Weighted average of importances
             self.feature_importance = pd.Series(
-                np.average(importances, axis=0, weights=self.weights[: len(importances)]), index=X.columns
+                np.average(importances, axis=0, weights=self.weights[: len(importances)]),
+                index=X.columns,
             ).sort_values(ascending=False)
 
     def get_feature_importance(self) -> pd.Series:
@@ -169,7 +180,10 @@ class StackedEnsemble:
 
         logger.info("Stacked ensemble trained successfully")
 
-        return {"n_base_models": len(self.base_models), "meta_model": type(self.meta_model).__name__}
+        return {
+            "n_base_models": len(self.base_models),
+            "meta_model": type(self.meta_model).__name__,
+        }
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         """Make stacked predictions."""

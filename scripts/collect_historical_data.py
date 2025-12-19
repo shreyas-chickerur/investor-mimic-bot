@@ -167,7 +167,9 @@ class HistoricalDataCollector:
 
         return price_data
 
-    def fetch_alpha_vantage_data(self, symbol: str, outputsize: str = "full") -> Optional[pd.DataFrame]:
+    def fetch_alpha_vantage_data(
+        self, symbol: str, outputsize: str = "full"
+    ) -> Optional[pd.DataFrame]:
         """
         Fetch historical data from Alpha Vantage.
 
@@ -272,7 +274,9 @@ class HistoricalDataCollector:
 
         return price_data
 
-    def collect_market_data(self, start_date: datetime, end_date: datetime) -> Dict[str, pd.DataFrame]:
+    def collect_market_data(
+        self, start_date: datetime, end_date: datetime
+    ) -> Dict[str, pd.DataFrame]:
         """
         Collect market benchmark data (SPY, VIX).
 
