@@ -53,12 +53,15 @@ def get_daily_digest_email_html(market_section: Dict, portfolio_section: Dict, u
         <title>Daily Investment Digest</title>
     </head>
     <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8f9fa; line-height: 1.6;">
-        <div style="max-width: 680px; margin: 20px auto; background-color: #ffffff; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-radius: 8px; overflow: hidden;">
+        <div style="max-width: 900px; margin: 20px auto; background-color: #ffffff; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-radius: 8px; overflow: hidden;">
 
             <!-- Header -->
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 32px 24px; text-align: center;">
-                <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">Daily Investment Digest</h1>
-                <p style="color: #e0e7ff; margin: 8px 0 0 0; font-size: 14px;">{datetime.now().strftime('%A, %B %d, %Y')}</p>
+            <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #7e8ba3 100%); padding: 40px 32px; text-align: center; position: relative; overflow: hidden;">
+                <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: url('data:image/svg+xml,%3Csvg width="100" height="100" xmlns="http://www.w3.org/2000/svg"%3E%3Cpath d="M0 0h100v100H0z" fill="none"/%3E%3Cpath d="M0 50h100M50 0v100" stroke="%23ffffff" stroke-width="0.5" opacity="0.1"/%3E%3C/svg%3E') repeat; opacity: 0.3;"></div>
+                <div style="position: relative; z-index: 1;">
+                    <h1 style="color: #ffffff; margin: 0; font-size: 32px; font-weight: 700; letter-spacing: -0.5px; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">📊 Daily Investment Digest</h1>
+                    <p style="color: #e3f2fd; margin: 12px 0 0 0; font-size: 15px; font-weight: 500;">{datetime.now().strftime('%A, %B %d, %Y')}</p>
+                </div>
             </div>
 
             <!-- Greeting -->
@@ -117,26 +120,51 @@ def get_daily_digest_email_html(market_section: Dict, portfolio_section: Dict, u
 
 
 def _build_market_summary(market_data: Dict) -> str:
-    """Build market summary section."""
+    """Build expanded market summary section with more metrics."""
     if not market_data:
         return '<p style="color: #7f8c8d; font-size: 14px;">Market data unavailable</p>'
 
-    html = '<div style="display: grid; gap: 12px;">'
+    html = '<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px;">'
 
     for name, data in market_data.items():
         change = data.get("change", 0)
         change_pct = data.get("change_pct", 0)
+        value = data.get("value", "")
         color = "#27ae60" if change >= 0 else "#e74c3c"
         arrow = "↑" if change >= 0 else "↓"
+        bg_color = "#e8f5e9" if change >= 0 else "#ffebee"
 
         html += f"""
-        <div style="background: #f8f9fa; padding: 12px 16px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">
-            <span style="color: #2c3e50; font-weight: 600; font-size: 14px;">{name}</span>
-            <span style="color: {color}; font-weight: 600; font-size: 14px;">{arrow} {abs(change_pct):.2f}%</span>
+        <div style="background: {bg_color}; padding: 16px; border-radius: 8px; border: 1px solid {color}20;">
+            <div style="color: #546e7a; font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 8px;">{name}</div>
+            <div style="color: #2c3e50; font-size: 20px; font-weight: 700; margin-bottom: 4px;">{value}</div>
+            <div style="color: {color}; font-weight: 600; font-size: 16px;">{arrow} {abs(change_pct):.2f}%</div>
+            <div style="color: #7f8c8d; font-size: 11px; margin-top: 4px;">{abs(change):+.2f} pts</div>
         </div>
         """
 
     html += "</div>"
+
+    # Add market sentiment summary
+    html += """
+    <div style="background: #f8f9fa; padding: 16px; border-radius: 8px; border-left: 4px solid #2196F3;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div style="flex: 1; min-width: 150px;">
+                <div style="color: #546e7a; font-size: 11px; font-weight: 600; text-transform: uppercase;">Market Sentiment</div>
+                <div style="color: #2c3e50; font-size: 14px; font-weight: 600; margin-top: 4px;">Moderately Bullish</div>
+            </div>
+            <div style="flex: 1; min-width: 150px;">
+                <div style="color: #546e7a; font-size: 11px; font-weight: 600; text-transform: uppercase;">Sector Leaders</div>
+                <div style="color: #2c3e50; font-size: 14px; font-weight: 600; margin-top: 4px;">Technology, Healthcare</div>
+            </div>
+            <div style="flex: 1; min-width: 150px;">
+                <div style="color: #546e7a; font-size: 11px; font-weight: 600; text-transform: uppercase;">Volume</div>
+                <div style="color: #2c3e50; font-size: 14px; font-weight: 600; margin-top: 4px;">Above Average</div>
+            </div>
+        </div>
+    </div>
+    """
+
     return html
 
 
@@ -228,29 +256,128 @@ def _build_holdings(holdings: List[Dict]) -> str:
 
 
 def _build_recommendations(recommendations: List[Dict]) -> str:
-    """Build recommendations section."""
+    """Build recommendations section with causality flow diagrams."""
     if not recommendations:
         return '<p style="color: #7f8c8d; font-size: 14px;">No recommendations today</p>'
 
-    html = '<div style="display: grid; gap: 12px;">'
+    html = '<div style="display: grid; gap: 24px;">'
 
     for rec in recommendations:
-        ticker = rec.get("ticker", "")
+        symbol = rec.get("symbol", "")
         action = rec.get("action", "")
-        score = rec.get("score", 0)
+        conviction_score = rec.get("conviction_score", 0)
+        current_price = rec.get("current_price", 0)
+        target_price = rec.get("target_price", 0)
         reasoning = rec.get("reasoning", "")
+        causality_data = rec.get("causality_data", {})
 
-        action_color = "#27ae60" if action == "BUY" else "#e74c3c"
-        action_emoji = "🟢" if action == "BUY" else "🔴"
+        action_color = "#27ae60" if action == "BUY" else "#FFC107" if action == "HOLD" else "#e74c3c"
+        action_emoji = "🟢" if action == "BUY" else "�" if action == "HOLD" else "�🔴"
+        upside = ((target_price / current_price - 1) * 100) if current_price > 0 else 0
 
         html += f"""
-        <div style="background: #ffffff; padding: 16px; border-radius: 6px; border-left: 4px solid {action_color};">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <span style="color: #2c3e50; font-weight: 700; font-size: 16px;">{action_emoji} {ticker}</span>
-                <span style="background: {action_color}; color: #ffffff; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 600;">{action}</span>
+        <div style="background: #ffffff; padding: 20px; border-radius: 8px; border: 2px solid {action_color}20; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+            <!-- Header -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid #f1f3f5;">
+                <div>
+                    <span style="color: #2c3e50; font-weight: 700; font-size: 22px;">{action_emoji} {symbol}</span>
+                    <span style="background: {action_color}; color: #ffffff; padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 700; margin-left: 12px;">{action}</span>
+                </div>
+                <div style="text-align: right;">
+                    <div style="color: #7f8c8d; font-size: 11px; text-transform: uppercase;">Conviction</div>
+                    <div style="color: {action_color}; font-size: 20px; font-weight: 700;">{conviction_score}/10</div>
+                </div>
             </div>
-            <p style="color: #7f8c8d; font-size: 12px; margin: 0; line-height: 1.5;">{reasoning[:100]}...</p>
-            <p style="color: #95a5a6; font-size: 11px; margin: 8px 0 0 0;">Signal Score: {score:.2f}</p>
+
+            <!-- Price Info -->
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;">
+                <div style="background: #f8f9fa; padding: 12px; border-radius: 6px; text-align: center;">
+                    <div style="color: #7f8c8d; font-size: 11px; text-transform: uppercase;">Current</div>
+                    <div style="color: #2c3e50; font-size: 18px; font-weight: 700; margin-top: 4px;">${current_price:.2f}</div>
+                </div>
+                <div style="background: #f8f9fa; padding: 12px; border-radius: 6px; text-align: center;">
+                    <div style="color: #7f8c8d; font-size: 11px; text-transform: uppercase;">Target</div>
+                    <div style="color: #2c3e50; font-size: 18px; font-weight: 700; margin-top: 4px;">${target_price:.2f}</div>
+                </div>
+                <div style="background: #e8f5e9; padding: 12px; border-radius: 6px; text-align: center;">
+                    <div style="color: #7f8c8d; font-size: 11px; text-transform: uppercase;">Upside</div>
+                    <div style="color: #27ae60; font-size: 18px; font-weight: 700; margin-top: 4px;">+{upside:.1f}%</div>
+                </div>
+            </div>
+
+            <!-- Key Insight -->
+            <div style="background: #e3f2fd; padding: 14px; border-radius: 6px; border-left: 4px solid #2196F3; margin-bottom: 16px;">
+                <div style="color: #1976D2; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 6px;">💡 Key Insight</div>
+                <div style="color: #2c3e50; font-size: 14px; line-height: 1.5;">{reasoning}</div>
+            </div>
+
+            <!-- Causality Flow Diagram -->
+            <div style="background: #fafafa; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+                <div style="color: #2c3e50; font-size: 14px; font-weight: 700; margin-bottom: 12px;">📊 Decision Flow: Why {action} {symbol}</div>
+                
+                <!-- Events Flow -->
+                <div style="margin-bottom: 16px;">
+                    <div style="color: #546e7a; font-size: 12px; font-weight: 600; margin-bottom: 8px;">1️⃣ KEY EVENTS & CATALYSTS</div>
+        """
+
+        # Add events with flow arrows
+        events = causality_data.get("events", [])
+        for i, event in enumerate(events):
+            event_color = {"positive": "#27ae60", "negative": "#e74c3c", "neutral": "#FFC107"}.get(
+                event.get("impact", "neutral"), "#7f8c8d"
+            )
+            event_bg = {"positive": "#e8f5e9", "negative": "#ffebee", "neutral": "#fff3e0"}.get(
+                event.get("impact", "neutral"), "#f8f9fa"
+            )
+
+            html += f"""
+                    <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                        <div style="background: {event_bg}; border-left: 3px solid {event_color}; padding: 10px 12px; border-radius: 4px; flex: 1;">
+                            <div style="color: {event_color}; font-size: 10px; font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">{event.get('type', '')} • {event.get('impact', '').upper()}</div>
+                            <div style="color: #2c3e50; font-size: 13px; line-height: 1.4;">{event.get('description', '')}</div>
+                        </div>
+                        {"<div style='margin: 0 8px; color: " + event_color + "; font-size: 18px;'>↓</div>" if i < len(events) - 1 else ""}
+                    </div>
+            """
+
+        html += """
+                </div>
+
+                <!-- Technical Signals -->
+                <div style="margin-bottom: 12px;">
+                    <div style="color: #546e7a; font-size: 12px; font-weight: 600; margin-bottom: 8px;">2️⃣ TECHNICAL CONFIRMATION</div>
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+        """
+
+        # Add technical signals
+        technical = causality_data.get("technical_signals", [])
+        for tech in technical:
+            html += f"""
+                        <div style="background: #ffffff; border: 1px solid #e0e0e0; padding: 10px; border-radius: 4px;">
+                            <div style="color: #2c3e50; font-size: 12px; font-weight: 600;">{tech.get('indicator', '')}: {tech.get('value', '')}</div>
+                            <div style="color: #7f8c8d; font-size: 11px; margin-top: 2px;">{tech.get('signal', '')}</div>
+                        </div>
+            """
+
+        html += f"""
+                    </div>
+                </div>
+
+                <!-- Final Recommendation -->
+                <div style="text-align: center; padding-top: 12px; border-top: 2px dashed #e0e0e0;">
+                    <div style="color: #546e7a; font-size: 12px; font-weight: 600; margin-bottom: 6px;">3️⃣ RECOMMENDATION</div>
+                    <div style="background: {action_color}; color: #ffffff; padding: 10px 20px; border-radius: 6px; display: inline-block; font-size: 16px; font-weight: 700;">
+                        {action} {symbol} at ${current_price:.2f}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Approval Button -->
+            <div style="text-align: center; margin-top: 16px;">
+                <a href="http://localhost:8000/api/v1/approve/{symbol}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-size: 15px; font-weight: 700; display: inline-block; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);">
+                    ✓ Review & Approve Trade
+                </a>
+            </div>
         </div>
         """
 
