@@ -64,7 +64,9 @@ class TechnicalIndicators:
         return macd_line, signal_line, histogram
 
     @staticmethod
-    def calculate_moving_averages(prices: pd.Series, periods: List[int] = [20, 50, 200]) -> Dict[int, pd.Series]:
+    def calculate_moving_averages(
+        prices: pd.Series, periods: List[int] = [20, 50, 200]
+    ) -> Dict[int, pd.Series]:
         """
         Calculate Simple Moving Averages.
 
@@ -227,7 +229,9 @@ class TechnicalSignalGenerator:
 
         return signals
 
-    def get_mock_signals(self, symbols: List[str], conviction_weights: Dict[str, float]) -> Dict[str, float]:
+    def get_mock_signals(
+        self, symbols: List[str], conviction_weights: Dict[str, float]
+    ) -> Dict[str, float]:
         """
         Generate mock technical signals.
 
@@ -243,7 +247,9 @@ class TechnicalSignalGenerator:
         # Generate signals that add momentum to top picks
         signals = {}
 
-        sorted_symbols = sorted([(s, conviction_weights.get(s, 0)) for s in symbols], key=lambda x: x[1], reverse=True)
+        sorted_symbols = sorted(
+            [(s, conviction_weights.get(s, 0)) for s in symbols], key=lambda x: x[1], reverse=True
+        )
 
         top_40_pct = int(len(sorted_symbols) * 0.4)
 

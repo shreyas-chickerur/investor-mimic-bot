@@ -106,7 +106,9 @@ def _compute_trades(
             proceeds = sh * px
             cost = proceeds * txn_cost
             cash_delta += proceeds - cost
-            trades.append({"ticker": t, "shares": -sh, "price": px, "notional": proceeds, "fee": cost})
+            trades.append(
+                {"ticker": t, "shares": -sh, "price": px, "notional": proceeds, "fee": cost}
+            )
 
     # Recompute total value after sells (cash increases).
     cash = cash_delta
@@ -128,7 +130,9 @@ def _compute_trades(
             fee = notional * txn_cost
             cash -= notional + fee
             positions[t] = float(positions.get(t, 0.0)) + sh
-            trades.append({"ticker": t, "shares": sh, "price": px, "notional": notional, "fee": fee})
+            trades.append(
+                {"ticker": t, "shares": sh, "price": px, "notional": notional, "fee": fee}
+            )
         else:
             # sell
             sh = abs(sh)
@@ -144,7 +148,9 @@ def _compute_trades(
                 positions.pop(t, None)
             else:
                 positions[t] = new_sh
-            trades.append({"ticker": t, "shares": -sh, "price": px, "notional": notional, "fee": fee})
+            trades.append(
+                {"ticker": t, "shares": -sh, "price": px, "notional": notional, "fee": fee}
+            )
 
     return positions, cash, trades
 
@@ -173,7 +179,9 @@ def run_backtest(
         rebal_dates.append(_next_business_day(d))
         d = d + timedelta(days=int(rebalance_days))
 
-    cfg = ConvictionConfig(recency_half_life_days=int(half_life_days), max_positions=int(max_positions))
+    cfg = ConvictionConfig(
+        recency_half_life_days=int(half_life_days), max_positions=int(max_positions)
+    )
 
     # We'll fetch prices over full interval for all tickers encountered.
     # First pass: get tickers per rebalance.
@@ -249,7 +257,9 @@ def run_backtest(
                 trade_rows.append(tr2)
 
         pv = _portfolio_value(positions, cash, day_prices)
-        history_rows.append({"date": day.isoformat(), "value": pv, "cash": cash, "positions": len(positions)})
+        history_rows.append(
+            {"date": day.isoformat(), "value": pv, "cash": cash, "positions": len(positions)}
+        )
 
     history = pd.DataFrame(history_rows)
     trades = pd.DataFrame(trade_rows)
@@ -258,14 +268,20 @@ def run_backtest(
     history["return"] = history["value"].pct_change().fillna(0.0)
     history["cum_return"] = (1.0 + history["return"]).cumprod() - 1.0
 
-    total_return = float(history["value"].iloc[-1] / history["value"].iloc[0] - 1.0) if len(history) else 0.0
+    total_return = (
+        float(history["value"].iloc[-1] / history["value"].iloc[0] - 1.0) if len(history) else 0.0
+    )
     daily_vol = float(history["return"].std()) if len(history) > 2 else 0.0
     ann_vol = daily_vol * math.sqrt(252.0) if daily_vol > 0 else 0.0
 
     # naive CAGR
     days = (end - start).days
     years = max(days / 365.25, 1e-9)
-    cagr = float((history["value"].iloc[-1] / history["value"].iloc[0]) ** (1.0 / years) - 1.0) if len(history) else 0.0
+    cagr = (
+        float((history["value"].iloc[-1] / history["value"].iloc[0]) ** (1.0 / years) - 1.0)
+        if len(history)
+        else 0.0
+    )
 
     # drawdown
     values = history["value"].astype(float)
@@ -290,7 +306,9 @@ def run_backtest(
         "half_life_days": int(half_life_days),
         "max_positions": int(max_positions),
         "txn_cost_bps": float(txn_cost_bps),
-        "used_synthetic_prices": bool(use_synthetic_prices or isinstance(provider, SyntheticPriceProvider)),
+        "used_synthetic_prices": bool(
+            use_synthetic_prices or isinstance(provider, SyntheticPriceProvider)
+        ),
         "unique_tickers": int(len(all_tickers)),
         "unique_priced_symbols": int(len(set(priced_symbols))),
         "trades": int(len(trades)),

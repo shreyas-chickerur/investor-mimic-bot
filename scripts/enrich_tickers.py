@@ -130,7 +130,9 @@ def _map_with_adaptive_batching(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Enrich securities.ticker using OpenFIGI CUSIP->ticker mapping")
+    parser = argparse.ArgumentParser(
+        description="Enrich securities.ticker using OpenFIGI CUSIP->ticker mapping"
+    )
     parser.add_argument(
         "--db-url",
         default=os.getenv("DATABASE_URL", "postgresql://postgres@localhost:5432/investorbot"),

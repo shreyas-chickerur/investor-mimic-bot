@@ -4,10 +4,12 @@ Data Quality Checks
 Validates data quality to prevent bad trades from bad data.
 """
 
-import pandas as pd
-import numpy as np
-from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Tuple
+
+import numpy as np
+import pandas as pd
+
 from utils.enhanced_logging import get_logger
 from utils.monitoring import monitor
 
@@ -35,7 +37,9 @@ class DataQualityChecker:
 
         return True, "No missing data"
 
-    def check_outliers(self, data: pd.Series, method: str = "iqr", threshold: float = 3.0) -> Tuple[bool, List[int]]:
+    def check_outliers(
+        self, data: pd.Series, method: str = "iqr", threshold: float = 3.0
+    ) -> Tuple[bool, List[int]]:
         """
         Detect outliers in data.
 
@@ -66,7 +70,9 @@ class DataQualityChecker:
 
         return is_clean, outlier_indices
 
-    def check_data_staleness(self, timestamp: datetime, max_age_hours: int = 24) -> Tuple[bool, str]:
+    def check_data_staleness(
+        self, timestamp: datetime, max_age_hours: int = 24
+    ) -> Tuple[bool, str]:
         """Check if data is too old."""
         age = datetime.now() - timestamp
         max_age = timedelta(hours=max_age_hours)
@@ -105,7 +111,9 @@ class DataQualityChecker:
         is_consistent = len(suspicious_tickers) == 0
         return is_consistent, suspicious_tickers
 
-    def check_volume_anomaly(self, current_volume: int, avg_volume: float, threshold: float = 5.0) -> Tuple[bool, str]:
+    def check_volume_anomaly(
+        self, current_volume: int, avg_volume: float, threshold: float = 5.0
+    ) -> Tuple[bool, str]:
         """Check for unusual volume."""
         if avg_volume == 0:
             return True, "No historical volume data"
@@ -143,7 +151,9 @@ class DataQualityChecker:
 
         return True, f"Data complete: {actual_rows}/{expected_rows} rows"
 
-    def run_full_quality_check(self, data: Dict[str, any], config: Dict[str, any]) -> Tuple[bool, List[str]]:
+    def run_full_quality_check(
+        self, data: Dict[str, any], config: Dict[str, any]
+    ) -> Tuple[bool, List[str]]:
         """
         Run comprehensive quality checks on data.
 
@@ -173,7 +183,9 @@ class DataQualityChecker:
 
         # Check timestamps
         if "timestamp" in data:
-            is_fresh, msg = self.check_data_staleness(data["timestamp"], config.get("max_age_hours", 24))
+            is_fresh, msg = self.check_data_staleness(
+                data["timestamp"], config.get("max_age_hours", 24)
+            )
             if not is_fresh:
                 issues.append(f"Stale data: {msg}")
 
@@ -182,7 +194,11 @@ class DataQualityChecker:
         monitor.record_metric("data_quality_checks", 1 if passed else 0)
 
         if not passed:
-            monitor.create_alert("warning", f"Data quality issues detected: {len(issues)} problems", {"issues": issues})
+            monitor.create_alert(
+                "warning",
+                f"Data quality issues detected: {len(issues)} problems",
+                {"issues": issues},
+            )
             logger.warning(f"Data quality check failed: {issues}")
         else:
             logger.info("Data quality check passed")

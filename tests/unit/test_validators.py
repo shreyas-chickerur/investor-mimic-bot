@@ -4,19 +4,15 @@ Unit Tests for Validators Module
 Tests data validation functionality.
 """
 
-import pytest
 import sys
-from pathlib import Path
 from datetime import date, datetime
+from pathlib import Path
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from utils.validators import (
-    Validator,
-    TradeValidator,
-    FactorScoreValidator,
-    ValidationError,
-)
+from utils.validators import FactorScoreValidator, TradeValidator, ValidationError, Validator
 
 
 class TestValidator:
