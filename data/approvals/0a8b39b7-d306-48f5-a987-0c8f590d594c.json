@@ -1,0 +1,86 @@
+{
+  "request_id": "0a8b39b7-d306-48f5-a987-0c8f590d594c",
+  "created_at": "2025-12-18T05:32:20.616476",
+  "expires_at": "2025-12-19T05:32:20.616409",
+  "status": "PENDING",
+  "total_investment": 45911.66535537715,
+  "cash_buffer": 14282.543,
+  "available_cash": 142825.43,
+  "trades": [
+    {
+      "symbol": "02079K305",
+      "quantity": 61.824718360677316,
+      "estimated_price": 100.0,
+      "estimated_value": 6182.471836067732,
+      "allocation_pct": 4.809656901566036
+    },
+    {
+      "symbol": "90353T100",
+      "quantity": 57.994041547326695,
+      "estimated_price": 100.0,
+      "estimated_value": 5799.40415473267,
+      "allocation_pct": 4.51164921691285
+    },
+    {
+      "symbol": "674599105",
+      "quantity": 57.790498885933175,
+      "estimated_price": 100.0,
+      "estimated_value": 5779.0498885933175,
+      "allocation_pct": 4.495814605901389
+    },
+    {
+      "symbol": "11271J107",
+      "quantity": 53.76231510341776,
+      "estimated_price": 100.0,
+      "estimated_value": 5376.231510341776,
+      "allocation_pct": 4.182441857200373
+    },
+    {
+      "symbol": "023135106",
+      "quantity": 45.100582878718804,
+      "estimated_price": 100.0,
+      "estimated_value": 4510.058287871881,
+      "allocation_pct": 3.508601987344411
+    },
+    {
+      "symbol": "500754106",
+      "quantity": 40.76906036212382,
+      "estimated_price": 100.0,
+      "estimated_value": 4076.906036212382,
+      "allocation_pct": 3.1716309874169712
+    },
+    {
+      "symbol": "H1467J104",
+      "quantity": 39.19671557561563,
+      "estimated_price": 100.0,
+      "estimated_value": 3919.671557561563,
+      "allocation_pct": 3.049310350063604
+    },
+    {
+      "symbol": "30303M102",
+      "quantity": 36.224090397283895,
+      "estimated_price": 100.0,
+      "estimated_value": 3622.4090397283894,
+      "allocation_pct": 2.8180548331144837
+    },
+    {
+      "symbol": "594918104",
+      "quantity": 36.089193416605724,
+      "estimated_price": 100.0,
+      "estimated_value": 3608.919341660572,
+      "allocation_pct": 2.8075605160949686
+    },
+    {
+      "symbol": "76131D103",
+      "quantity": 30.365437026068722,
+      "estimated_price": 100.0,
+      "estimated_value": 3036.543702606872,
+      "allocation_pct": 2.3622806158125824
+    }
+  ],
+  "strategy_name": "Conviction Strategy",
+  "max_positions": 10,
+  "approved_at": null,
+  "approved_by": null,
+  "notes": null
+}

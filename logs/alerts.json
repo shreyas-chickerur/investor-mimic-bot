@@ -1,0 +1,64 @@
+[
+  {
+    "timestamp": "2025-12-17T11:23:17.131237Z",
+    "level": "error",
+    "message": "Some trades failed to execute",
+    "data": {
+      "total_orders": 4,
+      "successful_orders": 0,
+      "failed_orders": 4,
+      "order_details": [
+        {
+          "symbol": "VTI",
+          "amount": 30000.0,
+          "status": "failed",
+          "order_id": null,
+          "error": "1 validation error for MarketOrderRequest\n  Value error, Both qty and notional can not be set. [type=value_error, input_value={'symbol': 'VTI', 'qty': ...rType.MARKET: 'market'>}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.10/v/value_error"
+        },
+        {
+          "symbol": "VXUS",
+          "amount": 20000.0,
+          "status": "failed",
+          "order_id": null,
+          "error": "1 validation error for MarketOrderRequest\n  Value error, Both qty and notional can not be set. [type=value_error, input_value={'symbol': 'VXUS', 'qty':...rType.MARKET: 'market'>}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.10/v/value_error"
+        },
+        {
+          "symbol": "BND",
+          "amount": 20000.0,
+          "status": "failed",
+          "order_id": null,
+          "error": "1 validation error for MarketOrderRequest\n  Value error, Both qty and notional can not be set. [type=value_error, input_value={'symbol': 'BND', 'qty': ...rType.MARKET: 'market'>}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.10/v/value_error"
+        },
+        {
+          "symbol": "GLD",
+          "amount": 15000.0,
+          "status": "failed",
+          "order_id": null,
+          "error": "1 validation error for MarketOrderRequest\n  Value error, Both qty and notional can not be set. [type=value_error, input_value={'symbol': 'GLD', 'qty': ...rType.MARKET: 'market'>}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.10/v/value_error"
+        }
+      ]
+    }
+  },
+  {
+    "timestamp": "2025-12-17T11:23:17.132480Z",
+    "level": "error",
+    "message": "Investment cycle failed",
+    "data": {
+      "cycle_id": "9bca71dc-8b23-431f-b4b2-e6e96289d42d",
+      "error": "'InvestmentDecision' object has no attribute 'dict'"
+    }
+  },
+  {
+    "timestamp": "2025-12-17T11:25:22.229206Z",
+    "level": "info",
+    "message": "All trades executed successfully",
+    "data": {
+      "total_orders": 4,
+      "successful_orders": 4,
+      "failed_orders": 0,
+      "order_details": [
+        {
+          "symbol": "VTI",
+          "amount": 400.0,
+          "status": "accepted",
+          "order_id": 
