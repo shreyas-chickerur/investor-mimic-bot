@@ -23,16 +23,19 @@ class Environment:
         base_dir = Path(__file__).parent.parent
         env_file = base_dir / f".env.{self.env}"
 
-        if not env_file.exists():
-            raise FileNotFoundError(f"Environment file not found: {env_file}")
-        else:
+        # Try environment-specific file first
+        if env_file.exists():
             load_dotenv(env_file)
             print(f"✓ Loaded {self.env} environment configuration")
-            # Fall back to default .env
-            default_env = base_dir / ".env"
-            if default_env.exists():
-                load_dotenv(default_env)
-                print("✓ Loaded default environment configuration")
+        
+        # Fall back to default .env (always try this)
+        default_env = base_dir / ".env"
+        if default_env.exists():
+            load_dotenv(default_env)
+            print("✓ Loaded default environment configuration")
+        elif not env_file.exists():
+            # Neither file exists
+            print(f"⚠ Warning: No .env file found. Using system environment variables only.")
 
     @property
     def is_development(self) -> bool:
