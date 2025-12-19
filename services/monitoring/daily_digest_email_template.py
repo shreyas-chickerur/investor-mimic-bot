@@ -158,16 +158,16 @@ def _build_market_summary(market_data: Dict) -> str:
     # Add market sentiment summary
     html += """
     <div style="background: #f8f9fa; padding: 20px 24px; border-radius: 8px; border-left: 4px solid #2196F3;">
-        <div style="display: flex; justify-content: space-evenly; align-items: center; flex-wrap: wrap; gap: 20px;">
-            <div style="flex: 1; min-width: 180px;">
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px;">
+            <div style="text-align: center;">
                 <div style="color: #546e7a; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Market Sentiment</div>
                 <div style="color: #2c3e50; font-size: 15px; font-weight: 600; margin-top: 6px;">Moderately Bullish</div>
             </div>
-            <div style="flex: 1; min-width: 180px;">
+            <div style="text-align: center;">
                 <div style="color: #546e7a; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Sector Leaders</div>
                 <div style="color: #2c3e50; font-size: 15px; font-weight: 600; margin-top: 6px;">Technology, Healthcare</div>
             </div>
-            <div style="flex: 1; min-width: 180px;">
+            <div style="text-align: center;">
                 <div style="color: #546e7a; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Volume</div>
                 <div style="color: #2c3e50; font-size: 15px; font-weight: 600; margin-top: 6px;">Above Average</div>
             </div>
