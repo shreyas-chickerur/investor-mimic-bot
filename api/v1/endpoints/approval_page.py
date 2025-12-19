@@ -258,6 +258,52 @@ async def reject_page(request_id: str):
 @router.get("/{request_id}/review", response_class=HTMLResponse)
 async def review_trades_page(request_id: str):
     """Display interactive form to review and approve/reject trades individually."""
+    # Handle special "today" keyword to get today's pending approval
+    if request_id == "today":
+        # Get all pending requests and find today's
+        from datetime import datetime
+
+        today = datetime.now().date()
+
+        # For now, return a helpful message since we don't have a get_pending_requests method
+        return """
+        <html>
+            <head>
+                <title>No Pending Approvals</title>
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 50px auto; padding: 40px; background: #f8f9fa; }
+                    .container { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+                    h1 { color: #2c3e50; margin-top: 0; }
+                    p { color: #546e7a; line-height: 1.6; font-size: 16px; }
+                    .info-box { background: #e3f2fd; padding: 20px; border-radius: 8px; border-left: 4px solid #2196F3; margin: 20px 0; }
+                    .button { display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 20px; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>📊 No Pending Trade Approvals</h1>
+                    <p>There are currently no trade recommendations waiting for your approval.</p>
+                    
+                    <div class="info-box">
+                        <strong>💡 How it works:</strong><br>
+                        Trade recommendations are generated daily by the system. When new recommendations are ready, 
+                        you'll receive an email with a link to review and approve them.
+                    </div>
+                    
+                    <p><strong>To generate recommendations:</strong></p>
+                    <ol>
+                        <li>Run the daily workflow script</li>
+                        <li>The system will analyze markets and generate recommendations</li>
+                        <li>You'll receive an email with the approval link</li>
+                        <li>Click the link to review and approve/reject trades</li>
+                    </ol>
+                    
+                    <a href="http://localhost:8000/docs" class="button">View API Documentation</a>
+                </div>
+            </body>
+        </html>
+        """
+
     request = approval_manager.get_request(request_id)
 
     if not request:
