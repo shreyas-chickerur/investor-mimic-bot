@@ -51,13 +51,13 @@ class ContinuousLearningEngine:
         with get_db_session() as session:
             # Get all training data
             query = """
-                SELECT 
+                SELECT
                     t.ticker,
                     t.date,
                     t.features,
                     t.target_return_10d
                 FROM training_data t
-                WHERE t.date >= :start_date 
+                WHERE t.date >= :start_date
                   AND t.date <= :end_date
                   AND t.target_return_10d IS NOT NULL
                 ORDER BY t.date
@@ -198,8 +198,8 @@ class ContinuousLearningEngine:
             try:
                 session.execute(
                     """
-                    INSERT INTO model_metrics 
-                    (model_version, training_date, test_sharpe, test_accuracy, 
+                    INSERT INTO model_metrics
+                    (model_version, training_date, test_sharpe, test_accuracy,
                      test_mse, test_mae, training_samples, hyperparameters)
                     VALUES (:version, :date, :sharpe, :accuracy, :mse, :mae, :samples, :params)
                     ON CONFLICT (model_version) DO UPDATE SET
@@ -238,10 +238,10 @@ class ContinuousLearningEngine:
 
         with get_db_session() as session:
             query = """
-                SELECT 
+                SELECT
                     AVG(ABS(prediction_error)) as mae,
                     AVG(prediction_error * prediction_error) as mse,
-                    AVG(CASE WHEN 
+                    AVG(CASE WHEN
                         (predicted_return > 0 AND actual_return > 0) OR
                         (predicted_return < 0 AND actual_return < 0)
                         THEN 1 ELSE 0 END) as accuracy,
@@ -352,10 +352,10 @@ class ContinuousLearningEngine:
         with get_db_session() as session:
             result = session.execute(
                 """
-                SELECT model_version 
-                FROM model_metrics 
-                WHERE is_production = TRUE 
-                ORDER BY deployed_at DESC 
+                SELECT model_version
+                FROM model_metrics
+                WHERE is_production = TRUE
+                ORDER BY deployed_at DESC
                 LIMIT 1
             """
             )
@@ -368,9 +368,9 @@ class ContinuousLearningEngine:
             # Retire current production model
             session.execute(
                 """
-                UPDATE model_metrics 
-                SET is_production = FALSE, 
-                    retired_at = NOW() 
+                UPDATE model_metrics
+                SET is_production = FALSE,
+                    retired_at = NOW()
                 WHERE is_production = TRUE
             """
             )
@@ -378,9 +378,9 @@ class ContinuousLearningEngine:
             # Promote new model
             session.execute(
                 """
-                UPDATE model_metrics 
-                SET is_production = TRUE, 
-                    deployed_at = NOW() 
+                UPDATE model_metrics
+                SET is_production = TRUE,
+                    deployed_at = NOW()
                 WHERE model_version = :version
             """,
                 {"version": version},
@@ -394,8 +394,8 @@ class ContinuousLearningEngine:
         with get_db_session() as session:
             session.execute(
                 """
-                INSERT INTO model_retraining_schedule 
-                (scheduled_time, status, model_version, samples_used, 
+                INSERT INTO model_retraining_schedule
+                (scheduled_time, status, model_version, samples_used,
                  performance_improvement, error_message)
                 VALUES (:time, :status, :version, :samples, :improvement, :error)
             """,

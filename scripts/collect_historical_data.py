@@ -336,7 +336,7 @@ class HistoricalDataCollector:
             conn = psycopg2.connect(self.db_url)
 
             query = """
-                SELECT 
+                SELECT
                     ticker,
                     security_name,
                     portfolio_weight,

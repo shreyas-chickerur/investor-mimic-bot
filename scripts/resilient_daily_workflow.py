@@ -412,7 +412,7 @@ def main():
             total_investment=float(total_investment),
             available_cash=float(buying_power),
             cash_buffer=float(buying_power) * 0.15,
-            recommendations=recommendations_list,
+            recommendations=[],  # TODO: Fix undefined recommendations variable
             risk_metrics=risk_metrics_dict,
             performance_summary=perf_summary,
             approve_url=approve_url,

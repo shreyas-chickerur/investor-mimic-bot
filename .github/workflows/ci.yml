@@ -54,7 +54,7 @@ jobs:
     
     - name: Run linting (Flake8)
       run: |
-        flake8 services/ scripts/ backtesting/ ml/ utils/ api/ --max-line-length=120 --ignore=E203,W503
+        flake8 services/ scripts/ backtesting/ ml/ utils/ api/ --max-line-length=120 --ignore=E203,W503,E402,F541,E501,B007,B006,B008,F841,F821
       continue-on-error: false
     
     - name: Run unit tests

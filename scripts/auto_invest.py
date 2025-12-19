@@ -10,13 +10,13 @@ Designed to work with Alpaca's recurring deposit feature.
 Usage:
     # Run once
     python3 scripts/auto_invest.py
-    
+
     # Run with custom parameters
     python3 scripts/auto_invest.py --min-cash 1000 --max-positions 10
-    
+
     # Dry run (no actual trades)
     python3 scripts/auto_invest.py --dry-run
-    
+
 Schedule this to run daily (e.g., via cron):
     0 10 * * 1-5 cd /path/to/bot && python3 scripts/auto_invest.py
 """
@@ -236,10 +236,10 @@ def main():
 Examples:
   # Dry run
   python3 scripts/auto_invest.py --dry-run
-  
+
   # Live with custom settings
   python3 scripts/auto_invest.py --min-cash 2000 --max-positions 15
-  
+
   # Schedule daily via cron (10 AM on weekdays)
   0 10 * * 1-5 cd /path/to/bot && python3 scripts/auto_invest.py
         """,
