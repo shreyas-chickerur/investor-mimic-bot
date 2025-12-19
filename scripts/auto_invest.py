@@ -145,9 +145,7 @@ async def run_investment_workflow(
     # Run strategy
     logger.info("Running conviction strategy...")
 
-    conviction_config = ConvictionConfig(
-        lookback_days=365, recency_weight=0.5, min_conviction_score=0.01
-    )
+    conviction_config = ConvictionConfig(lookback_days=365, recency_weight=0.5, min_conviction_score=0.01)
 
     engine = ConvictionEngine(conviction_config)
 
@@ -248,9 +246,7 @@ Examples:
         """,
     )
 
-    parser.add_argument(
-        "--dry-run", action="store_true", help="Run without executing actual trades"
-    )
+    parser.add_argument("--dry-run", action="store_true", help="Run without executing actual trades")
 
     parser.add_argument(
         "--min-cash",

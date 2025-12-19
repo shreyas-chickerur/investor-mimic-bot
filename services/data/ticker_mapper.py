@@ -28,9 +28,7 @@ class TickerMapper:
             db_url: Database URL for local cache
         """
         self.openfigi_api_key = openfigi_api_key or os.getenv("OPENFIGI_API_KEY")
-        self.db_url = db_url or os.getenv("DATABASE_URL", "").replace(
-            "postgresql+asyncpg://", "postgresql://"
-        )
+        self.db_url = db_url or os.getenv("DATABASE_URL", "").replace("postgresql+asyncpg://", "postgresql://")
 
         # In-memory cache
         self.cusip_to_ticker_cache: Dict[str, str] = {}

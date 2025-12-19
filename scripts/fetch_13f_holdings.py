@@ -40,9 +40,7 @@ async def main(max_filings_per_investor: int, output_dir: Path):
     # Initialize the SEC client
     async with SECClient() as client:
         # Get holdings for all investors
-        holdings = await client.get_all_investor_holdings(
-            max_filings_per_investor=max_filings_per_investor
-        )
+        holdings = await client.get_all_investor_holdings(max_filings_per_investor=max_filings_per_investor)
 
         # Process and save results
         for investor_name, data in holdings.items():
@@ -55,9 +53,7 @@ async def main(max_filings_per_investor: int, output_dir: Path):
 
                 for filing in filings:
                     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S_%f")
-                    acc = (
-                        str(filing.get("accession_number") or "").replace("/", "-").replace(" ", "")
-                    )
+                    acc = str(filing.get("accession_number") or "").replace("/", "-").replace(" ", "")
                     acc_suffix = f"_{acc}" if acc else ""
 
                     meta = {
@@ -78,16 +74,12 @@ async def main(max_filings_per_investor: int, output_dir: Path):
                     if "votingAuthority" in holdings_df.columns:
                         va_df = pd.json_normalize(holdings_df["votingAuthority"])
                         va_df.columns = [f"va_{col}" for col in va_df.columns]
-                        holdings_df = pd.concat(
-                            [holdings_df.drop(["votingAuthority"], axis=1), va_df], axis=1
-                        )
+                        holdings_df = pd.concat([holdings_df.drop(["votingAuthority"], axis=1), va_df], axis=1)
 
                     csv_file = output_dir / f"{safe_name}_{timestamp}{acc_suffix}_holdings.csv"
                     holdings_df.to_csv(csv_file, index=False)
 
-                    logger.info(
-                        f"Saved {len(holdings_df)} holdings for {investor_name} to {csv_file}"
-                    )
+                    logger.info(f"Saved {len(holdings_df)} holdings for {investor_name} to {csv_file}")
 
             except Exception as e:
                 logger.error(f"Error processing {investor_name}: {str(e)}", exc_info=True)
