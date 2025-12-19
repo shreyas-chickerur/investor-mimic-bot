@@ -52,14 +52,14 @@ def get_daily_digest_email_html(market_section: Dict, portfolio_section: Dict, u
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Daily Investment Digest</title>
     </head>
-    <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8f9fa; line-height: 1.6;">
+    <body style="margin: 0; padding: 0; font-family: Georgia, 'Times New Roman', Times, serif; background-color: #f8f9fa; line-height: 1.6;">
         <div style="max-width: 900px; margin: 20px auto; background-color: #ffffff; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-radius: 8px; overflow: hidden;">
 
             <!-- Header -->
             <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #7e8ba3 100%); padding: 40px 32px; text-align: center; position: relative; overflow: hidden;">
                 <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: url('data:image/svg+xml,%3Csvg width="100" height="100" xmlns="http://www.w3.org/2000/svg"%3E%3Cpath d="M0 0h100v100H0z" fill="none"/%3E%3Cpath d="M0 50h100M50 0v100" stroke="%23ffffff" stroke-width="0.5" opacity="0.1"/%3E%3C/svg%3E') repeat; opacity: 0.3;"></div>
                 <div style="position: relative; z-index: 1;">
-                    <h1 style="color: #ffffff; margin: 0; font-size: 32px; font-weight: 700; letter-spacing: -0.5px; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">📊 Daily Investment Digest</h1>
+                    <h1 style="color: #ffffff; margin: 0; font-size: 32px; font-weight: 700; letter-spacing: 0.5px; text-shadow: 0 2px 4px rgba(0,0,0,0.2); font-family: Georgia, 'Times New Roman', Times, serif;">📊 Daily Investment Digest</h1>
                     <p style="color: #e3f2fd; margin: 12px 0 0 0; font-size: 15px; font-weight: 500;">{datetime.now().strftime('%A, %B %d, %Y')}</p>
                 </div>
             </div>
@@ -163,7 +163,7 @@ def _build_market_summary(market_data: Dict) -> str:
     # Add market sentiment summary
     html += """
     <div style="background: #f8f9fa; padding: 20px 24px; border-radius: 8px; border-left: 4px solid #2196F3;">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 40px;">
+        <div style="display: flex; justify-content: space-evenly; align-items: center; flex-wrap: wrap; gap: 20px;">
             <div style="flex: 1; min-width: 180px;">
                 <div style="color: #546e7a; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Market Sentiment</div>
                 <div style="color: #2c3e50; font-size: 15px; font-weight: 600; margin-top: 6px;">Moderately Bullish</div>
