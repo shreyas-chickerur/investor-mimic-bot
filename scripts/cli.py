@@ -108,9 +108,7 @@ def optimize(metric, trials):
 
 
 @cli.command()
-@click.option(
-    "--env-name", type=click.Choice(["development", "staging", "production"]), required=True
-)
+@click.option("--env-name", type=click.Choice(["development", "staging", "production"]), required=True)
 def deploy(env_name):
     """Deploy to specified environment."""
     click.echo(f"Deploying to {env_name}...")
@@ -182,9 +180,7 @@ def init():
 
     # Database
     click.echo("\n2. Database")
-    db_url = click.prompt(
-        "  PostgreSQL URL", default="postgresql://postgres@localhost:5432/investorbot"
-    )
+    db_url = click.prompt("  PostgreSQL URL", default="postgresql://postgres@localhost:5432/investorbot")
 
     # Email (optional)
     click.echo("\n3. Email Notifications (optional)")

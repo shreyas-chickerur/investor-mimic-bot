@@ -27,10 +27,7 @@ class HealthChecker:
             pool_metrics = get_pool_metrics()
 
             # Check if pool is healthy
-            healthy = (
-                pool_metrics["checked_out"] < pool_metrics["size"] * 0.9
-                and pool_metrics["total_connections"] > 0
-            )
+            healthy = pool_metrics["checked_out"] < pool_metrics["size"] * 0.9 and pool_metrics["total_connections"] > 0
 
             return {
                 "status": "healthy" if healthy else "degraded",
@@ -95,9 +92,7 @@ class HealthChecker:
         except Exception as e:
             api_status["alpha_vantage"] = {"status": "error", "error": str(e)}
 
-        overall_healthy = all(
-            api["status"] in ["configured", "healthy"] for api in api_status.values()
-        )
+        overall_healthy = all(api["status"] in ["configured", "healthy"] for api in api_status.values())
 
         return {
             "status": "healthy" if overall_healthy else "degraded",

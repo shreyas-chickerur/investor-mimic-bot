@@ -158,9 +158,7 @@ class NotificationManager:
                 logger.warning("No email address specified")
                 return False
 
-            send_email(
-                to_email=to_email, subject=subject or "Investor Mimic Bot Alert", body=message
-            )
+            send_email(to_email=to_email, subject=subject or "Investor Mimic Bot Alert", body=message)
 
             logger.info(f"Email sent to {to_email}")
             return True
@@ -214,9 +212,7 @@ class NotificationManager:
 
         results = {}
         for channel in channels:
-            results[channel.value] = self.send_notification(
-                message, channel=channel, priority=priority
-            )
+            results[channel.value] = self.send_notification(message, channel=channel, priority=priority)
 
         return results
 

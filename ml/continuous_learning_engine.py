@@ -90,9 +90,7 @@ class ContinuousLearningEngine:
 
         return X, y
 
-    def train_new_model(
-        self, X: pd.DataFrame, y: pd.Series, model_type: str = "ensemble"
-    ) -> Tuple[object, Dict]:
+    def train_new_model(self, X: pd.DataFrame, y: pd.Series, model_type: str = "ensemble") -> Tuple[object, Dict]:
         """
         Train a new model on the data.
 
@@ -261,7 +259,12 @@ class ContinuousLearningEngine:
             logger.warning(f"No predictions found for model {version}")
             return {}
 
-        metrics = {"mae": float(row[0] or 0), "mse": float(row[1] or 0), "accuracy": float(row[2] or 0), "count": int(row[3])}
+        metrics = {
+            "mae": float(row[0] or 0),
+            "mse": float(row[1] or 0),
+            "accuracy": float(row[2] or 0),
+            "count": int(row[3]),
+        }
 
         logger.info(f"Model {version} performance: Accuracy={metrics['accuracy']:.2%}, MAE={metrics['mae']:.6f}")
 

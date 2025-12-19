@@ -156,9 +156,7 @@ class TradeApprovalManager:
             logger.error(f"Failed to load request {request_id}: {e}")
             return None
 
-    def approve_request(
-        self, request_id: str, approved_by: str = "user", notes: Optional[str] = None
-    ) -> bool:
+    def approve_request(self, request_id: str, approved_by: str = "user", notes: Optional[str] = None) -> bool:
         """
         Approve a request.
 

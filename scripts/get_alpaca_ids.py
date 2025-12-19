@@ -80,9 +80,7 @@ def main():
                     print(f"Bank {i}:")
                     print(f"  Bank ID: {bank.id}")
                     print(f"  Bank Name: {bank.bank_name}")
-                    print(
-                        f"  Account Type: {bank.account_type if hasattr(bank, 'account_type') else 'N/A'}"
-                    )
+                    print(f"  Account Type: {bank.account_type if hasattr(bank, 'account_type') else 'N/A'}")
                     print(f"  Status: {bank.status}")
                     print()
             else:

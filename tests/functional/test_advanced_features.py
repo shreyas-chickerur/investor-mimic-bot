@@ -126,9 +126,7 @@ class TestPortfolioRebalancer:
         total_value = 200 * 150 + 10 * 140 + 80 * 380
         portfolio_positions = rebalancer.calculate_portfolio_weights(positions, total_value)
 
-        oversized, undersized, within_range = rebalancer.identify_rebalance_needs(
-            portfolio_positions
-        )
+        oversized, undersized, within_range = rebalancer.identify_rebalance_needs(portfolio_positions)
 
         assert "AAPL" in oversized
         assert "GOOGL" in undersized

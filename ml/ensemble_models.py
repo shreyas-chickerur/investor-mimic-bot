@@ -30,15 +30,11 @@ class EnsembleOptimizer:
         """Create ensemble of models."""
         return (
             [
-                RandomForestRegressor(
-                    n_estimators=100, max_depth=10, min_samples_split=5, random_state=42 + i
-                )
+                RandomForestRegressor(n_estimators=100, max_depth=10, min_samples_split=5, random_state=42 + i)
                 for i in range(self.n_models)
             ]
             + [
-                GradientBoostingRegressor(
-                    n_estimators=100, max_depth=5, learning_rate=0.1, random_state=42 + i
-                )
+                GradientBoostingRegressor(n_estimators=100, max_depth=5, learning_rate=0.1, random_state=42 + i)
                 for i in range(self.n_models)
             ]
             + [Ridge(alpha=1.0, random_state=42)]
@@ -85,11 +81,7 @@ class EnsembleOptimizer:
         # Calculate model weights based on CV performance
         cv_scores = np.array(cv_scores)
         cv_scores = np.maximum(cv_scores, 0)  # Ensure non-negative
-        self.weights = (
-            cv_scores / cv_scores.sum()
-            if cv_scores.sum() > 0
-            else np.ones(len(cv_scores)) / len(cv_scores)
-        )
+        self.weights = cv_scores / cv_scores.sum() if cv_scores.sum() > 0 else np.ones(len(cv_scores)) / len(cv_scores)
 
         # Calculate feature importance
         self._calculate_feature_importance(X)
