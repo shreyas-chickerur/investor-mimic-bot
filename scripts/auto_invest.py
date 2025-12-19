@@ -10,20 +10,19 @@ Designed to work with Alpaca's recurring deposit feature.
 Usage:
     # Run once
     python3 scripts/auto_invest.py
-    
+
     # Run with custom parameters
     python3 scripts/auto_invest.py --min-cash 1000 --max-positions 10
-    
+
     # Dry run (no actual trades)
     python3 scripts/auto_invest.py --dry-run
-    
+
 Schedule this to run daily (e.g., via cron):
     0 10 * * 1-5 cd /path/to/bot && python3 scripts/auto_invest.py
 """
 
 import argparse
 import asyncio
-import logging
 import sys
 from datetime import datetime
 from decimal import Decimal
@@ -145,9 +144,7 @@ async def run_investment_workflow(
     # Run strategy
     logger.info("Running conviction strategy...")
 
-    conviction_config = ConvictionConfig(
-        lookback_days=365, recency_weight=0.5, min_conviction_score=0.01
-    )
+    conviction_config = ConvictionConfig(lookback_days=365, recency_weight=0.5, min_conviction_score=0.01)
 
     engine = ConvictionEngine(conviction_config)
 
@@ -239,18 +236,16 @@ def main():
 Examples:
   # Dry run
   python3 scripts/auto_invest.py --dry-run
-  
+
   # Live with custom settings
   python3 scripts/auto_invest.py --min-cash 2000 --max-positions 15
-  
+
   # Schedule daily via cron (10 AM on weekdays)
   0 10 * * 1-5 cd /path/to/bot && python3 scripts/auto_invest.py
         """,
     )
 
-    parser.add_argument(
-        "--dry-run", action="store_true", help="Run without executing actual trades"
-    )
+    parser.add_argument("--dry-run", action="store_true", help="Run without executing actual trades")
 
     parser.add_argument(
         "--min-cash",

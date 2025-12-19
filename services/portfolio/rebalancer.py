@@ -7,12 +7,9 @@ from target weights. Prevents concentration risk and maintains diversification.
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-from decimal import Decimal
+from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
-import numpy as np
-import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -287,9 +284,7 @@ class PortfolioRebalancer:
 
         return summary
 
-    def get_rebalance_report(
-        self, portfolio_positions: Dict[str, PortfolioPosition], total_value: float
-    ) -> str:
+    def get_rebalance_report(self, portfolio_positions: Dict[str, PortfolioPosition], total_value: float) -> str:
         """
         Generate human-readable rebalance report.
 
@@ -321,20 +316,26 @@ POSITION STATUS:
             report += "OVERSIZED POSITIONS:\n"
             for symbol in oversized:
                 pos = portfolio_positions[symbol]
-                report += f"  {symbol}: {pos.current_weight:.1%} (target: {pos.target_weight:.1%}, drift: {pos.drift:+.1%})\n"
+                report += (
+                    f"  {symbol}: {pos.current_weight:.1%} (target: {pos.target_weight:.1%}, drift: {pos.drift:+.1%})\n"
+                )
             report += "\n"
 
         if undersized:
             report += "UNDERSIZED POSITIONS:\n"
             for symbol in undersized:
                 pos = portfolio_positions[symbol]
-                report += f"  {symbol}: {pos.current_weight:.1%} (target: {pos.target_weight:.1%}, drift: {pos.drift:+.1%})\n"
+                report += (
+                    f"  {symbol}: {pos.current_weight:.1%} (target: {pos.target_weight:.1%}, drift: {pos.drift:+.1%})\n"
+                )
             report += "\n"
 
         if trades:
             report += f"RECOMMENDED TRADES ({len(trades)}):\n"
             for trade in trades:
-                report += f"  {trade['action']:4s} {trade['quantity']:8.2f} {trade['symbol']:6s} (${trade['value']:,.2f})\n"
+                report += (
+                    f"  {trade['action']:4s} {trade['quantity']:8.2f} {trade['symbol']:6s} (${trade['value']:,.2f})\n"
+                )
             report += f"\nTotal Trade Value: ${sum(t['value'] for t in trades):,.2f}\n"
         else:
             report += "NO TRADES NEEDED - Portfolio is balanced\n"
@@ -393,9 +394,7 @@ class SmartRebalancer(PortfolioRebalancer):
 
         return trades
 
-    def optimize_for_transaction_costs(
-        self, trades: List[Dict], min_trade_value: float = 100.0
-    ) -> List[Dict]:
+    def optimize_for_transaction_costs(self, trades: List[Dict], min_trade_value: float = 100.0) -> List[Dict]:
         """
         Filter out trades where transaction costs exceed benefit.
 

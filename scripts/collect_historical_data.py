@@ -11,7 +11,7 @@ Collects all necessary historical data for backtesting:
 
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -23,7 +23,6 @@ load_dotenv()
 import time
 from typing import Dict, List, Optional
 
-import numpy as np
 import pandas as pd
 import psycopg2
 import requests
@@ -167,9 +166,7 @@ class HistoricalDataCollector:
 
         return price_data
 
-    def fetch_alpha_vantage_data(
-        self, symbol: str, outputsize: str = "full"
-    ) -> Optional[pd.DataFrame]:
+    def fetch_alpha_vantage_data(self, symbol: str, outputsize: str = "full") -> Optional[pd.DataFrame]:
         """
         Fetch historical data from Alpha Vantage.
 
@@ -274,9 +271,7 @@ class HistoricalDataCollector:
 
         return price_data
 
-    def collect_market_data(
-        self, start_date: datetime, end_date: datetime
-    ) -> Dict[str, pd.DataFrame]:
+    def collect_market_data(self, start_date: datetime, end_date: datetime) -> Dict[str, pd.DataFrame]:
         """
         Collect market benchmark data (SPY, VIX).
 
@@ -341,7 +336,7 @@ class HistoricalDataCollector:
             conn = psycopg2.connect(self.db_url)
 
             query = """
-                SELECT 
+                SELECT
                     ticker,
                     security_name,
                     portfolio_weight,

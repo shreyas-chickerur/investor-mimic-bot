@@ -5,7 +5,7 @@ Uses VADER for simple sentiment analysis (no ML dependencies needed).
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, List
 
 logger = logging.getLogger(__name__)
@@ -177,9 +177,7 @@ class SimpleSentimentAnalyzer:
         weighted_score = sum(s * w for s, w in zip(scores, weights)) / sum(weights)
         return weighted_score
 
-    def analyze_batch(
-        self, articles_by_symbol: Dict[str, List], min_articles: int = 3
-    ) -> Dict[str, SentimentScore]:
+    def analyze_batch(self, articles_by_symbol: Dict[str, List], min_articles: int = 3) -> Dict[str, SentimentScore]:
         """
         Analyze sentiment for multiple symbols.
 

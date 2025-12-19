@@ -17,7 +17,7 @@ import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 from alpaca.trading.client import TradingClient
 from alpaca.trading.enums import OrderSide, TimeInForce
@@ -29,7 +29,6 @@ sys.path.append(str(Path(__file__).parent.parent))
 from config.risk_controls import RiskControls, default_risk_controls  # noqa: E402
 from services.funding.calculator import FundingCalculator, FundingRule  # noqa: E402
 from services.funding.types import InvestmentDecision  # noqa: E402
-from utils.alerting import AlertManager, alert_manager  # noqa: E402
 from utils.logging_config import setup_logger  # noqa: E402
 
 # Configure logging
@@ -89,9 +88,7 @@ class InvestmentCycle:
 
         except Exception as e:
             logger.error(f"Error checking deposits: {e}", exc_info=True)
-            await alert_manager.alert(
-                "Failed to check for deposits", level="error", data={"error": str(e)}
-            )
+            await alert_manager.alert("Failed to check for deposits", level="error", data={"error": str(e)})
             return None
 
     async def calculate_investment_amount(self, deposit_amount: Decimal) -> InvestmentDecision:
@@ -157,9 +154,7 @@ class InvestmentCycle:
             # Calculate dollar amounts for each position
             trade_plan = []
             for pos in target_positions:
-                amount = (investment_amount * Decimal(str(pos["allocation"]))).quantize(
-                    Decimal("0.01")
-                )
+                amount = (investment_amount * Decimal(str(pos["allocation"]))).quantize(Decimal("0.01"))
                 trade_plan.append(
                     {
                         "symbol": pos["symbol"],
@@ -230,9 +225,7 @@ class InvestmentCycle:
                     results["successful_orders"] += 1
 
                 except Exception as e:
-                    logger.error(
-                        f"Error submitting order for {trade['symbol']}: {e}", exc_info=True
-                    )
+                    logger.error(f"Error submitting order for {trade['symbol']}: {e}", exc_info=True)
                     log_method = getattr(logger, "error", logger.info)
                     log_data = {
                         "alert": True,
@@ -272,17 +265,13 @@ class InvestmentCycle:
                     data=results,
                 )
             else:
-                await alert_manager.alert(
-                    "All trades executed successfully", level="info", data=results
-                )
+                await alert_manager.alert("All trades executed successfully", level="info", data=results)
 
             return results
 
         except Exception as e:
             logger.error(f"Unexpected error executing trades: {e}", exc_info=True)
-            await alert_manager.alert(
-                "Unexpected error executing trades", level="error", data={"error": str(e)}
-            )
+            await alert_manager.alert("Unexpected error executing trades", level="error", data={"error": str(e)})
             raise
 
     async def run_cycle(self, manual_deposit_amount: Decimal = None) -> Dict:
@@ -322,9 +311,7 @@ class InvestmentCycle:
                 print(f"Available to invest: ${decision.investment_amount:,.2f}")
                 print("\nProposed trades:")
                 for trade in trade_plan:
-                    print(
-                        f"  - {trade['symbol']}: ${trade['amount']:,.2f} ({trade['allocation_pct']:.1f}%)"
-                    )
+                    print(f"  - {trade['symbol']}: ${trade['amount']:,.2f} ({trade['allocation_pct']:.1f}%)")
 
                 if not self.risk_controls.trading_enabled:
                     print("\nWARNING: Trading is currently disabled in risk controls")
@@ -363,11 +350,7 @@ class InvestmentCycle:
                 "failed_orders": execution_results.get("failed_orders", 0),
                 "order_details": [
                     {
-                        k: (
-                            str(v)
-                            if hasattr(v, "__str__") and not isinstance(v, (str, int, float, bool))
-                            else v
-                        )
+                        k: (str(v) if hasattr(v, "__str__") and not isinstance(v, (str, int, float, bool)) else v)
                         for k, v in order.items()
                     }
                     for order in execution_results.get("order_details", [])
@@ -404,9 +387,7 @@ async def main():
         if len(sys.argv) > 1:
             try:
                 manual_deposit_amount = Decimal(sys.argv[1])
-                logger.info(
-                    f"Using manual deposit amount from command line: ${manual_deposit_amount:,.2f}"
-                )
+                logger.info(f"Using manual deposit amount from command line: ${manual_deposit_amount:,.2f}")
             except (ValueError, IndexError):
                 logger.warning(f"Invalid manual deposit amount: {sys.argv[1]}")
                 print(f"Usage: {sys.argv[0]} [deposit_amount]")
@@ -425,9 +406,7 @@ async def main():
             # Print results
             print("\nInvestment Decision:")
             print(f"  - Deposit Amount: ${float(result['decision'].get('deposit_amount', 0)):,.2f}")
-            print(
-                f"  - Investment Amount: ${float(result['decision'].get('investment_amount', 0)):,.2f}"
-            )
+            print(f"  - Investment Amount: ${float(result['decision'].get('investment_amount', 0)):,.2f}")
             print(f"  - Remaining Cash: ${float(result['decision'].get('remaining_cash', 0)):,.2f}")
 
         if "execution_results" in result:
@@ -442,9 +421,7 @@ async def main():
 
     except Exception as e:
         logger.critical(f"Fatal error in main: {e}", exc_info=True)
-        await alert_manager.alert(
-            "Fatal error in investment cycle", level="critical", data={"error": str(e)}
-        )
+        await alert_manager.alert("Fatal error in investment cycle", level="critical", data={"error": str(e)})
         return 1
 
 

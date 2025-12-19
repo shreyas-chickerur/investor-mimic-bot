@@ -6,9 +6,8 @@ Runs complete backtest on historical data (2010-2024, excluding COVID).
 Tests the 8-factor system and generates detailed performance analysis.
 """
 
-import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -27,7 +26,7 @@ from typing import Dict, List
 import matplotlib.pyplot as plt
 
 from backtesting.backtest_engine import BacktestConfig, BacktestEngine, BacktestResult
-from ml.adaptive_learning_engine import AdaptiveLearningEngine, EnsembleOptimizer, MLConfig
+from ml.adaptive_learning_engine import AdaptiveLearningEngine, EnsembleOptimizer
 
 # Set style
 plt.style.use("ggplot")
@@ -45,9 +44,7 @@ class ComprehensiveBacktester:
         self.ml_engine = AdaptiveLearningEngine()
         self.ensemble_optimizer = EnsembleOptimizer()
 
-    def load_historical_data(
-        self, start_date: datetime, end_date: datetime
-    ) -> Dict[str, pd.DataFrame]:
+    def load_historical_data(self, start_date: datetime, end_date: datetime) -> Dict[str, pd.DataFrame]:
         """
         Load historical data for backtesting.
 
@@ -90,14 +87,12 @@ class ComprehensiveBacktester:
         spy_returns = np.random.normal(0.0004, 0.015, len(dates))
         spy_prices = 100 * (1 + spy_returns).cumprod()
 
-        spy_data = pd.DataFrame(
-            {"date": dates, "close": spy_prices, "returns": spy_returns}
-        ).set_index("date")
+        spy_data = pd.DataFrame({"date": dates, "close": spy_prices, "returns": spy_returns}).set_index("date")
 
         # VIX data
-        vix_data = pd.DataFrame(
-            {"date": dates, "vix": np.random.normal(18, 5, len(dates)).clip(10, 80)}
-        ).set_index("date")
+        vix_data = pd.DataFrame({"date": dates, "vix": np.random.normal(18, 5, len(dates)).clip(10, 80)}).set_index(
+            "date"
+        )
 
         print(f"  ✓ Loaded {len(symbols)} symbols")
         print(f"  ✓ {len(dates)} trading days")
@@ -130,9 +125,7 @@ class ComprehensiveBacktester:
 
         return scores
 
-    def calculate_combined_score(
-        self, factor_scores: Dict[str, float], weights: Dict[str, float]
-    ) -> float:
+    def calculate_combined_score(self, factor_scores: Dict[str, float], weights: Dict[str, float]) -> float:
         """Calculate weighted combined score."""
         return sum(factor_scores.get(factor, 0.0) * weight for factor, weight in weights.items())
 
@@ -163,9 +156,7 @@ class ComprehensiveBacktester:
         historical_data = self.load_historical_data(start_date, end_date)
 
         # Initialize backtest engine
-        config = BacktestConfig(
-            start_date=start_date, end_date=end_date, initial_capital=100000.0, max_positions=10
-        )
+        config = BacktestConfig(start_date=start_date, end_date=end_date, initial_capital=100000.0, max_positions=10)
 
         engine = BacktestEngine(config)
 
@@ -187,9 +178,7 @@ class ComprehensiveBacktester:
                 continue
 
             # Get current prices
-            current_prices = {
-                symbol: historical_data["prices"][symbol].loc[date, "close"] for symbol in symbols
-            }
+            current_prices = {symbol: historical_data["prices"][symbol].loc[date, "close"] for symbol in symbols}
 
             # Rebalance portfolio
             if i % rebalance_frequency == 0:
@@ -203,9 +192,7 @@ class ComprehensiveBacktester:
                 }
 
                 # Select top N stocks
-                top_stocks = sorted(combined_scores.items(), key=lambda x: x[1], reverse=True)[
-                    : config.max_positions
-                ]
+                top_stocks = sorted(combined_scores.items(), key=lambda x: x[1], reverse=True)[: config.max_positions]
 
                 # Calculate target allocation (equal weight for simplicity)
                 target_allocation = engine.cash * 0.95 / len(top_stocks)  # Keep 5% cash
@@ -241,9 +228,7 @@ class ComprehensiveBacktester:
                 if use_ml_optimization and i > 252:  # After 1 year of data
                     # Prepare training data from past performance
                     # (Simplified for demonstration)
-                    current_weights = self._optimize_weights_ml(
-                        historical_data, current_weights, date
-                    )
+                    current_weights = self._optimize_weights_ml(historical_data, current_weights, date)
 
             # Update portfolio
             engine.record_portfolio_state(date, current_prices)
@@ -256,9 +241,7 @@ class ComprehensiveBacktester:
 
         # Calculate metrics
         spy_returns = historical_data["spy"]["returns"]
-        spy_total_return = (
-            historical_data["spy"]["close"].iloc[-1] / historical_data["spy"]["close"].iloc[0]
-        ) - 1
+        spy_total_return = (historical_data["spy"]["close"].iloc[-1] / historical_data["spy"]["close"].iloc[0]) - 1
 
         metrics = engine.calculate_metrics(spy_returns)
         metrics["spy_return"] = spy_total_return
@@ -284,9 +267,7 @@ class ComprehensiveBacktester:
         # For now, return current weights
         return current_weights
 
-    def generate_visualizations(
-        self, engine: BacktestEngine, historical_data: Dict, output_dir: Path
-    ):
+    def generate_visualizations(self, engine: BacktestEngine, historical_data: Dict, output_dir: Path):
         """Generate performance visualizations."""
         print("\nGenerating visualizations...")
 
@@ -298,9 +279,7 @@ class ComprehensiveBacktester:
         portfolio_df.set_index("date", inplace=True)
 
         axes[0, 0].plot(portfolio_df.index, portfolio_df["value"], label="Strategy", linewidth=2)
-        axes[0, 0].axhline(
-            y=engine.config.initial_capital, color="r", linestyle="--", label="Initial Capital"
-        )
+        axes[0, 0].axhline(y=engine.config.initial_capital, color="r", linestyle="--", label="Initial Capital")
         axes[0, 0].set_title("Portfolio Value Over Time", fontsize=14, fontweight="bold")
         axes[0, 0].set_xlabel("Date")
         axes[0, 0].set_ylabel("Portfolio Value ($)")
@@ -310,9 +289,7 @@ class ComprehensiveBacktester:
         # 2. Returns distribution
         returns = portfolio_df["value"].pct_change().dropna()
         axes[0, 1].hist(returns, bins=50, alpha=0.7, edgecolor="black")
-        axes[0, 1].axvline(
-            x=returns.mean(), color="r", linestyle="--", label=f"Mean: {returns.mean():.4f}"
-        )
+        axes[0, 1].axvline(x=returns.mean(), color="r", linestyle="--", label=f"Mean: {returns.mean():.4f}")
         axes[0, 1].set_title("Returns Distribution", fontsize=14, fontweight="bold")
         axes[0, 1].set_xlabel("Daily Return")
         axes[0, 1].set_ylabel("Frequency")
@@ -333,9 +310,7 @@ class ComprehensiveBacktester:
 
         # 4. Cumulative returns comparison
         cumulative_returns = (1 + returns).cumprod()
-        axes[1, 1].plot(
-            cumulative_returns.index, cumulative_returns.values, linewidth=2, label="Strategy"
-        )
+        axes[1, 1].plot(cumulative_returns.index, cumulative_returns.values, linewidth=2, label="Strategy")
         axes[1, 1].axhline(y=1.0, color="r", linestyle="--", label="Breakeven")
         axes[1, 1].set_title("Cumulative Returns", fontsize=14, fontweight="bold")
         axes[1, 1].set_xlabel("Date")

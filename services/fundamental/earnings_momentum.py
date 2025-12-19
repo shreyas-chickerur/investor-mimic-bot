@@ -8,7 +8,7 @@ to maximize profit by identifying stocks with strong earnings momentum.
 import logging
 import os
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, List, Optional
 
 import requests
@@ -191,9 +191,7 @@ class EarningsMomentumTracker:
             except Exception as e:
                 logger.error(f"Error generating earnings signal for {symbol}: {e}")
                 # Add neutral signal on error
-                signals.append(
-                    {"symbol": symbol, "signal": 0.0, "has_data": False, "error": str(e)}
-                )
+                signals.append({"symbol": symbol, "signal": 0.0, "has_data": False, "error": str(e)})
 
         return signals
 

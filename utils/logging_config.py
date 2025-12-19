@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 import sys
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
@@ -19,9 +18,7 @@ class StructuredFormatter(logging.Formatter):
         if hasattr(obj, "isoformat"):
             return obj.isoformat() + "Z" if obj.tzinfo is None else obj.isoformat()
         elif hasattr(obj, "__dict__"):
-            return {
-                k: self._json_serialize(v) for k, v in obj.__dict__.items() if not k.startswith("_")
-            }
+            return {k: self._json_serialize(v) for k, v in obj.__dict__.items() if not k.startswith("_")}
         elif hasattr(obj, "__str__"):
             return str(obj)
         return obj

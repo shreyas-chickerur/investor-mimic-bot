@@ -15,9 +15,7 @@ Usage:
 
 import argparse
 import asyncio
-import logging
 import sys
-import time
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
@@ -115,9 +113,7 @@ async def run_investment_workflow_with_approval(
     # Run strategy
     logger.info("Running conviction strategy...")
 
-    conviction_config = ConvictionConfig(
-        lookback_days=365, recency_weight=0.5, min_conviction_score=0.01
-    )
+    conviction_config = ConvictionConfig(lookback_days=365, recency_weight=0.5, min_conviction_score=0.01)
 
     engine = ConvictionEngine(conviction_config)
 
@@ -161,13 +157,9 @@ async def run_investment_workflow_with_approval(
 
     for trade in trade_plan:
         # Estimate price and value
-        estimated_price = (
-            dollar_allocations.get(trade.symbol, 0) / trade.quantity if trade.quantity > 0 else 0
-        )
+        estimated_price = dollar_allocations.get(trade.symbol, 0) / trade.quantity if trade.quantity > 0 else 0
         estimated_value = estimated_price * trade.quantity
-        allocation_pct = (
-            (estimated_value / float(investable_cash)) * 100 if investable_cash > 0 else 0
-        )
+        allocation_pct = (estimated_value / float(investable_cash)) * 100 if investable_cash > 0 else 0
 
         trades_for_approval.append(
             {
@@ -196,19 +188,13 @@ async def run_investment_workflow_with_approval(
 
     # Send approval email
     logger.info(f"Sending approval email to {approval_email}...")
-    email_sent = await approval_manager.send_approval_email(
-        request=approval_request, recipient_email=approval_email
-    )
+    email_sent = await approval_manager.send_approval_email(request=approval_request, recipient_email=approval_email)
 
     if not email_sent:
         logger.error("Failed to send approval email")
         logger.info("You can still approve manually via API:")
-        logger.info(
-            f"  Approve: POST http://localhost:8000/api/v1/approvals/{approval_request.request_id}/approve"
-        )
-        logger.info(
-            f"  Reject:  POST http://localhost:8000/api/v1/approvals/{approval_request.request_id}/reject"
-        )
+        logger.info(f"  Approve: POST http://localhost:8000/api/v1/approvals/{approval_request.request_id}/approve")
+        logger.info(f"  Reject:  POST http://localhost:8000/api/v1/approvals/{approval_request.request_id}/reject")
     else:
         logger.info("✓ Approval email sent successfully")
 
@@ -282,17 +268,11 @@ def main():
         help="Email address to send approval requests to",
     )
 
-    parser.add_argument(
-        "--min-cash", type=float, default=1000.0, help="Minimum cash threshold (default: 1000)"
-    )
+    parser.add_argument("--min-cash", type=float, default=1000.0, help="Minimum cash threshold (default: 1000)")
 
-    parser.add_argument(
-        "--max-positions", type=int, default=10, help="Maximum positions (default: 10)"
-    )
+    parser.add_argument("--max-positions", type=int, default=10, help="Maximum positions (default: 10)")
 
-    parser.add_argument(
-        "--cash-buffer-pct", type=float, default=10.0, help="Cash buffer percentage (default: 10)"
-    )
+    parser.add_argument("--cash-buffer-pct", type=float, default=10.0, help="Cash buffer percentage (default: 10)")
 
     parser.add_argument(
         "--approval-timeout",

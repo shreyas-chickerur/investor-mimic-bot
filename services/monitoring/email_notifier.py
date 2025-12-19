@@ -261,9 +261,7 @@ Order ID: {order_id or 'N/A'}
         """
         subject = f"System Alert: {component}"
 
-        return self.send_alert(
-            to_emails=to_emails, subject=subject, message=message, level=level, details=details
-        )
+        return self.send_alert(to_emails=to_emails, subject=subject, message=message, level=level, details=details)
 
     def _format_text_email(self, message: str, level: str, details: Optional[dict] = None) -> str:
         """Format a plain text email body."""

@@ -7,7 +7,7 @@ import sys
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional
 
 from dotenv import load_dotenv
 
@@ -103,9 +103,7 @@ def _latest_prices(data_client, symbols) -> Dict[str, Decimal]:
     try:
         from alpaca.data.requests import StockLatestTradeRequest
 
-        resp = data_client.get_stock_latest_trade(
-            StockLatestTradeRequest(symbol_or_symbols=symbols)
-        )
+        resp = data_client.get_stock_latest_trade(StockLatestTradeRequest(symbol_or_symbols=symbols))
         for sym, trade in resp.items():
             px = getattr(trade, "price", None)
             if px is not None:
@@ -144,9 +142,7 @@ def _positions_by_symbol(trading_client) -> Dict[str, Decimal]:
 def main() -> int:
     load_dotenv()
 
-    parser = argparse.ArgumentParser(
-        description="Dry-run rebalance: strategy -> target orders (no trades)"
-    )
+    parser = argparse.ArgumentParser(description="Dry-run rebalance: strategy -> target orders (no trades)")
     parser.add_argument("--as-of", default=date.today().isoformat())
     parser.add_argument("--lookback-days", type=int, default=365)
     parser.add_argument("--half-life-days", type=int, default=90)
@@ -168,9 +164,7 @@ def main() -> int:
     parser.add_argument("--use-buying-power", action="store_true")
 
     # Execution (opt-in)
-    parser.add_argument(
-        "--execute", action="store_true", help="Place orders (paper only by default)"
-    )
+    parser.add_argument("--execute", action="store_true", help="Place orders (paper only by default)")
     parser.add_argument(
         "--confirm",
         default="",
@@ -215,9 +209,7 @@ def main() -> int:
     alloc = engine.allocations(
         as_of=_to_date(args.as_of),
         lookback_days=int(args.lookback_days),
-        cfg=ConvictionConfig(
-            recency_half_life_days=int(args.half_life_days), max_positions=int(args.max_positions)
-        ),
+        cfg=ConvictionConfig(recency_half_life_days=int(args.half_life_days), max_positions=int(args.max_positions)),
     )
 
     symbol_map = _load_symbol_map(args.symbol_map)
@@ -281,9 +273,7 @@ def main() -> int:
     print("DRY RUN (no trades placed)")
     print(f"paper={paper}")
     print(f"cash={cash} buying_power={buying_power} capital_used={capital}")
-    print(
-        f"as_of={args.as_of} lookback_days={args.lookback_days} max_positions={args.max_positions}"
-    )
+    print(f"as_of={args.as_of} lookback_days={args.lookback_days} max_positions={args.max_positions}")
     print(f"tickers_with_prices={len(prices)}/{len(set(target_symbols))}")
     print("--- Proposed Orders ---")
     if not proposed:
@@ -297,11 +287,7 @@ def main() -> int:
         return 0
 
     # ---- Execution guardrails ----
-    allowlist = {
-        s.strip().upper()
-        for s in (args.allowlist.split(",") if args.allowlist else [])
-        if s.strip()
-    }
+    allowlist = {s.strip().upper() for s in (args.allowlist.split(",") if args.allowlist else []) if s.strip()}
     filtered = []
     for o in proposed:
         if allowlist and o["symbol"].upper() not in allowlist:
@@ -317,9 +303,7 @@ def main() -> int:
     total_notional = sum(Decimal(o["est_notional"]) for o in filtered)
 
     if len(filtered) > int(args.max_orders):
-        raise RuntimeError(
-            f"Refusing to execute: {len(filtered)} orders exceeds --max-orders={args.max_orders}"
-        )
+        raise RuntimeError(f"Refusing to execute: {len(filtered)} orders exceeds --max-orders={args.max_orders}")
     if total_notional > max_total:
         raise RuntimeError(
             f"Refusing to execute: total notional {total_notional} exceeds --max-total-notional={max_total}"

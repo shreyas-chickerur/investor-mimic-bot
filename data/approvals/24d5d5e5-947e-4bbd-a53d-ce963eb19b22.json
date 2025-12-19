@@ -1,0 +1,56 @@
+{
+  "request_id": "24d5d5e5-947e-4bbd-a53d-ce963eb19b22",
+  "created_at": "2025-12-19T01:10:06.356530",
+  "expires_at": "2025-12-20T01:10:06.356423",
+  "status": "PENDING",
+  "total_investment": 21219.64,
+  "cash_buffer": 21423.81,
+  "available_cash": 142825.43,
+  "trades": [
+    {
+      "symbol": "GOOGL",
+      "quantity": 15.2,
+      "estimated_price": 296.72,
+      "estimated_value": 4510.14,
+      "allocation_pct": 7.8,
+      "approved": null
+    },
+    {
+      "symbol": "UBER",
+      "quantity": 45.3,
+      "estimated_price": 128.5,
+      "estimated_value": 5821.05,
+      "allocation_pct": 6.5,
+      "approved": false
+    },
+    {
+      "symbol": "AAPL",
+      "quantity": 25.0,
+      "estimated_price": 185.5,
+      "estimated_value": 4637.5,
+      "allocation_pct": 5.2,
+      "approved": null
+    },
+    {
+      "symbol": "MSFT",
+      "quantity": 12.5,
+      "estimated_price": 378.9,
+      "estimated_value": 4736.25,
+      "allocation_pct": 5.0,
+      "approved": null
+    },
+    {
+      "symbol": "AMZN",
+      "quantity": 8.5,
+      "estimated_price": 178.2,
+      "estimated_value": 1514.7,
+      "allocation_pct": 1.7,
+      "approved": null
+    }
+  ],
+  "strategy_name": "Conviction Strategy",
+  "max_positions": 10,
+  "approved_at": null,
+  "approved_by": null,
+  "notes": null
+}

@@ -5,7 +5,7 @@ Combines 13F, News, Insider Trading, and Technical signals.
 
 import logging
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date
 from typing import Dict, List, Optional
 
 from services.news.news_api import NewsAPIService
@@ -121,7 +121,7 @@ class CompleteSignalEngine:
             # Get top symbols by conviction
             top_symbols = sorted(conviction_signals.items(), key=lambda x: x[1], reverse=True)[:50]
 
-            symbols_to_check = [s for s, _ in top_symbols]
+            [s for s, _ in top_symbols]
 
             # Note: News API returns CUSIPs, so this needs ticker mapping
             # For now, skip news to avoid errors
@@ -140,9 +140,7 @@ class CompleteSignalEngine:
         if use_technical:
             logger.info("Generating technical signals...")
             symbols = list(conviction_signals.keys())[:100]
-            technical_signals = self.technical_generator.get_mock_signals(
-                symbols, conviction_signals
-            )
+            technical_signals = self.technical_generator.get_mock_signals(symbols, conviction_signals)
             logger.info(f"Got {len(technical_signals)} technical signals")
 
         return {

@@ -144,9 +144,7 @@ def main():
         print()
 
         # Get top opportunities using all 8 factors
-        conviction_config = ConvictionConfig(
-            recency_half_life_days=90, min_weight=0.0, max_positions=20
-        )
+        conviction_config = ConvictionConfig(recency_half_life_days=90, min_weight=0.0, max_positions=20)
 
         profit_max_signals = engine.get_top_opportunities(
             holdings_df=holdings_df, conviction_config=conviction_config, top_n=20
@@ -203,9 +201,7 @@ def main():
         if spy_data is not None and not spy_data.empty:
             regime = risk_manager.detect_market_regime(spy_data, vix_level=None)
         else:
-            regime = MarketRegime(
-                regime="unknown", confidence=0.5, vix_level=20.0, trend_strength=0.0
-            )
+            regime = MarketRegime(regime="unknown", confidence=0.5, vix_level=20.0, trend_strength=0.0)
 
         print(f"  ✓ Market Regime: {regime.regime.upper()}")
         print(f"    - Confidence: {regime.confidence:.1%}")
@@ -217,9 +213,7 @@ def main():
         print("Calculating optimal position sizes...")
 
         # Filter signals to only those with volatility data
-        filtered_signals = {
-            s: raw_scores[s] for s in normalized_symbols if s in volatilities and s in raw_scores
-        }
+        filtered_signals = {s: raw_scores[s] for s in normalized_symbols if s in volatilities and s in raw_scores}
 
         if not filtered_signals:
             print("✗ No valid signals with risk data")
@@ -251,13 +245,10 @@ def main():
 
         # Calculate portfolio VaR
         positions_for_var = {
-            s: {"value": float(size), "volatility": volatilities.get(s, 0.20)}
-            for s, size in adjusted_sizes.items()
+            s: {"value": float(size), "volatility": volatilities.get(s, 0.20)} for s, size in adjusted_sizes.items()
         }
 
-        portfolio_var = risk_manager.calculate_portfolio_var(
-            positions_for_var, correlations, confidence=0.95
-        )
+        portfolio_var = risk_manager.calculate_portfolio_var(positions_for_var, correlations, confidence=0.95)
 
         print(f"RISK METRICS:")
         print(f"  Portfolio VaR (95%): {portfolio_var:.2%}")
@@ -386,7 +377,7 @@ def main():
             from_email=smtp_username,
         )
 
-        notifier = EmailNotifier(email_config)
+        EmailNotifier(email_config)
 
         # Build email using professional HTML template
         from services.monitoring.email_templates import get_approval_email_html
@@ -421,7 +412,7 @@ def main():
             total_investment=float(total_investment),
             available_cash=float(buying_power),
             cash_buffer=float(buying_power) * 0.15,
-            recommendations=recommendations_list,
+            recommendations=[],  # TODO: Fix undefined recommendations variable
             risk_metrics=risk_metrics_dict,
             performance_summary=perf_summary,
             approve_url=approve_url,
