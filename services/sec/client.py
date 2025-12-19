@@ -99,8 +99,8 @@ class SECClient:
                 # aiohttp will refuse to decode unless we disable the content-type check.
                 return await response.json(content_type=None)
         except aiohttp.ContentTypeError as e:
-            status = getattr(e, 'status', None)
-            content_type = getattr(e, 'content_type', None)
+            status = getattr(e, "status", None)
+            content_type = getattr(e, "content_type", None)
             logger.error(
                 f"Failed to decode JSON {url}: status={status} "
                 f"content_type={content_type} error={str(e)}"

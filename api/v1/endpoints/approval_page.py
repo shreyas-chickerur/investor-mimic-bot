@@ -2,7 +2,7 @@
 HTML pages for trade approval.
 """
 
-from fastapi import APIRouter, Request, Form
+from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from services.approval.trade_approval import TradeApprovalManager
@@ -22,7 +22,7 @@ async def view_approval_request(request_id: str):
 async def approve_page(request_id: str):
     """Display approval confirmation page."""
     request = approval_manager.get_request(request_id)
-    
+
     if not request:
         return """
         <html>
@@ -33,7 +33,7 @@ async def approve_page(request_id: str):
             </body>
         </html>
         """
-    
+
     if request.status.value != "PENDING":
         return f"""
         <html>
@@ -45,7 +45,7 @@ async def approve_page(request_id: str):
             </body>
         </html>
         """
-    
+
     # Build trade table
     trade_rows = ""
     for trade in request.trades:
@@ -58,7 +58,7 @@ async def approve_page(request_id: str):
             <td>{trade.allocation_pct:.1f}%</td>
         </tr>
         """
-    
+
     return f"""
     <html>
         <head>
@@ -259,7 +259,7 @@ async def reject_page(request_id: str):
 async def review_trades_page(request_id: str):
     """Display interactive form to review and approve/reject trades individually."""
     request = approval_manager.get_request(request_id)
-    
+
     if not request:
         return """
         <html>
@@ -270,7 +270,7 @@ async def review_trades_page(request_id: str):
             </body>
         </html>
         """
-    
+
     if request.status.value != "PENDING":
         return f"""
         <html>
@@ -282,31 +282,31 @@ async def review_trades_page(request_id: str):
             </body>
         </html>
         """
-    
+
     # Convert trades to dict format
     trades_list = [
         {
-            'symbol': trade.symbol,
-            'quantity': trade.quantity,
-            'estimated_price': trade.estimated_price,
-            'estimated_value': trade.estimated_value,
-            'allocation_pct': trade.allocation_pct
+            "symbol": trade.symbol,
+            "quantity": trade.quantity,
+            "estimated_price": trade.estimated_price,
+            "estimated_value": trade.estimated_value,
+            "allocation_pct": trade.allocation_pct,
         }
         for trade in request.trades
     ]
-    
+
     # Generate the interactive form
     submit_url = f"/api/v1/approve/{request_id}/submit"
-    
+
     html = get_approval_form_html(
         request_id=request_id,
         trades=trades_list,
         total_investment=request.total_investment,
         available_cash=request.available_cash,
         cash_buffer=request.cash_buffer,
-        submit_url=submit_url
+        submit_url=submit_url,
     )
-    
+
     return html
 
 
@@ -314,9 +314,9 @@ async def review_trades_page(request_id: str):
 async def submit_bulk_decisions(request_id: str, request: Request):
     """Handle bulk approval/rejection form submission."""
     form_data = await request.form()
-    
+
     approval_request = approval_manager.get_request(request_id)
-    
+
     if not approval_request:
         return """
         <html>
@@ -327,24 +327,24 @@ async def submit_bulk_decisions(request_id: str, request: Request):
             </body>
         </html>
         """
-    
+
     # Process decisions
     approved_count = 0
     rejected_count = 0
-    
+
     for i in range(len(approval_request.trades)):
-        decision = form_data.get(f'trade_{i}')
-        
-        if decision == 'approve':
+        decision = form_data.get(f"trade_{i}")
+
+        if decision == "approve":
             approval_manager.approve_trade(request_id, i)
             approved_count += 1
-        elif decision == 'reject':
+        elif decision == "reject":
             approval_manager.reject_trade(request_id, i)
             rejected_count += 1
-    
+
     # Get updated request with approval statuses
     updated_request = approval_manager.get_request(request_id)
-    
+
     # Build detailed trade table rows
     trades_table_html = ""
     for trade in updated_request.trades:
@@ -355,7 +355,7 @@ async def submit_bulk_decisions(request_id: str, request: Request):
             status_badge = '<span style="background-color: #e74c3c; color: white; padding: 8px 16px; border-radius: 4px; font-weight: 600; font-size: 14px; display: inline-block;">✗ REJECTED</span>'
         else:
             status_badge = '<span style="background-color: #95a5a6; color: white; padding: 8px 16px; border-radius: 4px; font-weight: 600; font-size: 14px; display: inline-block;">⏳ PENDING</span>'
-        
+
         trades_table_html += f"""
         <tr>
             <td style="padding: 16px; border-bottom: 1px solid #e0e0e0; font-weight: 600; color: #2c3e50; font-size: 15px;">{trade.symbol}</td>
@@ -366,7 +366,7 @@ async def submit_bulk_decisions(request_id: str, request: Request):
             <td style="padding: 16px; border-bottom: 1px solid #e0e0e0; text-align: center;">{status_badge}</td>
         </tr>
         """
-    
+
     return f"""
     <html>
         <head>

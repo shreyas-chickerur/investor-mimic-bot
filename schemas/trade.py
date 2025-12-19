@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class TradeType(str, Enum):
@@ -34,8 +34,7 @@ class TradeInDB(TradeBase):
     timestamp: datetime
 
     model_config = ConfigDict(
-        from_attributes=True,  # Replaces orm_mode in Pydantic v2
-        arbitrary_types_allowed=True
+        from_attributes=True, arbitrary_types_allowed=True  # Replaces orm_mode in Pydantic v2
     )
 
 
@@ -53,8 +52,7 @@ class PositionInDB(PositionBase):
     security: Dict[str, Any] = {}
 
     model_config = ConfigDict(
-        from_attributes=True,  # Replaces orm_mode in Pydantic v2
-        arbitrary_types_allowed=True
+        from_attributes=True, arbitrary_types_allowed=True  # Replaces orm_mode in Pydantic v2
     )
 
 

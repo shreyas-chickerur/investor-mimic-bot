@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
 from typing import Any, Dict, Optional
 
-from pydantic import BaseModel, Field, field_validator, ConfigDict, model_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_serializer
 
 logger = logging.getLogger(__name__)
 
@@ -22,23 +22,17 @@ class FundingRule(BaseModel):
         cash_buffer: Optional amount to keep as cash buffer
         round_to_nearest: Round investment amount to nearest multiple (e.g., 10 for $10 increments)
     """
-    model_config = ConfigDict(
-        arbitrary_types_allowed=True
-    )
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     allocation_percent: float = Field(
-        ...,
-        ge=0,
-        le=100,
-        description="Percentage of paycheck to allocate (0-100)"
+        ..., ge=0, le=100, description="Percentage of paycheck to allocate (0-100)"
     )
     min_investment: Decimal = Field(
-        default=Decimal("0"), 
-        description="Minimum amount to invest per paycheck"
+        default=Decimal("0"), description="Minimum amount to invest per paycheck"
     )
     cash_buffer: Optional[Decimal] = Field(
-        default=None,
-        description="Optional amount to keep as cash buffer"
+        default=None, description="Optional amount to keep as cash buffer"
     )
     round_to_nearest: Optional[Decimal] = Field(
         default=Decimal("1"),
@@ -51,14 +45,16 @@ class FundingRule(BaseModel):
         if v is not None and v < 0:
             raise ValueError(f"{info.field_name} must be positive")
         return v
-        
+
     @model_serializer
     def serialize_model(self) -> Dict[str, Any]:
         return {
             "allocation_percent": self.allocation_percent,
             "min_investment": str(self.min_investment),
             "cash_buffer": str(self.cash_buffer) if self.cash_buffer is not None else None,
-            "round_to_nearest": str(self.round_to_nearest) if self.round_to_nearest is not None else None,
+            "round_to_nearest": str(self.round_to_nearest)
+            if self.round_to_nearest is not None
+            else None,
         }
 
 
@@ -153,10 +149,7 @@ class FundingCalculator:
                 investment_amount = Decimal("0.00")
 
             # If rounding is requested, round DOWN so we don't violate the buffer.
-            if (
-                rules.round_to_nearest is not None 
-                and rules.round_to_nearest > 0
-            ):
+            if rules.round_to_nearest is not None and rules.round_to_nearest > 0:
                 investment_amount = self._round_down_to_increment(
                     investment_amount, rules.round_to_nearest
                 )

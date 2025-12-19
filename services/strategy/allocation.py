@@ -117,11 +117,11 @@ def weights_to_dollars_and_shares(
 def weights_to_dollars(weights: Dict[str, float], total_capital: float) -> Dict[str, float]:
     """
     Simple helper to convert weight dict to dollar amounts.
-    
+
     Args:
         weights: Dictionary of {symbol: weight}
         total_capital: Total capital to allocate
-        
+
     Returns:
         Dictionary of {symbol: dollar_amount}
     """

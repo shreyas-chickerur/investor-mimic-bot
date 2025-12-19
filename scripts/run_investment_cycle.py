@@ -17,7 +17,7 @@ import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from alpaca.trading.client import TradingClient
 from alpaca.trading.enums import OrderSide, TimeInForce
@@ -211,10 +211,7 @@ class InvestmentCycle:
 
                     # Submit order
                     if not self.risk_controls.trading_enabled:
-                        logger.info(
-                            "[DRY RUN] Would submit order: %s",
-                            order_data
-                        )
+                        logger.info("[DRY RUN] Would submit order: %s", order_data)
                         status = "dry_run"
                         order_id = "dry_run_" + str(uuid.uuid4())
                     else:
@@ -234,8 +231,7 @@ class InvestmentCycle:
 
                 except Exception as e:
                     logger.error(
-                        f"Error submitting order for {trade['symbol']}: {e}",
-                        exc_info=True
+                        f"Error submitting order for {trade['symbol']}: {e}", exc_info=True
                     )
                     log_method = getattr(logger, "error", logger.info)
                     log_data = {

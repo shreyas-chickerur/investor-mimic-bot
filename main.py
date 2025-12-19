@@ -22,7 +22,7 @@ async def lifespan(app: FastAPI):
     try:
         from config.settings import get_notification_config
         from services.monitoring.notification_manager import initialize_notification_manager
-        
+
         notification_config = get_notification_config()
         if notification_config:
             initialize_notification_manager(notification_config)
@@ -51,7 +51,11 @@ app = FastAPI(
 )
 
 # CORS middleware
-allowed_origins = settings.ALLOWED_ORIGINS.split(",") if hasattr(settings, "ALLOWED_ORIGINS") and settings.ALLOWED_ORIGINS else ["*"]
+allowed_origins = (
+    settings.ALLOWED_ORIGINS.split(",")
+    if hasattr(settings, "ALLOWED_ORIGINS") and settings.ALLOWED_ORIGINS
+    else ["*"]
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[origin.strip() for origin in allowed_origins],
