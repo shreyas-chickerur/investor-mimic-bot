@@ -56,16 +56,14 @@ def main():
 
     # Ticker mapper
     ticker_mapper = TickerMapper()
-    print(
-        f"  ✓ Ticker mapper initialized ({len(ticker_mapper.cusip_to_ticker_cache)} mappings cached)"
-    )
+    print(f"  ✓ Ticker mapper initialized ({len(ticker_mapper.cusip_to_ticker_cache)} mappings cached)")
 
     # Real insider signal generator
-    insider_generator = RealInsiderSignalGenerator()
+    RealInsiderSignalGenerator()
     print("  ✓ Insider trading analyzer initialized")
 
     # Technical signal generator
-    technical_generator = TechnicalSignalGenerator()
+    TechnicalSignalGenerator()
     print("  ✓ Technical indicators initialized")
 
     # Performance tracker
@@ -135,9 +133,7 @@ def main():
         for i, rec in enumerate(recommendations, 1):
             # Try to get ticker if it's a CUSIP
             display_symbol = ticker_mapper.cusip_to_ticker(rec.symbol) or rec.symbol
-            print(
-                f"{i:<6} {display_symbol:<10} {rec.final_score:.4f}    {rec.recommendation:<15} {rec.confidence:.1%}"
-            )
+            print(f"{i:<6} {display_symbol:<10} {rec.final_score:.4f}    {rec.recommendation:<15} {rec.confidence:.1%}")
 
         print()
 
@@ -149,9 +145,7 @@ def main():
             display_symbol = ticker_mapper.cusip_to_ticker(rec.symbol) or rec.symbol
             print(f"\n{display_symbol}:")
             print(f"  Final Score:      {rec.final_score:.4f}")
-            print(
-                f"  Recommendation:   {rec.recommendation.upper()} (confidence: {rec.confidence:.1%})"
-            )
+            print(f"  Recommendation:   {rec.recommendation.upper()} (confidence: {rec.confidence:.1%})")
             print(f"  Signal Breakdown:")
             print(f"    13F Conviction:   {rec.conviction_score:.4f} (40% weight)")
             print(f"    News Sentiment:   {rec.sentiment_score:.4f} (20% weight)")

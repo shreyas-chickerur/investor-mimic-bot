@@ -5,8 +5,7 @@ Includes stop loss, take profit, and fundamental deterioration signals.
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-from decimal import Decimal
+from datetime import datetime
 from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -281,17 +280,13 @@ class PositionTracker:
         # For now, return empty list
         return []
 
-    def track_position(
-        self, symbol: str, quantity: float, entry_price: float, entry_date: datetime
-    ):
+    def track_position(self, symbol: str, quantity: float, entry_price: float, entry_date: datetime):
         """Record a new position."""
         # Would save to storage
-        pass
 
     def close_position(self, symbol: str):
         """Mark a position as closed."""
         # Would update storage
-        pass
 
     def get_position_history(self, symbol: str) -> List[Dict]:
         """Get historical performance for a symbol."""

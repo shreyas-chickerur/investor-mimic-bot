@@ -69,16 +69,16 @@ def get_approval_email_html(
     </head>
     <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8f9fa;">
         <div style="max-width: 700px; margin: 40px auto; background-color: #ffffff; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-radius: 8px; overflow: hidden;">
-            
+
             <!-- Header -->
             <div style="background-color: #2c3e50; padding: 32px; text-align: center;">
                 <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.5px;">Trade Approval Required</h1>
                 <p style="color: #95a5a6; margin: 8px 0 0 0; font-size: 14px;">InvestorMimic Bot</p>
             </div>
-            
+
             <!-- Main Content -->
             <div style="padding: 40px;">
-                
+
                 <!-- Summary -->
                 <div style="margin-bottom: 32px;">
                     <table style="width: 100%; border-collapse: collapse; background: #f8f9fa; border-radius: 6px; overflow: hidden;">
@@ -94,7 +94,7 @@ def get_approval_email_html(
                         </tbody>
                     </table>
                 </div>
-                
+
                 <!-- Proposed Trades -->
                 <div style="margin-bottom: 32px;">
                     <h2 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 18px; font-weight: 600;">Proposed Trades</h2>
@@ -120,7 +120,7 @@ def get_approval_email_html(
                         </table>
                     </div>
                 </div>
-                
+
                 <!-- Action Button -->
                 <div style="margin-top: 48px;">
                     <p style="color: #7f8c8d; text-align: center; margin-bottom: 32px; font-size: 13px;">This request expires in 24 hours</p>
@@ -131,15 +131,15 @@ def get_approval_email_html(
                     </div>
                     <p style="color: #95a5a6; text-align: center; margin-top: 16px; font-size: 12px;">Click to review each trade and make your decisions</p>
                 </div>
-                
+
             </div>
-            
+
             <!-- Footer -->
             <div style="background-color: #f8f9fa; padding: 24px; text-align: center; border-top: 1px solid #dee2e6;">
                 <p style="color: #7f8c8d; font-size: 12px; margin: 0;">Request ID: {request_id}</p>
                 <p style="color: #95a5a6; font-size: 11px; margin: 8px 0 0 0;">{datetime.now().strftime('%B %d, %Y at %I:%M %p')}</p>
             </div>
-            
+
         </div>
     </body>
     </html>

@@ -9,10 +9,8 @@ Implements profit-maximizing technical factors:
 """
 
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
-import numpy as np
 import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -136,11 +134,7 @@ class AdvancedTechnicalIndicators:
         # Volume trend (is volume increasing or decreasing)
         volume_ma_short = volumes.rolling(window=5).mean().iloc[-1]
         volume_ma_long = volumes.rolling(window=20).mean().iloc[-1]
-        volume_trend = (
-            ((volume_ma_short - volume_ma_long) / volume_ma_long) * 100
-            if volume_ma_long > 0
-            else 0.0
-        )
+        volume_trend = ((volume_ma_short - volume_ma_long) / volume_ma_long) * 100 if volume_ma_long > 0 else 0.0
 
         # Accumulation/Distribution (simplified)
         # Positive when price closes in upper half of range with high volume
@@ -188,9 +182,7 @@ class AdvancedTechnicalIndicators:
         }
 
     @staticmethod
-    def calculate_relative_strength(
-        stock_prices: pd.Series, spy_prices: pd.Series
-    ) -> Dict[str, float]:
+    def calculate_relative_strength(stock_prices: pd.Series, spy_prices: pd.Series) -> Dict[str, float]:
         """
         Calculate relative strength vs SPY (market).
 
@@ -210,9 +202,7 @@ class AdvancedTechnicalIndicators:
         spy_prices = spy_prices.iloc[-min_len:]
 
         # Calculate returns
-        stock_return_20d = (
-            (stock_prices.iloc[-1] - stock_prices.iloc[-20]) / stock_prices.iloc[-20]
-        ) * 100
+        stock_return_20d = ((stock_prices.iloc[-1] - stock_prices.iloc[-20]) / stock_prices.iloc[-20]) * 100
         spy_return_20d = ((spy_prices.iloc[-1] - spy_prices.iloc[-20]) / spy_prices.iloc[-20]) * 100
 
         # Relative strength (stock return - market return)
@@ -342,11 +332,7 @@ class AdvancedTechnicalSignalGenerator:
             "volume": volume_data,
             "relative_strength": rs_data,
             "trend_quality": trend_data,
-            "recommendation": "BUY"
-            if composite_signal > 0.3
-            else "SELL"
-            if composite_signal < -0.3
-            else "HOLD",
+            "recommendation": "BUY" if composite_signal > 0.3 else "SELL" if composite_signal < -0.3 else "HOLD",
             "confidence": abs(composite_signal),
         }
 

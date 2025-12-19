@@ -1,19 +1,18 @@
-# 📚 System Overview
+# System Overview
 
 **AI-Powered Investment System with Multi-Factor Analysis**
 
 ---
 
-## 🎯 Purpose
+## Purpose
 
 Automated investment system that analyzes stocks using multiple factors and provides trade recommendations with an interactive approval workflow.
 
 ---
 
-## 🔧 Core Components
+## Core Components
 
-### **8-Factor Analysis Engine**
-
+### 8-Factor Analysis Engine
 1. **13F Conviction** - Institutional investor holdings
 2. **News Sentiment** - Market sentiment analysis
 3. **Insider Trading** - Corporate insider activity
@@ -23,22 +22,19 @@ Automated investment system that analyzes stocks using multiple factors and prov
 7. **Relative Strength** - Performance vs market
 8. **Earnings Momentum** - Fundamental catalyst tracking
 
-### **Adaptive Features**
-
+### Adaptive Features
 - **Market Regime Detection** - Identifies Bull/Bear/Sideways markets
 - **Dynamic Weight Allocation** - Adjusts factor weights by market condition
 - **Risk Management** - Stop-loss, position sizing, rebalancing
 - **Sector Rotation** - Tracks sector performance trends
 
-### **Automation**
-
+### Automation
 - **Daily Workflow** - Automated analysis at scheduled times
 - **Email Approval** - Interactive trade approval system
 - **Risk Controls** - Automated stop-loss and position limits
 - **Database Integration** - Stores 13F filings and holdings data
 
-### **System Infrastructure**
-
+### System Infrastructure
 - **Environment Management** - Separate dev/staging/prod configurations
 - **Rate Limiting** - Token bucket algorithm for API calls
 - **Error Handling** - Centralized error handling with retry logic
@@ -49,9 +45,9 @@ Automated investment system that analyzes stocks using multiple factors and prov
 
 ---
 
-## 🏗️ Architecture
+## ️ Architecture
 
-### **Data Layer**
+### Data Layer
 ```
 services/sec/          # SEC EDGAR data (13F filings)
 services/news/         # News sentiment analysis
@@ -59,7 +55,7 @@ services/technical/    # Technical indicators
 services/fundamental/  # Earnings data
 ```
 
-### **Analysis Layer**
+### Analysis Layer
 ```
 services/strategy/     # 8-factor signal engine
 services/market/       # Regime detection
@@ -67,14 +63,14 @@ services/risk/         # Risk management
 services/portfolio/    # Position management
 ```
 
-### **Execution Layer**
+### Execution Layer
 ```
 services/execution/    # Trade planning
 services/approval/     # Email approval workflow
 services/monitoring/   # Alerts and notifications
 ```
 
-### **Infrastructure Layer**
+### Infrastructure Layer
 ```
 utils/environment.py   # Environment configuration manager
 utils/rate_limiter.py  # API rate limiting
@@ -87,7 +83,7 @@ utils/api_client.py    # Resilient API client
 
 ---
 
-## 🔄 Workflow
+## Workflow
 
 1. **Data Collection** - Fetch 13F filings, news, prices
 2. **Signal Generation** - Calculate 8-factor scores
@@ -101,7 +97,7 @@ utils/api_client.py    # Resilient API client
 
 ---
 
-## 📊 Factor Weights
+## Factor Weights
 
 Weights are dynamically adjusted based on market regime:
 
@@ -120,26 +116,26 @@ Weights are dynamically adjusted based on market regime:
 
 ## 🛡️ Risk Management
 
-### **Position Limits**
+### Position Limits
 - Maximum position size: 15% of portfolio
 - Maximum sector exposure: 25%
 - Correlation limits to prevent concentration
 
-### **Stop-Loss Protection**
+### Stop-Loss Protection
 - Automatic stop-loss orders
 - Trailing stops for profit protection
 - Volatility-adjusted sizing
 
-### **Portfolio Controls**
+### Portfolio Controls
 - Daily rebalancing checks
 - Position size monitoring
 - Cash buffer requirements
 
 ---
 
-## 🔧 Configuration
+## Configuration
 
-### **Environment Variables**
+### Environment Variables
 ```bash
 ALPACA_API_KEY         # Trading API key
 ALPACA_SECRET_KEY      # Trading API secret
@@ -150,7 +146,7 @@ SMTP_PASSWORD          # Email password
 DATABASE_URL           # PostgreSQL connection
 ```
 
-### **System Parameters**
+### System Parameters
 ```python
 MAX_POSITIONS = 10           # Maximum concurrent positions
 REBALANCE_FREQUENCY = 10     # Days between rebalancing
@@ -160,25 +156,25 @@ STOP_LOSS_PCT = 0.20        # Stop-loss percentage
 
 ---
 
-## 🚀 Usage
+## Usage
 
-### **Daily Workflow**
+### Daily Workflow
 ```bash
 make run-daily          # Run daily analysis and trading
 ```
 
-### **Backtesting**
+### Backtesting
 ```bash
 make backtest-optimized # Test strategy on historical data
 ```
 
-### **Data Collection**
+### Data Collection
 ```bash
 make collect-13f        # Update 13F filings
 make collect-data       # Fetch historical prices
 ```
 
-### **Optimization**
+### Optimization
 ```bash
 make optimize-weights   # Train ML models for weight optimization
 ```
@@ -193,7 +189,7 @@ make optimize-weights   # Train ML models for weight optimization
 
 ---
 
-## ⚙️ Technology Stack
+## ️ Technology Stack
 
 - **Backend:** Python, FastAPI
 - **Database:** PostgreSQL with migrations
@@ -220,7 +216,7 @@ make optimize-weights   # Train ML models for weight optimization
 
 ---
 
-## 📝 License
+## License
 
 MIT
 

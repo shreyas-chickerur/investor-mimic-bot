@@ -8,7 +8,6 @@ Prevents catastrophic losses and ensures disciplined profit-taking.
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -146,9 +145,7 @@ class StopLossManager:
 
         return hard_stop
 
-    def update_position(
-        self, symbol: str, current_price: float
-    ) -> Tuple[bool, Optional[str], Optional[float]]:
+    def update_position(self, symbol: str, current_price: float) -> Tuple[bool, Optional[str], Optional[float]]:
         """
         Update position with current price and check for exits.
 
@@ -177,9 +174,7 @@ class StopLossManager:
 
         # Check stop-loss
         if current_price <= position.stop_price:
-            logger.info(
-                f"Stop-loss hit for {symbol}: ${current_price:.2f} <= ${position.stop_price:.2f}"
-            )
+            logger.info(f"Stop-loss hit for {symbol}: ${current_price:.2f} <= ${position.stop_price:.2f}")
             return True, "STOP_LOSS", position.remaining_quantity
 
         # Check take-profit targets
@@ -190,23 +185,15 @@ class StopLossManager:
             exit_qty = position.quantity * self.profit_config.target_1_size
             position.target_1_hit = True
             position.remaining_quantity -= exit_qty
-            logger.info(
-                f"Target 1 hit for {symbol}: Taking {self.profit_config.target_1_size:.0%} off"
-            )
+            logger.info(f"Target 1 hit for {symbol}: Taking {self.profit_config.target_1_size:.0%} off")
             return True, "TAKE_PROFIT_1", exit_qty
 
         # Target 2
-        if (
-            position.target_1_hit
-            and not position.target_2_hit
-            and pnl_pct >= self.profit_config.target_2_pct * 100
-        ):
+        if position.target_1_hit and not position.target_2_hit and pnl_pct >= self.profit_config.target_2_pct * 100:
             exit_qty = position.quantity * self.profit_config.target_2_size
             position.target_2_hit = True
             position.remaining_quantity -= exit_qty
-            logger.info(
-                f"Target 2 hit for {symbol}: Taking {self.profit_config.target_2_size:.0%} off"
-            )
+            logger.info(f"Target 2 hit for {symbol}: Taking {self.profit_config.target_2_size:.0%} off")
             return True, "TAKE_PROFIT_2", exit_qty
 
         return False, None, None
@@ -320,12 +307,8 @@ class AdvancedStopLossManager(StopLossManager):
             "total_positions": len(self.positions),
             "positions_with_target_1": sum(1 for p in self.positions.values() if p.target_1_hit),
             "positions_with_target_2": sum(1 for p in self.positions.values() if p.target_2_hit),
-            "avg_pnl_pct": np.mean([p.current_pnl_pct for p in self.positions.values()])
-            if self.positions
-            else 0,
-            "avg_peak_pnl_pct": np.mean([p.peak_pnl_pct for p in self.positions.values()])
-            if self.positions
-            else 0,
+            "avg_pnl_pct": np.mean([p.current_pnl_pct for p in self.positions.values()]) if self.positions else 0,
+            "avg_peak_pnl_pct": np.mean([p.peak_pnl_pct for p in self.positions.values()]) if self.positions else 0,
         }
 
         return summary

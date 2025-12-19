@@ -25,15 +25,9 @@ class FundingRule(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    allocation_percent: float = Field(
-        ..., ge=0, le=100, description="Percentage of paycheck to allocate (0-100)"
-    )
-    min_investment: Decimal = Field(
-        default=Decimal("0"), description="Minimum amount to invest per paycheck"
-    )
-    cash_buffer: Optional[Decimal] = Field(
-        default=None, description="Optional amount to keep as cash buffer"
-    )
+    allocation_percent: float = Field(..., ge=0, le=100, description="Percentage of paycheck to allocate (0-100)")
+    min_investment: Decimal = Field(default=Decimal("0"), description="Minimum amount to invest per paycheck")
+    cash_buffer: Optional[Decimal] = Field(default=None, description="Optional amount to keep as cash buffer")
     round_to_nearest: Optional[Decimal] = Field(
         default=Decimal("1"),
         description="Round investment amount to nearest multiple (e.g., 10 for $10 increments)",
@@ -52,9 +46,7 @@ class FundingRule(BaseModel):
             "allocation_percent": self.allocation_percent,
             "min_investment": str(self.min_investment),
             "cash_buffer": str(self.cash_buffer) if self.cash_buffer is not None else None,
-            "round_to_nearest": str(self.round_to_nearest)
-            if self.round_to_nearest is not None
-            else None,
+            "round_to_nearest": str(self.round_to_nearest) if self.round_to_nearest is not None else None,
         }
 
 
@@ -71,9 +63,7 @@ class InvestmentDecision:
         """Convert to dictionary for API responses."""
         return {
             "investment_amount": float(self.investment_amount),
-            "remaining_cash": (
-                float(self.remaining_cash) if self.remaining_cash is not None else None
-            ),
+            "remaining_cash": (float(self.remaining_cash) if self.remaining_cash is not None else None),
             "rule_applied": self.rule_applied.dict(),
             "metadata": self.metadata or {},
         }
@@ -150,9 +140,7 @@ class FundingCalculator:
 
             # If rounding is requested, round DOWN so we don't violate the buffer.
             if rules.round_to_nearest is not None and rules.round_to_nearest > 0:
-                investment_amount = self._round_down_to_increment(
-                    investment_amount, rules.round_to_nearest
-                )
+                investment_amount = self._round_down_to_increment(investment_amount, rules.round_to_nearest)
 
             remaining_cash = current_cash_balance + paycheck_amount - investment_amount
 
@@ -162,9 +150,7 @@ class FundingCalculator:
 
             # Round to nearest specified increment (true nearest, half-up)
             if rules.round_to_nearest is not None and rules.round_to_nearest > 0:
-                investment_amount = self._round_to_nearest(
-                    investment_amount, rules.round_to_nearest
-                )
+                investment_amount = self._round_to_nearest(investment_amount, rules.round_to_nearest)
                 logger.debug(f"Rounded investment amount to ${investment_amount:.2f}")
 
             if current_cash_balance is not None:
@@ -180,13 +166,9 @@ class FundingCalculator:
                 "paycheck_amount": float(paycheck_amount),
                 "allocation_percent": float(rules.allocation_percent),
                 "calculated_amount": float(calculated_amount),
-                "min_investment": (
-                    float(rules.min_investment) if rules.min_investment is not None else None
-                ),
-                "cash_buffer_applied": rules.cash_buffer is not None
-                and current_cash_balance is not None,
-                "rounding_applied": rules.round_to_nearest is not None
-                and rules.round_to_nearest > 0,
+                "min_investment": (float(rules.min_investment) if rules.min_investment is not None else None),
+                "cash_buffer_applied": rules.cash_buffer is not None and current_cash_balance is not None,
+                "rounding_applied": rules.round_to_nearest is not None and rules.round_to_nearest > 0,
                 "rounding_increment": (
                     float(rules.round_to_nearest)
                     if rules.round_to_nearest is not None and rules.round_to_nearest > 0

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import ROUND_DOWN, Decimal
-from typing import Dict, Tuple
+from typing import Dict
 
 from services.execution.models import TradeOrder, TradePlan
 
@@ -81,9 +81,7 @@ class TradePlanner:
                 )
             )
 
-        return TradePlan(
-            created_at=self._now(), total_equity=total_equity, orders=orders, skipped=skipped
-        )
+        return TradePlan(created_at=self._now(), total_equity=total_equity, orders=orders, skipped=skipped)
 
     def _round_down(self, value: Decimal, increment: Decimal) -> Decimal:
         if increment <= 0:

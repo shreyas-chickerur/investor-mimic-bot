@@ -4,7 +4,6 @@ Multi-Signal Strategy Engine - Combines multiple data sources for trading decisi
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Dict, List, Optional
 
 from services.news.news_api import NewsAPIService
@@ -77,9 +76,7 @@ class MultiSignalEngine:
         self.sentiment_analyzer = SimpleSentimentAnalyzer()
         self.signal_generator = NewsSignalGenerator(self.sentiment_analyzer)
 
-    def compute_multi_signal_scores(
-        self, fetch_news: bool = True, news_lookback_hours: int = 48
-    ) -> Dict[str, float]:
+    def compute_multi_signal_scores(self, fetch_news: bool = True, news_lookback_hours: int = 48) -> Dict[str, float]:
         """
         Compute combined scores from all signal sources.
 
@@ -115,16 +112,12 @@ class MultiSignalEngine:
 
         # 2. Get news sentiment for top conviction picks
         logger.info("Fetching news for top securities...")
-        top_symbols = sorted(conviction_weights.items(), key=lambda x: x[1], reverse=True)[
-            :50
-        ]  # Top 50 by conviction
+        top_symbols = sorted(conviction_weights.items(), key=lambda x: x[1], reverse=True)[:50]  # Top 50 by conviction
 
         symbols_to_check = [s for s, _ in top_symbols]
 
         # Fetch news
-        articles_by_symbol = self.news_service.fetch_news_batch(
-            symbols_to_check, limit_per_symbol=20
-        )
+        articles_by_symbol = self.news_service.fetch_news_batch(symbols_to_check, limit_per_symbol=20)
 
         if not articles_by_symbol:
             logger.warning("No news articles fetched")
@@ -137,9 +130,7 @@ class MultiSignalEngine:
         sentiment_scores = self.sentiment_analyzer.analyze_batch(articles_by_symbol)
 
         # 4. Generate sentiment signals
-        sentiment_signals = self.signal_generator.generate_signals(
-            sentiment_scores, min_confidence=0.3, min_score=0.2
-        )
+        sentiment_signals = self.signal_generator.generate_signals(sentiment_scores, min_confidence=0.3, min_score=0.2)
 
         logger.info(f"Generated sentiment signals for {len(sentiment_signals)} symbols")
 
@@ -258,9 +249,7 @@ class MultiSignalEngine:
             "explanation": self._generate_explanation(conv_score, sentiment_score, article_count),
         }
 
-    def _generate_explanation(
-        self, conv_score: float, sent_score: float, article_count: int
-    ) -> str:
+    def _generate_explanation(self, conv_score: float, sent_score: float, article_count: int) -> str:
         """Generate human-readable explanation."""
         parts = []
 

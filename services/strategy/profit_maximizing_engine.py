@@ -18,7 +18,6 @@ import logging
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
-import numpy as np
 import pandas as pd
 
 from services.data.price_fetcher import PriceDataFetcher
@@ -109,9 +108,7 @@ class ProfitMaximizingEngine:
         self.earnings_generator = SimplifiedEarningsMomentum()
         self.price_fetcher = PriceDataFetcher(alpha_vantage_key=alpha_vantage_key)
 
-    def compute_signal(
-        self, symbol: str, conviction_score: float = 0.0, lookback_days: int = 90
-    ) -> ProfitMaxSignal:
+    def compute_signal(self, symbol: str, conviction_score: float = 0.0, lookback_days: int = 90) -> ProfitMaxSignal:
         """
         Compute comprehensive profit-maximizing signal.
 
@@ -136,9 +133,7 @@ class ProfitMaximizingEngine:
             else:
                 prices = price_data["close"]
                 volumes = price_data.get("volume", pd.Series([1000000] * len(prices)))
-                spy_prices = (
-                    spy_data["close"] if spy_data is not None else pd.Series([400.0] * len(prices))
-                )
+                spy_prices = spy_data["close"] if spy_data is not None else pd.Series([400.0] * len(prices))
         except Exception as e:
             logger.error(f"Error fetching price data for {symbol}: {e}")
             prices = pd.Series([100.0] * 250)
@@ -276,9 +271,7 @@ class ProfitMaximizingEngine:
         signals = []
         for _, row in conviction_scores.iterrows():
             try:
-                signal = self.compute_signal(
-                    symbol=row["ticker"], conviction_score=row["normalized_weight"]
-                )
+                signal = self.compute_signal(symbol=row["ticker"], conviction_score=row["normalized_weight"])
                 signals.append(signal)
             except Exception as e:
                 logger.error(f"Error computing signal for {row['ticker']}: {e}")

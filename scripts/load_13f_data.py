@@ -8,28 +8,21 @@ import csv
 import json
 import logging
 import os
-from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 # Third-party imports
 import psycopg2
-from psycopg2 import sql
-from psycopg2.extras import execute_values
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
 class SEC13FLoader:
     def __init__(self, db_url: str = None):
         """Initialize the loader with database connection."""
-        self.db_url = db_url or os.getenv(
-            "DATABASE_URL", "postgresql://postgres@localhost:5432/investorbot"
-        )
+        self.db_url = db_url or os.getenv("DATABASE_URL", "postgresql://postgres@localhost:5432/investorbot")
         self.conn = None
         self.cur = None
         self.investor_cache = {}
@@ -83,17 +76,13 @@ class SEC13FLoader:
 
         # First try to find an existing security by CUSIP or ticker
         if cusip:
-            self.cur.execute(
-                "SELECT security_id FROM securities WHERE cusip = %s LIMIT 1", (cusip,)
-            )
+            self.cur.execute("SELECT security_id FROM securities WHERE cusip = %s LIMIT 1", (cusip,))
             result = self.cur.fetchone()
             if result:
                 return result[0]
 
         if ticker:
-            self.cur.execute(
-                "SELECT security_id FROM securities WHERE ticker = %s LIMIT 1", (ticker,)
-            )
+            self.cur.execute("SELECT security_id FROM securities WHERE ticker = %s LIMIT 1", (ticker,))
             result = self.cur.fetchone()
             if result:
                 return result[0]

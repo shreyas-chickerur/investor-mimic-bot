@@ -8,7 +8,6 @@ from decimal import Decimal
 from typing import Dict, List, Optional
 
 # Third-party imports
-from alpaca.common.exceptions import APIError
 from alpaca.trading.client import TradingClient
 from alpaca.trading.enums import OrderSide, OrderStatus, OrderType, TimeInForce
 from alpaca.trading.models import Order
@@ -108,9 +107,7 @@ class AlpacaExecutionService:
                 raise RuntimeError("Kill switch active")
 
             try:
-                submitted = self._submit_limit_buy(
-                    symbol=o.symbol, qty=o.qty, limit_price=limit_price
-                )
+                submitted = self._submit_limit_buy(symbol=o.symbol, qty=o.qty, limit_price=limit_price)
                 order_id = str(getattr(submitted, "id", ""))
 
                 filled = self._wait_for_fill(order_id)

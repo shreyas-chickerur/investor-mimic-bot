@@ -9,10 +9,8 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Dict, List, Tuple
 
-import numpy as np
-import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -110,19 +108,11 @@ class MacroIndicatorTracker:
             Economic cycle phase
         """
         # Expansion: Growing economy, low unemployment, rising PMI
-        if (
-            indicators.gdp_growth > 2.0
-            and indicators.pmi > 52
-            and indicators.unemployment_rate < 4.5
-        ):
+        if indicators.gdp_growth > 2.0 and indicators.pmi > 52 and indicators.unemployment_rate < 4.5:
             return EconomicCycle.EXPANSION
 
         # Peak: Strong economy but showing signs of overheating
-        if (
-            indicators.gdp_growth > 3.0
-            and indicators.inflation_rate > 4.0
-            and indicators.unemployment_rate < 4.0
-        ):
+        if indicators.gdp_growth > 3.0 and indicators.inflation_rate > 4.0 and indicators.unemployment_rate < 4.0:
             return EconomicCycle.PEAK
 
         # Contraction: Slowing economy, rising unemployment
@@ -175,9 +165,7 @@ class MacroIndicatorTracker:
 
         return recommendations.get(cycle, {"favor": [], "avoid": []})
 
-    def get_portfolio_positioning(
-        self, indicators: MacroIndicators, cycle: EconomicCycle
-    ) -> Dict[str, any]:
+    def get_portfolio_positioning(self, indicators: MacroIndicators, cycle: EconomicCycle) -> Dict[str, any]:
         """
         Get portfolio positioning recommendations.
 
@@ -281,7 +269,9 @@ INTERPRETATION:
             report += "\n⚠️  WARNING: Inverted yield curve signals recession within 12-18 months\n"
 
         if indicators.recession_risk > 0.5:
-            report += f"\n⚠️  HIGH RECESSION RISK ({indicators.recession_risk:.0%}) - Defensive positioning recommended\n"
+            report += (
+                f"\n⚠️  HIGH RECESSION RISK ({indicators.recession_risk:.0%}) - Defensive positioning recommended\n"
+            )
 
         return report
 
@@ -295,9 +285,7 @@ class FedPolicyTracker:
         """Initialize Fed policy tracker."""
         self.rate_history: List[Tuple[datetime, float]] = []
 
-    def analyze_fed_policy(
-        self, current_rate: float, inflation: float, unemployment: float
-    ) -> Dict[str, any]:
+    def analyze_fed_policy(self, current_rate: float, inflation: float, unemployment: float) -> Dict[str, any]:
         """
         Analyze Fed policy stance and implications.
 

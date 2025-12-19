@@ -4,12 +4,10 @@ Form 4 reports insider transactions (executives buying/selling their own stock).
 """
 
 import logging
-import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, List, Optional
 
-import requests
 
 logger = logging.getLogger(__name__)
 
@@ -43,9 +41,7 @@ class InsiderTradingService:
             "Host": "www.sec.gov",
         }
 
-    def fetch_recent_insider_activity(
-        self, symbol: str, days_back: int = 90
-    ) -> List[InsiderTransaction]:
+    def fetch_recent_insider_activity(self, symbol: str, days_back: int = 90) -> List[InsiderTransaction]:
         """
         Fetch recent insider transactions for a symbol.
 
@@ -148,9 +144,7 @@ class SimpleInsiderSignalGenerator:
 
         return signals
 
-    def get_mock_signals(
-        self, symbols: List[str], conviction_weights: Dict[str, float]
-    ) -> Dict[str, float]:
+    def get_mock_signals(self, symbols: List[str], conviction_weights: Dict[str, float]) -> Dict[str, float]:
         """
         Generate mock insider signals based on conviction weights.
 
@@ -170,9 +164,7 @@ class SimpleInsiderSignalGenerator:
         signals = {}
 
         # Take top 30% of conviction picks and boost them slightly
-        sorted_symbols = sorted(
-            [(s, conviction_weights.get(s, 0)) for s in symbols], key=lambda x: x[1], reverse=True
-        )
+        sorted_symbols = sorted([(s, conviction_weights.get(s, 0)) for s in symbols], key=lambda x: x[1], reverse=True)
 
         top_30_pct = int(len(sorted_symbols) * 0.3)
 

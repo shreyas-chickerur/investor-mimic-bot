@@ -5,7 +5,7 @@ News API Service - Fetch financial news from multiple sources.
 import logging
 import os
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, List, Optional
 
 import requests
@@ -103,9 +103,7 @@ class NewsAPIService:
             logger.error(f"Error fetching news for {symbol}: {e}")
             return []
 
-    def fetch_news_batch(
-        self, symbols: List[str], limit_per_symbol: int = 20
-    ) -> Dict[str, List[NewsArticle]]:
+    def fetch_news_batch(self, symbols: List[str], limit_per_symbol: int = 20) -> Dict[str, List[NewsArticle]]:
         """
         Fetch news for multiple symbols.
 

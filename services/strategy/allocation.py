@@ -60,9 +60,7 @@ def weights_to_dollars_and_shares(
     available_capital = Decimal(available_capital)
 
     df["dollar_amount"] = df[weight_col].apply(
-        lambda w: (available_capital * Decimal(str(float(w)))).quantize(
-            Decimal("0.01"), rounding=ROUND_DOWN
-        )
+        lambda w: (available_capital * Decimal(str(float(w)))).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
     )
 
     # Enforce min trade dollars
