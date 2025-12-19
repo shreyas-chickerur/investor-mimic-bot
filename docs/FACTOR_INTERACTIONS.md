@@ -1,20 +1,20 @@
-# 🔄 Complete Factor Interaction System
+# Complete Factor Interaction System
 
 **How ALL investment factors work together dynamically**
 
 ---
 
-## ✅ ALL FACTORS CONFIRMED ACTIVE
+## ALL FACTORS CONFIRMED ACTIVE
 
 Your system uses **12 distinct factors** that interact dynamically:
 
-### **Signal Generation Factors (4)**
+### Signal Generation Factors (4)
 1. ✅ **13F Conviction** (40% weight)
 2. ✅ **News Sentiment** (20% weight)
 3. ✅ **Insider Trading** (20% weight)
 4. ✅ **Technical Indicators** (20% weight)
 
-### **Risk Management Factors (8)**
+### Risk Management Factors (8)
 5. ✅ **Volatility** (individual stock risk)
 6. ✅ **Correlation** (portfolio diversification)
 7. ✅ **Market Regime** (bull/bear/volatile/sideways)
@@ -26,10 +26,9 @@ Your system uses **12 distinct factors** that interact dynamically:
 
 ---
 
-## 🔄 How Factors Interact
+## How Factors Interact
 
-### **Level 1: Signal Generation**
-
+### Level 1: Signal Generation
 **Step 1: Individual Signals**
 ```
 13F Conviction → Raw score (0-1)
@@ -50,8 +49,7 @@ Combined Signal = (13F × 0.40) + (News × 0.20) + (Insider × 0.20) + (Technica
 
 ---
 
-### **Level 2: Risk Adjustment**
-
+### Level 2: Risk Adjustment
 **Step 3: Volatility Adjustment (Kelly Criterion)**
 ```
 Risk-Adjusted Score = Signal / Volatility
@@ -75,8 +73,7 @@ If Correlation(A, B) > 0.65:
 
 ---
 
-### **Level 3: Market Regime Adjustment**
-
+### Level 3: Market Regime Adjustment
 **Step 5: Detect Market Regime**
 ```
 IF 20-day MA > 50-day MA by 5%+ → Bull Market
@@ -100,8 +97,7 @@ Sideways: No adjustment (1.00)
 
 ---
 
-### **Level 4: Portfolio Constraints**
-
+### Level 4: Portfolio Constraints
 **Step 7: Apply Position Limits**
 ```
 IF Position > 8% of portfolio:
@@ -122,10 +118,9 @@ Reserve 15% as cash
 
 ---
 
-## 📊 Complete Example: GOOGL
+## Complete Example: GOOGL
 
-### **Day 1: Bull Market**
-
+### Day 1: Bull Market
 **Step 1: Generate Signals**
 - 13F Conviction: 0.0429 (Berkshire, Bridgewater hold)
 - News Sentiment: 0.02 (positive AI news)
@@ -158,8 +153,7 @@ Reserve 15% as cash
 
 ---
 
-### **Day 30: Bear Market (Same Stock)**
-
+### Day 30: Bear Market (Same Stock)
 **Step 1: Generate Signals**
 - 13F Conviction: 0.0429 (unchanged)
 - News Sentiment: -0.01 (negative macro news)
@@ -194,10 +188,9 @@ Reserve 15% as cash
 
 ---
 
-## 🔄 Dynamic Daily Changes
+## Dynamic Daily Changes
 
-### **What Changes Daily:**
-
+### What Changes Daily
 1. **✅ News Sentiment** - Updates every day
    - Breaking news affects scores immediately
    - Example: Earnings beat → +20% to sentiment score
@@ -218,20 +211,17 @@ Reserve 15% as cash
    - Rolling 60-day correlation
    - Example: Correlation increases → Reduce both positions
 
-### **What Changes Weekly:**
-
+### What Changes Weekly
 6. **✅ Insider Trading** - New Form 4 filings
    - SEC filings processed as available
    - Example: CEO buys $1M → +15% to insider score
 
-### **What Changes Quarterly:**
-
+### What Changes Quarterly
 7. **✅ 13F Conviction** - New filings every 45 days
    - Top investors report holdings
    - Example: Buffett sells → -30% to conviction score
 
-### **What's Constant:**
-
+### What's Constant
 8. **✅ Risk Limits** - Fixed constraints
    - Max position: 8%
    - Max sector: 25%
@@ -240,9 +230,9 @@ Reserve 15% as cash
 
 ---
 
-## 🎯 Factor Priority Hierarchy
+## Factor Priority Hierarchy
 
-### **Priority 1: Safety Constraints (ALWAYS ENFORCED)**
+### Priority 1: Safety Constraints (ALWAYS ENFORCED)
 ```
 1. Cash Buffer (15%) - Never violated
 2. Position Limit (8%) - Never violated
@@ -250,7 +240,7 @@ Reserve 15% as cash
 4. VaR Limit (15%) - Triggers warnings
 ```
 
-### **Priority 2: Market Regime (OVERRIDES SIGNALS)**
+### Priority 2: Market Regime (OVERRIDES SIGNALS)
 ```
 IF High Volatility:
     Reduce ALL positions by 30%
@@ -258,7 +248,7 @@ IF High Volatility:
     Ignore bullish signals
 ```
 
-### **Priority 3: Risk Adjustment (MODIFIES SIGNALS)**
+### Priority 3: Risk Adjustment (MODIFIES SIGNALS)
 ```
 Adjust position size based on:
 - Volatility (Kelly Criterion)
@@ -266,7 +256,7 @@ Adjust position size based on:
 - Beta (market sensitivity)
 ```
 
-### **Priority 4: Signal Strength (BASE ALLOCATION)**
+### Priority 4: Signal Strength (BASE ALLOCATION)
 ```
 Combine signals with weights:
 - 13F: 40%
@@ -277,10 +267,9 @@ Combine signals with weights:
 
 ---
 
-## 📈 Real-World Scenario
+## Real-World Scenario
 
-### **Scenario: Market Crash**
-
+### Scenario: Market Crash
 **Day 1: Normal Market**
 - VIX: 18
 - Regime: Bull
@@ -314,7 +303,7 @@ Combine signals with weights:
 
 ---
 
-## 🔄 Factor Interaction Matrix
+## Factor Interaction Matrix
 
 | Factor | Affects | Modified By | Update Frequency |
 |--------|---------|-------------|------------------|
@@ -333,7 +322,7 @@ Combine signals with weights:
 
 ---
 
-## 🎯 Decision Flow
+## Decision Flow
 
 ```
 1. Generate Signals (13F, News, Insider, Technical)
@@ -365,7 +354,7 @@ Combine signals with weights:
 
 ---
 
-## ✅ Confirmation: ALL Factors Active
+## Confirmation: ALL Factors Active
 
 **YES - All 12 factors are being used:**
 

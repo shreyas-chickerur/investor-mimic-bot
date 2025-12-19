@@ -1,15 +1,14 @@
-# 🎯 Selective Trade Approval System
+# Selective Trade Approval System
 
 **Complete control over individual trade execution**
 
 ---
 
-## 📋 Overview
+## Overview
 
 The selective trade approval system allows you to approve or reject each proposed trade individually, giving you complete control over which positions to enter.
 
-### **Key Features**
-
+### Key Features
 ✅ **Individual Approval** - Approve/reject each trade separately  
 ✅ **Flexible Control** - Mix approved and rejected trades  
 ✅ **Selective Execution** - Only approved trades are executed  
@@ -18,10 +17,9 @@ The selective trade approval system allows you to approve or reject each propose
 
 ---
 
-## 📧 Email Interface
+## Email Interface
 
-### **What You'll See**
-
+### What You'll See
 Each proposed trade has its own action buttons:
 
 ```
@@ -34,8 +32,7 @@ MSFT   | 12.5   | $378   | $4,736   | 5.0%       | [✓] [✗]
 AMZN   | 8.5    | $178   | $1,514   | 1.7%       | [✓] [✗]
 ```
 
-### **How to Use**
-
+### How to Use
 1. **Review each trade** - Check symbol, quantity, price, value
 2. **Click ✓** to approve a trade you want to execute
 3. **Click ✗** to reject a trade you don't want
@@ -44,10 +41,9 @@ AMZN   | 8.5    | $178   | $1,514   | 1.7%       | [✓] [✗]
 
 ---
 
-## 🔄 How It Works
+## How It Works
 
-### **Backend Flow**
-
+### Backend Flow
 ```
 1. System generates trade recommendations
    ↓
@@ -62,8 +58,7 @@ AMZN   | 8.5    | $178   | $1,514   | 1.7%       | [✓] [✗]
 6. Only approved trades are executed
 ```
 
-### **Trade Status Tracking**
-
+### Trade Status Tracking
 Each trade has three possible states:
 - **`approved: null`** - Pending (no action taken yet)
 - **`approved: true`** - Approved (will be executed)
@@ -73,8 +68,7 @@ Each trade has three possible states:
 
 ## 🛠️ Technical Implementation
 
-### **1. Data Model**
-
+### 1. Data Model
 ```python
 class TradeProposal(BaseModel):
     symbol: str
@@ -85,8 +79,7 @@ class TradeProposal(BaseModel):
     approved: Optional[bool] = None  # Track approval status
 ```
 
-### **2. API Endpoints**
-
+### 2. API Endpoints
 **Approve Individual Trade:**
 ```
 POST /api/v1/approve/{request_id}/approve-trade/{trade_index}
@@ -103,8 +96,7 @@ manager = TradeApprovalManager()
 approved_trades = manager.get_approved_trades(request_id)
 ```
 
-### **3. Email Template**
-
+### 3. Email Template
 Individual buttons generated for each trade:
 ```python
 for i, trade in enumerate(trades):
@@ -115,10 +107,9 @@ for i, trade in enumerate(trades):
 
 ---
 
-## 📊 Usage Examples
+## Usage Examples
 
-### **Example 1: Approve All**
-
+### Example 1: Approve All
 Click ✓ on all 5 trades → All 5 trades execute
 
 **Result:**
@@ -128,8 +119,7 @@ Click ✓ on all 5 trades → All 5 trades execute
 - MSFT: ✓ Executed
 - AMZN: ✓ Executed
 
-### **Example 2: Selective Approval**
-
+### Example 2: Selective Approval
 Click ✓ on GOOGL, AAPL, MSFT  
 Click ✗ on UBER, AMZN
 
@@ -140,8 +130,7 @@ Click ✗ on UBER, AMZN
 - MSFT: ✓ Executed
 - AMZN: ✗ Skipped
 
-### **Example 3: Reject All**
-
+### Example 3: Reject All
 Click ✗ on all 5 trades → No trades execute
 
 **Result:**
@@ -151,10 +140,9 @@ Click ✗ on all 5 trades → No trades execute
 
 ---
 
-## 🎯 Use Cases
+## Use Cases
 
-### **When to Use Selective Approval**
-
+### When to Use Selective Approval
 **1. Risk Management**
 - Approve only low-volatility stocks
 - Skip high-risk positions
@@ -182,10 +170,9 @@ Click ✗ on all 5 trades → No trades execute
 
 ---
 
-## 💡 Best Practices
+## Best Practices
 
-### **Review Criteria**
-
+### Review Criteria
 **Before approving a trade, consider:**
 
 ✅ **Signal Strength** - Is the conviction score high?  
@@ -195,8 +182,7 @@ Click ✗ on all 5 trades → No trades execute
 ✅ **Personal Knowledge** - Do you know the company?  
 ✅ **Market Conditions** - Is now a good time?  
 
-### **Approval Strategies**
-
+### Approval Strategies
 **Conservative:**
 - Approve only top 3 highest conviction
 - Skip anything with >25% volatility
@@ -214,10 +200,9 @@ Click ✗ on all 5 trades → No trades execute
 
 ---
 
-## 🔧 API Usage
+## API Usage
 
-### **Python Example**
-
+### Python Example
 ```python
 from services.approval.trade_approval import TradeApprovalManager
 
@@ -237,8 +222,7 @@ approved = manager.get_approved_trades(request_id="abc-123")
 print(f"Executing {len(approved)} approved trades")
 ```
 
-### **HTTP Example**
-
+### HTTP Example
 ```bash
 # Approve GOOGL (index 0)
 curl -X POST http://localhost:8000/api/v1/approve/abc-123/approve-trade/0
@@ -252,10 +236,9 @@ curl -X POST http://localhost:8000/api/v1/approve/abc-123/approve-trade/2
 
 ---
 
-## 📈 Execution Logic
+## Execution Logic
 
-### **How Approved Trades Are Executed**
-
+### How Approved Trades Are Executed
 ```python
 # In execution script
 manager = TradeApprovalManager()
@@ -270,8 +253,7 @@ for trade in approved_trades:
     )
 ```
 
-### **What Happens to Rejected Trades**
-
+### What Happens to Rejected Trades
 - ❌ Not executed
 - ❌ No order placed
 - ❌ No capital allocated
@@ -280,10 +262,9 @@ for trade in approved_trades:
 
 ---
 
-## 🎉 Benefits
+## Benefits
 
-### **Compared to All-or-Nothing Approval**
-
+### Compared to All-or-Nothing Approval
 **Old System:**
 - Approve all 10 trades or reject all 10
 - No flexibility
@@ -294,8 +275,7 @@ for trade in approved_trades:
 - Full flexibility
 - Complete control
 
-### **Key Advantages**
-
+### Key Advantages
 1. **Risk Control** - Limit exposure to specific stocks
 2. **Flexibility** - Adapt to changing conditions
 3. **Confidence** - Only execute what you're comfortable with
@@ -304,41 +284,35 @@ for trade in approved_trades:
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
-### **1. Receive Email**
-
+### 1. Receive Email
 Wait for daily email with proposed trades
 
-### **2. Review Trades**
-
+### 2. Review Trades
 Look at each trade's:
 - Symbol and company
 - Quantity and price
 - Total value
 - Allocation percentage
 
-### **3. Make Decisions**
-
+### 3. Make Decisions
 For each trade, decide:
 - ✓ Approve if you want to execute
 - ✗ Reject if you want to skip
 
-### **4. Click Buttons**
-
+### 4. Click Buttons
 Click the ✓ or ✗ button for each trade
 
-### **5. Confirmation**
-
+### 5. Confirmation
 System confirms each action and tracks status
 
-### **6. Execution**
-
+### 6. Execution
 Only approved trades are executed automatically
 
 ---
 
-## 📝 Summary
+## Summary
 
 **Selective trade approval gives you:**
 

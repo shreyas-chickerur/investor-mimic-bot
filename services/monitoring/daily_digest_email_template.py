@@ -53,30 +53,30 @@ def get_daily_digest_email_html(market_section: Dict, portfolio_section: Dict, u
             
             <!-- Header -->
             <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 32px 24px; text-align: center;">
-                <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">📈 Daily Investment Digest</h1>
+                <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">Daily Investment Digest</h1>
                 <p style="color: #e0e7ff; margin: 8px 0 0 0; font-size: 14px;">{datetime.now().strftime('%A, %B %d, %Y')}</p>
             </div>
             
             <!-- Greeting -->
             <div style="padding: 24px 24px 16px 24px; border-bottom: 2px solid #f1f3f5;">
-                <p style="color: #2c3e50; font-size: 16px; margin: 0;">Good morning, {user_name}! ☀️</p>
+                <p style="color: #2c3e50; font-size: 16px; margin: 0;">Good morning, {user_name}</p>
             </div>
             
             <!-- Market Section -->
             <div style="padding: 24px; border-bottom: 2px solid #f1f3f5;">
-                <h2 style="color: #2c3e50; margin: 0 0 16px 0; font-size: 20px; font-weight: 700;">📊 Market Overview</h2>
+                <h2 style="color: #2c3e50; margin: 0 0 16px 0; font-size: 20px; font-weight: 700;">Market Overview</h2>
                 {market_summary_html}
             </div>
             
             <!-- Headlines Section -->
             <div style="padding: 24px; border-bottom: 2px solid #f1f3f5;">
-                <h2 style="color: #2c3e50; margin: 0 0 16px 0; font-size: 20px; font-weight: 700;">📰 Top Headlines</h2>
+                <h2 style="color: #2c3e50; margin: 0 0 16px 0; font-size: 20px; font-weight: 700;">Top Headlines</h2>
                 {headlines_html}
             </div>
             
             <!-- Portfolio Section -->
             <div style="padding: 24px; background-color: #f8f9fa; border-bottom: 2px solid #e9ecef;">
-                <h2 style="color: #2c3e50; margin: 0 0 16px 0; font-size: 20px; font-weight: 700;">💼 Your Portfolio</h2>
+                <h2 style="color: #2c3e50; margin: 0 0 16px 0; font-size: 20px; font-weight: 700;">Your Portfolio</h2>
                 {performance_html}
             </div>
             
@@ -88,7 +88,7 @@ def get_daily_digest_email_html(market_section: Dict, portfolio_section: Dict, u
             
             <!-- Recommendations Section -->
             <div style="padding: 24px; background-color: #fff8e1; border-bottom: 2px solid #ffe082;">
-                <h2 style="color: #2c3e50; margin: 0 0 16px 0; font-size: 20px; font-weight: 700;">🎯 Today's Recommendations</h2>
+                <h2 style="color: #2c3e50; margin: 0 0 16px 0; font-size: 20px; font-weight: 700;">Today's Recommendations</h2>
                 {recommendations_html}
             </div>
             
@@ -257,7 +257,7 @@ def _build_holdings_news(holdings_news: List[Dict]) -> str:
         return ""
 
     html = '<div style="padding: 24px; border-bottom: 2px solid #f1f3f5;">'
-    html += '<h3 style="color: #2c3e50; margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">📢 News About Your Holdings</h3>'
+    html += '<h3 style="color: #2c3e50; margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">News About Your Holdings</h3>'
     html += '<div style="display: grid; gap: 12px;">'
 
     for news in holdings_news:

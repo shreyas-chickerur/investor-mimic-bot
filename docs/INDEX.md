@@ -1,12 +1,12 @@
-# 📚 Documentation Index
+# Documentation Index
 
 **Complete Guide to the Investor Mimic Bot**
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
-### **New Users Start Here**
+### New Users Start Here
 1. **[README](../README.md)** - Quick start and feature overview
 2. **[Complete System Guide](COMPLETE_SYSTEM_GUIDE.md)** - Comprehensive system overview
 3. **[Deployment Guide](DEPLOYMENT_READY.md)** - Production deployment checklist
@@ -15,31 +15,30 @@
 
 ## 📖 Core Documentation
 
-### **System Architecture**
+### System Architecture
 - **[Complete System Guide](COMPLETE_SYSTEM_GUIDE.md)** - Full system architecture and workflow
 - **[Profit-Maximizing System](PROFIT_MAXIMIZING_SYSTEM.md)** - 8-factor system details
 - **[Multi-Signal System](MULTI_SIGNAL_SYSTEM.md)** - Signal generation and combination
 
-### **Performance & Optimization**
+### Performance & Optimization
 - **[Optimization Results Report](OPTIMIZATION_RESULTS_REPORT.md)** - Complete performance analysis
 - **[Tuning Analysis](TUNING_ANALYSIS.md)** - Performance tuning recommendations
 - **[Backtesting & ML Guide](BACKTESTING_AND_ML_GUIDE.md)** - Historical testing and ML optimization
 
-### **Advanced Features**
+### Advanced Features
 - **[Advanced Features Guide](ADVANCED_FEATURES_GUIDE.md)** - Stop-loss, rebalancing, regime detection
 - **[Factor Interactions](FACTOR_INTERACTIONS.md)** - How factors work together
 - **[Selective Approval](SELECTIVE_APPROVAL.md)** - Trade approval workflow
 
-### **Deployment & Operations**
+### Deployment & Operations
 - **[Deployment Ready](DEPLOYMENT_READY.md)** - Complete deployment guide
 - **[Setup Email Approval](SETUP_EMAIL_APPROVAL.md)** - Email configuration
 
 ---
 
-## 🎯 Quick Reference
+## Quick Reference
 
-### **By Use Case**
-
+### By Use Case
 **I want to understand the system:**
 → [Complete System Guide](COMPLETE_SYSTEM_GUIDE.md)
 
@@ -63,7 +62,7 @@
 
 ---
 
-## 📊 Performance Summary
+## Performance Summary
 
 **Backtested 2010-2024 (14 years, 3,913 trading days)**
 
@@ -77,9 +76,9 @@
 
 ---
 
-## 🔧 Technical Documentation
+## Technical Documentation
 
-### **Code Organization**
+### Code Organization
 ```
 services/           # Core system components
 ├── strategy/       # 8-factor engine, profit maximization
@@ -95,7 +94,7 @@ scripts/            # Execution scripts
 docs/               # This documentation
 ```
 
-### **Configuration Files**
+### Configuration Files
 - `config/optimized_system_config.json` - Production configuration
 - `optimization_results/optimized_weights.json` - ML-optimized factor weights
 - `.env` - Environment variables (API keys, credentials)
@@ -104,19 +103,19 @@ docs/               # This documentation
 
 ## 🎓 Learning Path
 
-### **Beginner Path**
+### Beginner Path
 1. Read [README](../README.md) for overview
 2. Run `make quickstart` to see it in action
 3. Read [Complete System Guide](COMPLETE_SYSTEM_GUIDE.md)
 4. Review [Optimization Results](OPTIMIZATION_RESULTS_REPORT.md)
 
-### **Intermediate Path**
+### Intermediate Path
 1. Understand [8-Factor System](PROFIT_MAXIMIZING_SYSTEM.md)
 2. Learn [Advanced Features](ADVANCED_FEATURES_GUIDE.md)
 3. Study [Backtesting Guide](BACKTESTING_AND_ML_GUIDE.md)
 4. Review [Tuning Analysis](TUNING_ANALYSIS.md)
 
-### **Advanced Path**
+### Advanced Path
 1. Deep dive into [Factor Interactions](FACTOR_INTERACTIONS.md)
 2. Study ML optimization in [Backtesting Guide](BACKTESTING_AND_ML_GUIDE.md)
 3. Customize weights and parameters
@@ -124,7 +123,7 @@ docs/               # This documentation
 
 ---
 
-## 🚀 Quick Commands
+## Quick Commands
 
 ```bash
 # Get started
@@ -149,8 +148,7 @@ make test            # Run tests
 
 ## 📞 Support
 
-### **Common Issues**
-
+### Common Issues
 **Q: How do I run a backtest?**
 A: Run `make backtest-optimized` - uses synthetic data by default
 
@@ -163,15 +161,14 @@ A: Run `make optimize-weights` after collecting historical data
 **Q: What's the expected performance?**
 A: 10-12% annual return, 1.0-1.2 Sharpe ratio (see [Optimization Results](OPTIMIZATION_RESULTS_REPORT.md))
 
-### **Additional Resources**
-
+### Additional Resources
 - **Makefile** - Run `make help` for all available commands
 - **README** - Quick start and feature overview
 - **Tests** - See `tests/` folder for examples
 
 ---
 
-## 📝 Document Status
+## Document Status
 
 | Document | Status | Last Updated |
 |----------|--------|--------------|
@@ -184,7 +181,7 @@ A: 10-12% annual return, 1.0-1.2 Sharpe ratio (see [Optimization Results](OPTIMI
 
 ---
 
-## 🎯 Next Steps
+## Next Steps
 
 1. **Read** [Complete System Guide](COMPLETE_SYSTEM_GUIDE.md)
 2. **Run** `make quickstart` to see the system in action

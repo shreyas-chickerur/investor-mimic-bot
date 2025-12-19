@@ -1,10 +1,10 @@
-# 📚 Documentation
+# Documentation
 
 **Investor Mimic Bot - Complete Documentation**
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 - **[System Overview](SYSTEM_OVERVIEW.md)** - Architecture and components
 - **[Setup Guide](SETUP_EMAIL_APPROVAL.md)** - Installation and configuration
@@ -13,31 +13,31 @@
 
 ## 📖 Core Documentation
 
-### **System Architecture**
+### System Architecture
 - **[System Overview](SYSTEM_OVERVIEW.md)** - Complete system architecture
 - **[Complete System Guide](COMPLETE_SYSTEM_GUIDE.md)** - Detailed implementation
 - **[Multi-Signal System](MULTI_SIGNAL_SYSTEM.md)** - Signal generation
 
-### **Features**
+### Features
 - **[Advanced Features](ADVANCED_FEATURES_GUIDE.md)** - Stop-loss, rebalancing, regime detection
 - **[Profit-Maximizing System](PROFIT_MAXIMIZING_SYSTEM.md)** - 8-factor analysis
 - **[Factor Interactions](FACTOR_INTERACTIONS.md)** - How factors work together
 
-### **Workflows**
+### Workflows
 - **[Selective Approval](SELECTIVE_APPROVAL.md)** - Trade approval process
 - **[Email Setup](SETUP_EMAIL_APPROVAL.md)** - Email configuration
 
 ---
 
-## 🔧 Usage
+## Usage
 
-### **Daily Operations**
+### Daily Operations
 ```bash
 make run-daily          # Run daily workflow
 make run-paper          # Paper trading mode
 ```
 
-### **Development**
+### Development
 ```bash
 make install            # Install dependencies
 make lint               # Check code quality
@@ -45,7 +45,7 @@ make format             # Format code
 make test               # Run tests
 ```
 
-### **Backtesting**
+### Backtesting
 ```bash
 make backtest-optimized # Run backtest
 make optimize-weights   # Train ML models
@@ -53,7 +53,7 @@ make optimize-weights   # Train ML models
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 services/           # Core system components
@@ -71,9 +71,9 @@ docs/               # This documentation
 
 ---
 
-## 🎯 Key Concepts
+## Key Concepts
 
-### **8-Factor Analysis**
+### 8-Factor Analysis
 The system analyzes stocks using 8 factors:
 1. 13F Conviction
 2. News Sentiment
@@ -84,13 +84,13 @@ The system analyzes stocks using 8 factors:
 7. Relative Strength
 8. Earnings Momentum
 
-### **Market Regimes**
+### Market Regimes
 Automatically detects and adapts to:
 - Bull markets
 - Bear markets
 - Sideways markets
 
-### **Risk Management**
+### Risk Management
 - Stop-loss protection
 - Position sizing
 - Correlation limits
@@ -107,6 +107,6 @@ Automatically detects and adapts to:
 
 ---
 
-## 📝 License
+## License
 
 MIT
