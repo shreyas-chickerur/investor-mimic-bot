@@ -105,7 +105,9 @@ def main():
         print("-" * 80)
 
         for i, rec in enumerate(recommendations, 1):
-            print(f"{i:<6} {rec.symbol:<10} {rec.final_score:.4f}    {rec.recommendation:<15} {rec.confidence:.1%}")
+            print(
+                f"{i:<6} {rec.symbol:<10} {rec.final_score:.4f}    {rec.recommendation:<15} {rec.confidence:.1%}"
+            )
 
         print()
 
@@ -116,7 +118,9 @@ def main():
         for rec in recommendations[:3]:
             print(f"\n{rec.symbol}:")
             print(f"  Final Score:      {rec.final_score:.4f}")
-            print(f"  Recommendation:   {rec.recommendation.upper()} (confidence: {rec.confidence:.1%})")
+            print(
+                f"  Recommendation:   {rec.recommendation.upper()} (confidence: {rec.confidence:.1%})"
+            )
             print(f"  Signal Breakdown:")
             print(f"    13F Conviction:   {rec.conviction_score:.4f} (40% weight)")
             print(f"    News Sentiment:   {rec.sentiment_score:.4f} (20% weight)")

@@ -60,7 +60,9 @@ async def send_alert(alert: Alert):
     await alert.send()
 
 
-def send_alert_sync(level: AlertLevel, message: str, component: str, details: Optional[Dict[str, Any]] = None):
+def send_alert_sync(
+    level: AlertLevel, message: str, component: str, details: Optional[Dict[str, Any]] = None
+):
     """Synchronous helper function to send alerts (for non-async contexts).
 
     Args:

@@ -4,11 +4,12 @@ Health Check System
 Provides comprehensive system health monitoring and status endpoints.
 """
 
-from typing import Dict, Any
 from datetime import datetime
+from typing import Any, Dict
+
+from db.connection_pool import get_pool_metrics
 from utils.enhanced_logging import get_logger
 from utils.monitoring import monitor
-from db.connection_pool import get_pool_metrics
 
 logger = get_logger(__name__)
 
@@ -26,7 +27,10 @@ class HealthChecker:
             pool_metrics = get_pool_metrics()
 
             # Check if pool is healthy
-            healthy = pool_metrics["checked_out"] < pool_metrics["size"] * 0.9 and pool_metrics["total_connections"] > 0
+            healthy = (
+                pool_metrics["checked_out"] < pool_metrics["size"] * 0.9
+                and pool_metrics["total_connections"] > 0
+            )
 
             return {
                 "status": "healthy" if healthy else "degraded",
@@ -50,10 +54,17 @@ class HealthChecker:
             result = cache.get(test_key)
             cache.delete(test_key)
 
-            return {"status": "healthy" if result == "ok" else "degraded", "message": "Cache operational"}
+            return {
+                "status": "healthy" if result == "ok" else "degraded",
+                "message": "Cache operational",
+            }
         except Exception as e:
             logger.warning(f"Cache health check failed: {e}")
-            return {"status": "degraded", "error": str(e), "message": "Cache unavailable (using memory fallback)"}
+            return {
+                "status": "degraded",
+                "error": str(e),
+                "message": "Cache unavailable (using memory fallback)",
+            }
 
     def check_apis(self) -> Dict[str, Any]:
         """Check external API connectivity."""
@@ -77,11 +88,16 @@ class HealthChecker:
             if env.get("ALPHA_VANTAGE_API_KEY"):
                 api_status["alpha_vantage"] = {"status": "configured", "message": "API key present"}
             else:
-                api_status["alpha_vantage"] = {"status": "not_configured", "message": "API key missing"}
+                api_status["alpha_vantage"] = {
+                    "status": "not_configured",
+                    "message": "API key missing",
+                }
         except Exception as e:
             api_status["alpha_vantage"] = {"status": "error", "error": str(e)}
 
-        overall_healthy = all(api["status"] in ["configured", "healthy"] for api in api_status.values())
+        overall_healthy = all(
+            api["status"] in ["configured", "healthy"] for api in api_status.values()
+        )
 
         return {
             "status": "healthy" if overall_healthy else "degraded",
@@ -114,7 +130,11 @@ class HealthChecker:
             }
         except Exception as e:
             logger.error(f"System resource check failed: {e}", error=e)
-            return {"status": "unknown", "error": str(e), "message": "Could not check system resources"}
+            return {
+                "status": "unknown",
+                "error": str(e),
+                "message": "Could not check system resources",
+            }
 
     def get_full_health_status(self) -> Dict[str, Any]:
         """Get comprehensive health status."""
@@ -141,7 +161,12 @@ class HealthChecker:
         return {
             "status": overall_status,
             "timestamp": datetime.now().isoformat(),
-            "components": {"database": database, "cache": cache, "apis": apis, "resources": resources},
+            "components": {
+                "database": database,
+                "cache": cache,
+                "apis": apis,
+                "resources": resources,
+            },
             "monitoring": monitoring_summary,
             "uptime": self._get_uptime(),
         }

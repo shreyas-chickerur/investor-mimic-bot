@@ -5,10 +5,11 @@ Tracks system health, performance, and alerts.
 """
 
 import time
-from typing import Dict, Optional, List
-from datetime import datetime, timedelta
-from dataclasses import dataclass, field
 from collections import deque
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional
+
 import psutil
 
 
@@ -65,7 +66,9 @@ class SystemMonitor:
             return None
 
         cutoff_time = datetime.now() - timedelta(minutes=window_minutes)
-        recent_metrics = [m.value for m in self.performance_metrics[metric_name] if m.timestamp >= cutoff_time]
+        recent_metrics = [
+            m.value for m in self.performance_metrics[metric_name] if m.timestamp >= cutoff_time
+        ]
 
         return sum(recent_metrics) / len(recent_metrics) if recent_metrics else None
 
@@ -78,12 +81,21 @@ class SystemMonitor:
             "cpu_healthy": metrics.cpu_percent < 80,
             "memory_healthy": metrics.memory_percent < 85,
             "disk_healthy": metrics.disk_percent < 90,
-            "overall_healthy": (metrics.cpu_percent < 80 and metrics.memory_percent < 85 and metrics.disk_percent < 90),
+            "overall_healthy": (
+                metrics.cpu_percent < 80
+                and metrics.memory_percent < 85
+                and metrics.disk_percent < 90
+            ),
         }
 
     def create_alert(self, level: str, message: str, details: Optional[Dict] = None):
         """Create a system alert."""
-        alert = {"level": level, "message": message, "details": details or {}, "timestamp": datetime.now()}
+        alert = {
+            "level": level,
+            "message": message,
+            "details": details or {},
+            "timestamp": datetime.now(),
+        }
         self.alerts.append(alert)
 
         # Keep only last 1000 alerts
@@ -122,12 +134,16 @@ def track_execution_time(func):
         try:
             result = func(*args, **kwargs)
             execution_time = time.time() - start_time
-            monitor.record_metric(f"{func.__module__}.{func.__name__}_execution_time", execution_time, "seconds")
+            monitor.record_metric(
+                f"{func.__module__}.{func.__name__}_execution_time", execution_time, "seconds"
+            )
             return result
         except Exception as e:
             execution_time = time.time() - start_time
             monitor.create_alert(
-                "error", f"Function {func.__name__} failed after {execution_time:.2f}s", {"error": str(e)}
+                "error",
+                f"Function {func.__name__} failed after {execution_time:.2f}s",
+                {"error": str(e)},
             )
             raise
 

@@ -6,8 +6,9 @@ Provides consistent error handling across the system.
 
 import logging
 import traceback
-from typing import Optional, Callable, Any
 from functools import wraps
+from typing import Any, Callable, Optional
+
 from utils.monitoring import monitor
 
 
@@ -41,7 +42,9 @@ class ConfigurationError(SystemError):
     pass
 
 
-def handle_errors(default_return: Any = None, raise_on_error: bool = False, log_level: str = "error"):
+def handle_errors(
+    default_return: Any = None, raise_on_error: bool = False, log_level: str = "error"
+):
     """
     Decorator for consistent error handling.
 
@@ -88,7 +91,10 @@ def handle_errors(default_return: Any = None, raise_on_error: bool = False, log_
 
 
 def retry_on_failure(
-    max_attempts: int = 3, delay_seconds: float = 1.0, backoff_factor: float = 2.0, exceptions: tuple = (Exception,)
+    max_attempts: int = 3,
+    delay_seconds: float = 1.0,
+    backoff_factor: float = 2.0,
+    exceptions: tuple = (Exception,),
 ):
     """
     Decorator to retry function on failure.
@@ -157,7 +163,11 @@ class ErrorContext:
             monitor.create_alert(
                 "error",
                 error_msg,
-                {"operation": self.operation, "error_type": exc_type.__name__, "traceback": traceback.format_exc()},
+                {
+                    "operation": self.operation,
+                    "error_type": exc_type.__name__,
+                    "traceback": traceback.format_exc(),
+                },
             )
 
             if not self.raise_on_error:

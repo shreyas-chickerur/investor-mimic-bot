@@ -4,9 +4,11 @@ Multi-Channel Notification System
 Supports Slack, SMS (Twilio), Telegram, and Push notifications.
 """
 
-import requests
-from typing import Optional, Dict, Any
 from enum import Enum
+from typing import Any, Dict, Optional
+
+import requests
+
 from utils.enhanced_logging import get_logger
 from utils.environment import env
 
@@ -132,7 +134,12 @@ class NotificationManager:
             return False
 
         url = f"https://api.telegram.org/bot{self.telegram_token}/sendMessage"
-        payload = {"chat_id": self.telegram_chat_id, "text": message, "parse_mode": "Markdown", **kwargs}
+        payload = {
+            "chat_id": self.telegram_chat_id,
+            "text": message,
+            "parse_mode": "Markdown",
+            **kwargs,
+        }
 
         response = requests.post(url, json=payload, timeout=10)
         response.raise_for_status()
@@ -151,7 +158,9 @@ class NotificationManager:
                 logger.warning("No email address specified")
                 return False
 
-            send_email(to_email=to_email, subject=subject or "Investor Mimic Bot Alert", body=message)
+            send_email(
+                to_email=to_email, subject=subject or "Investor Mimic Bot Alert", body=message
+            )
 
             logger.info(f"Email sent to {to_email}")
             return True
@@ -205,7 +214,9 @@ class NotificationManager:
 
         results = {}
         for channel in channels:
-            results[channel.value] = self.send_notification(message, channel=channel, priority=priority)
+            results[channel.value] = self.send_notification(
+                message, channel=channel, priority=priority
+            )
 
         return results
 

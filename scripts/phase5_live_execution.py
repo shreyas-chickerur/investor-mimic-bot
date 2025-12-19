@@ -143,11 +143,15 @@ def main() -> int:
     buying_power = _as_decimal(getattr(acct, "buying_power", cash))
     total_equity = buying_power if args.use_buying_power else cash
 
-    engine = ConvictionEngine(db_url=str(args.db_url).replace("postgresql+asyncpg://", "postgresql://", 1))
+    engine = ConvictionEngine(
+        db_url=str(args.db_url).replace("postgresql+asyncpg://", "postgresql://", 1)
+    )
     alloc = engine.allocations(
         as_of=_to_date(args.as_of),
         lookback_days=int(args.lookback_days),
-        cfg=ConvictionConfig(recency_half_life_days=int(args.half_life_days), max_positions=int(args.max_positions)),
+        cfg=ConvictionConfig(
+            recency_half_life_days=int(args.half_life_days), max_positions=int(args.max_positions)
+        ),
     )
 
     m = _symbol_map(args.symbol_map)

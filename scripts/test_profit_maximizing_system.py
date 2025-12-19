@@ -89,7 +89,9 @@ def main():
 
     config = ConvictionConfig(recency_half_life_days=90, min_weight=0.0, max_positions=10)
 
-    signals = engine.get_top_opportunities(holdings_df=holdings_df, conviction_config=config, top_n=10)
+    signals = engine.get_top_opportunities(
+        holdings_df=holdings_df, conviction_config=config, top_n=10
+    )
 
     print("=" * 80)
     print("TOP 10 PROFIT-MAXIMIZING OPPORTUNITIES")
@@ -98,19 +100,35 @@ def main():
 
     for i, signal in enumerate(signals, 1):
         print(f"{i}. {signal.symbol} - {signal.recommendation}")
-        print(f"   Combined Score: {signal.combined_score:.3f} (Confidence: {signal.confidence:.1%})")
+        print(
+            f"   Combined Score: {signal.combined_score:.3f} (Confidence: {signal.confidence:.1%})"
+        )
         print()
         print("   Factor Scores:")
-        print(f"     13F Conviction:     {signal.conviction_score:.3f} × 30% = {signal.conviction_score * 0.30:.3f}")
-        print(f"     News Sentiment:     {signal.news_score:.3f} × 12% = {signal.news_score * 0.12:.3f}")
-        print(f"     Insider Trading:    {signal.insider_score:.3f} × 12% = {signal.insider_score * 0.12:.3f}")
-        print(f"     Technical:          {signal.technical_score:.3f} ×  8% = {signal.technical_score * 0.08:.3f}")
-        print(f"     Moving Averages:    {signal.moving_avg_score:.3f} × 18% = {signal.moving_avg_score * 0.18:.3f}")
-        print(f"     Volume Analysis:    {signal.volume_score:.3f} × 10% = {signal.volume_score * 0.10:.3f}")
+        print(
+            f"     13F Conviction:     {signal.conviction_score:.3f} × 30% = {signal.conviction_score * 0.30:.3f}"
+        )
+        print(
+            f"     News Sentiment:     {signal.news_score:.3f} × 12% = {signal.news_score * 0.12:.3f}"
+        )
+        print(
+            f"     Insider Trading:    {signal.insider_score:.3f} × 12% = {signal.insider_score * 0.12:.3f}"
+        )
+        print(
+            f"     Technical:          {signal.technical_score:.3f} ×  8% = {signal.technical_score * 0.08:.3f}"
+        )
+        print(
+            f"     Moving Averages:    {signal.moving_avg_score:.3f} × 18% = {signal.moving_avg_score * 0.18:.3f}"
+        )
+        print(
+            f"     Volume Analysis:    {signal.volume_score:.3f} × 10% = {signal.volume_score * 0.10:.3f}"
+        )
         print(
             f"     Relative Strength:  {signal.relative_strength_score:.3f} ×  8% = {signal.relative_strength_score * 0.08:.3f}"
         )
-        print(f"     Earnings Momentum:  {signal.earnings_score:.3f} ×  2% = {signal.earnings_score * 0.02:.3f}")
+        print(
+            f"     Earnings Momentum:  {signal.earnings_score:.3f} ×  2% = {signal.earnings_score * 0.02:.3f}"
+        )
         print()
 
         # Show key insights

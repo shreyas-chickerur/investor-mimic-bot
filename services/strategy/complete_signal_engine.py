@@ -140,7 +140,9 @@ class CompleteSignalEngine:
         if use_technical:
             logger.info("Generating technical signals...")
             symbols = list(conviction_signals.keys())[:100]
-            technical_signals = self.technical_generator.get_mock_signals(symbols, conviction_signals)
+            technical_signals = self.technical_generator.get_mock_signals(
+                symbols, conviction_signals
+            )
             logger.info(f"Got {len(technical_signals)} technical signals")
 
         return {
