@@ -108,9 +108,7 @@ class AlpacaExecutionService:
                 raise RuntimeError("Kill switch active")
 
             try:
-                submitted = self._submit_limit_buy(
-                    symbol=o.symbol, qty=o.qty, limit_price=limit_price
-                )
+                submitted = self._submit_limit_buy(symbol=o.symbol, qty=o.qty, limit_price=limit_price)
                 order_id = str(getattr(submitted, "id", ""))
 
                 filled = self._wait_for_fill(order_id)
