@@ -4,10 +4,9 @@ Slack notification service for alerts and monitoring.
 Sends Slack messages for critical events, errors, and status updates.
 """
 
-import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import httpx
 from pydantic import BaseModel, Field, HttpUrl

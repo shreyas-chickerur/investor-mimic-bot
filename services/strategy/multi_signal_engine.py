@@ -4,7 +4,6 @@ Multi-Signal Strategy Engine - Combines multiple data sources for trading decisi
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Dict, List, Optional
 
 from services.news.news_api import NewsAPIService

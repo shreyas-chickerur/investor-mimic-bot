@@ -5,7 +5,6 @@ System Cleanup Script
 Removes unused files and consolidates the codebase.
 """
 
-import os
 import shutil
 from pathlib import Path
 

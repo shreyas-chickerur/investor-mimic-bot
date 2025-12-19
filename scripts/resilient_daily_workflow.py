@@ -377,7 +377,7 @@ def main():
             from_email=smtp_username,
         )
 
-        notifier = EmailNotifier(email_config)
+        EmailNotifier(email_config)
 
         # Build email using professional HTML template
         from services.monitoring.email_templates import get_approval_email_html

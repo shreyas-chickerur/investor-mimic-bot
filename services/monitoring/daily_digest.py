@@ -5,8 +5,8 @@ Generates personalized daily investment digest with market news and recommendati
 """
 
 import requests
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from datetime import datetime
+from typing import Dict, List
 from utils.enhanced_logging import get_logger
 from utils.environment import env
 from db.connection_pool import get_db_session
@@ -163,7 +163,7 @@ class DailyDigestGenerator:
         try:
             with get_db_session() as session:
                 query = """
-                    SELECT 
+                    SELECT
                         h.ticker,
                         h.shares,
                         h.avg_cost,
@@ -204,7 +204,7 @@ class DailyDigestGenerator:
             with get_db_session() as session:
                 # Get latest recommendations from today
                 query = """
-                    SELECT 
+                    SELECT
                         ticker,
                         action,
                         quantity,
@@ -255,7 +255,7 @@ class DailyDigestGenerator:
         try:
             with get_db_session() as session:
                 query = """
-                    SELECT 
+                    SELECT
                         SUM(current_value) as total_value,
                         SUM(unrealized_gain_loss) as total_gain_loss,
                         AVG(unrealized_gain_loss_pct) as avg_gain_loss_pct

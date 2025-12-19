@@ -6,9 +6,8 @@ Runs complete backtest on historical data (2010-2024, excluding COVID).
 Tests the 8-factor system and generates detailed performance analysis.
 """
 
-import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -27,7 +26,7 @@ from typing import Dict, List
 import matplotlib.pyplot as plt
 
 from backtesting.backtest_engine import BacktestConfig, BacktestEngine, BacktestResult
-from ml.adaptive_learning_engine import AdaptiveLearningEngine, EnsembleOptimizer, MLConfig
+from ml.adaptive_learning_engine import AdaptiveLearningEngine, EnsembleOptimizer
 
 # Set style
 plt.style.use("ggplot")

@@ -4,12 +4,10 @@ Form 4 reports insider transactions (executives buying/selling their own stock).
 """
 
 import logging
-import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, List, Optional
 
-import requests
 
 logger = logging.getLogger(__name__)
 

@@ -23,7 +23,6 @@ Schedule this to run daily (e.g., via cron):
 
 import argparse
 import asyncio
-import logging
 import sys
 from datetime import datetime
 from decimal import Decimal

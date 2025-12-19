@@ -90,7 +90,7 @@ def _build_flow_charts(recommendations: List[Dict]) -> str:
         html += """
             <div style="margin-top: 12px; padding: 10px; background: #f8f9fa; border-radius: 6px;">
                 <p style="color: #7f8c8d; font-size: 10px; margin: 0; line-height: 1.3;">
-                    Click any step to view detailed reasoning. Analysis based on real-time data from news sources, 
+                    Click any step to view detailed reasoning. Analysis based on real-time data from news sources,
                     SEC filings, earnings reports, and technical indicators.
                 </p>
             </div>
@@ -102,7 +102,7 @@ def _build_flow_charts(recommendations: List[Dict]) -> str:
         function toggleDetails(stepId) {
             var details = document.getElementById('details_' + stepId);
             var arrow = document.getElementById('arrow_' + stepId);
-            
+
             if (details.style.display === 'none') {
                 details.style.display = 'block';
                 arrow.textContent = '▲';

@@ -13,8 +13,6 @@ from typing import Any, Dict
 class ValidationError(Exception):
     """Raised when validation fails."""
 
-    pass
-
 
 class Validator:
     """Base validator class."""
