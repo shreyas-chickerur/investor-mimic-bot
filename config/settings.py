@@ -35,6 +35,13 @@ class Settings(BaseSettings):
 
     # Trading Settings
     PAPER_TRADING: bool = Field(True, env="PAPER_TRADING")
+    MAX_POSITIONS: int = Field(10, env="MAX_POSITIONS")
+    REBALANCE_FREQUENCY: int = Field(10, env="REBALANCE_FREQUENCY")  # days
+    SIGNAL_THRESHOLD: float = Field(0.6, env="SIGNAL_THRESHOLD")
+    STOP_LOSS_PCT: float = Field(0.20, env="STOP_LOSS_PCT")
+    MAX_POSITION_SIZE: float = Field(0.15, env="MAX_POSITION_SIZE")  # % of portfolio
+    TRANSACTION_COST: float = Field(0.001, env="TRANSACTION_COST")  # 0.1%
+    SLIPPAGE: float = Field(0.0005, env="SLIPPAGE")  # 0.05%
 
     # CORS
     ALLOWED_ORIGINS: str = Field(
