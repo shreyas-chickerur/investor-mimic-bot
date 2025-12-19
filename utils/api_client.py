@@ -5,12 +5,14 @@ Provides resilient API calls with exponential backoff and rate limiting.
 """
 
 import time
-import requests
-from typing import Optional, Dict, Any, Callable
 from functools import wraps
-from utils.rate_limiter import rate_limiter
-from utils.error_handler import retry_on_failure, APIError
+from typing import Any, Callable, Dict, Optional
+
+import requests
+
 from utils.enhanced_logging import get_logger
+from utils.error_handler import APIError, retry_on_failure
+from utils.rate_limiter import rate_limiter
 
 logger = get_logger(__name__)
 
@@ -19,7 +21,11 @@ class APIClient:
     """Base API client with retry and rate limiting."""
 
     def __init__(
-        self, base_url: str, api_key: Optional[str] = None, rate_limit_key: str = "default", timeout: int = 30
+        self,
+        base_url: str,
+        api_key: Optional[str] = None,
+        rate_limit_key: str = "default",
+        timeout: int = 30,
     ):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
@@ -48,7 +54,12 @@ class APIClient:
 
         try:
             response = self.session.request(
-                method=method, url=url, params=params, json=data, headers=headers, timeout=self.timeout
+                method=method,
+                url=url,
+                params=params,
+                json=data,
+                headers=headers,
+                timeout=self.timeout,
             )
 
             response.raise_for_status()
@@ -104,10 +115,21 @@ class AlpacaClient(APIClient):
         return self.get("/v2/positions")
 
     def place_order(
-        self, symbol: str, qty: float, side: str, order_type: str = "market", time_in_force: str = "day"
+        self,
+        symbol: str,
+        qty: float,
+        side: str,
+        order_type: str = "market",
+        time_in_force: str = "day",
     ) -> Dict[str, Any]:
         """Place an order."""
-        data = {"symbol": symbol, "qty": qty, "side": side.lower(), "type": order_type, "time_in_force": time_in_force}
+        data = {
+            "symbol": symbol,
+            "qty": qty,
+            "side": side.lower(),
+            "type": order_type,
+            "time_in_force": time_in_force,
+        }
         return self.post("/v2/orders", data=data)
 
 
@@ -115,7 +137,9 @@ class AlphaVantageClient(APIClient):
     """Alpha Vantage API client."""
 
     def __init__(self, api_key: str):
-        super().__init__("https://www.alphavantage.co", api_key=api_key, rate_limit_key="alpha_vantage")
+        super().__init__(
+            "https://www.alphavantage.co", api_key=api_key, rate_limit_key="alpha_vantage"
+        )
 
     def get_quote(self, symbol: str) -> Dict[str, Any]:
         """Get real-time quote."""

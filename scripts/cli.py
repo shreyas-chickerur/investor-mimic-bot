@@ -5,16 +5,18 @@ CLI Tool for Investor Mimic Bot
 User-friendly command-line interface for system management.
 """
 
-import click
 import sys
 from pathlib import Path
+
+import click
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from datetime import datetime
-from utils.environment import env
-from utils.enhanced_logging import get_logger
+
 from db.connection_pool import get_pool_metrics
+from utils.enhanced_logging import get_logger
+from utils.environment import env
 
 logger = get_logger(__name__)
 
@@ -106,7 +108,9 @@ def optimize(metric, trials):
 
 
 @cli.command()
-@click.option("--env-name", type=click.Choice(["development", "staging", "production"]), required=True)
+@click.option(
+    "--env-name", type=click.Choice(["development", "staging", "production"]), required=True
+)
 def deploy(env_name):
     """Deploy to specified environment."""
     click.echo(f"Deploying to {env_name}...")
@@ -178,7 +182,9 @@ def init():
 
     # Database
     click.echo("\n2. Database")
-    db_url = click.prompt("  PostgreSQL URL", default="postgresql://postgres@localhost:5432/investorbot")
+    db_url = click.prompt(
+        "  PostgreSQL URL", default="postgresql://postgres@localhost:5432/investorbot"
+    )
 
     # Email (optional)
     click.echo("\n3. Email Notifications (optional)")

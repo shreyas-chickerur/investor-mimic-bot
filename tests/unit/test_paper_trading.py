@@ -4,13 +4,14 @@ Unit Tests for Paper Trading Module
 Tests paper trading engine functionality.
 """
 
-import pytest
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from services.paper_trading import PaperTradingEngine, PaperPosition
+from services.paper_trading import PaperPosition, PaperTradingEngine
 
 
 class TestPaperTradingEngine:
@@ -28,7 +29,7 @@ class TestPaperTradingEngine:
         """Test successful buy order."""
         engine = PaperTradingEngine(initial_capital=100000)
         success = engine.place_order("AAPL", "BUY", 100, 150.0)
-        
+
         assert success is True
         assert "AAPL" in engine.positions
         assert engine.positions["AAPL"].quantity == 100
@@ -39,7 +40,7 @@ class TestPaperTradingEngine:
         """Test buy order with insufficient funds."""
         engine = PaperTradingEngine(initial_capital=1000)
         success = engine.place_order("AAPL", "BUY", 100, 150.0)
-        
+
         assert success is False
         assert "AAPL" not in engine.positions
         assert engine.cash == 1000
@@ -49,7 +50,7 @@ class TestPaperTradingEngine:
         engine = PaperTradingEngine(initial_capital=100000)
         engine.place_order("AAPL", "BUY", 100, 150.0)
         success = engine.place_order("AAPL", "SELL", 50, 160.0)
-        
+
         assert success is True
         assert engine.positions["AAPL"].quantity == 50
         assert engine.cash == 93000  # 85000 + (50 * 160)
@@ -58,7 +59,7 @@ class TestPaperTradingEngine:
         """Test sell order without position."""
         engine = PaperTradingEngine(initial_capital=100000)
         success = engine.place_order("AAPL", "SELL", 50, 160.0)
-        
+
         assert success is False
 
     def test_sell_order_insufficient_shares(self):
@@ -66,7 +67,7 @@ class TestPaperTradingEngine:
         engine = PaperTradingEngine(initial_capital=100000)
         engine.place_order("AAPL", "BUY", 100, 150.0)
         success = engine.place_order("AAPL", "SELL", 150, 160.0)
-        
+
         assert success is False
         assert engine.positions["AAPL"].quantity == 100
 
@@ -75,7 +76,7 @@ class TestPaperTradingEngine:
         engine = PaperTradingEngine(initial_capital=100000)
         engine.place_order("AAPL", "BUY", 100, 150.0)
         engine.place_order("AAPL", "SELL", 100, 160.0)
-        
+
         assert "AAPL" not in engine.positions
 
     def test_multiple_buys_average_cost(self):
@@ -83,7 +84,7 @@ class TestPaperTradingEngine:
         engine = PaperTradingEngine(initial_capital=100000)
         engine.place_order("AAPL", "BUY", 100, 150.0)
         engine.place_order("AAPL", "BUY", 100, 160.0)
-        
+
         assert engine.positions["AAPL"].quantity == 200
         assert engine.positions["AAPL"].avg_cost == 155.0  # (150 + 160) / 2
 
@@ -92,7 +93,7 @@ class TestPaperTradingEngine:
         engine = PaperTradingEngine(initial_capital=100000)
         engine.place_order("AAPL", "BUY", 100, 150.0)
         engine.update_prices({"AAPL": 160.0})
-        
+
         assert engine.positions["AAPL"].current_price == 160.0
 
     def test_portfolio_value(self):
@@ -100,7 +101,7 @@ class TestPaperTradingEngine:
         engine = PaperTradingEngine(initial_capital=100000)
         engine.place_order("AAPL", "BUY", 100, 150.0)
         engine.update_prices({"AAPL": 160.0})
-        
+
         portfolio_value = engine.get_portfolio_value()
         expected = 85000 + (100 * 160.0)  # cash + position value
         assert portfolio_value == expected
@@ -110,9 +111,9 @@ class TestPaperTradingEngine:
         engine = PaperTradingEngine(initial_capital=100000)
         engine.place_order("AAPL", "BUY", 100, 150.0)
         engine.update_prices({"AAPL": 160.0})
-        
+
         metrics = engine.get_performance_metrics()
-        
+
         assert "total_value" in metrics
         assert "cash" in metrics
         assert "positions_value" in metrics
@@ -126,9 +127,9 @@ class TestPaperTradingEngine:
         engine = PaperTradingEngine(initial_capital=100000)
         engine.place_order("AAPL", "BUY", 100, 150.0)
         engine.update_prices({"AAPL": 160.0})
-        
+
         summary = engine.get_positions_summary()
-        
+
         assert len(summary) == 1
         assert summary[0]["ticker"] == "AAPL"
         assert summary[0]["quantity"] == 100
@@ -143,11 +144,15 @@ class TestPaperPosition:
     def test_position_creation(self):
         """Test position creation."""
         from datetime import datetime
-        
+
         pos = PaperPosition(
-            ticker="AAPL", quantity=100, avg_cost=150.0, entry_date=datetime.now(), current_price=150.0
+            ticker="AAPL",
+            quantity=100,
+            avg_cost=150.0,
+            entry_date=datetime.now(),
+            current_price=150.0,
         )
-        
+
         assert pos.ticker == "AAPL"
         assert pos.quantity == 100
         assert pos.avg_cost == 150.0
@@ -155,41 +160,57 @@ class TestPaperPosition:
     def test_market_value(self):
         """Test market value calculation."""
         from datetime import datetime
-        
+
         pos = PaperPosition(
-            ticker="AAPL", quantity=100, avg_cost=150.0, entry_date=datetime.now(), current_price=160.0
+            ticker="AAPL",
+            quantity=100,
+            avg_cost=150.0,
+            entry_date=datetime.now(),
+            current_price=160.0,
         )
-        
+
         assert pos.market_value == 16000.0
 
     def test_cost_basis(self):
         """Test cost basis calculation."""
         from datetime import datetime
-        
+
         pos = PaperPosition(
-            ticker="AAPL", quantity=100, avg_cost=150.0, entry_date=datetime.now(), current_price=160.0
+            ticker="AAPL",
+            quantity=100,
+            avg_cost=150.0,
+            entry_date=datetime.now(),
+            current_price=160.0,
         )
-        
+
         assert pos.cost_basis == 15000.0
 
     def test_unrealized_pnl(self):
         """Test unrealized P&L calculation."""
         from datetime import datetime
-        
+
         pos = PaperPosition(
-            ticker="AAPL", quantity=100, avg_cost=150.0, entry_date=datetime.now(), current_price=160.0
+            ticker="AAPL",
+            quantity=100,
+            avg_cost=150.0,
+            entry_date=datetime.now(),
+            current_price=160.0,
         )
-        
+
         assert pos.unrealized_pnl == 1000.0
 
     def test_unrealized_pnl_pct(self):
         """Test unrealized P&L percentage."""
         from datetime import datetime
-        
+
         pos = PaperPosition(
-            ticker="AAPL", quantity=100, avg_cost=150.0, entry_date=datetime.now(), current_price=160.0
+            ticker="AAPL",
+            quantity=100,
+            avg_cost=150.0,
+            entry_date=datetime.now(),
+            current_price=160.0,
         )
-        
+
         assert abs(pos.unrealized_pnl_pct - 0.0667) < 0.001  # ~6.67%
 
 

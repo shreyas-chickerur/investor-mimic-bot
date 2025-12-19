@@ -103,7 +103,9 @@ class NewsAPIService:
             logger.error(f"Error fetching news for {symbol}: {e}")
             return []
 
-    def fetch_news_batch(self, symbols: List[str], limit_per_symbol: int = 20) -> Dict[str, List[NewsArticle]]:
+    def fetch_news_batch(
+        self, symbols: List[str], limit_per_symbol: int = 20
+    ) -> Dict[str, List[NewsArticle]]:
         """
         Fetch news for multiple symbols.
 

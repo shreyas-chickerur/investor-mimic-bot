@@ -137,7 +137,9 @@ class Form4Parser:
 
                     # Transaction code (P=Purchase, S=Sale)
                     trans_code = non_derivative.findtext(".//transactionCode", "")
-                    trans_type = "buy" if trans_code == "P" else "sell" if trans_code == "S" else "other"
+                    trans_type = (
+                        "buy" if trans_code == "P" else "sell" if trans_code == "S" else "other"
+                    )
 
                     # Shares
                     shares_str = non_derivative.findtext(".//transactionShares/value", "0")
@@ -181,7 +183,9 @@ class Form4Parser:
             logger.error(f"Error parsing Form 4 XML: {e}")
             return []
 
-    def get_insider_activity_for_symbol(self, symbol: str, days_back: int = 90) -> List[InsiderTransaction]:
+    def get_insider_activity_for_symbol(
+        self, symbol: str, days_back: int = 90
+    ) -> List[InsiderTransaction]:
         """
         Get recent insider activity for a symbol.
 
@@ -214,7 +218,9 @@ class RealInsiderSignalGenerator:
     def __init__(self):
         self.parser = Form4Parser()
 
-    def calculate_insider_sentiment(self, transactions: List[InsiderTransaction], recency_weight: float = 0.7) -> float:
+    def calculate_insider_sentiment(
+        self, transactions: List[InsiderTransaction], recency_weight: float = 0.7
+    ) -> float:
         """
         Calculate insider sentiment score.
 

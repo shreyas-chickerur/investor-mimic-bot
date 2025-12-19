@@ -5,8 +5,9 @@ Implements token bucket algorithm for rate limiting.
 """
 
 import time
-from typing import Dict, Optional
 from threading import Lock
+from typing import Dict, Optional
+
 from utils.environment import env
 
 

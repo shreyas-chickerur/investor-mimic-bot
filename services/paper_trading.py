@@ -4,13 +4,14 @@ Paper Trading Mode
 Simulates real trades without risking capital, tracking hypothetical portfolio performance.
 """
 
-from typing import Dict, List, Optional
+from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
-from dataclasses import dataclass, field
+from typing import Dict, List, Optional
+
+from db.connection_pool import get_db_session
 from utils.enhanced_logging import get_logger
 from utils.validators import trade_validator
-from db.connection_pool import get_db_session
 
 logger = get_logger(__name__)
 
@@ -70,7 +71,9 @@ class PaperTradingEngine:
 
         logger.info(f"Paper trading initialized with ${initial_capital:,.2f}")
 
-    def place_order(self, ticker: str, action: str, quantity: float, price: float, commission: float = 0.0) -> bool:
+    def place_order(
+        self, ticker: str, action: str, quantity: float, price: float, commission: float = 0.0
+    ) -> bool:
         """
         Place a paper trade order.
 
@@ -89,9 +92,13 @@ class PaperTradingEngine:
             validated = trade_validator.validate_trade(ticker, action, quantity, price)
 
             if action == "BUY":
-                return self._execute_buy(validated["ticker"], validated["quantity"], validated["price"], commission)
+                return self._execute_buy(
+                    validated["ticker"], validated["quantity"], validated["price"], commission
+                )
             else:
-                return self._execute_sell(validated["ticker"], validated["quantity"], validated["price"], commission)
+                return self._execute_sell(
+                    validated["ticker"], validated["quantity"], validated["price"], commission
+                )
 
         except Exception as e:
             logger.error(f"Paper trade failed: {e}", error=e)
@@ -102,7 +109,9 @@ class PaperTradingEngine:
         total_cost = quantity * price + commission
 
         if total_cost > self.cash:
-            logger.warning(f"Insufficient cash for {ticker}: need ${total_cost:,.2f}, have ${self.cash:,.2f}")
+            logger.warning(
+                f"Insufficient cash for {ticker}: need ${total_cost:,.2f}, have ${self.cash:,.2f}"
+            )
             return False
 
         # Update cash
@@ -117,12 +126,21 @@ class PaperTradingEngine:
             pos.avg_cost = new_avg_cost
         else:
             self.positions[ticker] = PaperPosition(
-                ticker=ticker, quantity=quantity, avg_cost=price, entry_date=datetime.now(), current_price=price
+                ticker=ticker,
+                quantity=quantity,
+                avg_cost=price,
+                entry_date=datetime.now(),
+                current_price=price,
             )
 
         # Record trade
         trade = PaperTrade(
-            ticker=ticker, action="BUY", quantity=quantity, price=price, timestamp=datetime.now(), commission=commission
+            ticker=ticker,
+            action="BUY",
+            quantity=quantity,
+            price=price,
+            timestamp=datetime.now(),
+            commission=commission,
         )
         self.trades.append(trade)
 

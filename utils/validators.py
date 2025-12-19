@@ -4,10 +4,10 @@ Data Validation Layer
 Validates inputs, outputs, and data integrity across the system.
 """
 
-from typing import Any, Optional, List, Dict
-from decimal import Decimal
-from datetime import datetime, date
 import re
+from datetime import date, datetime
+from decimal import Decimal
+from typing import Any, Dict, List, Optional
 
 
 class ValidationError(Exception):
@@ -210,7 +210,9 @@ class FactorScoreValidator:
             raise ValidationError(f"Weights must sum to 1.0, got {weight_sum}")
 
         # Calculate composite
-        composite = sum(validated_scores.get(factor, 0) * weight for factor, weight in weights.items())
+        composite = sum(
+            validated_scores.get(factor, 0) * weight for factor, weight in weights.items()
+        )
 
         return Validator.validate_score(composite)
 

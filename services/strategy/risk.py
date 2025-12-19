@@ -23,7 +23,9 @@ def apply_risk_constraints(
     df = allocations.copy()
 
     if df.empty:
-        return pd.DataFrame([{symbol_col: constraints.cash_symbol, weight_col: 1.0, "sector": None}])
+        return pd.DataFrame(
+            [{symbol_col: constraints.cash_symbol, weight_col: 1.0, "sector": None}]
+        )
 
     if "sector" not in df.columns:
         df["sector"] = None
@@ -34,11 +36,15 @@ def apply_risk_constraints(
     df[weight_col] = pd.to_numeric(df[weight_col], errors="coerce").fillna(0.0)
     df = df[df[weight_col] > 0].copy()
     if df.empty:
-        return pd.DataFrame([{symbol_col: constraints.cash_symbol, weight_col: 1.0, "sector": None}])
+        return pd.DataFrame(
+            [{symbol_col: constraints.cash_symbol, weight_col: 1.0, "sector": None}]
+        )
 
     total = float(df[weight_col].sum())
     if total <= 0:
-        return pd.DataFrame([{symbol_col: constraints.cash_symbol, weight_col: 1.0, "sector": None}])
+        return pd.DataFrame(
+            [{symbol_col: constraints.cash_symbol, weight_col: 1.0, "sector": None}]
+        )
 
     df["_base"] = df[weight_col] / total
 
@@ -115,7 +121,9 @@ def apply_risk_constraints(
     out = pd.concat(
         [
             out,
-            pd.DataFrame([{symbol_col: constraints.cash_symbol, weight_col: cash_weight, "sector": None}]),
+            pd.DataFrame(
+                [{symbol_col: constraints.cash_symbol, weight_col: cash_weight, "sector": None}]
+            ),
         ],
         ignore_index=True,
     )

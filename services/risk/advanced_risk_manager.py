@@ -134,11 +134,15 @@ class AdvancedRiskManager:
         adjusted_weights = self._adjust_for_correlations(kelly_weights, correlations)
 
         # Convert to dollar amounts
-        position_sizes = {symbol: investable * Decimal(str(weight)) for symbol, weight in adjusted_weights.items()}
+        position_sizes = {
+            symbol: investable * Decimal(str(weight)) for symbol, weight in adjusted_weights.items()
+        }
 
         return position_sizes
 
-    def _adjust_for_correlations(self, weights: Dict[str, float], correlations: pd.DataFrame) -> Dict[str, float]:
+    def _adjust_for_correlations(
+        self, weights: Dict[str, float], correlations: pd.DataFrame
+    ) -> Dict[str, float]:
         """
         Adjust weights to reduce concentration from high correlations.
 
@@ -174,7 +178,9 @@ class AdvancedRiskManager:
 
         return adjusted
 
-    def detect_market_regime(self, market_prices: pd.DataFrame, vix_level: Optional[float] = None) -> MarketRegime:
+    def detect_market_regime(
+        self, market_prices: pd.DataFrame, vix_level: Optional[float] = None
+    ) -> MarketRegime:
         """
         Detect current market regime to adjust strategy.
 
@@ -186,7 +192,9 @@ class AdvancedRiskManager:
             MarketRegime object
         """
         if market_prices.empty:
-            return MarketRegime(regime="unknown", confidence=0.0, vix_level=vix_level or 20.0, trend_strength=0.0)
+            return MarketRegime(
+                regime="unknown", confidence=0.0, vix_level=vix_level or 20.0, trend_strength=0.0
+            )
 
         # Calculate returns
         returns = market_prices["close"].pct_change().dropna()
@@ -224,7 +232,9 @@ class AdvancedRiskManager:
             trend_strength=trend,
         )
 
-    def adjust_for_market_regime(self, position_sizes: Dict[str, Decimal], regime: MarketRegime) -> Dict[str, Decimal]:
+    def adjust_for_market_regime(
+        self, position_sizes: Dict[str, Decimal], regime: MarketRegime
+    ) -> Dict[str, Decimal]:
         """
         Adjust position sizes based on market regime.
 
@@ -240,7 +250,9 @@ class AdvancedRiskManager:
         if regime.regime == "high_volatility":
             # Reduce exposure in high volatility
             adjustment_factor = 0.70  # 30% reduction
-            logger.info(f"High volatility detected (VIX: {regime.vix_level:.1f}), reducing exposure by 30%")
+            logger.info(
+                f"High volatility detected (VIX: {regime.vix_level:.1f}), reducing exposure by 30%"
+            )
 
         elif regime.regime == "bear":
             # Reduce exposure in bear market
@@ -253,7 +265,10 @@ class AdvancedRiskManager:
             logger.info(f"Bull market detected, increasing exposure by 10%")
 
         # Apply adjustment
-        adjusted = {symbol: size * Decimal(str(adjustment_factor)) for symbol, size in position_sizes.items()}
+        adjusted = {
+            symbol: size * Decimal(str(adjustment_factor))
+            for symbol, size in position_sizes.items()
+        }
 
         return adjusted
 
@@ -283,7 +298,9 @@ class AdvancedRiskManager:
 
         # Build covariance matrix
         if not correlations.empty:
-            cov_matrix = np.outer(volatilities, volatilities) * correlations.loc[symbols, symbols].values
+            cov_matrix = (
+                np.outer(volatilities, volatilities) * correlations.loc[symbols, symbols].values
+            )
         else:
             # Assume 0.5 correlation if no data
             cov_matrix = np.outer(volatilities, volatilities) * 0.5
@@ -425,7 +442,9 @@ class AdvancedRiskManager:
         for symbol, size in positions.items():
             pct = float(size / total)
             if pct > self.max_position_size:
-                violations.append(f"{symbol}: {pct:.1%} exceeds max position size {self.max_position_size:.1%}")
+                violations.append(
+                    f"{symbol}: {pct:.1%} exceeds max position size {self.max_position_size:.1%}"
+                )
 
         # Check sector exposure
         sector_exposure = {}
@@ -436,7 +455,9 @@ class AdvancedRiskManager:
         for sector, exposure in sector_exposure.items():
             pct = float(exposure / total)
             if pct > self.max_sector_exposure:
-                violations.append(f"{sector}: {pct:.1%} exceeds max sector exposure {self.max_sector_exposure:.1%}")
+                violations.append(
+                    f"{sector}: {pct:.1%} exceeds max sector exposure {self.max_sector_exposure:.1%}"
+                )
 
         is_valid = len(violations) == 0
         return is_valid, violations
