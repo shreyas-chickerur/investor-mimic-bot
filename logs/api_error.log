@@ -1373,3 +1373,243 @@ Traceback (most recent call last):
   File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 234, in _get_code_from_file
     with io.open_code(decoded_path) as f:
 FileNotFoundError: [Errno 2] No such file or directory: '/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/main.py'
+WARNING:  StatReload detected changes in 'utils/validators.py'. Reloading...
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 116, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 125, in _main
+    prepare(preparation_data)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 236, in prepare
+    _fixup_main_from_path(data['init_main_from_path'])
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 287, in _fixup_main_from_path
+    main_content = runpy.run_path(main_path,
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 264, in run_path
+    code, fname = _get_code_from_file(run_name, path_name)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 234, in _get_code_from_file
+    with io.open_code(decoded_path) as f:
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/main.py'
+WARNING:  StatReload detected changes in 'tests/functional/test_approval_integration.py'. Reloading...
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 116, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 125, in _main
+    prepare(preparation_data)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 236, in prepare
+    _fixup_main_from_path(data['init_main_from_path'])
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 287, in _fixup_main_from_path
+    main_content = runpy.run_path(main_path,
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 264, in run_path
+    code, fname = _get_code_from_file(run_name, path_name)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 234, in _get_code_from_file
+    with io.open_code(decoded_path) as f:
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/main.py'
+WARNING:  StatReload detected changes in 'utils/async_data_fetcher.py'. Reloading...
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 116, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 125, in _main
+    prepare(preparation_data)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 236, in prepare
+    _fixup_main_from_path(data['init_main_from_path'])
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 287, in _fixup_main_from_path
+    main_content = runpy.run_path(main_path,
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 264, in run_path
+    code, fname = _get_code_from_file(run_name, path_name)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 234, in _get_code_from_file
+    with io.open_code(decoded_path) as f:
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/main.py'
+WARNING:  StatReload detected changes in 'utils/cache.py'. Reloading...
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 116, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 125, in _main
+    prepare(preparation_data)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 236, in prepare
+    _fixup_main_from_path(data['init_main_from_path'])
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 287, in _fixup_main_from_path
+    main_content = runpy.run_path(main_path,
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 264, in run_path
+    code, fname = _get_code_from_file(run_name, path_name)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 234, in _get_code_from_file
+    with io.open_code(decoded_path) as f:
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/main.py'
+WARNING:  StatReload detected changes in 'utils/enhanced_logging.py'. Reloading...
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 116, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 125, in _main
+    prepare(preparation_data)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 236, in prepare
+    _fixup_main_from_path(data['init_main_from_path'])
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 287, in _fixup_main_from_path
+    main_content = runpy.run_path(main_path,
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 264, in run_path
+    code, fname = _get_code_from_file(run_name, path_name)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 234, in _get_code_from_file
+    with io.open_code(decoded_path) as f:
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/main.py'
+WARNING:  StatReload detected changes in 'utils/environment.py'. Reloading...
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 116, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 125, in _main
+    prepare(preparation_data)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 236, in prepare
+    _fixup_main_from_path(data['init_main_from_path'])
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 287, in _fixup_main_from_path
+    main_content = runpy.run_path(main_path,
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 264, in run_path
+    code, fname = _get_code_from_file(run_name, path_name)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 234, in _get_code_from_file
+    with io.open_code(decoded_path) as f:
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/main.py'
+WARNING:  StatReload detected changes in 'utils/error_handler.py'. Reloading...
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 116, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 125, in _main
+    prepare(preparation_data)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 236, in prepare
+    _fixup_main_from_path(data['init_main_from_path'])
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 287, in _fixup_main_from_path
+    main_content = runpy.run_path(main_path,
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 264, in run_path
+    code, fname = _get_code_from_file(run_name, path_name)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 234, in _get_code_from_file
+    with io.open_code(decoded_path) as f:
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/main.py'
+WARNING:  StatReload detected changes in 'utils/health_check.py'. Reloading...
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 116, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 125, in _main
+    prepare(preparation_data)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 236, in prepare
+    _fixup_main_from_path(data['init_main_from_path'])
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 287, in _fixup_main_from_path
+    main_content = runpy.run_path(main_path,
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 264, in run_path
+    code, fname = _get_code_from_file(run_name, path_name)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 234, in _get_code_from_file
+    with io.open_code(decoded_path) as f:
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/main.py'
+WARNING:  StatReload detected changes in 'utils/logging_config.py'. Reloading...
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 116, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 125, in _main
+    prepare(preparation_data)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 236, in prepare
+    _fixup_main_from_path(data['init_main_from_path'])
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 287, in _fixup_main_from_path
+    main_content = runpy.run_path(main_path,
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 264, in run_path
+    code, fname = _get_code_from_file(run_name, path_name)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 234, in _get_code_from_file
+    with io.open_code(decoded_path) as f:
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/main.py'
+WARNING:  StatReload detected changes in 'utils/notifications.py'. Reloading...
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 116, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 125, in _main
+    prepare(preparation_data)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 236, in prepare
+    _fixup_main_from_path(data['init_main_from_path'])
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 287, in _fixup_main_from_path
+    main_content = runpy.run_path(main_path,
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 264, in run_path
+    code, fname = _get_code_from_file(run_name, path_name)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 234, in _get_code_from_file
+    with io.open_code(decoded_path) as f:
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/main.py'
+WARNING:  StatReload detected changes in 'utils/notifications.py'. Reloading...
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 116, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 125, in _main
+    prepare(preparation_data)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 236, in prepare
+    _fixup_main_from_path(data['init_main_from_path'])
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 287, in _fixup_main_from_path
+    main_content = runpy.run_path(main_path,
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 264, in run_path
+    code, fname = _get_code_from_file(run_name, path_name)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 234, in _get_code_from_file
+    with io.open_code(decoded_path) as f:
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/main.py'
+WARNING:  StatReload detected changes in 'utils/validators.py'. Reloading...
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 116, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 125, in _main
+    prepare(preparation_data)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 236, in prepare
+    _fixup_main_from_path(data['init_main_from_path'])
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 287, in _fixup_main_from_path
+    main_content = runpy.run_path(main_path,
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 264, in run_path
+    code, fname = _get_code_from_file(run_name, path_name)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 234, in _get_code_from_file
+    with io.open_code(decoded_path) as f:
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/main.py'
+WARNING:  StatReload detected changes in 'utils/validators.py'. Reloading...
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 116, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 125, in _main
+    prepare(preparation_data)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 236, in prepare
+    _fixup_main_from_path(data['init_main_from_path'])
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 287, in _fixup_main_from_path
+    main_content = runpy.run_path(main_path,
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 264, in run_path
+    code, fname = _get_code_from_file(run_name, path_name)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 234, in _get_code_from_file
+    with io.open_code(decoded_path) as f:
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/main.py'
+WARNING:  StatReload detected changes in 'utils/environment.py'. Reloading...
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 116, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 125, in _main
+    prepare(preparation_data)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 236, in prepare
+    _fixup_main_from_path(data['init_main_from_path'])
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 287, in _fixup_main_from_path
+    main_content = runpy.run_path(main_path,
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 264, in run_path
+    code, fname = _get_code_from_file(run_name, path_name)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 234, in _get_code_from_file
+    with io.open_code(decoded_path) as f:
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/main.py'
+WARNING:  StatReload detected changes in 'utils/health_check.py'. Reloading...
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 116, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 125, in _main
+    prepare(preparation_data)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 236, in prepare
+    _fixup_main_from_path(data['init_main_from_path'])
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/multiprocessing/spawn.py", line 287, in _fixup_main_from_path
+    main_content = runpy.run_path(main_path,
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 264, in run_path
+    code, fname = _get_code_from_file(run_name, path_name)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/runpy.py", line 234, in _get_code_from_file
+    with io.open_code(decoded_path) as f:
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/main.py'

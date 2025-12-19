@@ -10,9 +10,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 import aiohttp
 
-from utils.cache import cache_stock_price
 from utils.enhanced_logging import get_logger
-from utils.rate_limiter import rate_limiter
 
 logger = get_logger(__name__)
 

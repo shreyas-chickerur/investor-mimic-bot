@@ -5,9 +5,7 @@ Provides in-memory and Redis caching for API responses and computed data.
 """
 
 import hashlib
-import json
 import pickle
-from datetime import timedelta
 from functools import wraps
 from typing import Any, Callable, Optional
 
