@@ -7,7 +7,7 @@ Validates inputs, outputs, and data integrity across the system.
 import re
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 
 class ValidationError(Exception):
@@ -67,11 +67,11 @@ class Validator:
     @staticmethod
     def validate_date(date_value: Any) -> date:
         """Validate date value."""
-        if isinstance(date_value, date):
-            return date_value
-
         if isinstance(date_value, datetime):
             return date_value.date()
+
+        if isinstance(date_value, date):
+            return date_value
 
         if isinstance(date_value, str):
             try:

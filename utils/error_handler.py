@@ -7,7 +7,7 @@ Provides consistent error handling across the system.
 import logging
 import traceback
 from functools import wraps
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Dict
 
 from utils.monitoring import monitor
 
