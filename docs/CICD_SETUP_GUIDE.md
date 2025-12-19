@@ -1,4 +1,4 @@
-# 🚀 CI/CD Pipeline Setup Guide - Investor Mimic Bot
+# CI/CD Pipeline Setup Guide - Investor Mimic Bot
 
 **Comprehensive Project Documentation for CI/CD Implementation**
 
@@ -6,7 +6,7 @@ This document provides all necessary information to set up a complete CI/CD pipe
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
 1. [Project Overview](#project-overview)
 2. [Architecture & Technology Stack](#architecture--technology-stack)
@@ -43,7 +43,7 @@ Automated investment system that analyzes stocks using 8 factors (13F filings, n
 
 ---
 
-## 🏗️ Architecture & Technology Stack
+## ️ Architecture & Technology Stack
 
 ### Backend
 - **Language:** Python 3.8
@@ -67,7 +67,7 @@ Automated investment system that analyzes stocks using 8 factors (13F filings, n
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 investor-mimic-bot/
@@ -186,7 +186,7 @@ pre-commit>=3.3.0
 
 ---
 
-## 🔧 Environment Configuration
+## Environment Configuration
 
 ### Environment Variables Required
 
@@ -299,7 +299,7 @@ make backtest-optimized  # Run backtest
 
 ---
 
-## 🚀 Build & Deployment Process
+## Build & Deployment Process
 
 ### Build Steps
 
@@ -365,7 +365,7 @@ make backtest-optimized  # Run backtest
 
 ---
 
-## 🔄 Current CI/CD Setup
+## Current CI/CD Setup
 
 ### GitHub Actions Workflows
 
@@ -397,11 +397,11 @@ make backtest-optimized  # Run backtest
 
 ---
 
-## 🎯 CI/CD Pipeline Requirements
+## CI/CD Pipeline Requirements
 
 ### What the Pipeline Should Do
 
-#### On Every Push/PR:
+#### On Every Push/PR
 1. ✅ Install dependencies
 2. ✅ Run linting (black, flake8)
 3. ✅ Run type checking (mypy - optional)
@@ -410,14 +410,14 @@ make backtest-optimized  # Run backtest
 6. ✅ Generate coverage report
 7. ✅ Check code quality metrics
 
-#### On Merge to Develop (Staging):
+#### On Merge to Develop (Staging)
 1. ✅ All CI checks pass
 2. ✅ Build application
 3. ✅ Deploy to staging environment
 4. ✅ Run smoke tests
 5. ✅ Notify team (Slack/Email)
 
-#### On Merge to Main (Production):
+#### On Merge to Main (Production)
 1. ✅ All CI checks pass
 2. ✅ Require manual approval
 3. ✅ Build application
@@ -427,7 +427,7 @@ make backtest-optimized  # Run backtest
 7. ✅ Monitor for errors
 8. ✅ Notify team
 
-#### Scheduled Jobs:
+#### Scheduled Jobs
 1. ✅ Daily data fetch (13F filings)
 2. ✅ Daily backtest validation
 3. ✅ Weekly dependency updates
@@ -499,7 +499,7 @@ CODECOV_TOKEN (optional)
 
 ---
 
-## 📊 Monitoring & Alerts
+## Monitoring & Alerts
 
 ### Health Checks
 
@@ -582,7 +582,7 @@ python scripts/cli.py status
 
 ---
 
-## 📝 Additional Notes
+## Additional Notes
 
 ### Important Considerations
 
@@ -626,7 +626,7 @@ make backtest-optimized                   # Run optimized backtest
 
 ---
 
-## 🔗 Resources
+## Resources
 
 - **Repository:** https://github.com/shreyas-chickerur/investor-mimic-bot
 - **Documentation:** `docs/SYSTEM_OVERVIEW.md`
@@ -635,7 +635,7 @@ make backtest-optimized                   # Run optimized backtest
 
 ---
 
-## ✅ Summary for CI/CD Implementation
+## Summary for CI/CD Implementation
 
 **Project Type:** Python 3.8 application with PostgreSQL database  
 **Testing:** pytest with coverage, black/flake8 for linting  

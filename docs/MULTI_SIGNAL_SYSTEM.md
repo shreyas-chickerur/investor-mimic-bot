@@ -1,6 +1,6 @@
 # Multi-Signal Trading System
 
-## 🎉 What's New
+## What's New
 
 I just added **news sentiment analysis** to your investment bot! Your system now combines:
 
@@ -9,53 +9,53 @@ I just added **news sentiment analysis** to your investment bot! Your system now
 
 ---
 
-## 🚀 How It Works
+## How It Works
 
-### **Data Sources**
+### Data Sources
 - **13F Filings**: Quarterly filings from top investors (existing)
 - **News Articles**: Real-time financial news from Alpha Vantage
 - **Sentiment Analysis**: Keyword-based analysis of news headlines
 
-### **Signal Generation**
+### Signal Generation
 1. Fetch 13F conviction scores (your existing system)
 2. Fetch recent news for top stocks
 3. Analyze sentiment (positive/negative keywords)
 4. Combine signals with weighted average
 5. Generate final recommendations
 
-### **Weights (Configurable)**
+### Weights (Configurable)
 - 13F Conviction: 70%
 - News Sentiment: 30%
 
 ---
 
-## 📝 Setup (5 Minutes)
+## Setup (5 Minutes)
 
-### **1. Get Free Alpha Vantage API Key**
+### 1. Get Free Alpha Vantage API Key
 1. Go to: https://www.alphavantage.co/support/#api-key
 2. Enter your email
 3. Get instant API key (free tier: 500 calls/day)
 
-### **2. Add to .env**
+### 2. Add to .env
 ```bash
 ALPHA_VANTAGE_API_KEY=your_key_here
 ```
 
-### **3. Test It**
+### 3. Test It
 ```bash
 python3 scripts/test_multi_signal.py
 ```
 
 ---
 
-## 🎯 What You Get
+## What You Get
 
-### **Before (13F Only)**
+### Before (13F Only)
 - Signal lag: 45 days
 - Data points: Quarterly filings only
 - Coverage: ~100 stocks
 
-### **After (Multi-Signal)**
+### After (Multi-Signal)
 - Signal lag: Real-time
 - Data points: Filings + news + sentiment
 - Coverage: All stocks with news
@@ -63,7 +63,7 @@ python3 scripts/test_multi_signal.py
 
 ---
 
-## 📊 Example Output
+## Example Output
 
 ```
 TOP 10 RECOMMENDATIONS:
@@ -86,14 +86,14 @@ AAPL:
 
 ---
 
-## 🔧 How to Use
+## How to Use
 
-### **Option 1: Automatic (Recommended)**
+### Option 1: Automatic (Recommended)
 The system automatically uses multi-signal analysis in your daily workflow.
 
 No changes needed - it just works!
 
-### **Option 2: Manual Testing**
+### Option 2: Manual Testing
 ```bash
 # Test multi-signal analysis
 python3 scripts/test_multi_signal.py
@@ -104,9 +104,9 @@ python3 scripts/test_multi_signal.py --no-news
 
 ---
 
-## ⚙️ Configuration
+## ️ Configuration
 
-### **Adjust Signal Weights**
+### Adjust Signal Weights
 Edit in your code:
 ```python
 from services.strategy.multi_signal_engine import SignalWeights
@@ -117,7 +117,7 @@ weights = SignalWeights(
 )
 ```
 
-### **Sentiment Thresholds**
+### Sentiment Thresholds
 ```python
 # In sentiment_analyzer.py
 min_confidence=0.3,  # Minimum confidence (0-1)
@@ -126,9 +126,9 @@ min_score=0.2        # Minimum sentiment score
 
 ---
 
-## 📈 Performance Expectations
+## Performance Expectations
 
-### **Estimated Improvements**
+### Estimated Improvements
 - **Better timing**: Catch trends before quarterly filings
 - **Risk reduction**: Avoid stocks with negative news
 - **Higher returns**: Combine institutional wisdom with market sentiment
@@ -138,7 +138,7 @@ min_score=0.2        # Minimum sentiment score
 
 ## 🔮 Future Enhancements (Ready to Add)
 
-### **Next Signal Sources** (in priority order):
+### **Next Signal Sources** (in priority order)
 1. **Insider Trading** (Form 4 filings) - 2-3 hours to implement
 2. **Technical Indicators** (RSI, MACD) - 1-2 hours to implement
 3. **Options Flow** (unusual activity) - 3-4 hours to implement
@@ -150,25 +150,25 @@ Each can be added incrementally without breaking existing functionality.
 
 ## 🛠️ Technical Details
 
-### **Files Created**
+### Files Created
 - `services/news/news_api.py` - News fetching service
 - `services/news/sentiment_analyzer.py` - Sentiment analysis
 - `services/strategy/multi_signal_engine.py` - Signal combination
 - `scripts/test_multi_signal.py` - Testing script
 
-### **Dependencies**
+### Dependencies
 - No new dependencies needed!
 - Uses built-in keyword matching (fast, simple)
 - Optional: Can upgrade to ML-based sentiment later
 
-### **API Limits**
+### API Limits
 - Alpha Vantage free tier: 500 calls/day
 - Sufficient for daily analysis of 50-100 stocks
 - Upgrade to premium if needed ($50/month for unlimited)
 
 ---
 
-## ✅ Testing Checklist
+## Testing Checklist
 
 - [ ] Get Alpha Vantage API key
 - [ ] Add to .env file
@@ -179,7 +179,7 @@ Each can be added incrementally without breaking existing functionality.
 
 ---
 
-## 🎉 Summary
+## Summary
 
 **You now have a multi-signal trading system that combines:**
 - Institutional investor behavior (13F)
