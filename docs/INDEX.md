@@ -9,8 +9,8 @@
 ### New Users Start Here
 1. **[User Action Items](user-actions/USER_ACTION_ITEMS.md)** - Complete setup checklist (START HERE)
 2. **[README](../README.md)** - Quick start and feature overview
-3. **[Complete System Guide](COMPLETE_SYSTEM_GUIDE.md)** - Comprehensive system overview
-4. **[Deployment Guide](DEPLOYMENT_READY.md)** - Production deployment checklist
+3. **[System Overview](SYSTEM_OVERVIEW.md)** - High-level architecture overview
+4. **[Complete System Guide](COMPLETE_SYSTEM_GUIDE.md)** - Comprehensive system details
 
 ---
 
