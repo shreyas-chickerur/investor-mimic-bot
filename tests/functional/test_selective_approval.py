@@ -376,13 +376,7 @@ def run_manual_tests():
     updated_request = manager.get_request(request.request_id)
     print("Trade status:")
     for i, trade in enumerate(updated_request.trades):
-        status = (
-            "✅ APPROVED"
-            if trade.approved is True
-            else "❌ REJECTED"
-            if trade.approved is False
-            else "⏳ PENDING"
-        )
+        status = "✅ APPROVED" if trade.approved is True else "❌ REJECTED" if trade.approved is False else "⏳ PENDING"
         print(f"  {i}. {trade.symbol:6s} - {status}")
     print()
 

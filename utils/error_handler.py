@@ -42,9 +42,7 @@ class ConfigurationError(SystemError):
     pass
 
 
-def handle_errors(
-    default_return: Any = None, raise_on_error: bool = False, log_level: str = "error"
-):
+def handle_errors(default_return: Any = None, raise_on_error: bool = False, log_level: str = "error"):
     """
     Decorator for consistent error handling.
 

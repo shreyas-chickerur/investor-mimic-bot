@@ -210,9 +210,7 @@ class FactorScoreValidator:
             raise ValidationError(f"Weights must sum to 1.0, got {weight_sum}")
 
         # Calculate composite
-        composite = sum(
-            validated_scores.get(factor, 0) * weight for factor, weight in weights.items()
-        )
+        composite = sum(validated_scores.get(factor, 0) * weight for factor, weight in weights.items())
 
         return Validator.validate_score(composite)
 

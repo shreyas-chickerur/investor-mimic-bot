@@ -207,9 +207,7 @@ class TestBulkApprovalWorkflow:
             "trade_4": "approve",
         }
 
-        response = client.post(
-            f"/api/v1/approve/{sample_request.request_id}/submit", data=form_data
-        )
+        response = client.post(f"/api/v1/approve/{sample_request.request_id}/submit", data=form_data)
 
         assert response.status_code == 200
         assert "Decisions Submitted Successfully" in response.text
@@ -229,9 +227,7 @@ class TestBulkApprovalWorkflow:
             "trade_4": "reject",  # AMZN
         }
 
-        response = client.post(
-            f"/api/v1/approve/{sample_request.request_id}/submit", data=form_data
-        )
+        response = client.post(f"/api/v1/approve/{sample_request.request_id}/submit", data=form_data)
 
         assert response.status_code == 200
         assert "Decisions Submitted Successfully" in response.text
@@ -257,9 +253,7 @@ class TestBulkApprovalWorkflow:
             "trade_4": "reject",
         }
 
-        response = client.post(
-            f"/api/v1/approve/{sample_request.request_id}/submit", data=form_data
-        )
+        response = client.post(f"/api/v1/approve/{sample_request.request_id}/submit", data=form_data)
 
         assert response.status_code == 200
         assert "Decisions Submitted Successfully" in response.text

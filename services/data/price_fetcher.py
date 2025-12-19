@@ -41,16 +41,12 @@ class PriceDataFetcher:
         self.alpha_vantage_key = alpha_vantage_key or os.getenv("ALPHA_VANTAGE_API_KEY")
 
         if self.alpaca_api_key and self.alpaca_secret_key:
-            self.alpaca_client = StockHistoricalDataClient(
-                self.alpaca_api_key, self.alpaca_secret_key
-            )
+            self.alpaca_client = StockHistoricalDataClient(self.alpaca_api_key, self.alpaca_secret_key)
         else:
             self.alpaca_client = None
             logger.warning("Alpaca credentials not provided")
 
-    def fetch_historical_prices_alpaca(
-        self, symbol: str, days: int = 200
-    ) -> Optional[pd.DataFrame]:
+    def fetch_historical_prices_alpaca(self, symbol: str, days: int = 200) -> Optional[pd.DataFrame]:
         """
         Fetch historical prices from Alpaca.
 
@@ -68,9 +64,7 @@ class PriceDataFetcher:
             end = datetime.now()
             start = end - timedelta(days=days)
 
-            request = StockBarsRequest(
-                symbol_or_symbols=symbol, timeframe=TimeFrame.Day, start=start, end=end
-            )
+            request = StockBarsRequest(symbol_or_symbols=symbol, timeframe=TimeFrame.Day, start=start, end=end)
 
             bars = self.alpaca_client.get_stock_bars(request)
 
@@ -101,9 +95,7 @@ class PriceDataFetcher:
             logger.error(f"Error fetching Alpaca data for {symbol}: {e}")
             return None
 
-    def fetch_historical_prices_alpha_vantage(
-        self, symbol: str, outputsize: str = "compact"
-    ) -> Optional[pd.DataFrame]:
+    def fetch_historical_prices_alpha_vantage(self, symbol: str, outputsize: str = "compact") -> Optional[pd.DataFrame]:
         """
         Fetch historical prices from Alpha Vantage.
 

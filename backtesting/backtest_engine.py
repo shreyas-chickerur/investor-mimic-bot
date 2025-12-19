@@ -127,8 +127,7 @@ class BacktestEngine:
     def calculate_portfolio_value(self, current_prices: Dict[str, float]) -> float:
         """Calculate total portfolio value."""
         positions_value = sum(
-            pos.quantity * current_prices.get(pos.symbol, pos.current_price)
-            for pos in self.positions.values()
+            pos.quantity * current_prices.get(pos.symbol, pos.current_price) for pos in self.positions.values()
         )
         return self.cash + positions_value
 
@@ -167,9 +166,7 @@ class BacktestEngine:
         if action == "BUY":
             total_cost = value + commission
             if total_cost > self.cash:
-                logger.warning(
-                    f"Insufficient cash for {symbol}: need ${total_cost:.2f}, have ${self.cash:.2f}"
-                )
+                logger.warning(f"Insufficient cash for {symbol}: need ${total_cost:.2f}, have ${self.cash:.2f}")
                 return None
 
             self.cash -= total_cost
@@ -178,9 +175,7 @@ class BacktestEngine:
                 # Add to existing position
                 pos = self.positions[symbol]
                 new_quantity = pos.quantity + quantity
-                new_entry_price = (
-                    (pos.quantity * pos.entry_price) + (quantity * execution_price)
-                ) / new_quantity
+                new_entry_price = ((pos.quantity * pos.entry_price) + (quantity * execution_price)) / new_quantity
                 pos.quantity = new_quantity
                 pos.entry_price = new_entry_price
             else:
@@ -233,9 +228,7 @@ class BacktestEngine:
                 pos.current_price = current_prices[symbol]
                 pos.current_value = pos.quantity * pos.current_price
                 pos.unrealized_pnl = pos.current_value - (pos.quantity * pos.entry_price)
-                pos.unrealized_pnl_pct = (
-                    pos.unrealized_pnl / (pos.quantity * pos.entry_price)
-                ) * 100
+                pos.unrealized_pnl_pct = (pos.unrealized_pnl / (pos.quantity * pos.entry_price)) * 100
 
     def record_portfolio_state(self, date: datetime, current_prices: Dict[str, float]):
         """Record current portfolio state."""
@@ -269,9 +262,7 @@ class BacktestEngine:
         df["returns"] = df["value"].pct_change()
 
         # Total return
-        total_return = (
-            df["value"].iloc[-1] - self.config.initial_capital
-        ) / self.config.initial_capital
+        total_return = (df["value"].iloc[-1] - self.config.initial_capital) / self.config.initial_capital
 
         # Annualized return
         days = (df.index[-1] - df.index[0]).days
@@ -286,9 +277,7 @@ class BacktestEngine:
         # Sortino ratio (downside deviation)
         downside_returns = df["returns"][df["returns"] < 0]
         downside_std = downside_returns.std()
-        sortino_ratio = (
-            np.sqrt(252) * excess_returns.mean() / downside_std if downside_std > 0 else 0
-        )
+        sortino_ratio = np.sqrt(252) * excess_returns.mean() / downside_std if downside_std > 0 else 0
 
         # Maximum drawdown
         cumulative = (1 + df["returns"]).cumprod()
@@ -306,10 +295,7 @@ class BacktestEngine:
         avg_loss = np.mean([abs(self._trade_pnl(t)) for t in losing_trades]) if losing_trades else 0
 
         profit_factor = (
-            (
-                sum([self._trade_pnl(t) for t in winning_trades])
-                / sum([abs(self._trade_pnl(t)) for t in losing_trades])
-            )
+            (sum([self._trade_pnl(t) for t in winning_trades]) / sum([abs(self._trade_pnl(t)) for t in losing_trades]))
             if losing_trades
             else 0
         )
@@ -322,9 +308,7 @@ class BacktestEngine:
             covariance = np.cov(aligned_returns, aligned_spy)[0][1]
             spy_variance = np.var(aligned_spy)
             beta = covariance / spy_variance if spy_variance > 0 else 1.0
-            alpha = annualized_return - (
-                risk_free_rate + beta * (spy_returns.mean() * 252 - risk_free_rate)
-            )
+            alpha = annualized_return - (risk_free_rate + beta * (spy_returns.mean() * 252 - risk_free_rate))
         else:
             beta = 1.0
             alpha = 0.0
