@@ -213,16 +213,14 @@ def _build_portfolio_performance(performance: Dict) -> str:
     sign = "+" if gain_loss >= 0 else ""
 
     html = f"""
-    <div style="background: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-        <div style="display: grid; gap: 16px;">
-            <div>
-                <p style="color: #7f8c8d; font-size: 12px; margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">Total Value</p>
-                <p style="color: #2c3e50; font-size: 28px; font-weight: 700; margin: 4px 0 0 0;">${total_value:,.2f}</p>
-            </div>
-            <div>
-                <p style="color: #7f8c8d; font-size: 12px; margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">Total Gain/Loss</p>
-                <p style="color: {color}; font-size: 20px; font-weight: 600; margin: 4px 0 0 0;">{sign}${abs(gain_loss):,.2f} ({sign}{gain_loss_pct:.2f}%)</p>
-            </div>
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
+        <div style="background: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            <p style="color: #7f8c8d; font-size: 12px; margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">Total Value</p>
+            <p style="color: #2c3e50; font-size: 28px; font-weight: 700; margin: 4px 0 0 0;">${total_value:,.2f}</p>
+        </div>
+        <div style="background: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            <p style="color: #7f8c8d; font-size: 12px; margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">Total Gain/Loss</p>
+            <p style="color: {color}; font-size: 20px; font-weight: 600; margin: 4px 0 0 0;">{sign}${abs(gain_loss):,.2f} ({sign}{gain_loss_pct:.2f}%)</p>
         </div>
     </div>
     """
