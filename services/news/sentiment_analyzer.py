@@ -177,9 +177,7 @@ class SimpleSentimentAnalyzer:
         weighted_score = sum(s * w for s, w in zip(scores, weights)) / sum(weights)
         return weighted_score
 
-    def analyze_batch(
-        self, articles_by_symbol: Dict[str, List], min_articles: int = 3
-    ) -> Dict[str, SentimentScore]:
+    def analyze_batch(self, articles_by_symbol: Dict[str, List], min_articles: int = 3) -> Dict[str, SentimentScore]:
         """
         Analyze sentiment for multiple symbols.
 

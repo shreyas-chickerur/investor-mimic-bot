@@ -13,7 +13,13 @@ help:
 	@echo "  make lint             - Run all linting checks (flake8, mypy)"
 	@echo "  make format           - Format code with black"
 	@echo "  make format-check     - Check code formatting without changes"
-	@echo "  make test             - Run all tests"
+	@echo "  make test             - Run all tests
+  make test-unit        - Run unit tests only
+  make test-functional  - Run functional tests only
+  make test-integration - Run integration tests only
+  make test-performance - Run performance tests only
+  make test-coverage    - Run tests with coverage report
+  make test-quick       - Run quick tests (unit only)"
 	@echo ""
 	@echo "Backtesting:"
 	@echo "  make backtest-baseline    - Run baseline backtest (static weights)"
@@ -51,22 +57,47 @@ install-dev:
 # Code Quality
 lint:
 	@echo "Running flake8..."
-	flake8 services/ scripts/ backtesting/ ml/ --max-line-length=120 --ignore=E203,W503 || true
+	python3 -m flake8 services/ scripts/ backtesting/ ml/ utils/ --max-line-length=120 --ignore=E203,W503 || true
 	@echo ""
 	@echo "Running mypy..."
-	mypy services/ scripts/ backtesting/ ml/ --ignore-missing-imports || true
+	python3 -m mypy services/ scripts/ backtesting/ ml/ utils/ --ignore-missing-imports || true
 
 format:
 	@echo "Formatting code with black..."
-	black services/ scripts/ backtesting/ ml/ tests/ --line-length=120
+	python3 -m black services/ scripts/ backtesting/ ml/ tests/ utils/ --line-length=120
 
 format-check:
 	@echo "Checking code formatting..."
-	black services/ scripts/ backtesting/ ml/ tests/ --line-length=120 --check
+	python3 -m black services/ scripts/ backtesting/ ml/ tests/ utils/ --line-length=120 --check
 
 test:
-	@echo "Running tests..."
-	pytest tests/ -v --cov=services --cov=backtesting --cov=ml
+	@echo "Running all tests..."
+	python3 -m pytest tests/ -v --cov=services --cov=backtesting --cov=ml --cov=utils
+
+test-unit:
+	@echo "Running unit tests..."
+	python3 -m pytest tests/unit/ -v
+
+test-functional:
+	@echo "Running functional tests..."
+	python3 -m pytest tests/functional/ -v
+
+test-integration:
+	@echo "Running integration tests..."
+	python3 -m pytest tests/integration/ -v
+
+test-performance:
+	@echo "Running performance tests..."
+	python3 -m pytest tests/performance/ -v
+
+test-coverage:
+	@echo "Running tests with coverage report..."
+	python3 -m pytest tests/ -v --cov=services --cov=backtesting --cov=ml --cov=utils --cov-report=html --cov-report=term
+	@echo "Coverage report generated in htmlcov/index.html"
+
+test-quick:
+	@echo "Running quick tests (unit only)..."
+	python3 -m pytest tests/unit/ -v -x
 
 # Data Generation
 generate-data:

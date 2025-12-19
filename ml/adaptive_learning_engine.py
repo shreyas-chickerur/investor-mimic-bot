@@ -139,9 +139,7 @@ class AdaptiveLearningEngine:
 
         # Calculate feature importance
         if hasattr(self.best_model, "feature_importances_"):
-            self.feature_importance = dict(
-                zip(range(X.shape[1]), self.best_model.feature_importances_)
-            )
+            self.feature_importance = dict(zip(range(X.shape[1]), self.best_model.feature_importances_))
 
         return model_scores
 
@@ -302,16 +300,12 @@ class ReinforcementLearningOptimizer:
             State string
         """
         # Discretize weights into bins
-        weight_bins = {
-            factor: int(weight * 10) for factor, weight in current_weights.items()  # 0-10 bins
-        }
+        weight_bins = {factor: int(weight * 10) for factor, weight in current_weights.items()}  # 0-10 bins
 
         # Discretize performance
         sharpe_bin = int(performance_metrics.get("sharpe_ratio", 0) * 2)  # 0-10 bins
 
-        state = f"{market_regime}_{sharpe_bin}_" + "_".join(
-            f"{k}:{v}" for k, v in sorted(weight_bins.items())
-        )
+        state = f"{market_regime}_{sharpe_bin}_" + "_".join(f"{k}:{v}" for k, v in sorted(weight_bins.items()))
 
         return state
 
@@ -367,15 +361,11 @@ class ReinforcementLearningOptimizer:
             max_next_q = 0.0
 
         # Q-learning update
-        new_q = current_q + self.learning_rate * (
-            reward + self.discount_factor * max_next_q - current_q
-        )
+        new_q = current_q + self.learning_rate * (reward + self.discount_factor * max_next_q - current_q)
 
         self.q_table[state][action_str] = new_q
 
-    def train_episode(
-        self, historical_data: pd.DataFrame, initial_weights: Dict[str, float]
-    ) -> Dict[str, float]:
+    def train_episode(self, historical_data: pd.DataFrame, initial_weights: Dict[str, float]) -> Dict[str, float]:
         """
         Train one episode on historical data.
 
@@ -460,9 +450,7 @@ class EnsembleOptimizer:
         self.optimizers = {"ml": self.ml_engine, "rl": self.rl_optimizer}
         self.weights_history = []
 
-    def optimize(
-        self, historical_data: pd.DataFrame, current_weights: Dict[str, float]
-    ) -> Dict[str, float]:
+    def optimize(self, historical_data: pd.DataFrame, current_weights: Dict[str, float]) -> Dict[str, float]:
         """
         Optimize weights using ensemble of methods.
 

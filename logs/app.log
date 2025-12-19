@@ -1,0 +1,158 @@
+2025-12-18 19:00:49,712 - utils.cache - WARNING - warning:96 - Redis not available, using in-memory cache only
+2025-12-18 19:00:50,454 - utils.cache - WARNING - _log_to_database:83 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:00:53,695 - utils.data_quality - INFO - info:91 - Data quality check passed
+2025-12-18 19:00:53,695 - utils.data_quality - WARNING - _log_to_database:83 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:00:53,697 - utils.data_quality - WARNING - warning:96 - Data quality check failed: ['AAPL: Invalid price $-150.0']
+2025-12-18 19:00:53,697 - utils.data_quality - WARNING - _log_to_database:83 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:00:53,698 - services.paper_trading - INFO - info:91 - Paper trading initialized with $100,000.00
+2025-12-18 19:00:53,698 - services.paper_trading - WARNING - _log_to_database:83 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:00:53,699 - db.connection_pool - INFO - info:91 - Database connection pool initialized
+2025-12-18 19:00:53,699 - db.connection_pool - WARNING - _log_to_database:83 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:00:53,699 - db.connection_pool - ERROR - error:105 - Database session error: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:00:53,700 - db.connection_pool - WARNING - _log_to_database:83 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:00:53,700 - services.paper_trading - ERROR - error:105 - Failed to log paper trade to DB: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:00:53,700 - services.paper_trading - WARNING - _log_to_database:83 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:00:53,700 - services.paper_trading - INFO - info:91 - Paper BUY: 100.0 AAPL @ $150.00
+2025-12-18 19:00:53,700 - services.paper_trading - WARNING - _log_to_database:83 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:00:53,702 - services.paper_trading - INFO - info:91 - Paper trading initialized with $100,000.00
+2025-12-18 19:00:53,702 - services.paper_trading - WARNING - _log_to_database:83 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:00:53,702 - db.connection_pool - ERROR - error:105 - Database session error: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:00:53,702 - db.connection_pool - WARNING - _log_to_database:83 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:00:53,702 - services.paper_trading - ERROR - error:105 - Failed to log paper trade to DB: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:00:53,702 - services.paper_trading - WARNING - _log_to_database:83 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:00:53,703 - services.paper_trading - INFO - info:91 - Paper BUY: 100.0 AAPL @ $150.00
+2025-12-18 19:00:53,703 - services.paper_trading - WARNING - _log_to_database:83 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:00:53,703 - db.connection_pool - ERROR - error:105 - Database session error: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:00:53,703 - db.connection_pool - WARNING - _log_to_database:83 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:00:53,703 - services.paper_trading - ERROR - error:105 - Failed to log paper trade to DB: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:00:53,703 - services.paper_trading - WARNING - _log_to_database:83 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:00:53,703 - services.paper_trading - INFO - info:91 - Paper SELL: 50.0 AAPL @ $155.00
+2025-12-18 19:00:53,703 - services.paper_trading - WARNING - _log_to_database:83 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:00:53,705 - services.paper_trading - INFO - info:91 - Paper trading initialized with $1,000.00
+2025-12-18 19:00:53,705 - services.paper_trading - WARNING - _log_to_database:83 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:00:53,705 - services.paper_trading - WARNING - warning:96 - Insufficient cash for AAPL: need $150,000.00, have $1,000.00
+2025-12-18 19:00:53,705 - services.paper_trading - WARNING - _log_to_database:83 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:00:53,706 - services.paper_trading - INFO - info:91 - Paper trading initialized with $100,000.00
+2025-12-18 19:00:53,707 - services.paper_trading - WARNING - _log_to_database:83 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:00:53,707 - db.connection_pool - ERROR - error:105 - Database session error: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:00:53,707 - db.connection_pool - WARNING - _log_to_database:83 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:00:53,707 - services.paper_trading - ERROR - error:105 - Failed to log paper trade to DB: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:00:53,707 - services.paper_trading - WARNING - _log_to_database:83 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:00:53,707 - services.paper_trading - INFO - info:91 - Paper BUY: 100.0 AAPL @ $150.00
+2025-12-18 19:00:53,707 - services.paper_trading - WARNING - _log_to_database:83 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:00:53,711 - utils.data_quality - INFO - info:91 - Data quality check passed
+2025-12-18 19:00:53,711 - utils.data_quality - WARNING - _log_to_database:83 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:00:53,711 - services.paper_trading - INFO - info:91 - Paper trading initialized with $100,000.00
+2025-12-18 19:00:53,711 - services.paper_trading - WARNING - _log_to_database:83 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:00:53,712 - db.connection_pool - ERROR - error:105 - Database session error: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:00:53,712 - db.connection_pool - WARNING - _log_to_database:83 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:00:53,712 - services.paper_trading - ERROR - error:105 - Failed to log paper trade to DB: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:00:53,712 - services.paper_trading - WARNING - _log_to_database:83 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:00:53,712 - services.paper_trading - INFO - info:91 - Paper BUY: 100.0 AAPL @ $150.00
+2025-12-18 19:00:53,712 - services.paper_trading - WARNING - _log_to_database:83 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:06,192 - utils.cache - WARNING - warning:94 - Redis not available, using in-memory cache only
+2025-12-18 19:07:06,835 - utils.cache - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,301 - services.paper_trading - INFO - info:89 - Paper trading initialized with $100,000.00
+2025-12-18 19:07:07,302 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,303 - services.paper_trading - INFO - info:89 - Paper trading initialized with $100,000.00
+2025-12-18 19:07:07,303 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,304 - db.connection_pool - INFO - info:89 - Database connection pool initialized
+2025-12-18 19:07:07,304 - db.connection_pool - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,304 - db.connection_pool - ERROR - error:103 - Database session error: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:07:07,305 - db.connection_pool - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,305 - services.paper_trading - ERROR - error:103 - Failed to log paper trade to DB: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:07:07,305 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,305 - services.paper_trading - INFO - info:89 - Paper BUY: 100.0 AAPL @ $150.00
+2025-12-18 19:07:07,305 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,307 - services.paper_trading - INFO - info:89 - Paper trading initialized with $1,000.00
+2025-12-18 19:07:07,307 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,307 - services.paper_trading - WARNING - warning:94 - Insufficient cash for AAPL: need $15,000.00, have $1,000.00
+2025-12-18 19:07:07,307 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,309 - services.paper_trading - INFO - info:89 - Paper trading initialized with $100,000.00
+2025-12-18 19:07:07,309 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,309 - db.connection_pool - ERROR - error:103 - Database session error: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:07:07,309 - db.connection_pool - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,309 - services.paper_trading - ERROR - error:103 - Failed to log paper trade to DB: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:07:07,309 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,309 - services.paper_trading - INFO - info:89 - Paper BUY: 100.0 AAPL @ $150.00
+2025-12-18 19:07:07,309 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,310 - db.connection_pool - ERROR - error:103 - Database session error: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:07:07,310 - db.connection_pool - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,310 - services.paper_trading - ERROR - error:103 - Failed to log paper trade to DB: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:07:07,310 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,310 - services.paper_trading - INFO - info:89 - Paper SELL: 50.0 AAPL @ $160.00
+2025-12-18 19:07:07,310 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,312 - services.paper_trading - INFO - info:89 - Paper trading initialized with $100,000.00
+2025-12-18 19:07:07,312 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,312 - services.paper_trading - WARNING - warning:94 - No position in AAPL to sell
+2025-12-18 19:07:07,312 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,313 - services.paper_trading - INFO - info:89 - Paper trading initialized with $100,000.00
+2025-12-18 19:07:07,314 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,314 - db.connection_pool - ERROR - error:103 - Database session error: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:07:07,314 - db.connection_pool - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,314 - services.paper_trading - ERROR - error:103 - Failed to log paper trade to DB: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:07:07,314 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,314 - services.paper_trading - INFO - info:89 - Paper BUY: 100.0 AAPL @ $150.00
+2025-12-18 19:07:07,314 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,314 - services.paper_trading - WARNING - warning:94 - Insufficient shares: trying to sell 150.0, have 100.0
+2025-12-18 19:07:07,315 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,316 - services.paper_trading - INFO - info:89 - Paper trading initialized with $100,000.00
+2025-12-18 19:07:07,316 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,316 - db.connection_pool - ERROR - error:103 - Database session error: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:07:07,316 - db.connection_pool - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,316 - services.paper_trading - ERROR - error:103 - Failed to log paper trade to DB: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:07:07,316 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,317 - services.paper_trading - INFO - info:89 - Paper BUY: 100.0 AAPL @ $150.00
+2025-12-18 19:07:07,317 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,317 - db.connection_pool - ERROR - error:103 - Database session error: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:07:07,317 - db.connection_pool - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,317 - services.paper_trading - ERROR - error:103 - Failed to log paper trade to DB: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:07:07,317 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,317 - services.paper_trading - INFO - info:89 - Paper SELL: 100.0 AAPL @ $160.00
+2025-12-18 19:07:07,317 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,319 - services.paper_trading - INFO - info:89 - Paper trading initialized with $100,000.00
+2025-12-18 19:07:07,319 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,319 - db.connection_pool - ERROR - error:103 - Database session error: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:07:07,319 - db.connection_pool - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,319 - services.paper_trading - ERROR - error:103 - Failed to log paper trade to DB: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:07:07,319 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,319 - services.paper_trading - INFO - info:89 - Paper BUY: 100.0 AAPL @ $150.00
+2025-12-18 19:07:07,320 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,320 - db.connection_pool - ERROR - error:103 - Database session error: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:07:07,320 - db.connection_pool - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,320 - services.paper_trading - ERROR - error:103 - Failed to log paper trade to DB: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:07:07,320 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,320 - services.paper_trading - INFO - info:89 - Paper BUY: 100.0 AAPL @ $160.00
+2025-12-18 19:07:07,320 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,322 - services.paper_trading - INFO - info:89 - Paper trading initialized with $100,000.00
+2025-12-18 19:07:07,322 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,322 - db.connection_pool - ERROR - error:103 - Database session error: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:07:07,322 - db.connection_pool - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,322 - services.paper_trading - ERROR - error:103 - Failed to log paper trade to DB: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:07:07,322 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,322 - services.paper_trading - INFO - info:89 - Paper BUY: 100.0 AAPL @ $150.00
+2025-12-18 19:07:07,323 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,324 - services.paper_trading - INFO - info:89 - Paper trading initialized with $100,000.00
+2025-12-18 19:07:07,324 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,324 - db.connection_pool - ERROR - error:103 - Database session error: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:07:07,325 - db.connection_pool - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,325 - services.paper_trading - ERROR - error:103 - Failed to log paper trade to DB: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:07:07,325 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,325 - services.paper_trading - INFO - info:89 - Paper BUY: 100.0 AAPL @ $150.00
+2025-12-18 19:07:07,325 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,326 - services.paper_trading - INFO - info:89 - Paper trading initialized with $100,000.00
+2025-12-18 19:07:07,326 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,327 - db.connection_pool - ERROR - error:103 - Database session error: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:07:07,327 - db.connection_pool - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,327 - services.paper_trading - ERROR - error:103 - Failed to log paper trade to DB: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:07:07,327 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,327 - services.paper_trading - INFO - info:89 - Paper BUY: 100.0 AAPL @ $150.00
+2025-12-18 19:07:07,327 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,329 - services.paper_trading - INFO - info:89 - Paper trading initialized with $100,000.00
+2025-12-18 19:07:07,329 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,329 - db.connection_pool - ERROR - error:103 - Database session error: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:07:07,329 - db.connection_pool - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,329 - services.paper_trading - ERROR - error:103 - Failed to log paper trade to DB: Textual SQL expression '\n                    INSE...' should be explicitly declared as text('\n                    INSE...')
+2025-12-18 19:07:07,329 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
+2025-12-18 19:07:07,329 - services.paper_trading - INFO - info:89 - Paper BUY: 100.0 AAPL @ $150.00
+2025-12-18 19:07:07,329 - services.paper_trading - WARNING - _log_to_database:81 - Failed to log to database: cannot import name 'get_db_session' from 'db.base' (/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/db/base.py)
