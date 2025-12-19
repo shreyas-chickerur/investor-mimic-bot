@@ -48,6 +48,21 @@ Everything you need to do to complete the system setup and deployment.
 - [ ] Verify all integrations
 - [ ] Production readiness check
 
+**Phase 8 - Code Quality & Cleanup** (1-2 hours)
+- [ ] Run Black formatting on all Python files
+- [ ] Address Flake8 linting issues (497 issues to fix)
+- [ ] Remove unused imports
+- [ ] Fix code quality warnings
+- [ ] Verify CI/CD passes all checks
+
+**Phase 9 - Frontend Development** (Optional, 1-2 weeks)
+- [ ] Decide on frontend approach (build now vs later)
+- [ ] If building: Initialize Next.js project
+- [ ] If building: Create authentication pages
+- [ ] If building: Build dashboard components
+- [ ] If building: Integrate with backend API
+- [ ] If building: Deploy to Vercel
+
 ---
 
 ## CRITICAL: API Keys & Credentials
@@ -698,6 +713,135 @@ UNION ALL SELECT 'training_data', COUNT(*) FROM training_data;"
 
 ---
 
+## PHASE 8: Code Quality & Cleanup (1-2 hours)
+
+### Step 8.1: Run Black Formatting
+
+**IMPORTANT**: Always run before committing to avoid CI failures.
+
+```bash
+python3 -m black services/ scripts/ backtesting/ ml/ tests/ utils/ api/ --line-length=120
+```
+
+**Expected**: "All done! ✨ 🍰 ✨"
+
+### Step 8.2: Check Flake8 Linting
+
+```bash
+python3 -m flake8 services/ scripts/ backtesting/ ml/ utils/ api/ --max-line-length=120 --ignore=E203,W503 --count
+```
+
+**Current status**: 497 issues (mostly unused imports)
+
+### Step 8.3: Fix Major Linting Issues
+
+**Priority fixes:**
+1. Remove unused imports
+2. Fix undefined names (F821 errors)
+3. Fix f-strings missing placeholders
+4. Remove trailing whitespace
+5. Fix lines too long (>120 characters)
+
+**Example fixes:**
+```bash
+# Remove unused import
+# Before: from typing import List, Dict, Optional
+# After: from typing import Dict  # Only keep what's used
+
+# Fix undefined name
+# Before: def get_items() -> List[str]:
+# After: from typing import List
+#        def get_items() -> List[str]:
+```
+
+### Step 8.4: Verify CI/CD Passes
+
+Create test PR to verify:
+```bash
+git checkout -b test/code-quality-check
+echo "# Code Quality Check" >> README.md
+git add README.md
+git commit -m "test: verify code quality checks pass"
+git push -u origin test/code-quality-check
+```
+
+Verify on GitHub:
+- ✅ Black formatting passes
+- ✅ Flake8 linting passes
+- ✅ Unit tests pass (58 tests)
+
+**✓ Phase 8 Complete - Code quality improved**
+
+---
+
+## PHASE 9: Frontend Development (Optional, 1-2 weeks)
+
+### Decision Point: Build Frontend Now or Later?
+
+**Option A: Build Now (Recommended if you want full system)**
+- Complete user experience
+- Visual portfolio tracking
+- Interactive recommendations
+- Real-time updates
+- Time: 1-2 weeks
+
+**Option B: Build Later (Recommended if you want to test backend first)**
+- Focus on backend functionality
+- Test with command-line tools
+- Add frontend when backend is stable
+- Time: Can defer indefinitely
+
+### If Building Frontend Now:
+
+#### Step 9.1: Initialize Next.js Project
+
+```bash
+cd /path/to/investor-mimic-bot
+npx create-next-app@latest frontend --typescript --tailwind --app --no-src-dir
+cd frontend
+npm install
+```
+
+#### Step 9.2: Install Additional Dependencies
+
+```bash
+npm install @radix-ui/react-* lucide-react recharts swr next-auth
+npm install -D @types/node @types/react
+```
+
+#### Step 9.3: Set Up Authentication
+
+- Configure NextAuth.js
+- Create login/register pages
+- Set up JWT token handling
+- Test authentication flow
+
+#### Step 9.4: Build Dashboard Pages
+
+- Dashboard home (portfolio overview)
+- Portfolio view (holdings, charts)
+- Recommendations (with flow charts)
+- Settings (profile, API keys)
+- Trade history
+
+#### Step 9.5: Integrate with Backend
+
+- Set up API client
+- Connect to FastAPI backend
+- Test all endpoints
+- Handle errors gracefully
+
+#### Step 9.6: Deploy Frontend
+
+```bash
+npm run build
+vercel deploy
+```
+
+**✓ Phase 9 Complete - Frontend deployed**
+
+---
+
 ## Post-Deployment Monitoring
 
 ### Daily Checks
@@ -721,6 +865,9 @@ UNION ALL SELECT 'training_data', COUNT(*) FROM training_data;"
 - [ ] Review and rotate API keys if needed
 - [ ] Check backup integrity
 - [ ] Run security audit
+- [ ] Review and address Flake8 linting issues
+- [ ] Update documentation with new features
+- [ ] Review CHANGELOG.md and update
 ```
 
 
