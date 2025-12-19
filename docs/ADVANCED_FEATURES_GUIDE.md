@@ -1,10 +1,10 @@
-# 🚀 Advanced Features Guide
+# Advanced Features Guide
 
 **Complete Guide to Profit-Maximizing Features**
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
 1. [Stop-Loss & Take-Profit Automation](#stop-loss--take-profit-automation)
 2. [Position Rebalancing](#position-rebalancing)
@@ -17,12 +17,10 @@
 
 ## 🛡️ Stop-Loss & Take-Profit Automation
 
-### **Overview**
-
+### Overview
 Automated exit strategy that protects capital and locks in profits. Prevents catastrophic losses and ensures disciplined profit-taking.
 
-### **Features**
-
+### Features
 **1. Hard Stop-Loss**
 - Default: -10% from entry price
 - Prevents catastrophic losses
@@ -43,8 +41,7 @@ Automated exit strategy that protects capital and locks in profits. Prevents cat
 - Target 2: +30% (take 25% off)
 - Trail remaining 25%
 
-### **Configuration**
-
+### Configuration
 ```python
 from services.risk.stop_loss_manager import StopLossManager, StopLossConfig, TakeProfitConfig
 
@@ -70,8 +67,7 @@ profit_config = TakeProfitConfig(
 manager = StopLossManager(stop_config, profit_config)
 ```
 
-### **Usage**
-
+### Usage
 ```python
 # Add position
 manager.add_position(
@@ -89,8 +85,7 @@ if should_exit:
     # Execute sell order
 ```
 
-### **Expected Impact**
-
+### Expected Impact
 - **Reduce max drawdown:** -40-50%
 - **Increase profit factor:** +30%
 - **Prevent emotional decisions:** 100%
@@ -100,12 +95,10 @@ if should_exit:
 
 ## ⚖️ Position Rebalancing
 
-### **Overview**
-
+### Overview
 Maintains optimal portfolio allocation by rebalancing positions that drift from target weights. Prevents concentration risk.
 
-### **Features**
-
+### Features
 **1. Automatic Rebalancing**
 - Weekly scheduled rebalancing
 - Monthly full rebalancing
@@ -121,8 +114,7 @@ Maintains optimal portfolio allocation by rebalancing positions that drift from 
 - Transaction cost optimization
 - Minimum trade size filtering
 
-### **Configuration**
-
+### Configuration
 ```python
 from services.portfolio.rebalancer import PortfolioRebalancer, RebalanceConfig
 
@@ -138,8 +130,7 @@ config = RebalanceConfig(
 rebalancer = PortfolioRebalancer(config)
 ```
 
-### **Usage**
-
+### Usage
 ```python
 # Define positions
 positions = {
@@ -169,8 +160,7 @@ if should_rebalance:
     print(f"Rebalanced: {summary['num_trades']} trades")
 ```
 
-### **Expected Impact**
-
+### Expected Impact
 - **Maintain diversification:** 100%
 - **Reduce concentration risk:** -60%
 - **Improve risk-adjusted returns:** +15%
@@ -178,14 +168,12 @@ if should_rebalance:
 
 ---
 
-## 🎯 Adaptive Regime Detection
+## Adaptive Regime Detection
 
-### **Overview**
-
+### Overview
 Dynamically adjusts factor weights based on market conditions. Different indicators work better in different regimes.
 
-### **Market Regimes**
-
+### Market Regimes
 **1. BULL MARKET**
 - Strong uptrend
 - Low VIX (<20)
@@ -210,8 +198,7 @@ Dynamically adjusts factor weights based on market conditions. Different indicat
 - Whipsaws
 - **Strategy:** Capital preservation
 
-### **Adaptive Weights**
-
+### Adaptive Weights
 | Factor | Bull | Bear | Sideways | Volatile |
 |--------|------|------|----------|----------|
 | 13F Conviction | 25% | 40% | 20% | 50% |
@@ -224,8 +211,7 @@ Dynamically adjusts factor weights based on market conditions. Different indicat
 | Earnings | 2% | 2% | 2% | 0% |
 | **Cash Allocation** | **5%** | **20%** | **10%** | **30%** |
 
-### **Usage**
-
+### Usage
 ```python
 from services.market.adaptive_regime_engine import AdaptiveRegimeEngine
 
@@ -247,8 +233,7 @@ print(f"Moving Averages: {weights['moving_avg']:.0%}")
 print(f"Cash: {weights['cash']:.0%}")
 ```
 
-### **Expected Impact**
-
+### Expected Impact
 - **Annual alpha:** +10-15%
 - **Drawdown reduction:** -30-40%
 - **False signals:** -50%
@@ -256,14 +241,12 @@ print(f"Cash: {weights['cash']:.0%}")
 
 ---
 
-## 🔄 Sector Rotation
+## Sector Rotation
 
-### **Overview**
-
+### Overview
 Identifies sector rotation opportunities based on relative momentum. Overweight leading sectors, underweight lagging sectors.
 
-### **Tracked Sectors**
-
+### Tracked Sectors
 - XLK: Technology
 - XLF: Financials
 - XLV: Healthcare
@@ -276,8 +259,7 @@ Identifies sector rotation opportunities based on relative momentum. Overweight 
 - XLU: Utilities
 - XLC: Communication Services
 
-### **Strategy**
-
+### Strategy
 **Overweight Top 3 Sectors:**
 - +20% allocation
 - Strong relative momentum
@@ -288,8 +270,7 @@ Identifies sector rotation opportunities based on relative momentum. Overweight 
 - Weak relative momentum
 - Underperforming market
 
-### **Usage**
-
+### Usage
 ```python
 from services.market.adaptive_regime_engine import SectorRotationDetector
 
@@ -313,22 +294,19 @@ print(f"Overweight: {recs['overweight']}")
 print(f"Underweight: {recs['underweight']}")
 ```
 
-### **Expected Impact**
-
+### Expected Impact
 - **Annual alpha:** +5-10%
 - **Better risk-adjusted returns:** Yes
 - **Smoother equity curve:** Yes
 
 ---
 
-## 📊 Macro Economic Indicators
+## Macro Economic Indicators
 
-### **Overview**
-
+### Overview
 Tracks economic indicators that drive market cycles. Helps position portfolio for expansions and contractions.
 
-### **Key Indicators**
-
+### Key Indicators
 **1. Yield Curve (10Y-2Y)**
 - Inverted (<0): Recession signal
 - Steep (>2%): Expansion signal
@@ -349,8 +327,7 @@ Tracks economic indicators that drive market cycles. Helps position portfolio fo
 - High (>5%): Restrictive
 - Low (<2%): Accommodative
 
-### **Economic Cycles**
-
+### Economic Cycles
 **EXPANSION**
 - Growing economy
 - Low unemployment
@@ -376,8 +353,7 @@ Tracks economic indicators that drive market cycles. Helps position portfolio fo
 - **Favor:** Tech, Consumer Discretionary, Financials
 - **Equity:** 80%
 
-### **Usage**
-
+### Usage
 ```python
 from services.market.macro_indicators import MacroIndicatorTracker
 
@@ -398,18 +374,16 @@ print(f"Recommended Equity: {positioning['equity_allocation']:.0%}")
 print(f"Favored Sectors: {positioning['favored_sectors']}")
 ```
 
-### **Expected Impact**
-
+### Expected Impact
 - **Avoid recessions:** Major drawdown protection
 - **Position for cycles:** +3-5% annual alpha
 - **Better timing:** Yes
 
 ---
 
-## 🔗 Integration & Usage
+## Integration & Usage
 
-### **Complete Workflow**
-
+### Complete Workflow
 ```python
 from services.risk.stop_loss_manager import StopLossManager
 from services.portfolio.rebalancer import PortfolioRebalancer
@@ -449,8 +423,7 @@ if should_rebalance:
     summary = rebalancer.execute_rebalance(portfolio_positions, total_value)
 ```
 
-### **Daily Workflow Integration**
-
+### Daily Workflow Integration
 The advanced features are automatically integrated into `scripts/resilient_daily_workflow.py`:
 
 1. **Regime Detection:** Adjusts factor weights
@@ -461,7 +434,7 @@ The advanced features are automatically integrated into `scripts/resilient_daily
 
 ---
 
-## 📈 Expected Total Impact
+## Expected Total Impact
 
 **With ALL Advanced Features:**
 
@@ -475,7 +448,7 @@ The advanced features are automatically integrated into `scripts/resilient_daily
 
 ---
 
-## ✅ Best Practices
+## Best Practices
 
 1. **Trust the System:** Let automation work
 2. **Monitor Regime Changes:** Adjust expectations
@@ -485,7 +458,7 @@ The advanced features are automatically integrated into `scripts/resilient_daily
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 All features are ready to use. Run the daily workflow:
 

@@ -1,10 +1,10 @@
-# 🤖 Continuous Learning System Guide
+# Continuous Learning System Guide
 
 **Comprehensive ML Enhancement for Maximum Revenue**
 
 ---
 
-## 🎯 System Overview
+## System Overview
 
 This system maximizes model accuracy and revenue through:
 1. **Comprehensive Data Collection** - Multiple sources, real-time updates
@@ -15,27 +15,27 @@ This system maximizes model accuracy and revenue through:
 
 ---
 
-## 📊 What Data We Collect
+## What Data We Collect
 
-### **1. 13F Institutional Holdings**
+### 1. 13F Institutional Holdings
 - Historical filings (5+ years)
 - Investor performance tracking
 - Position changes and patterns
 - Conviction scores
 
-### **2. News & Sentiment**
+### 2. News & Sentiment
 - Multiple sources (Alpha Vantage, Finnhub)
 - 7-day, 30-day, 90-day sentiment
 - Article volume and trends
 - Bullish/bearish ratios
 
-### **3. Fundamental Data**
+### 3. Fundamental Data
 - Revenue and earnings growth
 - Profitability metrics
 - Valuation ratios (P/E, P/B, P/S, PEG)
 - Financial health indicators
 
-### **4. Technical Indicators**
+### 4. Technical Indicators
 - 50+ technical indicators
 - Price momentum, volatility
 - Volume analysis
@@ -48,7 +48,7 @@ This system maximizes model accuracy and revenue through:
 
 ---
 
-## 🗄️ Database Schema
+## ️ Database Schema
 
 **New Tables Created:**
 - `investor_performance` - Track institutional investor returns
@@ -64,16 +64,16 @@ This system maximizes model accuracy and revenue through:
 
 ---
 
-## 🔄 Automated Pipeline
+## Automated Pipeline
 
-### **Hourly (Every Hour)**
+### Hourly (Every Hour)
 ```
 - Collect latest news articles
 - Update sentiment scores
 - Store in database
 ```
 
-### **Daily (6 AM)**
+### Daily (6 AM)
 ```
 - Generate features for yesterday's data
 - Calculate target returns
@@ -81,7 +81,7 @@ This system maximizes model accuracy and revenue through:
 - Store in training_data table
 ```
 
-### **Daily (7 AM)**
+### Daily (7 AM)
 ```
 - Evaluate current model performance
 - Check accuracy, MAE, MSE
@@ -89,7 +89,7 @@ This system maximizes model accuracy and revenue through:
 - Trigger retraining if needed
 ```
 
-### **Weekly (Sunday 2 AM)**
+### Weekly (Sunday 2 AM)
 ```
 - Load all training data (3 years)
 - Train new ensemble model
@@ -99,14 +99,14 @@ This system maximizes model accuracy and revenue through:
 - Version and deploy
 ```
 
-### **Weekly (Saturday 1 AM)**
+### Weekly (Saturday 1 AM)
 ```
 - Collect fundamental data for all stocks
 - Update company financials
 - Refresh valuation ratios
 ```
 
-### **Monthly (1st, 9 AM)**
+### Monthly (1st, 9 AM)
 ```
 - Generate performance report
 - 30-day accuracy metrics
@@ -116,10 +116,9 @@ This system maximizes model accuracy and revenue through:
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
-### **Step 1: Set Up API Keys**
-
+### Step 1: Set Up API Keys
 Add to your `.env` file:
 ```bash
 # Required
@@ -134,14 +133,12 @@ REDDIT_CLIENT_SECRET=your_secret
 TWITTER_BEARER_TOKEN=your_token
 ```
 
-### **Step 2: Run Database Migrations**
-
+### Step 2: Run Database Migrations
 ```bash
 psql -U postgres -d investorbot < sql/migrations/002_ml_training_schema.sql
 ```
 
-### **Step 3: Initial Data Collection**
-
+### Step 3: Initial Data Collection
 ```bash
 # Collect 3 years of historical data
 python3 ml/data_collection_pipeline.py
@@ -150,8 +147,7 @@ python3 ml/data_collection_pipeline.py
 # Collects 13F, news, fundamentals for 100+ stocks
 ```
 
-### **Step 4: Generate Training Data**
-
+### Step 4: Generate Training Data
 ```bash
 # Create features from collected data
 python3 ml/feature_engineering_pipeline.py
@@ -160,8 +156,7 @@ python3 ml/feature_engineering_pipeline.py
 # Each with 50+ features
 ```
 
-### **Step 5: Train Initial Model**
-
+### Step 5: Train Initial Model
 ```bash
 # Train first model
 python3 ml/continuous_learning_engine.py
@@ -171,8 +166,7 @@ python3 ml/continuous_learning_engine.py
 # Saves as v{timestamp}
 ```
 
-### **Step 6: Start Automated Pipeline**
-
+### Step 6: Start Automated Pipeline
 ```bash
 # Run continuously
 python3 scripts/automated_ml_pipeline.py
@@ -185,10 +179,9 @@ python3 scripts/automated_ml_pipeline.py
 
 ---
 
-## 📈 Expected Performance
+## Expected Performance
 
-### **With Enhanced Data:**
-
+### With Enhanced Data
 **Before (Basic System):**
 - Accuracy: ~52%
 - Sharpe Ratio: ~1.5
@@ -201,7 +194,7 @@ python3 scripts/automated_ml_pipeline.py
 - Win Rate: **60-65%** (+5-10%)
 - Annual Return: **25-35%** (+10-15%)
 
-### **Revenue Impact:**
+### Revenue Impact
 - **+20-40% annual returns**
 - Better risk-adjusted performance
 - Reduced drawdowns
@@ -209,10 +202,9 @@ python3 scripts/automated_ml_pipeline.py
 
 ---
 
-## 🔧 Configuration
+## Configuration
 
-### **Model Training Settings:**
-
+### Model Training Settings
 Edit `ml/continuous_learning_engine.py`:
 ```python
 # Training data lookback
@@ -228,8 +220,7 @@ threshold_accuracy = 0.52  # Retrain if below 52%
 improvement_threshold = 1.05  # 5% improvement needed
 ```
 
-### **Data Collection Settings:**
-
+### Data Collection Settings
 Edit `ml/data_collection_pipeline.py`:
 ```python
 # Historical data years
@@ -245,8 +236,7 @@ rate_limiters = {
 }
 ```
 
-### **Feature Engineering:**
-
+### Feature Engineering
 Edit `ml/feature_engineering_pipeline.py`:
 ```python
 # Feature windows
@@ -261,10 +251,9 @@ news_windows = [7, 30, 90]  # days
 
 ---
 
-## 📊 Monitoring & Alerts
+## Monitoring & Alerts
 
-### **Slack Notifications:**
-
+### Slack Notifications
 You'll receive alerts for:
 - ✅ Pipeline started/stopped
 - ⚠️ Data collection failures
@@ -273,8 +262,7 @@ You'll receive alerts for:
 - 🚀 New model deployed
 - 📊 Monthly performance reports
 
-### **Database Monitoring:**
-
+### Database Monitoring
 Check pipeline status:
 ```sql
 SELECT * FROM data_collection_status 
@@ -303,33 +291,33 @@ GROUP BY model_version;
 
 ---
 
-## 🎯 What You Need to Provide
+## What You Need to Provide
 
-### **API Keys (Required):**
+### API Keys (Required)
 - [x] Alpha Vantage API key (free tier OK)
 - [x] Database credentials (PostgreSQL)
 
-### **API Keys (Optional but Recommended):**
+### API Keys (Optional but Recommended)
 - [ ] Finnhub API key (free tier: 60 calls/min)
 - [ ] NewsAPI key (free tier: 100 req/day)
 - [ ] Financial Modeling Prep ($14/month - comprehensive fundamentals)
 - [ ] Polygon.io ($29/month - options data)
 
-### **Infrastructure:**
+### Infrastructure
 - [x] Database with 50-100GB storage
 - [x] Server to run automated pipeline 24/7
 - [ ] Optional: Cloud compute for faster training (AWS/GCP)
 
-### **Budget (Optional):**
+### Budget (Optional)
 - **Free Tier:** $0/month (Alpha Vantage + Finnhub free)
 - **Basic:** $50/month (adds FMP + NewsAPI)
 - **Premium:** $150/month (adds Polygon.io + Twitter)
 
 ---
 
-## 🔍 Troubleshooting
+## Troubleshooting
 
-### **Issue: Not enough training data**
+### Issue: Not enough training data
 ```bash
 # Check data collection status
 python3 -c "
@@ -343,7 +331,7 @@ with get_db_session() as s:
 python3 ml/data_collection_pipeline.py
 ```
 
-### **Issue: Model accuracy not improving**
+### Issue: Model accuracy not improving
 ```bash
 # Check feature importance
 python3 -c "
@@ -355,7 +343,7 @@ engine = ContinuousLearningEngine()
 # May need more data or different features
 ```
 
-### **Issue: Pipeline not running**
+### Issue: Pipeline not running
 ```bash
 # Check logs
 tail -f logs/app.log
@@ -372,7 +360,7 @@ python3 scripts/automated_ml_pipeline.py
 
 ---
 
-## 📚 Code Structure
+## Code Structure
 
 ```
 ml/
@@ -395,7 +383,7 @@ docs/
 
 ---
 
-## ✅ Success Checklist
+## Success Checklist
 
 **Data Collection:**
 - [ ] 3+ years of historical data collected
@@ -423,7 +411,7 @@ docs/
 
 ---
 
-## 🚀 Next Steps
+## Next Steps
 
 1. **Provide API keys** (see "What You Need to Provide")
 2. **Run database migrations**
@@ -436,7 +424,7 @@ docs/
 
 ---
 
-## 💡 Tips for Maximum Performance
+## Tips for Maximum Performance
 
 1. **More Data = Better Models**
    - Add more API keys for diverse data sources
