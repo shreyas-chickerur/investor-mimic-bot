@@ -39,7 +39,9 @@ class HistoricalDataCollector:
     def __init__(self):
         """Initialize data collector."""
         self.alpha_vantage_key = os.getenv("ALPHA_VANTAGE_API_KEY")
-        self.db_url = os.getenv("DATABASE_URL", "postgresql://postgres@localhost:5432/investorbot")
+        # Convert async URL to sync format for psycopg2
+        db_url = os.getenv("DATABASE_URL", "postgresql://postgres@localhost:5432/investorbot")
+        self.db_url = db_url.replace("postgresql+asyncpg://", "postgresql://")
 
         # Alpaca client
         alpaca_key = os.getenv("ALPACA_API_KEY")
@@ -62,24 +64,30 @@ class HistoricalDataCollector:
         try:
             conn = psycopg2.connect(self.db_url)
             query = """
-                SELECT DISTINCT ticker
-                FROM holdings
-                WHERE days_old <= 365
-                ORDER BY ticker
+                SELECT DISTINCT s.ticker
+                FROM holdings h
+                JOIN securities s ON h.security_id = s.security_id
+                WHERE s.ticker IS NOT NULL AND s.ticker != ''
+                ORDER BY s.ticker
                 LIMIT 100
             """
             df = pd.read_sql(query, conn)
             conn.close()
 
             symbols = df["ticker"].tolist()
-            print(f"  ✓ Found {len(symbols)} symbols from 13F filings")
-            return symbols
+            if len(symbols) > 0:
+                print(f"  ✓ Found {len(symbols)} symbols from 13F filings")
+                return symbols
+            else:
+                print(f"  ⚠ Found 0 symbols in database")
+                print("  Using default stock universe...")
 
         except Exception as e:
             print(f"  ⚠ Database error: {e}")
             print("  Using default stock universe...")
-            # Default universe of liquid large caps
-            return [
+        
+        # Default universe of liquid large caps
+        return [
                 "AAPL",
                 "MSFT",
                 "GOOGL",
@@ -152,11 +160,30 @@ class HistoricalDataCollector:
 
                 bars = self.alpaca_client.get_stock_bars(request)
 
+                # Handle the response - Alpaca returns a dict-like object
                 for symbol in batch:
-                    if symbol in bars:
-                        df = bars[symbol].df
-                        price_data[symbol] = df
-                        print(f"  ✓ {symbol}: {len(df)} days")
+                    try:
+                        if symbol in bars:
+                            symbol_bars = bars[symbol]
+                            if hasattr(symbol_bars, 'df'):
+                                df = symbol_bars.df
+                            else:
+                                # Convert list of bars to DataFrame
+                                df = pd.DataFrame([{
+                                    'open': bar.open,
+                                    'high': bar.high,
+                                    'low': bar.low,
+                                    'close': bar.close,
+                                    'volume': bar.volume,
+                                    'timestamp': bar.timestamp
+                                } for bar in symbol_bars])
+                                df.set_index('timestamp', inplace=True)
+                            
+                            price_data[symbol] = df
+                            print(f"  ✓ {symbol}: {len(df)} days")
+                    except Exception as e:
+                        print(f"  ✗ {symbol}: {e}")
+                        continue
 
                 time.sleep(0.5)  # Rate limiting
 
@@ -192,8 +219,17 @@ class HistoricalDataCollector:
             response = requests.get(url, params=params, timeout=30)
             data = response.json()
 
+            # Check for rate limit message
+            if "Note" in data or "Information" in data:
+                print(f"  ⚠ {symbol}: Rate limit hit, waiting 60s...")
+                time.sleep(60)
+                return None
+
             if "Time Series (Daily)" not in data:
-                print(f"  ✗ {symbol}: No data")
+                if "Error Message" in data:
+                    print(f"  ✗ {symbol}: {data['Error Message']}")
+                else:
+                    print(f"  ✗ {symbol}: No data available")
                 return None
 
             # Convert to DataFrame
@@ -251,7 +287,7 @@ class HistoricalDataCollector:
         if missing_symbols and self.alpha_vantage_key:
             print(f"\nFetching {len(missing_symbols)} missing symbols from Alpha Vantage...")
 
-            for symbol in missing_symbols[:20]:  # Limit to 20 due to API limits
+            for i, symbol in enumerate(missing_symbols[:36]):  # Collect all default symbols
                 df = self.fetch_alpha_vantage_data(symbol)
                 if df is not None:
                     # Filter to date range
