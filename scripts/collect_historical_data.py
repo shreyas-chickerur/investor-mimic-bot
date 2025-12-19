@@ -160,15 +160,13 @@ class HistoricalDataCollector:
 
                 bars = self.alpaca_client.get_stock_bars(request)
 
-                # Handle the response - Alpaca returns a dict-like object
-                for symbol in batch:
-                    try:
-                        if symbol in bars:
-                            symbol_bars = bars[symbol]
-                            if hasattr(symbol_bars, 'df'):
-                                df = symbol_bars.df
-                            else:
-                                # Convert list of bars to DataFrame
+                # Alpaca returns a BarSet with .data dict containing symbol -> list of bars
+                if hasattr(bars, 'data'):
+                    for symbol in batch:
+                        try:
+                            if symbol in bars.data:
+                                bar_list = bars.data[symbol]
+                                # Convert list of Bar objects to DataFrame
                                 df = pd.DataFrame([{
                                     'open': bar.open,
                                     'high': bar.high,
@@ -176,14 +174,14 @@ class HistoricalDataCollector:
                                     'close': bar.close,
                                     'volume': bar.volume,
                                     'timestamp': bar.timestamp
-                                } for bar in symbol_bars])
+                                } for bar in bar_list])
                                 df.set_index('timestamp', inplace=True)
-                            
-                            price_data[symbol] = df
-                            print(f"  ✓ {symbol}: {len(df)} days")
-                    except Exception as e:
-                        print(f"  ✗ {symbol}: {e}")
-                        continue
+                                
+                                price_data[symbol] = df
+                                print(f"  ✓ {symbol}: {len(df)} days")
+                        except Exception as e:
+                            print(f"  ✗ {symbol}: {e}")
+                            continue
 
                 time.sleep(0.5)  # Rate limiting
 
