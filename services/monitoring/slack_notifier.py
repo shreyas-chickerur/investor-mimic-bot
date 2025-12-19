@@ -91,16 +91,22 @@ class SlackNotifier:
             True if message sent successfully, False otherwise
         """
         try:
-            payload = self._build_payload(message=message, level=level, title=title, details=details, channel=channel)
+            payload = self._build_payload(
+                message=message, level=level, title=title, details=details, channel=channel
+            )
 
             async with httpx.AsyncClient() as client:
-                response = await client.post(str(self.config.webhook_url), json=payload, timeout=10.0)
+                response = await client.post(
+                    str(self.config.webhook_url), json=payload, timeout=10.0
+                )
 
                 if response.status_code == 200:
                     logger.info(f"Slack alert sent: {title or message[:50]}")
                     return True
                 else:
-                    logger.error(f"Failed to send Slack alert: {response.status_code} - {response.text}")
+                    logger.error(
+                        f"Failed to send Slack alert: {response.status_code} - {response.text}"
+                    )
                     return False
 
         except Exception as e:
@@ -131,7 +137,9 @@ class SlackNotifier:
         try:
             import requests
 
-            payload = self._build_payload(message=message, level=level, title=title, details=details, channel=channel)
+            payload = self._build_payload(
+                message=message, level=level, title=title, details=details, channel=channel
+            )
 
             response = requests.post(str(self.config.webhook_url), json=payload, timeout=10.0)
 
@@ -139,7 +147,9 @@ class SlackNotifier:
                 logger.info(f"Slack alert sent: {title or message[:50]}")
                 return True
             else:
-                logger.error(f"Failed to send Slack alert: {response.status_code} - {response.text}")
+                logger.error(
+                    f"Failed to send Slack alert: {response.status_code} - {response.text}"
+                )
                 return False
 
         except Exception as e:
@@ -195,7 +205,9 @@ class SlackNotifier:
                 "Transfer ID": transfer_id or "N/A",
             }
 
-        return await self.send_alert(message=message, level=level, title=title, details=details, channel=channel)
+        return await self.send_alert(
+            message=message, level=level, title=title, details=details, channel=channel
+        )
 
     async def send_trade_alert(
         self,
@@ -254,7 +266,9 @@ class SlackNotifier:
                 "Order ID": order_id or "N/A",
             }
 
-        return await self.send_alert(message=message, level=level, title=title, details=details, channel=channel)
+        return await self.send_alert(
+            message=message, level=level, title=title, details=details, channel=channel
+        )
 
     async def send_system_alert(
         self,
@@ -280,7 +294,9 @@ class SlackNotifier:
         emoji = self.LEVEL_EMOJIS.get(level, ":bell:")
         title = f"{emoji} System Alert: {component}"
 
-        return await self.send_alert(message=message, level=level, title=title, details=details, channel=channel)
+        return await self.send_alert(
+            message=message, level=level, title=title, details=details, channel=channel
+        )
 
     def _build_payload(
         self,

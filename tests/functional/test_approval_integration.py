@@ -447,7 +447,6 @@ def run_manual_tests():
     print()
 
     from fastapi.testclient import TestClient
-
     from main import app
 
     client = TestClient(app)

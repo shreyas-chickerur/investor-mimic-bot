@@ -5,12 +5,13 @@ Tools for profiling and optimizing system performance.
 """
 
 import cProfile
-import pstats
-import io
-import time
 import functools
-from typing import Callable, Any, Dict
+import io
+import pstats
+import time
 from pathlib import Path
+from typing import Any, Callable, Dict
+
 from utils.enhanced_logging import get_logger
 
 logger = get_logger(__name__)

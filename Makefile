@@ -41,6 +41,9 @@ help:
 	@echo "  make collect-data        - Collect real historical data"
 	@echo "  make collect-13f         - Update 13F filings"
 	@echo ""
+	@echo "Email & Notifications:"
+	@echo "  make send-digest         - Send daily digest email to all users"
+	@echo ""
 	@echo "Utilities:"
 	@echo "  make clean               - Clean generated files"
 	@echo "  make docs                - Generate documentation"
@@ -111,6 +114,11 @@ collect-data:
 collect-13f:
 	@echo "Updating 13F filings..."
 	python3 scripts/load_13f_data.py
+
+# Email & Notifications
+send-digest:
+	@echo "Sending daily digest emails..."
+	python3 scripts/send_daily_digest.py
 
 # Backtesting
 backtest-baseline:
