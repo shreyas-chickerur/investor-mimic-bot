@@ -69,28 +69,37 @@ def get_daily_digest_email_html(market_section: Dict, portfolio_section: Dict, u
                 <p style="color: #2c3e50; font-size: 16px; margin: 0;">Good morning, {user_name}</p>
             </div>
 
-            <!-- Market Section -->
-            <div style="padding: 24px; border-bottom: 2px solid #f1f3f5;">
-                <h2 style="color: #2c3e50; margin: 0 0 16px 0; font-size: 20px; font-weight: 700;">Market Overview</h2>
-                {market_summary_html}
+            <!-- Market Overview Section -->
+            <div style="background: #ffffff; padding: 32px 24px; border-bottom: 4px solid #e9ecef;">
+                <h2 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 22px; font-weight: 700; border-bottom: 2px solid #667eea; padding-bottom: 8px; display: inline-block;">📈 Market Overview</h2>
+                
+                <div style="padding: 24px; border-bottom: 2px solid #f1f3f5;">
+                    <h3 style="color: #2c3e50; margin: 0 0 16px 0; font-size: 18px; font-weight: 600;">Market Summary</h3>
+                    {market_summary_html}
+                </div>
+
+                <div style="padding: 24px;">
+                    <h3 style="color: #2c3e50; margin: 0 0 16px 0; font-size: 18px; font-weight: 600;">Top Headlines</h3>
+                    {headlines_html}
+                </div>
             </div>
 
-            <!-- Headlines Section -->
-            <div style="padding: 24px; border-bottom: 2px solid #f1f3f5;">
-                <h2 style="color: #2c3e50; margin: 0 0 16px 0; font-size: 20px; font-weight: 700;">Top Headlines</h2>
-                {headlines_html}
+            <!-- Portfolio Analysis Section -->
+            <div style="background: #f8f9fa; padding: 32px 24px; border-bottom: 4px solid #e9ecef;">
+                <h2 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 22px; font-weight: 700; border-bottom: 2px solid #27ae60; padding-bottom: 8px; display: inline-block;">💼 Portfolio Analysis</h2>
+                
+                <div style="padding: 24px;">
+                    <h3 style="color: #2c3e50; margin: 0 0 16px 0; font-size: 18px; font-weight: 600;">Performance</h3>
+                    {performance_html}
+                </div>
             </div>
 
-            <!-- Portfolio Section -->
-            <div style="padding: 24px; background-color: #f8f9fa; border-bottom: 2px solid #e9ecef;">
-                <h2 style="color: #2c3e50; margin: 0 0 16px 0; font-size: 20px; font-weight: 700;">Your Portfolio</h2>
-                {performance_html}
-            </div>
-
-            <!-- Holdings Section -->
-            <div style="padding: 24px; border-bottom: 2px solid #f1f3f5;">
-                <h3 style="color: #2c3e50; margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">Current Holdings</h3>
-                {holdings_html}
+            <!-- Holdings Section (within Portfolio Analysis) -->
+            <div style="background: #f8f9fa; padding: 0 24px 24px 24px;">
+                <div style="padding: 24px; background: #ffffff; border-radius: 8px;">
+                    <h3 style="color: #2c3e50; margin: 0 0 16px 0; font-size: 18px; font-weight: 600;">Current Holdings</h3>
+                    {holdings_html}
+                </div>
             </div>
 
             <!-- Recommendations Section -->
