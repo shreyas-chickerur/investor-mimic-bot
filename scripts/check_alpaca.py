@@ -40,9 +40,7 @@ def main():
             positions = alpaca.get_all_positions()
             if positions:
                 for position in positions:
-                    print(
-                        f"{position.symbol}: {position.qty} shares (Market Value: ${position.market_value})"
-                    )
+                    print(f"{position.symbol}: {position.qty} shares (Market Value: ${position.market_value})")
             else:
                 print("No positions found.")
         except Exception as e:
