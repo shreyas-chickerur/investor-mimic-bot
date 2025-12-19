@@ -277,9 +277,7 @@ class AdaptiveRegimeEngine:
         """
         regime = self.detect_regime(spy_prices, vix_level, breadth)
 
-        logger.info(
-            f"Market Regime: {regime.regime.value.upper()} (confidence: {regime.confidence:.1%})"
-        )
+        logger.info(f"Market Regime: {regime.regime.value.upper()} (confidence: {regime.confidence:.1%})")
         logger.info(
             f"  VIX: {regime.vix_level:.1f}, Trend: {regime.trend_strength:+.1f}%, Breadth: {regime.breadth:.0f}%"
         )
@@ -385,9 +383,7 @@ class SectorRotationDetector:
         sector_momentum = {}
 
         # Calculate SPY return
-        spy_return = (
-            (spy_prices.iloc[-1] - spy_prices.iloc[-period]) / spy_prices.iloc[-period]
-        ) * 100
+        spy_return = ((spy_prices.iloc[-1] - spy_prices.iloc[-period]) / spy_prices.iloc[-period]) * 100
 
         for sector, prices in sector_prices.items():
             if len(prices) < period:

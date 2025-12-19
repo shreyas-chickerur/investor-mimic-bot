@@ -61,9 +61,7 @@ def test_risk_constraints_max_position_sector_and_cash_buffer():
 
     constrained = apply_risk_constraints(
         alloc,
-        constraints=RiskConstraints(
-            max_position_weight=0.10, max_sector_weight=0.30, cash_buffer_weight=0.10
-        ),
+        constraints=RiskConstraints(max_position_weight=0.10, max_sector_weight=0.30, cash_buffer_weight=0.10),
     )
 
     weights = constrained.set_index("ticker")["normalized_weight"].to_dict()
@@ -79,12 +77,7 @@ def test_risk_constraints_max_position_sector_and_cash_buffer():
         assert w <= 0.10 + 1e-9
 
     # Max sector 30% (only for sector-tagged rows)
-    sector_totals = (
-        constrained[constrained["ticker"] != "CASH"]
-        .groupby("sector")["normalized_weight"]
-        .sum()
-        .to_dict()
-    )
+    sector_totals = constrained[constrained["ticker"] != "CASH"].groupby("sector")["normalized_weight"].sum().to_dict()
     assert sector_totals.get("Tech", 0.0) <= 0.30 + 1e-9
     assert sector_totals.get("Health", 0.0) <= 0.30 + 1e-9
 

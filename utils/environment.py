@@ -27,7 +27,7 @@ class Environment:
         if env_file.exists():
             load_dotenv(env_file)
             print(f"✓ Loaded {self.env} environment configuration")
-        
+
         # Fall back to default .env (always try this)
         default_env = base_dir / ".env"
         if default_env.exists():

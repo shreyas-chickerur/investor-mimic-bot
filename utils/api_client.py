@@ -137,9 +137,7 @@ class AlphaVantageClient(APIClient):
     """Alpha Vantage API client."""
 
     def __init__(self, api_key: str):
-        super().__init__(
-            "https://www.alphavantage.co", api_key=api_key, rate_limit_key="alpha_vantage"
-        )
+        super().__init__("https://www.alphavantage.co", api_key=api_key, rate_limit_key="alpha_vantage")
 
     def get_quote(self, symbol: str) -> Dict[str, Any]:
         """Get real-time quote."""

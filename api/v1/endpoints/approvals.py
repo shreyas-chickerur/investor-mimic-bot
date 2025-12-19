@@ -54,9 +54,7 @@ async def approve_request(request_id: str, notes: Optional[str] = None) -> Appro
     Returns:
         ApprovalResponse with success status
     """
-    success = approval_manager.approve_request(
-        request_id=request_id, approved_by="web", notes=notes
-    )
+    success = approval_manager.approve_request(request_id=request_id, approved_by="web", notes=notes)
 
     if not success:
         request = approval_manager.get_request(request_id)
@@ -71,9 +69,7 @@ async def approve_request(request_id: str, notes: Optional[str] = None) -> Appro
 
     request = approval_manager.get_request(request_id)
 
-    return ApprovalResponse(
-        success=True, message="Trade request approved successfully", request=request
-    )
+    return ApprovalResponse(success=True, message="Trade request approved successfully", request=request)
 
 
 @router.post("/{request_id}/reject")
@@ -125,15 +121,11 @@ async def approve_trade(request_id: str, trade_index: int) -> ApprovalResponse:
         if not request:
             raise HTTPException(status_code=404, detail="Approval request not found")
 
-        return ApprovalResponse(
-            success=False, message=f"Could not approve trade {trade_index}", request=request
-        )
+        return ApprovalResponse(success=False, message=f"Could not approve trade {trade_index}", request=request)
 
     request = approval_manager.get_request(request_id)
 
-    return ApprovalResponse(
-        success=True, message=f"Trade {trade_index} approved successfully", request=request
-    )
+    return ApprovalResponse(success=True, message=f"Trade {trade_index} approved successfully", request=request)
 
 
 @router.api_route("/{request_id}/reject-trade/{trade_index}", methods=["GET", "POST"])
@@ -155,15 +147,11 @@ async def reject_trade(request_id: str, trade_index: int) -> ApprovalResponse:
         if not request:
             raise HTTPException(status_code=404, detail="Approval request not found")
 
-        return ApprovalResponse(
-            success=False, message=f"Could not reject trade {trade_index}", request=request
-        )
+        return ApprovalResponse(success=False, message=f"Could not reject trade {trade_index}", request=request)
 
     request = approval_manager.get_request(request_id)
 
-    return ApprovalResponse(
-        success=True, message=f"Trade {trade_index} rejected successfully", request=request
-    )
+    return ApprovalResponse(success=True, message=f"Trade {trade_index} rejected successfully", request=request)
 
 
 @router.post("/{request_id}/submit-bulk")

@@ -50,10 +50,7 @@ class SECClient:
             connector=connector,
             headers={
                 "User-Agent": f"InvestorMimicBot/1.0 ({contact})",
-                "Accept": (
-                    "application/json,text/html,application/xhtml+xml,"
-                    "application/xml;q=0.9,*/*;q=0.8"
-                ),
+                "Accept": ("application/json,text/html,application/xhtml+xml," "application/xml;q=0.9,*/*;q=0.8"),
                 "Accept-Encoding": "gzip, deflate",
             },
         )
@@ -101,10 +98,7 @@ class SECClient:
         except aiohttp.ContentTypeError as e:
             status = getattr(e, "status", None)
             content_type = getattr(e, "content_type", None)
-            logger.error(
-                f"Failed to decode JSON {url}: status={status} "
-                f"content_type={content_type} error={str(e)}"
-            )
+            logger.error(f"Failed to decode JSON {url}: status={status} " f"content_type={content_type} error={str(e)}")
             raise
         except aiohttp.ClientResponseError as e:
             logger.error(f"Failed to fetch JSON {url}: status={e.status} message={e.message}")
@@ -184,17 +178,13 @@ class SECClient:
         try:
             index_json = await self._get_json(index_json_url)
             items = index_json.get("directory", {}).get("item", [])
-            xml_files = [
-                i.get("name", "") for i in items if str(i.get("name", "")).lower().endswith(".xml")
-            ]
+            xml_files = [i.get("name", "") for i in items if str(i.get("name", "")).lower().endswith(".xml")]
             if not xml_files:
                 logger.warning(f"No XML files found in filing index: {index_json_url}")
                 return pd.DataFrame()
 
             preferred = [
-                f
-                for f in xml_files
-                if any(k in f.lower() for k in ["infotable", "informationtable", "form13f", "13f"])
+                f for f in xml_files if any(k in f.lower() for k in ["infotable", "informationtable", "form13f", "13f"])
             ]
             xml_name = preferred[0] if preferred else xml_files[0]
             base_url = index_json_url.rsplit("/", 1)[0] + "/"
@@ -211,18 +201,12 @@ class SECClient:
 
             holdings = []
             for info_table in soup.find_all(lambda t: t.name and t.name.lower() == "infotable"):
-                shrs_or_prn_amt = info_table.find(
-                    lambda t: t.name and t.name.lower() == "shrsorprnamt"
-                )
-                voting_auth = info_table.find(
-                    lambda t: t.name and t.name.lower() == "votingauthority"
-                )
+                shrs_or_prn_amt = info_table.find(lambda t: t.name and t.name.lower() == "shrsorprnamt")
+                voting_auth = info_table.find(lambda t: t.name and t.name.lower() == "votingauthority")
 
                 shares = "0"
                 if shrs_or_prn_amt is not None:
-                    shares = find_text(shrs_or_prn_amt, "sshPrnamt") or find_text(
-                        shrs_or_prn_amt, "sshprnamt"
-                    )
+                    shares = find_text(shrs_or_prn_amt, "sshPrnamt") or find_text(shrs_or_prn_amt, "sshprnamt")
 
                 holding = {
                     "nameOfIssuer": find_text(info_table, "nameOfIssuer"),
@@ -233,17 +217,9 @@ class SECClient:
                     "putCall": find_text(info_table, "putCall"),
                     "investmentDiscretion": find_text(info_table, "investmentDiscretion"),
                     "votingAuthority": {
-                        "sole": (
-                            int(float(find_text(voting_auth, "sole") or "0")) if voting_auth else 0
-                        ),
-                        "shared": (
-                            int(float(find_text(voting_auth, "shared") or "0"))
-                            if voting_auth
-                            else 0
-                        ),
-                        "none": (
-                            int(float(find_text(voting_auth, "none") or "0")) if voting_auth else 0
-                        ),
+                        "sole": (int(float(find_text(voting_auth, "sole") or "0")) if voting_auth else 0),
+                        "shared": (int(float(find_text(voting_auth, "shared") or "0")) if voting_auth else 0),
+                        "none": (int(float(find_text(voting_auth, "none") or "0")) if voting_auth else 0),
                     },
                 }
                 holdings.append(holding)
@@ -301,9 +277,7 @@ class SECClient:
         for investor in INVESTORS:
             try:
                 logger.info(f"Fetching holdings for {investor['name']} (CIK: {investor['cik']})")
-                holdings = await self.get_latest_13f_holdings(
-                    cik=investor["cik"], max_filings=max_filings_per_investor
-                )
+                holdings = await self.get_latest_13f_holdings(cik=investor["cik"], max_filings=max_filings_per_investor)
 
                 if holdings:
                     results[investor["name"]] = holdings

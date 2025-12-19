@@ -4,9 +4,7 @@ from services.execution.planner import TradePlanner, TradePlannerConfig
 
 
 def test_generate_buy_plan_basic():
-    planner = TradePlanner(
-        TradePlannerConfig(share_increment=Decimal("0.01"), min_trade_notional=Decimal("10"))
-    )
+    planner = TradePlanner(TradePlannerConfig(share_increment=Decimal("0.01"), min_trade_notional=Decimal("10")))
     target_weights = {"AAA": Decimal("0.5"), "BBB": Decimal("0.5")}
     prices = {"AAA": Decimal("100"), "BBB": Decimal("50")}
     current_positions = {"AAA": Decimal("0"), "BBB": Decimal("0")}
@@ -26,9 +24,7 @@ def test_generate_buy_plan_basic():
 
 
 def test_generate_buy_plan_respects_current_position():
-    planner = TradePlanner(
-        TradePlannerConfig(share_increment=Decimal("0.01"), min_trade_notional=Decimal("10"))
-    )
+    planner = TradePlanner(TradePlannerConfig(share_increment=Decimal("0.01"), min_trade_notional=Decimal("10")))
     target_weights = {"AAA": Decimal("1")}
     prices = {"AAA": Decimal("100")}
     current_positions = {"AAA": Decimal("9")}

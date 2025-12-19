@@ -281,9 +281,7 @@ class PositionTracker:
         # For now, return empty list
         return []
 
-    def track_position(
-        self, symbol: str, quantity: float, entry_price: float, entry_date: datetime
-    ):
+    def track_position(self, symbol: str, quantity: float, entry_price: float, entry_date: datetime):
         """Record a new position."""
         # Would save to storage
         pass
