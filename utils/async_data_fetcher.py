@@ -39,9 +39,7 @@ class AsyncDataFetcher:
         """Fetch data from URL asynchronously."""
         async with self.semaphore:
             try:
-                async with self.session.get(
-                    url, params=params, headers=headers, timeout=30
-                ) as response:
+                async with self.session.get(url, params=params, headers=headers, timeout=30) as response:
                     response.raise_for_status()
                     return await response.json()
             except Exception as e:
@@ -61,9 +59,7 @@ class AsyncDataFetcher:
                 logger.error(f"Error fetching {ticker}: {e}")
                 return {"ticker": ticker, "data": None, "success": False, "error": str(e)}
 
-    async def fetch_multiple_stocks(
-        self, tickers: List[str], data_fetcher: Callable
-    ) -> List[Dict[str, Any]]:
+    async def fetch_multiple_stocks(self, tickers: List[str], data_fetcher: Callable) -> List[Dict[str, Any]]:
         """Fetch data for multiple stocks in parallel."""
         tasks = [self.fetch_stock_data(ticker, data_fetcher) for ticker in tickers]
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -78,17 +74,13 @@ class AsyncDataFetcher:
 
         return valid_results
 
-    async def fetch_batch(
-        self, items: List[Any], fetch_func: Callable, batch_size: int = 50
-    ) -> List[Dict[str, Any]]:
+    async def fetch_batch(self, items: List[Any], fetch_func: Callable, batch_size: int = 50) -> List[Dict[str, Any]]:
         """Fetch items in batches to avoid overwhelming APIs."""
         all_results = []
 
         for i in range(0, len(items), batch_size):
             batch = items[i : i + batch_size]
-            logger.info(
-                f"Processing batch {i//batch_size + 1}/{(len(items) + batch_size - 1)//batch_size}"
-            )
+            logger.info(f"Processing batch {i//batch_size + 1}/{(len(items) + batch_size - 1)//batch_size}")
 
             tasks = [fetch_func(item) for item in batch]
             batch_results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -137,9 +129,7 @@ async def fetch_all_stock_prices(tickers: List[str], price_fetcher: Callable) ->
     return price_data
 
 
-async def fetch_all_factor_scores(
-    tickers: List[str], score_calculator: Callable
-) -> Dict[str, Dict[str, float]]:
+async def fetch_all_factor_scores(tickers: List[str], score_calculator: Callable) -> Dict[str, Dict[str, float]]:
     """
     Calculate factor scores for all stocks in parallel.
 
@@ -169,8 +159,6 @@ def fetch_prices_parallel(tickers: List[str], price_fetcher: Callable) -> Dict[s
     return run_async(fetch_all_stock_prices(tickers, price_fetcher))
 
 
-def calculate_scores_parallel(
-    tickers: List[str], score_calculator: Callable
-) -> Dict[str, Dict[str, float]]:
+def calculate_scores_parallel(tickers: List[str], score_calculator: Callable) -> Dict[str, Dict[str, float]]:
     """Synchronous wrapper for parallel score calculation."""
     return run_async(fetch_all_factor_scores(tickers, score_calculator))

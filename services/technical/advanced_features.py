@@ -45,9 +45,7 @@ class AdvancedFeatureEngineer:
 
         # Historical volatility
         for period in [10, 20, 50]:
-            df[f"volatility_{period}"] = df["close"].pct_change().rolling(period).std() * np.sqrt(
-                252
-            )
+            df[f"volatility_{period}"] = df["close"].pct_change().rolling(period).std() * np.sqrt(252)
 
         # ATR (Average True Range)
         df["atr_14"] = self._calculate_atr(df, 14)
@@ -122,15 +120,11 @@ class AdvancedFeatureEngineer:
 
         # Distance from moving averages
         for period in [20, 50, 200]:
-            df[f"dist_from_sma_{period}"] = (df["close"] - df[f"sma_{period}"]) / df[
-                f"sma_{period}"
-            ]
+            df[f"dist_from_sma_{period}"] = (df["close"] - df[f"sma_{period}"]) / df[f"sma_{period}"]
 
         # Trend strength
         df["trend_strength_20"] = (
-            df["close"]
-            .rolling(20)
-            .apply(lambda x: np.polyfit(range(len(x)), x, 1)[0] if len(x) == 20 else 0)
+            df["close"].rolling(20).apply(lambda x: np.polyfit(range(len(x)), x, 1)[0] if len(x) == 20 else 0)
         )
 
         logger.debug("Created trend features")
@@ -146,9 +140,7 @@ class AdvancedFeatureEngineer:
         df = self.create_trend_features(df)
 
         # Store feature names
-        self.feature_names = [
-            col for col in df.columns if col not in ["open", "high", "low", "close", "volume"]
-        ]
+        self.feature_names = [col for col in df.columns if col not in ["open", "high", "low", "close", "volume"]]
 
         logger.info(f"Created {len(self.feature_names)} advanced features")
         return df
@@ -164,9 +156,7 @@ class AdvancedFeatureEngineer:
         plus_dm[plus_dm < 0] = 0
         minus_dm[minus_dm < 0] = 0
 
-        tr = pd.concat(
-            [high - low, abs(high - close.shift()), abs(low - close.shift())], axis=1
-        ).max(axis=1)
+        tr = pd.concat([high - low, abs(high - close.shift()), abs(low - close.shift())], axis=1).max(axis=1)
 
         atr = tr.rolling(period).mean()
         plus_di = 100 * (plus_dm.rolling(period).mean() / atr)
@@ -193,9 +183,7 @@ class AdvancedFeatureEngineer:
         low = df["low"]
         close = df["close"]
 
-        tr = pd.concat(
-            [high - low, abs(high - close.shift()), abs(low - close.shift())], axis=1
-        ).max(axis=1)
+        tr = pd.concat([high - low, abs(high - close.shift()), abs(low - close.shift())], axis=1).max(axis=1)
 
         atr = tr.rolling(period).mean()
         return atr

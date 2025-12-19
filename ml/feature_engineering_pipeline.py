@@ -76,9 +76,15 @@ class FeatureEngineer:
                 features["13f_decreased_positions"] = float(row[5] or 0)
 
                 # Calculate conviction score
-                total_changes = features["13f_new_positions"] + features["13f_increased_positions"] + features["13f_decreased_positions"]
+                total_changes = (
+                    features["13f_new_positions"]
+                    + features["13f_increased_positions"]
+                    + features["13f_decreased_positions"]
+                )
                 if total_changes > 0:
-                    features["13f_conviction"] = (features["13f_new_positions"] + features["13f_increased_positions"]) / total_changes
+                    features["13f_conviction"] = (
+                        features["13f_new_positions"] + features["13f_increased_positions"]
+                    ) / total_changes
                 else:
                     features["13f_conviction"] = 0.5
 
