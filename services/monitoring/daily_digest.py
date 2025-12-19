@@ -199,7 +199,7 @@ class DailyDigestGenerator:
             return []
 
     def _get_todays_recommendations(self, user_email: str) -> List[Dict]:
-        """Get today's trade recommendations."""
+        """Get today's trade recommendations with causality analysis."""
         try:
             with get_db_session() as session:
                 # Get latest recommendations from today
@@ -223,16 +223,26 @@ class DailyDigestGenerator:
 
                 recommendations = []
                 for row in rows:
-                    recommendations.append(
-                        {
-                            "ticker": row[0],
-                            "action": row[1],
-                            "quantity": float(row[2]),
-                            "price": float(row[3]),
-                            "score": float(row[4]),
-                            "reasoning": row[5],
-                        }
-                    )
+                    rec = {
+                        "ticker": row[0],
+                        "action": row[1],
+                        "quantity": float(row[2]),
+                        "price": float(row[3]),
+                        "score": float(row[4]),
+                        "reasoning": row[5],
+                    }
+
+                    # Add causality analysis for each recommendation
+                    try:
+                        from services.analysis.stock_causality_analyzer import analyze_stock_recommendation
+
+                        causality_data = analyze_stock_recommendation(rec["ticker"], rec["action"], rec["score"])
+                        rec["causality_data"] = causality_data
+                    except Exception as e:
+                        logger.error(f"Error analyzing causality for {rec['ticker']}: {e}")
+                        rec["causality_data"] = None
+
+                    recommendations.append(rec)
 
                 return recommendations
 
