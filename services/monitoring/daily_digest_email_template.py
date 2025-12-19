@@ -105,6 +105,21 @@ def get_daily_digest_email_html(market_section: Dict, portfolio_section: Dict, u
             <!-- Holdings News Section -->
             {holdings_news_html}
 
+            <!-- Approve/Reject All Trades Section -->
+            <div style="padding: 32px 24px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-top: 2px solid #dee2e6; text-align: center;">
+                <h3 style="color: #2c3e50; margin: 0 0 8px 0; font-size: 18px; font-weight: 700;">Ready to Execute?</h3>
+                <p style="color: #7f8c8d; font-size: 14px; margin: 0 0 20px 0;">Review today's recommendations and approve or reject all trades</p>
+                <div style="display: flex; justify-content: center; gap: 16px; flex-wrap: wrap;">
+                    <a href="http://localhost:8000/api/v1/approve/all" style="background: linear-gradient(135deg, #27ae60 0%, #229954 100%); color: #ffffff; padding: 16px 40px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: 700; display: inline-block; box-shadow: 0 4px 12px rgba(39, 174, 96, 0.4); transition: transform 0.2s;">
+                        ✓ Approve All Trades
+                    </a>
+                    <a href="http://localhost:8000/api/v1/approve/reject-all" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: #ffffff; padding: 16px 40px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: 700; display: inline-block; box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4); transition: transform 0.2s;">
+                        ✗ Reject All Trades
+                    </a>
+                </div>
+                <p style="color: #95a5a6; font-size: 12px; margin: 16px 0 0 0;">You can also review each trade individually in the dashboard</p>
+            </div>
+
             <!-- Footer -->
             <div style="background-color: #f8f9fa; padding: 24px; text-align: center; border-top: 1px solid #dee2e6;">
                 <p style="color: #7f8c8d; font-size: 12px; margin: 0;">InvestorMimic Bot • Daily Digest</p>
@@ -320,7 +335,7 @@ def _build_recommendations(recommendations: List[Dict]) -> str:
                     <div style="color: #546e7a; font-size: 12px; font-weight: 600; margin-bottom: 8px;">1️⃣ KEY EVENTS & CATALYSTS</div>
         """
 
-        # Add events with flow arrows
+        # Add events with flow boxes
         events = causality_data.get("events", [])
         for i, event in enumerate(events):
             event_color = {"positive": "#27ae60", "negative": "#e74c3c", "neutral": "#FFC107"}.get(
@@ -331,14 +346,25 @@ def _build_recommendations(recommendations: List[Dict]) -> str:
             )
 
             html += f"""
-                    <div style="display: flex; align-items: center; margin-bottom: 8px;">
-                        <div style="background: {event_bg}; border-left: 3px solid {event_color}; padding: 10px 12px; border-radius: 4px; flex: 1;">
+                    <div style="margin-bottom: 8px;">
+                        <div style="background: {event_bg}; border: 2px solid {event_color}; padding: 12px 14px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.08);">
                             <div style="color: {event_color}; font-size: 10px; font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">{event.get('type', '')} • {event.get('impact', '').upper()}</div>
                             <div style="color: #2c3e50; font-size: 13px; line-height: 1.4;">{event.get('description', '')}</div>
                         </div>
-                        {"<div style='margin: 0 8px; color: " + event_color + "; font-size: 18px;'>↓</div>" if i < len(events) - 1 else ""}
+            """
+
+            # Add connecting box if not last event
+            if i < len(events) - 1:
+                html += f"""
+                        <div style="text-align: center; margin: 6px 0;">
+                            <div style="width: 2px; height: 12px; background: {event_color}; margin: 0 auto;"></div>
+                            <div style="background: {event_color}; color: #ffffff; padding: 4px 12px; border-radius: 4px; display: inline-block; font-size: 11px; font-weight: 700; margin: 4px 0;">↓ LEADS TO</div>
+                            <div style="width: 2px; height: 12px; background: {event_color}; margin: 0 auto;"></div>
+                        </div>
                     </div>
             """
+            else:
+                html += "</div>"
 
         html += """
                 </div>
@@ -372,12 +398,6 @@ def _build_recommendations(recommendations: List[Dict]) -> str:
                 </div>
             </div>
 
-            <!-- Approval Button -->
-            <div style="text-align: center; margin-top: 16px;">
-                <a href="http://localhost:8000/api/v1/approve/{symbol}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-size: 15px; font-weight: 700; display: inline-block; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);">
-                    ✓ Review & Approve Trade
-                </a>
-            </div>
         </div>
         """
 
