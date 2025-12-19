@@ -37,7 +37,7 @@ class HealthChecker:
                 "connections": pool_metrics,
                 "message": "Database pool operational" if healthy else "Pool near capacity",
             }
-        except Exception as e:
+        except ConnectionError as e:
             logger.error(f"Database health check failed: {e}", error=e)
             return {"status": "unhealthy", "error": str(e), "message": "Database connection failed"}
 
@@ -184,7 +184,7 @@ class HealthChecker:
             minutes = (uptime.seconds % 3600) // 60
 
             return f"{days}d {hours}h {minutes}m"
-        except:
+        except Exception:
             return "unknown"
 
     def is_healthy(self) -> bool:

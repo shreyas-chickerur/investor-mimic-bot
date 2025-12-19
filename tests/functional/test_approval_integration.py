@@ -30,7 +30,7 @@ class TestApprovalURLRouting:
     @pytest.fixture
     def client(self):
         """Create FastAPI test client."""
-        from main import app
+        from scripts.main import app
 
         return TestClient(app)
 
@@ -141,7 +141,7 @@ class TestBulkApprovalWorkflow:
     @pytest.fixture
     def client(self):
         """Create FastAPI test client."""
-        from main import app
+        from scripts.main import app
 
         return TestClient(app)
 
@@ -371,7 +371,7 @@ class TestErrorHandling:
     @pytest.fixture
     def client(self):
         """Create FastAPI test client."""
-        from main import app
+        from scripts.main import app
 
         return TestClient(app)
 
@@ -447,7 +447,7 @@ def run_manual_tests():
     print()
 
     from fastapi.testclient import TestClient
-    from main import app
+    from scripts.main import app
 
     client = TestClient(app)
     manager = TradeApprovalManager()
