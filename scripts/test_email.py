@@ -5,32 +5,34 @@ Test email notification configuration.
 This script sends a test email to verify your SMTP settings are correct.
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
-from services.monitoring.email_notifier import EmailNotifier, EmailConfig
+from services.monitoring.email_notifier import EmailConfig, EmailNotifier
+
 
 def main():
     print("=" * 80)
     print("EMAIL CONFIGURATION TEST")
     print("=" * 80)
     print()
-    
+
     # Get email config from environment
     print("Loading configuration from .env...")
-    smtp_server = os.getenv('SMTP_SERVER')
-    smtp_port = os.getenv('SMTP_PORT', '587')
-    smtp_username = os.getenv('SMTP_USERNAME')
-    smtp_password = os.getenv('SMTP_PASSWORD')
-    alert_email = os.getenv('ALERT_EMAIL')
-    
+    smtp_server = os.getenv("SMTP_SERVER")
+    smtp_port = os.getenv("SMTP_PORT", "587")
+    smtp_username = os.getenv("SMTP_USERNAME")
+    smtp_password = os.getenv("SMTP_PASSWORD")
+    alert_email = os.getenv("ALERT_EMAIL")
+
     if not all([smtp_server, smtp_username, smtp_password, alert_email]):
         print("❌ Missing email configuration")
         print()
@@ -41,7 +43,7 @@ def main():
         print("  SMTP_PASSWORD=your-app-password")
         print("  ALERT_EMAIL=your-email@gmail.com")
         sys.exit(1)
-    
+
     print("✓ Configuration loaded")
     print()
     print(f"SMTP Server: {smtp_server}")
@@ -49,7 +51,7 @@ def main():
     print(f"Username: {smtp_username}")
     print(f"Alert Email: {alert_email}")
     print()
-    
+
     # Create email config
     try:
         email_config = EmailConfig(
@@ -57,23 +59,23 @@ def main():
             smtp_port=int(smtp_port),
             smtp_username=smtp_username,
             smtp_password=smtp_password,
-            from_email=smtp_username
+            from_email=smtp_username,
         )
     except Exception as e:
         print(f"❌ Failed to create email config: {e}")
         sys.exit(1)
-    
+
     # Create email notifier
     print("Initializing email notifier...")
     notifier = EmailNotifier(email_config)
     print("✓ Notifier initialized")
     print()
-    
+
     # Send test email
     print("Sending test email...")
     print(f"To: {alert_email}")
     print()
-    
+
     success = notifier.send_alert(
         to_emails=[alert_email],
         subject="Test Email from InvestorMimic Bot",
@@ -90,9 +92,9 @@ Next steps:
 
 Happy investing! 🚀
 """,
-        level="INFO"
+        level="INFO",
     )
-    
+
     print()
     if success:
         print("=" * 80)
@@ -122,6 +124,7 @@ Happy investing! 🚀
         print("  3. Update SMTP_PASSWORD in your .env file")
         print()
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

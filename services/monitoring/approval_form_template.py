@@ -6,7 +6,7 @@ select approve/reject for each, and submit all decisions together.
 """
 
 from datetime import datetime
-from typing import List, Dict
+from typing import Dict, List
 
 
 def get_approval_form_html(
@@ -15,11 +15,11 @@ def get_approval_form_html(
     total_investment: float,
     available_cash: float,
     cash_buffer: float,
-    submit_url: str = ""
+    submit_url: str = "",
 ) -> str:
     """
     Generate interactive HTML form for bulk trade approval.
-    
+
     Args:
         request_id: Approval request ID
         trades: List of proposed trades
@@ -27,20 +27,20 @@ def get_approval_form_html(
         available_cash: Available cash
         cash_buffer: Cash buffer amount
         submit_url: URL to submit the form
-        
+
     Returns:
         HTML form string
     """
-    
+
     # Build trades form rows
     trades_html = ""
     for i, trade in enumerate(trades):
-        symbol = trade['symbol']
-        quantity = trade['quantity']
-        price = trade['estimated_price']
-        value = trade['estimated_value']
-        allocation = trade['allocation_pct']
-        
+        symbol = trade["symbol"]
+        quantity = trade["quantity"]
+        price = trade["estimated_price"]
+        value = trade["estimated_value"]
+        allocation = trade["allocation_pct"]
+
         trades_html += f"""
         <tr>
             <td style="padding: 16px; border-bottom: 1px solid #e0e0e0; font-weight: 600; color: #2c3e50; font-size: 15px;">{symbol}</td>
@@ -62,7 +62,7 @@ def get_approval_form_html(
             </td>
         </tr>
         """
-    
+
     # Interactive HTML form template
     html = f"""
     <!DOCTYPE html>
@@ -293,5 +293,5 @@ def get_approval_form_html(
     </body>
     </html>
     """
-    
+
     return html

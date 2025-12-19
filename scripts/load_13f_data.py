@@ -134,12 +134,7 @@ class SEC13FLoader:
                     filing_url = EXCLUDED.filing_url
                 RETURNING filing_id
                 """,
-                (
-                    investor_id,
-                    meta["filing_date"],
-                    meta["accession_number"],
-                    meta["filing_url"]
-                ),
+                (investor_id, meta["filing_date"], meta["accession_number"], meta["filing_url"]),
             )
             filing_result = self.cur.fetchone()
             if not filing_result:
@@ -150,8 +145,8 @@ class SEC13FLoader:
             logger.info(
                 "Processing filing %s for %s on %s",
                 filing_id,
-                meta['investor'],
-                meta['filing_date']
+                meta["investor"],
+                meta["filing_date"],
             )
 
             # Commit filing insert/update early so holdings processing can't rollback the filing row

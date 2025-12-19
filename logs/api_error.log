@@ -1203,3 +1203,28 @@ WARNING:main:Failed to initialize notification manager: `BaseSettings` has been 
 
 For further information visit https://errors.pydantic.dev/2.10/u/import-error
 INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'main.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:main:Shutting down...
+INFO:     Application shutdown complete.
+INFO:     Finished server process [46934]
+WARNING:  StatReload detected changes in 'tests/test_advanced_features.py'. Reloading...
+INFO:     Started server process [49438]
+INFO:     Waiting for application startup.
+WARNING:main:Failed to initialize notification manager: `BaseSettings` has been moved to the `pydantic-settings` package. See https://docs.pydantic.dev/2.10/migration/#basesettings-has-moved-to-pydantic-settings for more details.
+
+For further information visit https://errors.pydantic.dev/2.10/u/import-error
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'tests/test_advanced_features.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:main:Shutting down...
+INFO:     Application shutdown complete.
+INFO:     Finished server process [49438]
+INFO:     Started server process [49480]
+INFO:     Waiting for application startup.
+WARNING:main:Failed to initialize notification manager: `BaseSettings` has been moved to the `pydantic-settings` package. See https://docs.pydantic.dev/2.10/migration/#basesettings-has-moved-to-pydantic-settings for more details.
+
+For further information visit https://errors.pydantic.dev/2.10/u/import-error
+INFO:     Application startup complete.
