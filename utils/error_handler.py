@@ -7,7 +7,7 @@ Provides consistent error handling across the system.
 import logging
 import traceback
 from functools import wraps
-from typing import Any, Callable, Dict
+from typing import Any, Callable
 
 from utils.monitoring import monitor
 
@@ -15,31 +15,21 @@ from utils.monitoring import monitor
 class SystemError(Exception):
     """Base exception for system errors."""
 
-    pass
-
 
 class APIError(SystemError):
     """API-related errors."""
-
-    pass
 
 
 class DatabaseError(SystemError):
     """Database-related errors."""
 
-    pass
-
 
 class ValidationError(SystemError):
     """Data validation errors."""
 
-    pass
-
 
 class ConfigurationError(SystemError):
     """Configuration errors."""
-
-    pass
 
 
 def handle_errors(default_return: Any = None, raise_on_error: bool = False, log_level: str = "error"):

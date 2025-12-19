@@ -8,7 +8,6 @@ Prevents catastrophic losses and ensures disciplined profit-taking.
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np

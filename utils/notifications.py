@@ -5,7 +5,7 @@ Supports Slack, SMS (Twilio), Telegram, and Push notifications.
 """
 
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 import requests
 

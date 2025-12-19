@@ -29,9 +29,9 @@ def get_all_users() -> list:
     try:
         with get_db_session() as session:
             query = """
-                SELECT DISTINCT email, name 
-                FROM investors 
-                WHERE email IS NOT NULL 
+                SELECT DISTINCT email, name
+                FROM investors
+                WHERE email IS NOT NULL
                   AND email != ''
             """
             result = session.execute(query)

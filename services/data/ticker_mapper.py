@@ -49,8 +49,8 @@ class TickerMapper:
             # Load from securities table
             cur.execute(
                 """
-                SELECT cusip, ticker 
-                FROM securities 
+                SELECT cusip, ticker
+                FROM securities
                 WHERE ticker IS NOT NULL AND ticker != ''
                 AND cusip IS NOT NULL AND cusip != ''
             """

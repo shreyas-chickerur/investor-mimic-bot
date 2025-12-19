@@ -11,7 +11,7 @@ Collects all necessary historical data for backtesting:
 
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -23,7 +23,6 @@ load_dotenv()
 import time
 from typing import Dict, List, Optional
 
-import numpy as np
 import pandas as pd
 import psycopg2
 import requests

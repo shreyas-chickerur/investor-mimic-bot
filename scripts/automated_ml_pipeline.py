@@ -15,11 +15,10 @@ import time
 from datetime import datetime
 from typing import List
 
-from ml.data_collection_pipeline import collect_comprehensive_data, EnhancedDataCollector
-from ml.feature_engineering_pipeline import generate_training_data, FeatureEngineer
+from ml.data_collection_pipeline import EnhancedDataCollector
+from ml.feature_engineering_pipeline import FeatureEngineer
 from ml.continuous_learning_engine import ContinuousLearningEngine
 from utils.enhanced_logging import get_logger
-from utils.monitoring import monitor
 from utils.notifications import notify, NotificationChannel, NotificationPriority
 
 logger = get_logger(__name__)

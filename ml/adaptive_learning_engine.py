@@ -166,7 +166,7 @@ class AdaptiveLearningEngine:
         X, y = self.prepare_training_data(factor_scores, returns, market_features)
 
         # Train models
-        model_scores = self.train_models(X, y)
+        self.train_models(X, y)
 
         # Get feature importance (factor importance)
         if self.feature_importance:
@@ -217,7 +217,7 @@ class AdaptiveLearningEngine:
         X_scaled = self.scaler.transform(X)
 
         # Predict
-        prediction = self.best_model.predict(X_scaled)[0]
+        self.best_model.predict(X_scaled)[0]
 
         # Convert prediction to weights (simplified)
         # In practice, this would be more sophisticated
@@ -461,7 +461,6 @@ class EnsembleOptimizer:
         Returns:
             Optimized weights
         """
-        optimized_weights = {}
 
         # Get predictions from each optimizer
         # (Simplified - would need proper implementation)

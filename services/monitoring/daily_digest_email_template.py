@@ -54,60 +54,60 @@ def get_daily_digest_email_html(market_section: Dict, portfolio_section: Dict, u
     </head>
     <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8f9fa; line-height: 1.6;">
         <div style="max-width: 680px; margin: 20px auto; background-color: #ffffff; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-radius: 8px; overflow: hidden;">
-            
+
             <!-- Header -->
             <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 32px 24px; text-align: center;">
                 <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">Daily Investment Digest</h1>
                 <p style="color: #e0e7ff; margin: 8px 0 0 0; font-size: 14px;">{datetime.now().strftime('%A, %B %d, %Y')}</p>
             </div>
-            
+
             <!-- Greeting -->
             <div style="padding: 24px 24px 16px 24px; border-bottom: 2px solid #f1f3f5;">
                 <p style="color: #2c3e50; font-size: 16px; margin: 0;">Good morning, {user_name}</p>
             </div>
-            
+
             <!-- Market Section -->
             <div style="padding: 24px; border-bottom: 2px solid #f1f3f5;">
                 <h2 style="color: #2c3e50; margin: 0 0 16px 0; font-size: 20px; font-weight: 700;">Market Overview</h2>
                 {market_summary_html}
             </div>
-            
+
             <!-- Headlines Section -->
             <div style="padding: 24px; border-bottom: 2px solid #f1f3f5;">
                 <h2 style="color: #2c3e50; margin: 0 0 16px 0; font-size: 20px; font-weight: 700;">Top Headlines</h2>
                 {headlines_html}
             </div>
-            
+
             <!-- Portfolio Section -->
             <div style="padding: 24px; background-color: #f8f9fa; border-bottom: 2px solid #e9ecef;">
                 <h2 style="color: #2c3e50; margin: 0 0 16px 0; font-size: 20px; font-weight: 700;">Your Portfolio</h2>
                 {performance_html}
             </div>
-            
+
             <!-- Holdings Section -->
             <div style="padding: 24px; border-bottom: 2px solid #f1f3f5;">
                 <h3 style="color: #2c3e50; margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">Current Holdings</h3>
                 {holdings_html}
             </div>
-            
+
             <!-- Recommendations Section -->
             <div style="padding: 24px; background-color: #fff8e1; border-bottom: 2px solid #ffe082;">
                 <h2 style="color: #2c3e50; margin: 0 0 16px 0; font-size: 20px; font-weight: 700;">Today's Recommendations</h2>
                 {recommendations_html}
             </div>
-            
+
             <!-- Flow Charts Section -->
             {flow_charts_html}
-            
+
             <!-- Holdings News Section -->
             {holdings_news_html}
-            
+
             <!-- Footer -->
             <div style="background-color: #f8f9fa; padding: 24px; text-align: center; border-top: 1px solid #dee2e6;">
                 <p style="color: #7f8c8d; font-size: 12px; margin: 0;">InvestorMimic Bot • Daily Digest</p>
                 <p style="color: #95a5a6; font-size: 11px; margin: 8px 0 0 0;">Sent at {datetime.now().strftime('%I:%M %p ET')}</p>
             </div>
-            
+
         </div>
     </body>
     </html>

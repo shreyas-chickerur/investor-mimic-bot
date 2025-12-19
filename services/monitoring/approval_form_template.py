@@ -200,16 +200,16 @@ def get_approval_form_html(
     </head>
     <body>
         <div class="container">
-            
+
             <!-- Header -->
             <div class="header">
                 <h1>Trade Approval Required</h1>
                 <p>InvestorMimic Bot</p>
             </div>
-            
+
             <!-- Main Content -->
             <div class="content">
-                
+
                 <!-- Summary -->
                 <table class="summary-table">
                     <tbody>
@@ -223,19 +223,19 @@ def get_approval_form_html(
                         </tr>
                     </tbody>
                 </table>
-                
+
                 <!-- Instructions -->
                 <div style="background: #e3f2fd; border-left: 4px solid #2196f3; padding: 16px; margin-bottom: 24px; border-radius: 4px;">
                     <p style="margin: 0; color: #1976d2; font-weight: 600; font-size: 14px;">📋 Instructions</p>
                     <p style="margin: 8px 0 0 0; color: #555; font-size: 13px;">Review each trade below and select <strong>Approve</strong> or <strong>Reject</strong>. All trades are pre-selected to approve by default. Click <strong>Submit Decisions</strong> when ready.</p>
                 </div>
-                
+
                 <!-- Proposed Trades Form -->
                 <form id="approvalForm" action="{submit_url}" method="POST">
                     <input type="hidden" name="request_id" value="{request_id}">
-                    
+
                     <h2 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 18px; font-weight: 600;">Proposed Trades</h2>
-                    
+
                     <div style="overflow-x: auto;">
                         <table class="trades-table">
                             <thead>
@@ -253,7 +253,7 @@ def get_approval_form_html(
                             </tbody>
                         </table>
                     </div>
-                    
+
                     <!-- Submit Section -->
                     <div class="submit-section">
                         <button type="submit" class="submit-button">
@@ -261,32 +261,32 @@ def get_approval_form_html(
                         </button>
                         <p class="helper-text">This request expires in 24 hours</p>
                     </div>
-                    
+
                 </form>
-                
+
             </div>
-            
+
             <!-- Footer -->
             <div class="footer">
                 <p>Request ID: {request_id}</p>
                 <p>{datetime.now().strftime('%B %d, %Y at %I:%M %p')}</p>
             </div>
-            
+
         </div>
-        
+
         <script>
             // Calculate and display summary on form change
             document.getElementById('approvalForm').addEventListener('change', function() {{
                 const formData = new FormData(this);
                 let approvedCount = 0;
                 let rejectedCount = 0;
-                
+
                 for (let i = 0; i < {len(trades)}; i++) {{
                     const decision = formData.get('trade_' + i);
                     if (decision === 'approve') approvedCount++;
                     else if (decision === 'reject') rejectedCount++;
                 }}
-                
+
                 console.log('Approved:', approvedCount, 'Rejected:', rejectedCount);
             }});
         </script>

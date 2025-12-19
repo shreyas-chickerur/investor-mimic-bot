@@ -8,14 +8,11 @@ import csv
 import json
 import logging
 import os
-from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 # Third-party imports
 import psycopg2
-from psycopg2 import sql
-from psycopg2.extras import execute_values
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")

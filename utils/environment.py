@@ -35,7 +35,7 @@ class Environment:
             print("✓ Loaded default environment configuration")
         elif not env_file.exists():
             # Neither file exists
-            print(f"⚠ Warning: No .env file found. Using system environment variables only.")
+            print("⚠ Warning: No .env file found. Using system environment variables only.")
 
     @property
     def is_development(self) -> bool:

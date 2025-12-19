@@ -4,10 +4,9 @@ Paper Trading Mode
 Simulates real trades without risking capital, tracking hypothetical portfolio performance.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from decimal import Decimal
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from db.connection_pool import get_db_session
 from utils.enhanced_logging import get_logger
@@ -231,7 +230,7 @@ class PaperTradingEngine:
             with get_db_session() as session:
                 session.execute(
                     """
-                    INSERT INTO trade_history 
+                    INSERT INTO trade_history
                     (ticker, action, quantity, price, total_value, commission, trade_date, status, notes)
                     VALUES (:ticker, :action, :quantity, :price, :total_value, :commission, :trade_date, :status, :notes)
                     """,
@@ -268,7 +267,7 @@ class PaperTradingEngine:
             with get_db_session() as session:
                 session.execute(
                     """
-                    INSERT INTO performance_metrics 
+                    INSERT INTO performance_metrics
                     (date, portfolio_value, cash_balance, total_value, daily_return, cumulative_return)
                     VALUES (:date, :portfolio_value, :cash_balance, :total_value, :daily_return, :cumulative_return)
                     ON CONFLICT (date) DO UPDATE SET
