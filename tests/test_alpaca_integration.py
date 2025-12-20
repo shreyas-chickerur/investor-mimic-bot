@@ -8,6 +8,7 @@ Tests the automated workflow and Alpaca API integration
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src'))
 
 import unittest
 from unittest.mock import Mock, patch, MagicMock
@@ -121,7 +122,7 @@ class TestWorkflowExecution(unittest.TestCase):
     
     def test_run_script_exists(self):
         """Test that run_paper_trading.py exists"""
-        script_path = 'run_paper_trading.py'
+        script_path = 'src/run_paper_trading.py'
         self.assertTrue(os.path.exists(script_path), 
                        f"Run script not found: {script_path}")
         print("✓ Run script exists")
