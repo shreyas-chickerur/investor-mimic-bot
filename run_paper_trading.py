@@ -66,42 +66,31 @@ def main():
     print(f"   Portfolio Value: ${float(account.portfolio_value):,.2f}")
     print(f"   Cash: ${float(account.cash):,.2f}")
     
-    # Fetch historical data
-    print(f"\nFetching historical data for {len(SYMBOLS)} symbols...")
-    end = datetime.now()
-    start = end - timedelta(days=100)
+    # Load historical data from file
+    print(f"\nLoading historical data from training_data.csv...")
+    data_file = project_root / 'data' / 'training_data.csv'
     
-    all_data = []
-    for symbol in SYMBOLS:
-        try:
-            request = StockBarsRequest(
-                symbol_or_symbols=symbol,
-                timeframe=TimeFrame.Day,
-                start=start,
-                end=end
-            )
-            bars = data_client.get_stock_bars(request)
-            if symbol in bars.data:
-                df = bars.df.reset_index()
-                df['symbol'] = symbol
-                all_data.append(df)
-        except Exception as e:
-            print(f"  ⚠️ Error fetching {symbol}: {e}")
-    
-    if not all_data:
-        print("ERROR: No data fetched")
+    if not data_file.exists():
+        print(f"ERROR: Data file not found: {data_file}")
         sys.exit(1)
     
-    combined = pd.concat(all_data, ignore_index=True)
-    print(f"✅ Fetched {len(combined)} bars")
+    combined = pd.read_csv(data_file, index_col=0)
+    print(f"✅ Loaded {len(combined)} rows of data")
+    
+    # Get latest data for each symbol (last 100 days)
+    combined['date'] = pd.to_datetime(combined.index)
+    latest_date = combined['date'].max()
+    cutoff_date = latest_date - timedelta(days=100)
+    combined = combined[combined['date'] >= cutoff_date].copy()
+    
+    print(f"✅ Using {len(combined)} recent bars for {combined['symbol'].nunique()} symbols")
     
     # Initialize trading system
     capital = float(account.cash)
     system = TradingSystem(capital=capital, position_size=0.10, max_positions=10, max_per_symbol=2)
     
     # Prepare data
-    stock_data = combined[['symbol', 'close', 'timestamp']].copy()
-    stock_data['date'] = stock_data['timestamp']
+    stock_data = combined[['symbol', 'close', 'date']].copy()
     
     # Generate signals
     print("\n🔍 Generating signals...")
