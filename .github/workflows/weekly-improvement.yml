@@ -1,0 +1,49 @@
+name: Weekly Improvement Analysis
+
+on:
+  schedule:
+    # Run every Sunday at 8:00 PM ET (Monday 1:00 AM UTC)
+    - cron: '0 1 * * 1'
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  PYTHON_VERSION: "3.8"
+
+jobs:
+  analyze-performance:
+    name: Analyze Trading Performance
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Continuous Improvement Analysis
+        run: |
+          echo "📊 Running weekly performance analysis..."
+          python3 continuous_improvement.py
+          
+      - name: Upload improvement reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: improvement-reports-${{ github.run_number }}
+          path: logs/improvement_report_*.json
+          retention-days: 90
+          if-no-files-found: ignore
+
+      - name: Notify completion
+        if: success()
+        run: |
+          echo "✅ Weekly improvement analysis completed"
