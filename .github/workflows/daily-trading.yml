@@ -1,0 +1,58 @@
+name: Daily Paper Trading
+
+on:
+  schedule:
+    # Run at 10:00 AM ET (3:00 PM UTC) every weekday
+    - cron: '0 15 * * 1-5'
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  PYTHON_VERSION: "3.8"
+
+jobs:
+  run-paper-trading:
+    name: Execute Daily Paper Trading
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Paper Trading Strategy
+        env:
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+          ALPACA_BASE_URL: https://paper-api.alpaca.markets
+        run: |
+          echo "🚀 Starting daily paper trading run..."
+          python3 bin/alpaca_paper_trading.py
+          
+      - name: Upload logs (if any)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trading-logs-${{ github.run_number }}
+          path: logs/
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Notify completion
+        if: success()
+        run: |
+          echo "✅ Paper trading run completed successfully"
+          
+      - name: Notify failure
+        if: failure()
+        run: |
+          echo "❌ Paper trading run failed - check logs"
