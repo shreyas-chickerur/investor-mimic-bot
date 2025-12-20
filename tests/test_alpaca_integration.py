@@ -158,13 +158,17 @@ class TestErrorHandling(unittest.TestCase):
         
         system = TradingSystem(capital=10000)
         
-        # Create empty dataframe with required columns
-        empty_df = pd.DataFrame(columns=['symbol', 'close', 'date'])
+        # Create dataframe with minimal data (not enough for indicators)
+        minimal_df = pd.DataFrame({
+            'symbol': ['AAPL'] * 5,
+            'close': [150.0, 151.0, 149.0, 150.5, 151.5],
+            'date': pd.date_range('2024-01-01', periods=5)
+        })
         
-        # Should handle empty dataframe gracefully
-        signals = system.generate_signals(empty_df)
+        # Should handle insufficient data gracefully (need 60+ days for indicators)
+        signals = system.generate_signals(minimal_df)
         self.assertEqual(len(signals), 0)
-        print("✓ Empty dataframe handled correctly")
+        print("✓ Insufficient data handled correctly")
     
     def test_invalid_data_handling(self):
         """Test handling of invalid data"""
