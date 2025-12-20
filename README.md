@@ -25,7 +25,7 @@ cp .env.example .env
 # Runs daily at 10 AM ET Monday-Friday
 
 # Or run manually
-python3 src/run_paper_trading.py
+python3 src/main.py
 
 # Run tests
 python3 tests/test_trading_system.py
@@ -55,9 +55,9 @@ python3 src/continuous_improvement.py
 
 ```
 investor-mimic-bot/
-├── src/                    # Source code
+├── src/                    # Source code (2 files)
 │   ├── trading_system.py          # Core trading logic
-│   ├── run_paper_trading.py       # Alpaca integration
+│   ├── main.py                    # Execution & logging
 │   └── continuous_improvement.py  # Performance analysis
 ├── tests/                  # Test suite (32 tests)
 ├── scripts/                # Data collection
