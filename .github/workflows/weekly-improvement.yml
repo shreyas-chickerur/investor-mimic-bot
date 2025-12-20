@@ -30,9 +30,11 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run Continuous Improvement Analysis
+        id: analysis
         run: |
           echo "📊 Running weekly performance analysis..."
-          python3 src/continuous_improvement.py
+          python3 src/continuous_improvement.py > analysis_output.txt 2>&1
+          cat analysis_output.txt
           
       - name: Upload improvement reports
         if: always()
@@ -43,7 +45,30 @@ jobs:
           retention-days: 90
           if-no-files-found: ignore
 
+      - name: Send Email Notification
+        if: always()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "📊 Weekly Trading Performance Analysis - ${{ github.run_number }}"
+          to: ${{ secrets.EMAIL_TO }}
+          from: Trading System <${{ secrets.EMAIL_USERNAME }}>
+          body: |
+            Weekly Improvement Analysis Complete
+            
+            Run: ${{ github.run_number }}
+            Status: ${{ job.status }}
+            Time: ${{ github.event.repository.updated_at }}
+            
+            View full report: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            
+            Download detailed analysis from the artifacts section.
+          attachments: analysis_output.txt
+
       - name: Notify completion
         if: success()
         run: |
-          echo "✅ Weekly improvement analysis completed"
+          echo "✅ Weekly improvement analysis completed and email sent"
