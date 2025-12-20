@@ -36,7 +36,7 @@ jobs:
           ALPACA_BASE_URL: https://paper-api.alpaca.markets
         run: |
           echo "🚀 Starting daily paper trading run..."
-          python3 run_paper_trading.py
+          python3 src/run_paper_trading.py
           
       - name: Upload logs (if any)
         if: always()

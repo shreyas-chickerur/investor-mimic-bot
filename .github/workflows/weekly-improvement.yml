@@ -32,7 +32,7 @@ jobs:
       - name: Run Continuous Improvement Analysis
         run: |
           echo "📊 Running weekly performance analysis..."
-          python3 continuous_improvement.py
+          python3 src/continuous_improvement.py
           
       - name: Upload improvement reports
         if: always()
