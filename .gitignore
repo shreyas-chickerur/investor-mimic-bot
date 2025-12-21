@@ -16,3 +16,12 @@ htmlcov/
 .DS_Store
 logs/
 *.log
+
+# Generated HTML files (test outputs)
+*.html
+
+# Encryption key
+data/.encryption_key
+
+# Database files (contain sensitive data)
+data/*.db

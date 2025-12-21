@@ -1,0 +1,50 @@
+name: Multi-Strategy Daily Execution
+
+on:
+  schedule:
+    # Run every weekday at 9:00 AM ET (2:00 PM UTC)
+    - cron: '0 14 * * 1-5'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  run-strategies:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.8'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+      
+      - name: Run automated workflow
+        env:
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+          EMAIL_USERNAME: ${{ secrets.EMAIL_USERNAME }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+        run: |
+          python3 scripts/automated_morning_workflow.py
+      
+      - name: Upload database
+        uses: actions/upload-artifact@v3
+        with:
+          name: strategy-database
+          path: data/strategy_performance.db
+          retention-days: 90
+      
+      - name: Commit database changes
+        run: |
+          git config user.name "Strategy Bot"
+          git config user.email "bot@strategies.com"
+          git add data/
+          git diff --quiet && git diff --staged --quiet || git commit -m "Update strategy performance database - $(date +'%Y-%m-%d')"
+          git push
+        continue-on-error: true
