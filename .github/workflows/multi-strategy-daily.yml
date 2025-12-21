@@ -38,7 +38,7 @@ jobs:
           python3 scripts/automated_morning_workflow.py
       
       - name: Upload database
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: strategy-database
           path: data/strategy_performance.db
