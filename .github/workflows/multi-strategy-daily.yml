@@ -23,17 +23,22 @@ jobs:
         run: |
           pip install -r requirements.txt
       
+      - name: Create .env file
+        run: |
+          echo "ALPACA_API_KEY=${{ secrets.ALPACA_API_KEY }}" >> .env
+          echo "ALPACA_SECRET_KEY=${{ secrets.ALPACA_SECRET_KEY }}" >> .env
+          echo "ALPACA_BASE_URL=https://paper-api.alpaca.markets" >> .env
+          echo "EMAIL_USERNAME=${{ secrets.EMAIL_USERNAME }}" >> .env
+          echo "EMAIL_PASSWORD=${{ secrets.EMAIL_PASSWORD }}" >> .env
+          echo "EMAIL_TO=${{ secrets.EMAIL_TO }}" >> .env
+          echo "APPROVAL_BASE_URL=http://localhost:8000/approve" >> .env
+          echo "AUTO_TRADE=false" >> .env
+      
       - name: Initialize strategies database
         run: |
           python3 scripts/setup_strategies.py
       
       - name: Run automated workflow
-        env:
-          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
-          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
-          EMAIL_USERNAME: ${{ secrets.EMAIL_USERNAME }}
-          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
-          EMAIL_TO: ${{ secrets.EMAIL_TO }}
         run: |
           python3 scripts/automated_morning_workflow.py
       
