@@ -1,10 +1,10 @@
-name: Daily Paper Trading
+name: Daily Paper Trading (DISABLED - Using Multi-Strategy)
 
 on:
-  schedule:
-    # Run at 10:00 AM ET (3:00 PM UTC) every weekday
-    - cron: '0 15 * * 1-5'
-  workflow_dispatch:  # Allow manual trigger
+  # Disabled - now using multi-strategy-daily.yml
+  # schedule:
+  #   - cron: '0 15 * * 1-5'
+  workflow_dispatch:  # Allow manual trigger for testing
 
 env:
   PYTHON_VERSION: "3.8"
