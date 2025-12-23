@@ -11,7 +11,41 @@ Automated trading system that executes RSI-based mean reversion strategy on Alpa
 
 ## Quick Start
 
-### GitHub Actions (Recommended - Runs in Cloud)
+### Using Makefile (Easiest)
+
+```bash
+# 1. Install dependencies
+make install
+
+# 2. Configure credentials
+cp .env.example .env
+# Edit .env with your Alpaca API keys
+
+# 3. Sync database
+make sync-db
+
+# 4. Run all strategies
+make run
+
+# 5. View dashboard
+make dashboard
+# Open http://localhost:5000 in browser
+```
+
+### All Available Commands
+```bash
+make help              # Show all commands
+make run               # Run all 5 strategies
+make dashboard         # Web dashboard
+make analyze           # Analyze signals
+make view              # CLI performance
+make logs              # View logs
+make test              # Run tests
+```
+
+See `docs/MAKEFILE_GUIDE.md` for complete command reference.
+
+### GitHub Actions (Cloud Deployment)
 
 1. **Add GitHub Secrets:**
    - Go to: Settings → Secrets and variables → Actions
@@ -19,24 +53,7 @@ Automated trading system that executes RSI-based mean reversion strategy on Alpa
 
 2. **Enable Workflow:**
    - Push code to GitHub
-   - Workflow runs automatically weekdays at 10 AM ET
-
-3. **Manual Trigger (Optional):**
-   - Go to Actions → Daily Paper Trading → Run workflow
-
-### Local Testing
-
-```bash
-# 1. Install dependencies
-pip install -r requirements.txt
-
-# 2. Configure credentials
-cp .env.example .env
-# Edit .env with your Alpaca API keys
-
-# 3. Run trading system
-python3 src/main.py
-```
+   - Runs automatically weekdays at 10 AM ET
 
 ## What It Does
 
@@ -59,16 +76,25 @@ Each strategy operates independently with $20K capital allocation.
 
 ## Monitoring
 
+### Web Dashboard (Recommended)
 ```bash
-# View multi-strategy performance dashboard
-python3 scripts/view_strategy_performance.py
-
-# View logs
-tail -f logs/multi_strategy.log
-
-# Or check Alpaca dashboard
-https://app.alpaca.markets/paper/dashboard/overview
+make dashboard
+# Opens http://localhost:5000
 ```
+- Real-time performance tracking
+- All 5 strategies in one view
+- Auto-refreshes every 30 seconds
+- Beautiful, easy-to-read interface
+
+### Command Line
+```bash
+make view              # Strategy performance
+make logs              # Recent logs
+make positions         # Current positions
+```
+
+### Alpaca Dashboard
+https://app.alpaca.markets/paper/dashboard/overview
 
 ## Documentation
 
