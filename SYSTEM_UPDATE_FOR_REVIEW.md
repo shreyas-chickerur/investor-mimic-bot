@@ -1,8 +1,9 @@
-# Trading System Update - Post-Expert Review Implementation
+# Trading System Update - Expert Review Round 2
 
 **Date:** December 23, 2025  
-**Status:** All Expert Recommendations Implemented  
-**Assessment:** Elevated from "Retail Bot" to "Junior Quant System"
+**Status:** Phase 1-3 Complete, Integration & Testing Pending  
+**Expert Assessment:** "Well-designed junior quant system with professional risk architecture"  
+**Upgrade Path:** → Mid-Level Quant System
 
 ---
 
@@ -492,18 +493,52 @@ All calculated during data update, available to all strategies.
 
 ---
 
-## Request for Feedback
+## Expert Feedback Received ✅
 
-Please review this updated system and provide:
+**See `EXPERT_FEEDBACK_ROUND2.md` for complete analysis**
 
-1. **Critical Flaws** - Any major issues we've introduced?
-2. **Integration Approach** - Best way to integrate new modules?
-3. **Testing Strategy** - How to validate these improvements?
-4. **Priority Fixes** - What should we tackle next?
-5. **Performance Expectations** - Realistic Sharpe ratio targets?
-6. **Risk Assessment** - Are we properly managing risk?
-7. **Next Steps** - What would elevate this to "mid-level quant system"?
+### Key Findings
+
+**Assessment Upgrade:**  
+*"Well-designed junior quant system with professional risk architecture"*
+
+**What Was Fixed Well:**
+- ✅ Execution timing (4:15 PM) - "massive credibility upgrade"
+- ✅ RSI strategy - "now legit, one of strongest strategies"
+- ✅ Volatility sizing - "likely improves Sharpe most"
+- ✅ Portfolio risk controls - "major architectural upgrade"
+- ✅ Correlation filter - "ahead of most retail systems"
+- ✅ ML redesign - "correct modeling choice"
+
+**New Weakest Link:**
+- Integration and validated backtesting (not strategy logic anymore)
+
+**Realistic Performance Targets:**
+- Sharpe: 0.8-1.3 (excellent)
+- Max Drawdown: 10-20%
+- Annual Return: 10-25%
+- Win Rate: 45-55%
+
+**Path to Mid-Level Quant (In Order):**
+1. Walk-forward portfolio backtesting (MANDATORY)
+2. Regime detection (next best ROI)
+3. Dynamic strategy weighting
+4. Catastrophe stop losses
 
 ---
 
-**The system has been transformed from a basic retail bot into a professional-grade junior quant system. All expert recommendations have been implemented. Ready for final integration and testing.**
+## Next Steps (Updated)
+
+### Immediate Priorities
+1. ⏳ **Integrate new modules** into `multi_strategy_main.py`
+2. ⏳ **Build backtest framework** (portfolio-level, all filters/costs)
+3. ⏳ **Implement regime detection** (VIX-based)
+
+### Integration Guidance (Expert)
+- ✅ Keep modular design (DO NOT merge into monolith)
+- ✅ Execution flow: signals → correlation → risk → sizing → costs → execute → metrics
+- ✅ Each step explicit and ordered
+
+**Status:** Ready to transition from junior to mid-level quant system  
+**Timeline:** 1-2 weeks with focused work  
+**Blocker:** Integration and backtesting
