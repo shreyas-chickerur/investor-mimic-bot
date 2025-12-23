@@ -1,24 +1,18 @@
 #!/usr/bin/env python3
 """
-Fetch Extended Historical Data
-Downloads 10+ years of historical data for all 36 stocks using Alpha Vantage
+Fetch Extended Historical Data using yfinance (FREE)
+Downloads 15 years of historical data for all 36 stocks
 
-CONFIGURATION:
-- Minimum 10 years (3650 days)
-- Preferred 15 years (5475 days)
-- Daily OHLCV bars
-- Same 36 large-cap US stocks
+yfinance is free and provides full historical data without API limits
 """
-import os
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 import pandas as pd
-import time
+import numpy as np
 from datetime import datetime, timedelta
 import logging
-import requests
 
 logging.basicConfig(
     level=logging.INFO,
@@ -26,99 +20,67 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# 36 large-cap stocks (same as current universe)
+# Install yfinance if needed
+try:
+    import yfinance as yf
+except ImportError:
+    logger.info("Installing yfinance...")
+    import subprocess
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "yfinance"])
+    import yfinance as yf
+
+# 36 large-cap stocks
 STOCK_SYMBOLS = [
-    'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'BRK.B',
+    'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'BRK-B',
     'UNH', 'JNJ', 'JPM', 'V', 'PG', 'MA', 'HD', 'CVX',
     'MRK', 'ABBV', 'PEP', 'KO', 'AVGO', 'COST', 'WMT', 'MCD',
     'CSCO', 'ACN', 'LLY', 'TMO', 'DHR', 'ABT', 'NKE', 'DIS',
     'VZ', 'ADBE', 'NFLX', 'CRM'
 ]
 
-class ExtendedDataFetcher:
-    """Fetch extended historical data"""
+class YFinanceDataFetcher:
+    """Fetch extended historical data using yfinance (free)"""
     
-    def __init__(self, api_key: str = None, years: int = 15):
-        """
-        Initialize fetcher
-        
-        Args:
-            api_key: Alpha Vantage API key
-            years: Years of history to fetch (default 15)
-        """
-        self.api_key = api_key or os.getenv('ALPHA_VANTAGE_API_KEY')
-        if not self.api_key:
-            raise ValueError("ALPHA_VANTAGE_API_KEY not set")
-        
+    def __init__(self, years: int = 15):
         self.years = years
-        self.base_url = "https://www.alphavantage.co/query"
-        
-        logger.info(f"Fetcher initialized: {years} years of data")
+        logger.info(f"YFinance fetcher initialized: {years} years of data")
     
     def fetch_stock_data(self, symbol: str) -> pd.DataFrame:
-        """
-        Fetch full historical data for a symbol
-        
-        Args:
-            symbol: Stock symbol
-            
-        Returns:
-            DataFrame with OHLCV data
-        """
+        """Fetch historical data for a symbol"""
         logger.info(f"Fetching {symbol}...")
         
-        params = {
-            'function': 'TIME_SERIES_DAILY_ADJUSTED',
-            'symbol': symbol,
-            'outputsize': 'full',  # Get full history
-            'apikey': self.api_key
-        }
-        
         try:
-            response = requests.get(self.base_url, params=params, timeout=30)
-            response.raise_for_status()
-            data = response.json()
+            # Calculate date range
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=self.years * 365)
             
-            if 'Time Series (Daily)' not in data:
-                if 'Note' in data:
-                    logger.warning(f"{symbol}: API rate limit hit - {data['Note']}")
-                    return None
-                elif 'Error Message' in data:
-                    logger.error(f"{symbol}: {data['Error Message']}")
-                    return None
-                elif 'Information' in data:
-                    logger.error(f"{symbol}: {data['Information']}")
-                    return None
-                else:
-                    logger.error(f"{symbol}: Unexpected response format")
-                    logger.debug(f"Response keys: {list(data.keys())}")
-                    if data:
-                        logger.debug(f"First key content: {str(data[list(data.keys())[0]])[:200]}")
-                    return None
+            # Fetch data
+            ticker = yf.Ticker(symbol)
+            df = ticker.history(start=start_date, end=end_date, interval='1d')
             
-            # Parse time series
-            ts_data = data['Time Series (Daily)']
+            if len(df) == 0:
+                logger.warning(f"  {symbol}: No data returned")
+                return None
             
-            records = []
-            for date_str, values in ts_data.items():
-                records.append({
-                    'date': date_str,
-                    'symbol': symbol,
-                    'open': float(values['1. open']),
-                    'high': float(values['2. high']),
-                    'low': float(values['3. low']),
-                    'close': float(values['4. close']),
-                    'adjusted_close': float(values['5. adjusted close']),
-                    'volume': int(values['6. volume'])
-                })
+            # Rename columns to match our format
+            df = df.reset_index()
+            df = df.rename(columns={
+                'Date': 'date',
+                'Open': 'open',
+                'High': 'high',
+                'Low': 'low',
+                'Close': 'close',
+                'Volume': 'volume'
+            })
             
-            df = pd.DataFrame(records)
-            df['date'] = pd.to_datetime(df['date'])
-            df = df.sort_values('date')
+            # Add symbol column
+            df['symbol'] = symbol
             
-            # Filter to requested years
-            cutoff_date = datetime.now() - timedelta(days=self.years * 365)
-            df = df[df['date'] >= cutoff_date]
+            # Keep only needed columns
+            df = df[['date', 'symbol', 'open', 'high', 'low', 'close', 'volume']]
+            
+            # Add adjusted_close (same as close for now)
+            df['adjusted_close'] = df['close']
             
             logger.info(f"  {symbol}: {len(df)} days ({df['date'].min().date()} to {df['date'].max().date()})")
             
@@ -128,18 +90,9 @@ class ExtendedDataFetcher:
             logger.error(f"Error fetching {symbol}: {e}")
             return None
     
-    def fetch_all_stocks(self, delay_seconds: int = 12) -> pd.DataFrame:
-        """
-        Fetch data for all stocks
-        
-        Args:
-            delay_seconds: Delay between API calls (Alpha Vantage limit: 5 calls/min)
-            
-        Returns:
-            Combined DataFrame
-        """
-        logger.info(f"Fetching {len(STOCK_SYMBOLS)} stocks with {delay_seconds}s delay...")
-        logger.info(f"Estimated time: {len(STOCK_SYMBOLS) * delay_seconds / 60:.1f} minutes")
+    def fetch_all_stocks(self) -> pd.DataFrame:
+        """Fetch data for all stocks"""
+        logger.info(f"Fetching {len(STOCK_SYMBOLS)} stocks...")
         
         all_data = []
         
@@ -150,11 +103,6 @@ class ExtendedDataFetcher:
             
             if df is not None and len(df) > 0:
                 all_data.append(df)
-            
-            # Delay to respect API limits
-            if i < len(STOCK_SYMBOLS):
-                logger.info(f"Waiting {delay_seconds}s...")
-                time.sleep(delay_seconds)
         
         if not all_data:
             raise ValueError("No data fetched for any symbol")
@@ -163,7 +111,7 @@ class ExtendedDataFetcher:
         combined = pd.concat(all_data, ignore_index=True)
         combined = combined.sort_values(['date', 'symbol'])
         
-        logger.info(f"\nTotal records: {len(combined)}")
+        logger.info(f"\nTotal records: {len(combined):,}")
         logger.info(f"Date range: {combined['date'].min().date()} to {combined['date'].max().date()}")
         logger.info(f"Symbols: {combined['symbol'].nunique()}")
         
@@ -209,7 +157,7 @@ class ExtendedDataFetcher:
             tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
             symbol_data['atr_20'] = tr.rolling(window=20).mean()
             
-            # VWAP (daily)
+            # VWAP (daily reset)
             symbol_data['vwap'] = (symbol_data['close'] * symbol_data['volume']).cumsum() / symbol_data['volume'].cumsum()
             
             # ADX (simplified)
@@ -241,15 +189,15 @@ class ExtendedDataFetcher:
 def main():
     """Fetch extended historical data"""
     logger.info("="*80)
-    logger.info("EXTENDED HISTORICAL DATA FETCH")
+    logger.info("EXTENDED HISTORICAL DATA FETCH (yfinance)")
     logger.info("="*80)
     
     # Initialize fetcher
-    fetcher = ExtendedDataFetcher(years=15)
+    fetcher = YFinanceDataFetcher(years=15)
     
     # Fetch all stock data
     logger.info("\nFetching stock data...")
-    df = fetcher.fetch_all_stocks(delay_seconds=12)
+    df = fetcher.fetch_all_stocks()
     
     # Calculate technical indicators
     df = fetcher.calculate_technical_indicators(df)

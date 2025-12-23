@@ -80,6 +80,7 @@ class MLMomentumStrategy(TradingStrategy):
         
         if len(X_train) > 50:
             X_train = self.scaler.fit_transform(X_train)
+            # Train model
             self.model.fit(X_train, y_train)
             self.is_trained = True
     
