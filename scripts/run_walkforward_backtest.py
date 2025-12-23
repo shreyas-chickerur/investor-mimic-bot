@@ -357,6 +357,12 @@ class WalkForwardBacktester:
         with open(metrics_file, 'w') as f:
             # Convert to JSON-serializable format
             metrics = results['aggregate_results'].copy()
+            # Convert numpy types to Python types
+            for key, value in metrics.items():
+                if hasattr(value, 'item'):  # numpy scalar
+                    metrics[key] = value.item()
+                elif isinstance(value, (np.integer, np.floating)):
+                    metrics[key] = float(value)
             json.dump(metrics, f, indent=2)
         logger.info(f"Saved metrics to {metrics_file}")
         
