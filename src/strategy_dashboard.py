@@ -294,7 +294,7 @@ def get_strategy_detail(strategy_id):
         'trades': trades
     })
 
-def run_dashboard(host='0.0.0.0', port=5000):
+def run_dashboard(host='0.0.0.0', port=8080):
     """Run the dashboard server"""
     print("="*80)
     print("STRATEGY DASHBOARD")

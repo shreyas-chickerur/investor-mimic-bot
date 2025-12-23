@@ -1,116 +1,102 @@
-# Automated Trading System
+# Investor Mimic Bot
 
-RSI + Volatility paper trading system with Alpaca integration.
-
-**Expected Performance:** $14,670/year on $10K capital (146.7% return)
-
----
-
-## Quick Start
-
-### Install
-```bash
-pip3 install -r requirements.txt
-```
-
-### Configure
-```bash
-cp .env.example .env
-# Add your Alpaca paper trading API keys to .env
-```
-
-### Run
-```bash
-# Paper trading (automated via GitHub Actions)
-# Runs daily at 10 AM ET Monday-Friday
-
-# Or run manually
-python3 src/main.py
-
-# Run tests
-python3 tests/test_trading_system.py
-python3 tests/test_alpaca_integration.py
-
-# Analyze performance
-python3 src/continuous_improvement.py
-```
-
----
+Automated trading system that executes RSI-based mean reversion strategy on Alpaca paper trading.
 
 ## Strategy
 
-- **Buy Signal:** RSI < 30 AND Volatility < 1.25× median
-- **Holding Period:** 20 days
-- **Position Size:** 10% per trade
-- **Max Positions:** 10 (max 2 per symbol)
+- **Entry:** RSI < 30 + Volatility < 1.25x rolling median
+- **Exit:** Hold for 20 days
+- **Position Size:** 10% of capital per trade
+- **Max Positions:** 10 concurrent, 2 per symbol
 
-**Performance:**
-- Win Rate: 63.8%
-- Avg Return: 2.62%
-- Sharpe Ratio: 4.35
+## Quick Start
 
----
+### GitHub Actions (Recommended - Runs in Cloud)
+
+1. **Add GitHub Secrets:**
+   - Go to: Settings → Secrets and variables → Actions
+   - Add `ALPACA_API_KEY` and `ALPACA_SECRET_KEY`
+
+2. **Enable Workflow:**
+   - Push code to GitHub
+   - Workflow runs automatically weekdays at 10 AM ET
+
+3. **Manual Trigger (Optional):**
+   - Go to Actions → Daily Paper Trading → Run workflow
+
+### Local Testing
+
+```bash
+# 1. Install dependencies
+pip install -r requirements.txt
+
+# 2. Configure credentials
+cp .env.example .env
+# Edit .env with your Alpaca API keys
+
+# 3. Run trading system
+python3 src/main.py
+```
+
+## What It Does
+
+✅ Scans 36 stocks daily for oversold conditions  
+✅ Executes buy orders when signals are generated  
+✅ Automatically closes positions after 20 days  
+✅ Tracks all trades in local database  
+✅ Logs all activity for monitoring  
+
+## Monitoring
+
+```bash
+# View logs
+tail -f logs/trading.log
+
+# Check positions
+sqlite3 data/trading_system.db "SELECT * FROM positions WHERE status='open'"
+
+# Or check Alpaca dashboard
+https://app.alpaca.markets/paper/dashboard/overview
+```
+
+## Documentation
+
+See `docs/GUIDE.md` for complete documentation including:
+- Configuration options
+- Troubleshooting
+- Performance metrics
+- Security best practices
 
 ## Project Structure
 
 ```
 investor-mimic-bot/
-├── src/                    # Source code (2 files)
-│   ├── trading_system.py          # Core trading logic
-│   ├── main.py                    # Execution & logging
-│   └── continuous_improvement.py  # Performance analysis
-├── tests/                  # Test suite (32 tests)
-├── scripts/                # Data collection
-├── data/                   # Historical data & database
-├── docs/                   # Documentation
-├── .github/workflows/      # Automation
-│   ├── daily-trading.yml          # Daily execution
-│   └── weekly-improvement.yml     # Weekly analysis
-├── requirements.txt        # Dependencies
-└── README.md              # This file
+├── src/
+│   ├── main.py              # Main trading execution
+│   ├── trading_system.py    # Core strategy logic
+│   └── strategies/          # Strategy implementations
+├── scripts/
+│   ├── sync_database.py     # Sync with Alpaca
+│   └── update_data.py       # Update market data
+├── data/
+│   ├── training_data.csv    # Historical data
+│   └── trading_system.db    # Position tracking
+└── logs/                    # Execution logs
 ```
 
----
+## Deployment
 
-## Automated Execution
+**GitHub Actions** - Automated cloud execution
+- Runs weekdays at 10:00 AM ET
+- No computer needed
+- Free tier (2,000 minutes/month)
+- Logs saved for 30 days
 
-**Daily Trading:** Runs weekdays at 10:00 AM ET  
-**Weekly Analysis:** Runs Sundays at 8:00 PM ET
+**Monitor:** https://github.com/YOUR_USERNAME/investor-mimic-bot/actions
 
-Monitor at: https://github.com/shreyas-chickerur/investor-mimic-bot/actions
+## Status
 
----
-
-## Documentation
-
-- **Deployment Guide:** `docs/DEPLOYMENT.md`
-- **Test Coverage:** 32 tests (100% passing)
-- **Alpaca Dashboard:** https://app.alpaca.markets/paper
-
----
-
-## Development
-
-```bash
-# Run tests
-python3 tests/test_trading_system.py
-python3 tests/test_alpaca_integration.py
-
-# Analyze performance
-python3 src/continuous_improvement.py
-
-# Update data
-python3 scripts/collect_historical_data.py
-```
-
----
-
-## Production Ready
-
-✅ Automated daily execution  
-✅ Comprehensive test coverage  
-✅ Performance monitoring  
-✅ Paper trading validation  
-✅ Continuous improvement
-
-**Status:** Production-ready, running on Alpaca paper trading
+✅ **Active** - Configured for GitHub Actions  
+✅ Workflow ready for cloud deployment  
+✅ 4 positions currently held  
+✅ All systems operational
