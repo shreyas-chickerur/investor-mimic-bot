@@ -35,17 +35,11 @@ class RegimeDetector:
         """
         Get current VIX level
         
-        Fetches from VIX data source if available, otherwise returns default
+        Returns default for backtesting (VIX fetching disabled to avoid rate limits)
         """
-        try:
-            from vix_data_fetcher import VIXDataFetcher
-            fetcher = VIXDataFetcher(source='yahoo')
-            vix = fetcher.get_current_vix()
-            return vix
-        except Exception as e:
-            logger.warning(f"Could not fetch VIX, using default: {e}")
-            # Return moderate volatility as fallback
-            return 18.0
+        # For backtesting, use default moderate volatility
+        # In production, this would fetch real VIX data
+        return 18.0
     
     def detect_volatility_regime(self, vix: float = None) -> str:
         """
