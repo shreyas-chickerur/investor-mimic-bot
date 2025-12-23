@@ -49,7 +49,7 @@ jobs:
           retention-days: 30
           if-no-files-found: ignore
 
-      - name: Upload databases
+      - name: Upload databases (timestamped)
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -57,7 +57,18 @@ jobs:
           path: |
             data/trading_system.db
             data/strategy_performance.db
-          retention-days: 7
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Upload databases (latest)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trading-databases-latest
+          path: |
+            data/trading_system.db
+            data/strategy_performance.db
+          retention-days: 90
           if-no-files-found: ignore
       
       - name: Generate Performance Report

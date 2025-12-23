@@ -55,6 +55,12 @@ See `docs/MAKEFILE_GUIDE.md` for complete command reference.
    - Push code to GitHub
    - Runs automatically weekdays at 10 AM ET
 
+**Data Freshness Guarantees:**
+- ✅ Market data updated every run (0 minutes stale)
+- ✅ Database synced with Alpaca before trading
+- ✅ Performance history persisted via artifacts
+- ✅ See `docs/DATABASE_PERSISTENCE.md` for details
+
 ## What It Does
 
 ✅ Runs 5 independent trading strategies simultaneously  
