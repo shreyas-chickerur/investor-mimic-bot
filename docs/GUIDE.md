@@ -66,6 +66,18 @@ investor-mimic-bot/
 - **Entry Signal:** RSI < 30 + Volatility < 1.25x median
 - **Exit Signal:** 20 days elapsed
 
+### Email Notifications
+
+### Setup (Optional)
+Add these GitHub Secrets to receive daily email summaries:
+- `SENDER_EMAIL` - Your email address
+- `SENDER_PASSWORD` - App password (Gmail: https://myaccount.google.com/apppasswords)
+- `RECIPIENT_EMAIL` - Where to send notifications
+- `SMTP_SERVER` - `smtp.gmail.com` for Gmail
+- `SMTP_PORT` - `587` for Gmail
+
+If not configured, system runs normally without emails.
+
 ### Database Tracking
 - Open positions
 - Trade history
