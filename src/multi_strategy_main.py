@@ -27,7 +27,8 @@ from alpaca.trading.requests import MarketOrderRequest
 from alpaca.trading.enums import OrderSide, TimeInForce
 import pandas as pd
 
-# Setup logging
+# Setup logging - CRITICAL FIX: Ensure logs directory exists
+Path('logs').mkdir(exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -53,16 +54,17 @@ class MultiStrategyRunner:
         
         self.trading_client = TradingClient(api_key, secret_key, paper=True)
         
-        # Get account info
+        # Get account info - CRITICAL FIX: Use portfolio value, not just cash
         account = self.trading_client.get_account()
-        self.total_capital = float(account.cash)
         self.portfolio_value = float(account.portfolio_value)
+        self.cash_available = float(account.cash)
         
-        logger.info(f"Portfolio: ${self.portfolio_value:.2f}, Cash: ${self.total_capital:.2f}")
+        logger.info(f"Portfolio: ${self.portfolio_value:.2f}, Cash: ${self.cash_available:.2f}")
     
     def initialize_strategies(self):
         """Initialize all 5 strategies with equal capital allocation"""
-        capital_per_strategy = self.total_capital / 5
+        # CRITICAL FIX: Use portfolio value for allocation, not just cash
+        capital_per_strategy = self.portfolio_value / 5
         
         # Check if strategies already exist
         existing = self.db.get_all_strategies()
@@ -71,7 +73,10 @@ class MultiStrategyRunner:
             logger.info(f"Found {len(existing)} existing strategies")
             strategies = []
             for strat in existing:
-                strategies.append(self._create_strategy_instance(strat['id'], strat['name'], capital_per_strategy))
+                strategy = self._create_strategy_instance(strat['id'], strat['name'], capital_per_strategy)
+                # CRITICAL FIX: Load positions from Alpaca for each strategy
+                self._load_strategy_positions(strategy)
+                strategies.append(strategy)
             return strategies
         
         # Create new strategies
@@ -89,10 +94,42 @@ class MultiStrategyRunner:
         for name, desc, strategy_class in strategy_configs:
             strategy_id = self.db.create_strategy(name, desc, capital_per_strategy)
             strategy = strategy_class(strategy_id, capital_per_strategy)
+            # CRITICAL FIX: Load positions for new strategies too
+            self._load_strategy_positions(strategy)
             strategies.append(strategy)
             logger.info(f"  Created: {name} (ID: {strategy_id}, Capital: ${capital_per_strategy:.2f})")
         
         return strategies
+    
+    def _load_strategy_positions(self, strategy):
+        """Load current positions for a strategy from database"""
+        try:
+            # Get all open trades for this strategy
+            trades = self.db.get_strategy_trades(strategy.strategy_id)
+            
+            # Build positions dict
+            positions = {}
+            for trade in trades:
+                if trade['action'] == 'BUY':
+                    symbol = trade['symbol']
+                    shares = trade['shares']
+                    if symbol in positions:
+                        positions[symbol] += shares
+                    else:
+                        positions[symbol] = shares
+                elif trade['action'] == 'SELL':
+                    symbol = trade['symbol']
+                    shares = trade['shares']
+                    if symbol in positions:
+                        positions[symbol] -= shares
+                        if positions[symbol] <= 0:
+                            del positions[symbol]
+            
+            strategy.positions = positions
+            logger.info(f"  Loaded {len(positions)} positions for {strategy.name}")
+        except Exception as e:
+            logger.error(f"Error loading positions for {strategy.name}: {e}")
+            strategy.positions = {}
     
     def _create_strategy_instance(self, strategy_id, name, capital):
         """Create strategy instance based on name"""

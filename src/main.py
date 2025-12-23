@@ -1,5 +1,22 @@
 #!/usr/bin/env python3
 """
+DEPRECATED: Use multi_strategy_main.py instead
+
+This file is kept for backwards compatibility but should not be used.
+The multi-strategy system (multi_strategy_main.py) is the production version.
+"""
+import sys
+print("=" * 80)
+print("⚠️  WARNING: This script is DEPRECATED")
+print("=" * 80)
+print("Please use: python3 src/multi_strategy_main.py")
+print("Or run: make run")
+print("=" * 80)
+sys.exit(1)
+
+# DEPRECATED CODE BELOW - DO NOT USE
+"""
+OLD SINGLE-STRATEGY CODE - DEPRECATED
 Automated Trading System - Main Execution
 Consolidates paper trading execution and logging
 """
