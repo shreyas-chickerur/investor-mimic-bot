@@ -1,10 +1,9 @@
-name: Daily Paper Trading (DISABLED - Using Multi-Strategy)
+name: Daily Paper Trading
 
 on:
-  # Disabled - now using multi-strategy-daily.yml
-  # schedule:
-  #   - cron: '0 15 * * 1-5'
-  workflow_dispatch:  # Allow manual trigger for testing
+  schedule:
+    - cron: '0 15 * * 1-5'  # 10:00 AM ET (3:00 PM UTC) on weekdays
+  workflow_dispatch:  # Allow manual trigger
 
 env:
   PYTHON_VERSION: "3.8"
@@ -29,22 +28,34 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Create required directories
+        run: |
+          mkdir -p logs data
+
       - name: Run Paper Trading Strategy
         env:
           ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
-          ALPACA_BASE_URL: https://paper-api.alpaca.markets
         run: |
           echo "🚀 Starting daily paper trading run..."
           python3 src/main.py
           
-      - name: Upload logs (if any)
+      - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: trading-logs-${{ github.run_number }}
           path: logs/
           retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Upload database
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trading-database-${{ github.run_number }}
+          path: data/trading_system.db
+          retention-days: 7
           if-no-files-found: ignore
 
       - name: Notify completion

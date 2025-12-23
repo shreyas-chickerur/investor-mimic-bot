@@ -1,127 +1,120 @@
-# Quick Start Guide - Tomorrow Morning
+# Quick Start Guide
 
-## 🚀 **OPTION 1: Multi-Strategy Testing (Automated)**
+Get the trading system running in the cloud with GitHub Actions.
 
-Run 5 strategies automatically, get summary email:
+## Prerequisites
 
-```bash
-# Run this command tomorrow morning
-python3 scripts/automated_morning_workflow.py
-```
+- GitHub account
+- Alpaca API account (free paper trading)
 
-**What happens:**
-- ✅ All 5 strategies execute automatically
-- ✅ Trades placed on paper account
-- ✅ Summary email sent to your inbox
-- ✅ No manual approval needed
+## GitHub Actions Setup (Recommended)
 
-**View results:**
-```bash
-./START_DASHBOARD.sh
-# Opens at http://localhost:5000
-```
+### 1. Add GitHub Secrets
 
----
+Go to your repository: **Settings → Secrets and variables → Actions**
 
-## 📧 **OPTION 2: Manual Approval Workflow**
+Click **New repository secret** and add:
 
-Get email, manually approve/reject trades:
+**Secret 1:**
+- Name: `ALPACA_API_KEY`
+- Value: Your Alpaca API key
+
+**Secret 2:**
+- Name: `ALPACA_SECRET_KEY`
+- Value: Your Alpaca secret key
+
+### 2. Push Code to GitHub
 
 ```bash
-# Send approval email
-python3 scripts/test_morning_workflow.py
+git add .
+git commit -m "Setup automated trading system"
+git push origin main
 ```
 
-**What happens:**
-- ✅ Email sent with proposed trades
-- ⏸️ You click link and approve/reject
-- ✅ Approved trades execute
-- ✅ Confirmation email sent after submission
+### 3. Verify Workflow
 
-**Approval server (must be running):**
-```bash
-python3 src/approval_server.py
-```
+- Go to: **Actions** tab in your repository
+- You should see "Daily Paper Trading" workflow
+- It will run automatically weekdays at 10:00 AM ET
 
----
+### 4. Manual Test (Optional)
 
-## 📊 **Admin Dashboard**
+- Click **Daily Paper Trading** workflow
+- Click **Run workflow** button
+- Select branch and click **Run workflow**
+- Watch it execute in real-time
 
-View all 5 strategies competing:
-
-```bash
-./START_DASHBOARD.sh
-```
-
-**Or:**
-```bash
-python3 src/strategy_dashboard.py
-```
-
-**Then open:** http://localhost:5000
-
-**Shows:**
-- 🏆 Strategy rankings
-- 📈 Performance charts
-- 💰 Portfolio values
-- 📊 Return percentages
-- 🔢 Trade counts
-
----
-
-## ⚙️ **What's Configured**
-
-### Email Settings (`.env`)
-```
-EMAIL_USERNAME=schickerur2020@gmail.com
-EMAIL_PASSWORD=guigmczeokncwpin
-EMAIL_TO=schickerur2020@gmail.com
-```
-
-### Strategies Initialized
-1. RSI Mean Reversion - $20,000
-2. ML Momentum - $20,000
-3. News Sentiment - $20,000
-4. MA Crossover - $20,000
-5. Volatility Breakout - $20,000
-
-### Databases
-- Strategy performance: `data/strategy_performance.db`
-- Trading system: `data/trading_system.db`
-
----
-
-## 📅 **Recommended: Daily Schedule**
-
-### Every Morning (Automated)
-```bash
-python3 scripts/automated_morning_workflow.py
-```
-
-### Anytime (Check Results)
-```bash
-./START_DASHBOARD.sh
-```
-
----
-
-## ✅ **Summary**
-
-**Tomorrow morning, just run ONE command:**
+## Local Testing (Optional)
 
 ```bash
-python3 scripts/automated_morning_workflow.py
+# 1. Install dependencies
+pip install -r requirements.txt
+
+# 2. Configure credentials
+cp .env.example .env
+# Edit .env with your Alpaca API keys
+
+# 3. Run trading system
+python3 src/main.py
 ```
 
-**This will:**
-1. ✅ Run all 5 strategies
-2. ✅ Execute trades automatically
-3. ✅ Send you summary email
-4. ✅ Track performance in database
+## Verify It's Working
 
-**Then check dashboard anytime:**
-```bash
-./START_DASHBOARD.sh
-```
+### GitHub Actions
+✅ Go to **Actions** tab - see workflow runs  
+✅ Click on a run - view detailed logs  
+✅ Download artifacts - get trading logs  
 
-**That's it! No manual work needed.** 🎯
+### Alpaca Dashboard
+✅ Check positions: https://app.alpaca.markets/paper  
+✅ View orders and executions  
+
+## What Happens Daily
+
+**10:00 AM ET (Weekdays)** - GitHub Actions triggers automatically:
+
+1. **Setup** - Spins up Ubuntu container
+2. **Install** - Installs Python dependencies
+3. **Execute** - Runs trading strategy
+4. **Scan** - Checks 36 stocks for RSI < 30 signals
+5. **Trade** - Submits buy orders to Alpaca
+6. **Exit** - Closes positions held for 20+ days
+7. **Log** - Saves logs as artifacts (30 days)
+8. **Cleanup** - Container shuts down
+
+**Cost:** FREE (GitHub Actions free tier)
+
+## Monitoring
+
+### View Execution History
+- Go to **Actions** tab
+- See all past runs with timestamps
+- Green checkmark = success
+- Red X = failure
+
+### View Logs
+- Click on any workflow run
+- Click **Execute Daily Paper Trading**
+- Expand **Run Paper Trading Strategy**
+- See full output
+
+### Download Logs
+- Scroll to bottom of workflow run
+- Under **Artifacts**, download `trading-logs-XXX`
+
+## Troubleshooting
+
+**Workflow not running?**  
+- Check GitHub Actions is enabled in Settings
+- Verify secrets are set correctly
+- Check workflow file syntax
+
+**No signals generated?**  
+Normal - strategy only buys during oversold + low volatility conditions.
+
+**Authentication errors?**  
+Re-add secrets in GitHub Settings → Secrets and variables → Actions
+
+## Next Steps
+
+See `docs/GUIDE.md` for complete documentation.
