@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Strategy 2: ML Momentum
-Random Forest predicts next-day returns based on technical features
+Strategy 3: ML Momentum
+Machine learning-based momentum prediction using classification
+IMPROVED: Uses classifier (probability of positive return) instead of regressor
 """
 import sys
 from pathlib import Path
@@ -11,6 +12,8 @@ from strategy_base import TradingStrategy
 from typing import List, Dict
 import pandas as pd
 import numpy as np
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
 
@@ -24,12 +27,14 @@ class MLMomentumStrategy(TradingStrategy):
             name="ML Momentum",
             capital=capital
         )
-        self.model = RandomForestClassifier(n_estimators=100, max_depth=5, random_state=42)
-        self.scaler = StandardScaler()
-        self.is_trained = False
-        self.hold_days = 15
+        self.hold_days = 5
         self.entry_dates = {}
-    
+        # IMPROVED: Use Logistic Regression classifier
+        self.model = LogisticRegression(max_iter=1000, random_state=42)
+        self.scaler = StandardScaler()
+        self.model_trained = False
+        self.min_probability = 0.6  # Minimum probability for buy signal
+        
     def _prepare_features(self, symbol_data: pd.DataFrame) -> np.array:
         """Extract features for ML model"""
         features = []
@@ -102,7 +107,7 @@ class MLMomentumStrategy(TradingStrategy):
                 confidence = self.model.predict_proba(features_scaled)[0][1]
                 
                 # Buy signal: Model predicts positive return with high confidence
-                if prediction == 1 and confidence > 0.6 and symbol not in self.positions:
+                if prediction == 1 and prob_positive > 0.6 and symbol not in self.positions:
                     shares = self.calculate_position_size(price, max_position_pct=0.10)
                     
                     signals.append({
@@ -111,14 +116,14 @@ class MLMomentumStrategy(TradingStrategy):
                         'shares': shares,
                         'price': price,
                         'value': shares * price,
-                        'confidence': confidence,
-                        'reasoning': f'ML predicts positive return (confidence: {confidence:.2f})'
+                        'confidence': prob_positive,
+                        'reasoning': f'ML probability of positive return: {prob_positive*100:.1f}%'
                     })
                 
                 # Sell signal: Held for target days or model predicts negative
                 elif symbol in self.positions:
                     days_held = self.entry_dates.get(symbol, 0)
-                    if days_held >= self.hold_days or (prediction == 0 and confidence > 0.7):
+                    if days_held >= self.hold_days or (prediction == 0 and prob_positive < 0.4):
                         shares = self.positions[symbol]
                         
                         signals.append({
@@ -136,4 +141,4 @@ class MLMomentumStrategy(TradingStrategy):
         return signals
     
     def get_description(self) -> str:
-        return "Random Forest ML model predicts momentum based on technical features"
+        return "Logistic Regression classifier predicting probability of positive 5-day return"

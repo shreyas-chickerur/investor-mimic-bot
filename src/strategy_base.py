@@ -38,11 +38,34 @@ class TradingStrategy(ABC):
         """Return strategy description"""
         pass
     
-    def calculate_position_size(self, price: float, max_position_pct: float = 0.1) -> int:
-        """Calculate number of shares to buy"""
-        max_investment = self.capital * max_position_pct
-        shares = int(max_investment / price)
-        return max(1, shares)
+    def calculate_position_size(self, price: float, atr: float = None, max_position_pct: float = 0.10) -> int:
+        """
+        Calculate number of shares to buy with volatility adjustment
+        
+        Args:
+            price: Current stock price
+            atr: Average True Range (20-day) for volatility adjustment
+            max_position_pct: Maximum percentage of capital for this position
+            
+        Returns:
+            Number of shares to buy
+        """
+        # VOLATILITY-ADJUSTED SIZING: Target 1% portfolio volatility per position
+        if atr and atr > 0:
+            # Position size inversely proportional to volatility (ATR)
+            # Target: 1% portfolio risk per position
+            target_risk_pct = 0.01  # 1% of portfolio
+            position_value = (self.capital * target_risk_pct) / (atr / price)
+            
+            # Cap at max_position_pct of capital
+            max_value = self.capital * max_position_pct
+            position_value = min(position_value, max_value)
+        else:
+            # Fallback to fixed percentage if no ATR
+            position_value = self.capital * max_position_pct
+        
+        shares = int(position_value / price)
+        return max(shares, 0)
     
     def update_capital(self, amount: float):
         """Update available capital"""

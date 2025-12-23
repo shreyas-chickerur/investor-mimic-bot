@@ -44,12 +44,14 @@ class RSIMeanReversionStrategy(TradingStrategy):
             # IMPROVED Buy signal: RSI < 30 AND turning upward AND not too far from VWAP
             if symbol not in self.positions:
                 distance_from_vwap = abs(price - vwap) / vwap
+                atr = symbol_data.get('atr_20', None)
                 
                 if (rsi < self.rsi_threshold and 
                     rsi_slope > 0 and  # RSI turning upward (not catching falling knife)
                     distance_from_vwap < 0.05):  # Within 5% of VWAP
                     
-                    shares = self.calculate_position_size(price, max_position_pct=0.10)
+                    # Volatility-adjusted position sizing
+                    shares = self.calculate_position_size(price, atr=atr, max_position_pct=0.10)
                     
                     signals.append({
                         'symbol': symbol,

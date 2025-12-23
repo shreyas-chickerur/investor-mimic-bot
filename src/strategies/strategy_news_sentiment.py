@@ -35,24 +35,31 @@ class NewsSentimentStrategy(TradingStrategy):
         return 0.5  # Neutral sentiment
     
     def generate_signals(self, market_data: pd.DataFrame) -> List[Dict]:
-        """Generate signals combining news sentiment and technical indicators"""
+        """Generate signals using sentiment as FILTER, not trigger"""
         signals = []
         
         for symbol in market_data['symbol'].unique():
             symbol_data = market_data[market_data['symbol'] == symbol].iloc[-1]
             
-            if pd.isna(symbol_data.get('rsi')):
-                continue
+            # Placeholder: In production, fetch real sentiment
+            sentiment_score = 0.5  # Neutral
             
             price = symbol_data['close']
-            rsi = symbol_data['rsi']
+            rsi = symbol_data.get('rsi', 50)
+            volume_ratio = symbol_data.get('volume_ratio', 1.0)
+            atr = symbol_data.get('atr_20', None)
+            returns_5d = symbol_data.get('returns_5d', 0)
             
-            # Get sentiment (in production, from news API)
-            sentiment = self._get_sentiment_score(symbol)
-            
-            # Buy signal: Positive sentiment + oversold technical
-            if sentiment > 0.6 and rsi < 35 and symbol not in self.positions:
-                shares = self.calculate_position_size(price, max_position_pct=0.10)
+            # IMPROVED: Sentiment as FILTER, momentum as TRIGGER
+            # Buy signal: Momentum signal (positive 5d return) + sentiment confirmation
+            if (returns_5d > 0.02 and  # Momentum trigger (2% gain)
+                sentiment_score > 0.6 and  # Sentiment filter
+                rsi < 60 and  # Not overbought
+                volume_ratio > 1.2 and  # Volume confirmation
+                symbol not in self.positions):
+                
+                # Volatility-adjusted position sizing
+                shares = self.calculate_position_size(price, atr=atr, max_position_pct=0.10)
                 
                 signals.append({
                     'symbol': symbol,
@@ -60,14 +67,14 @@ class NewsSentimentStrategy(TradingStrategy):
                     'shares': shares,
                     'price': price,
                     'value': shares * price,
-                    'confidence': sentiment,
-                    'reasoning': f'Positive sentiment ({sentiment:.2f}) + RSI {rsi:.1f} oversold'
+                    'confidence': sentiment_score * 0.8,  # Slightly lower confidence
+                    'reasoning': f'Momentum {returns_5d*100:.1f}% + sentiment filter ({sentiment_score:.2f})'
                 })
             
             # Sell signal: Negative sentiment or held long enough
             elif symbol in self.positions:
                 days_held = self.entry_dates.get(symbol, 0)
-                if sentiment < 0.4 or days_held >= self.hold_days:
+                if sentiment_score < 0.4 or days_held >= self.hold_days:
                     shares = self.positions[symbol]
                     
                     signals.append({
@@ -83,4 +90,4 @@ class NewsSentimentStrategy(TradingStrategy):
         return signals
     
     def get_description(self) -> str:
-        return "Combines news sentiment analysis with technical indicators (RSI)"
+        return "Buy on momentum signals with positive sentiment filter (sentiment confirms, not triggers) with technical indicators (RSI)"

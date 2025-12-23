@@ -36,7 +36,7 @@ class VolatilityBreakoutStrategy(TradingStrategy):
         return ma, upper_band, lower_band
     
     def generate_signals(self, market_data: pd.DataFrame) -> List[Dict]:
-        """Generate signals based on volatility breakouts"""
+        """Generate signals based on volatility breakouts with false breakout protection"""
         signals = []
         
         for symbol in market_data['symbol'].unique():
@@ -49,17 +49,25 @@ class VolatilityBreakoutStrategy(TradingStrategy):
             ma, upper_band, lower_band = self._calculate_bollinger_bands(symbol_data['close'])
             
             current = symbol_data.iloc[-1]
+            previous = symbol_data.iloc[-2]
             price = current['close']
+            prev_price = previous['close']
             volume = current['volume']
             avg_volume = symbol_data['volume'].iloc[-20:].mean()
+            atr = current.get('atr_20', None)
             
             current_upper = upper_band.iloc[-1]
+            prev_upper = upper_band.iloc[-2]
             current_lower = lower_band.iloc[-1]
             
-            # Buy signal: Price breaks above upper band with high volume
-            if (price > current_upper and volume > avg_volume * 1.5 and 
+            # IMPROVED Buy signal: 2 consecutive closes above upper band (false breakout protection)
+            if (price > current_upper and 
+                prev_price > prev_upper and  # 2 consecutive bars above band
+                volume > avg_volume * 1.5 and 
                 symbol not in self.positions):
-                shares = self.calculate_position_size(price, max_position_pct=0.10)
+                
+                # Volatility-adjusted position sizing
+                shares = self.calculate_position_size(price, atr=atr, max_position_pct=0.10)
                 
                 signals.append({
                     'symbol': symbol,
@@ -68,7 +76,7 @@ class VolatilityBreakoutStrategy(TradingStrategy):
                     'price': price,
                     'value': shares * price,
                     'confidence': min((volume / avg_volume) / 2, 1.0),
-                    'reasoning': f'Breakout above BB upper band with {volume/avg_volume:.1f}x volume'
+                    'reasoning': f'2-bar breakout above BB with {volume/avg_volume:.1f}x volume (false breakout protected)'
                 })
             
             # Sell signal: Price drops below lower band or held long enough
@@ -90,4 +98,4 @@ class VolatilityBreakoutStrategy(TradingStrategy):
         return signals
     
     def get_description(self) -> str:
-        return f"Buy on breakouts above Bollinger Bands with high volume"
+        return f"Buy on 2-bar breakouts above Bollinger Bands with high volume (false breakout protected)"
