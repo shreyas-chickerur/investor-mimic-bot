@@ -39,7 +39,7 @@ class RSIMeanReversionStrategy(TradingStrategy):
             latest = symbol_data.iloc[-1]
             
             # Check if we have RSI
-            if 'rsi' not in symbol_data.columns or pd.isna(latest['rsi']):
+            if 'rsi' not in latest.index or pd.isna(latest['rsi']):
                 continue
             
             rsi = latest['rsi']
