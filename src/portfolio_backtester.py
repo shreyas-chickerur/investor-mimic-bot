@@ -208,7 +208,7 @@ class PortfolioBacktester:
         
         return cash
     
-    def _execute_sell(self, signal: Dict, cash: float, cost_model, date) -> float:
+    def _execute_sell(self, signal: Dict, cash: float, cost_model, date, signal_tracer=None) -> float:
         """Execute a sell order"""
         symbol = signal['symbol']
         

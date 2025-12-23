@@ -1,0 +1,69 @@
+guardrails:
+  min_trade_value: 100.0
+  zero_shares_error: true
+logging:
+  execution_details: true
+  rejection_reasons: true
+  signal_flow_trace: true
+signal_injection_templates:
+- action: BUY
+  confidence: 0.7
+  price: 150.0
+  reasoning: Synthetic validation signal
+  shares: 10
+  symbol: AAPL
+- action: BUY
+  confidence: 0.8
+  price: 350.0
+  reasoning: Synthetic validation signal
+  shares: 5
+  symbol: MSFT
+- action: BUY
+  confidence: 0.75
+  price: 140.0
+  reasoning: Synthetic validation signal
+  shares: 8
+  symbol: GOOGL
+strategy_overrides:
+  rsi_mean_reversion:
+    production:
+      hold_days: 20
+      rsi_threshold: 30
+      slope_required: true
+    validation_sweeps:
+    - hold_days: 20
+      name: conservative
+      rsi_threshold: 30
+      slope_required: true
+    - hold_days: 15
+      name: moderate
+      rsi_threshold: 35
+      slope_required: true
+    - hold_days: 10
+      name: relaxed
+      rsi_threshold: 40
+      slope_required: false
+validation_mode:
+  parameter_sweep:
+    enabled: false
+  signal_injection:
+    enabled: true
+    inject_count: 5
+  trace_signals:
+    enabled: true
+    log_file: logs/signal_flow_trace.log
+  volatile_periods:
+    enabled: false
+volatile_test_periods:
+- description: COVID-19 market crash and recovery
+  end: '2020-06-30'
+  name: COVID_CRASH
+  start: '2020-02-15'
+- description: 2022 bear market
+  end: '2022-10-15'
+  name: BEAR_2022
+  start: '2022-01-01'
+- description: Q4 2018 correction
+  end: '2018-12-31'
+  name: CORRECTION_2018
+  start: '2018-10-01'
