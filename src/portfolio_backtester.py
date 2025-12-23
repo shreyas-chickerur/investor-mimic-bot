@@ -54,7 +54,9 @@ class PortfolioBacktester:
                     regime_detector,
                     correlation_filter,
                     portfolio_risk,
-                    cost_model) -> Dict:
+                    cost_model,
+                    signal_injection_engine=None,
+                    signal_tracer=None) -> Dict:
         """
         Run portfolio-level backtest
         
