@@ -15,20 +15,23 @@ class CorrelationFilter:
     
     def __init__(self, 
                  correlation_window: int = 60,  # 60-day rolling correlation
+                 short_window: int = 20,  # Short-term override window
                  max_correlation: float = 0.7):  # Reject if correlation > 0.7
         """
         Initialize correlation filter
         
         Args:
             correlation_window: Days to use for correlation calculation
+            short_window: Short-term window for regime shift detection
             max_correlation: Maximum allowed correlation with existing positions
         """
         self.correlation_window = correlation_window
+        self.short_window = short_window
         self.max_correlation = max_correlation
         self.price_history = {}  # {symbol: [prices]}
         
         logger.info(f"Correlation Filter: window={correlation_window}d, "
-                   f"max_corr={max_correlation}")
+                   f"short={short_window}d, max_corr={max_correlation}")
     
     def update_price_history(self, symbol: str, prices: pd.Series):
         """Update price history for a symbol"""
@@ -66,9 +69,48 @@ class CorrelationFilter:
         
         return 0.0
     
+    def calculate_correlation_multi_window(self, symbol1: str, symbol2: str) -> tuple:
+        """
+        Calculate correlation on both long and short windows
+        
+        Returns:
+            (long_window_corr, short_window_corr)
+        """
+        if symbol1 not in self.price_history or symbol2 not in self.price_history:
+            return 0.0, 0.0
+        
+        prices1 = self.price_history[symbol1]
+        prices2 = self.price_history[symbol2]
+        
+        # Long window correlation
+        min_len = min(len(prices1), len(prices2))
+        if min_len >= self.correlation_window:
+            p1_long = prices1[-self.correlation_window:]
+            p2_long = prices2[-self.correlation_window:]
+            returns1_long = np.diff(p1_long) / p1_long[:-1]
+            returns2_long = np.diff(p2_long) / p2_long[:-1]
+            long_corr = np.corrcoef(returns1_long, returns2_long)[0, 1] if len(returns1_long) > 0 else 0.0
+            long_corr = long_corr if not np.isnan(long_corr) else 0.0
+        else:
+            long_corr = 0.0
+        
+        # Short window correlation (regime shift detection)
+        if min_len >= self.short_window:
+            p1_short = prices1[-self.short_window:]
+            p2_short = prices2[-self.short_window:]
+            returns1_short = np.diff(p1_short) / p1_short[:-1]
+            returns2_short = np.diff(p2_short) / p2_short[:-1]
+            short_corr = np.corrcoef(returns1_short, returns2_short)[0, 1] if len(returns1_short) > 0 else 0.0
+            short_corr = short_corr if not np.isnan(short_corr) else 0.0
+        else:
+            short_corr = 0.0
+        
+        return long_corr, short_corr
+    
     def check_correlation(self, new_symbol: str, existing_symbols: List[str]) -> tuple:
         """
         Check if new symbol is too correlated with existing positions
+        Uses both long and short windows to catch regime shifts
         
         Args:
             new_symbol: Symbol to check
@@ -84,16 +126,18 @@ class CorrelationFilter:
         max_corr_symbol = None
         
         for existing_symbol in existing_symbols:
-            corr = self.calculate_correlation(new_symbol, existing_symbol)
+            long_corr, short_corr = self.calculate_correlation_multi_window(new_symbol, existing_symbol)
             
-            if abs(corr) > abs(max_corr):
-                max_corr = corr
+            # Track maximum correlation
+            if abs(long_corr) > abs(max_corr):
+                max_corr = long_corr
                 max_corr_symbol = existing_symbol
             
-            if abs(corr) > self.max_correlation:
-                logger.warning(f"Rejecting {new_symbol}: correlation {corr:.2f} with "
-                             f"{existing_symbol} exceeds {self.max_correlation}")
-                return False, corr, existing_symbol
+            # Reject if EITHER window exceeds threshold (catches regime shifts)
+            if abs(long_corr) > self.max_correlation or abs(short_corr) > self.max_correlation:
+                logger.warning(f"Rejecting {new_symbol}: correlation with {existing_symbol} "
+                             f"(60d: {long_corr:.2f}, 20d: {short_corr:.2f}) exceeds {self.max_correlation}")
+                return False, max(abs(long_corr), abs(short_corr)), existing_symbol
         
         return True, max_corr, max_corr_symbol
     

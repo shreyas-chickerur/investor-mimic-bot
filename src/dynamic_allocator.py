@@ -1,0 +1,145 @@
+#!/usr/bin/env python3
+"""
+Dynamic Strategy Allocation
+Adjusts capital allocation based on strategy performance
+"""
+import logging
+from typing import Dict, List
+import numpy as np
+
+logger = logging.getLogger(__name__)
+
+class DynamicAllocator:
+    """Dynamically allocates capital based on strategy performance"""
+    
+    def __init__(self, 
+                 total_capital: float,
+                 lookback_days: int = 60,
+                 max_allocation_pct: float = 0.35,
+                 min_allocation_pct: float = 0.10):
+        """
+        Initialize dynamic allocator
+        
+        Args:
+            total_capital: Total portfolio capital
+            lookback_days: Days to look back for performance calculation
+            max_allocation_pct: Maximum allocation to any strategy (35%)
+            min_allocation_pct: Minimum allocation to any strategy (10%)
+        """
+        self.total_capital = total_capital
+        self.lookback_days = lookback_days
+        self.max_allocation = max_allocation_pct
+        self.min_allocation = min_allocation_pct
+        
+        logger.info(f"Dynamic Allocator: max={max_allocation_pct*100}%, min={min_allocation_pct*100}%")
+    
+    def calculate_sharpe_ratios(self, strategy_performance: Dict[int, List[float]]) -> Dict[int, float]:
+        """
+        Calculate Sharpe ratio for each strategy
+        
+        Args:
+            strategy_performance: Dict of {strategy_id: [daily_returns]}
+            
+        Returns:
+            Dict of {strategy_id: sharpe_ratio}
+        """
+        sharpe_ratios = {}
+        
+        for strategy_id, returns in strategy_performance.items():
+            if len(returns) < 20:  # Need minimum data
+                sharpe_ratios[strategy_id] = 0.0
+                continue
+            
+            returns_array = np.array(returns)
+            
+            if returns_array.std() == 0:
+                sharpe_ratios[strategy_id] = 0.0
+            else:
+                # Annualized Sharpe ratio
+                sharpe = np.sqrt(252) * (returns_array.mean() / returns_array.std())
+                sharpe_ratios[strategy_id] = max(sharpe, 0.0)  # Floor at 0
+        
+        return sharpe_ratios
+    
+    def calculate_allocations(self, 
+                             strategy_ids: List[int],
+                             strategy_performance: Dict[int, List[float]] = None) -> Dict[int, float]:
+        """
+        Calculate dynamic capital allocations
+        
+        Args:
+            strategy_ids: List of strategy IDs
+            strategy_performance: Optional performance data for dynamic weighting
+            
+        Returns:
+            Dict of {strategy_id: capital_allocation}
+        """
+        num_strategies = len(strategy_ids)
+        
+        # If no performance data, use equal weighting
+        if not strategy_performance or all(len(perf) < 20 for perf in strategy_performance.values()):
+            equal_allocation = self.total_capital / num_strategies
+            allocations = {sid: equal_allocation for sid in strategy_ids}
+            logger.info(f"Using equal allocation: ${equal_allocation:,.2f} per strategy")
+            return allocations
+        
+        # Calculate Sharpe ratios
+        sharpe_ratios = self.calculate_sharpe_ratios(strategy_performance)
+        
+        # If all Sharpe ratios are 0 or negative, use equal weighting
+        total_sharpe = sum(sharpe_ratios.values())
+        if total_sharpe <= 0:
+            equal_allocation = self.total_capital / num_strategies
+            allocations = {sid: equal_allocation for sid in strategy_ids}
+            logger.info(f"All Sharpe ≤ 0, using equal allocation: ${equal_allocation:,.2f}")
+            return allocations
+        
+        # Weight by Sharpe ratio
+        raw_allocations = {}
+        for strategy_id in strategy_ids:
+            sharpe = sharpe_ratios.get(strategy_id, 0.0)
+            weight = sharpe / total_sharpe
+            
+            # Apply min/max constraints
+            weight = max(self.min_allocation, min(self.max_allocation, weight))
+            raw_allocations[strategy_id] = weight
+        
+        # Normalize to sum to 1.0
+        total_weight = sum(raw_allocations.values())
+        normalized_allocations = {
+            sid: (weight / total_weight) * self.total_capital
+            for sid, weight in raw_allocations.items()
+        }
+        
+        # Log allocations
+        for strategy_id, allocation in normalized_allocations.items():
+            sharpe = sharpe_ratios.get(strategy_id, 0.0)
+            pct = (allocation / self.total_capital) * 100
+            logger.info(f"Strategy {strategy_id}: ${allocation:,.2f} ({pct:.1f}%, Sharpe: {sharpe:.2f})")
+        
+        return normalized_allocations
+    
+    def rebalance_needed(self, 
+                        current_allocations: Dict[int, float],
+                        target_allocations: Dict[int, float],
+                        threshold: float = 0.10) -> bool:
+        """
+        Check if rebalancing is needed
+        
+        Args:
+            current_allocations: Current capital allocations
+            target_allocations: Target allocations
+            threshold: Rebalance if any strategy differs by more than this (10%)
+            
+        Returns:
+            True if rebalancing needed
+        """
+        for strategy_id, target in target_allocations.items():
+            current = current_allocations.get(strategy_id, 0)
+            
+            if abs(current - target) / target > threshold:
+                logger.info(f"Rebalance needed: Strategy {strategy_id} "
+                          f"current=${current:,.2f} vs target=${target:,.2f}")
+                return True
+        
+        return False
