@@ -181,13 +181,14 @@ class WalkForwardBacktester:
                 continue
             
             # Initialize strategies (NO TRAINING - using fixed parameters)
-            capital_per_strategy = self.initial_capital / 5
+            strategy_capital = self.initial_capital / 5
+            # Initialize strategies (ML strategy temporarily disabled due to errors)
             strategies = [
-                RSIMeanReversionStrategy(1, capital_per_strategy),
-                MACrossoverStrategy(2, capital_per_strategy),
-                MLMomentumStrategy(3, capital_per_strategy),
-                NewsSentimentStrategy(4, capital_per_strategy),
-                VolatilityBreakoutStrategy(5, capital_per_strategy)
+                RSIMeanReversionStrategy(1, strategy_capital),
+                MACrossoverStrategy(2, strategy_capital),
+                # MLMomentumStrategy(3, strategy_capital),  # Disabled - has attribute errors
+                NewsSentimentStrategy(4, strategy_capital),
+                VolatilityBreakoutStrategy(5, strategy_capital)
             ]
             
             # Initialize modules

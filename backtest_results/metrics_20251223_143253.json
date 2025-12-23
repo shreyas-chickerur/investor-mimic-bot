@@ -1,0 +1,17 @@
+{
+  "initial_capital": 100000,
+  "final_value": 100000,
+  "total_return_pct": 0.0,
+  "cagr": 0.0,
+  "annual_volatility": 0.0,
+  "sharpe_ratio": 0,
+  "sortino_ratio": 0,
+  "calmar_ratio": 0,
+  "max_drawdown_pct": 0.0,
+  "win_rate_pct": 0,
+  "avg_win": 0,
+  "avg_loss": 0,
+  "profit_factor": 0,
+  "total_trades": 0,
+  "num_windows": 13
+}
