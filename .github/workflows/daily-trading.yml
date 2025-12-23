@@ -32,13 +32,13 @@ jobs:
         run: |
           mkdir -p logs data
 
-      - name: Run Paper Trading Strategy
+      - name: Run Multi-Strategy Trading System
         env:
           ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
         run: |
-          echo "🚀 Starting daily paper trading run..."
-          python3 src/main.py
+          echo "🚀 Starting multi-strategy trading run..."
+          python3 src/multi_strategy_main.py
           
       - name: Upload logs
         if: always()
@@ -49,14 +49,31 @@ jobs:
           retention-days: 30
           if-no-files-found: ignore
 
-      - name: Upload database
+      - name: Upload databases
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: trading-database-${{ github.run_number }}
-          path: data/trading_system.db
+          name: trading-databases-${{ github.run_number }}
+          path: |
+            data/trading_system.db
+            data/strategy_performance.db
           retention-days: 7
           if-no-files-found: ignore
+      
+      - name: Generate Performance Report
+        if: success()
+        run: |
+          echo "📊 Generating strategy performance report..."
+          python3 scripts/view_strategy_performance.py > strategy_report.txt
+          cat strategy_report.txt
+      
+      - name: Upload Performance Report
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: strategy-report-${{ github.run_number }}
+          path: strategy_report.txt
+          retention-days: 30
 
       - name: Notify completion
         if: success()
