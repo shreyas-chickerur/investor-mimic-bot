@@ -195,6 +195,105 @@ class StrategyDatabase:
         conn.commit()
         conn.close()
     
+    def log_signal(self, strategy_id: int, symbol: str, signal: str, confidence: float, reasoning: str):
+        """Log a trading signal"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            INSERT INTO strategy_signals 
+            (strategy_id, symbol, signal, confidence, reasoning)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (strategy_id, symbol, signal, confidence, reasoning))
+        
+        conn.commit()
+        conn.close()
+    
+    def log_trade(self, strategy_id: int, symbol: str, action: str, shares: float, 
+                  price: float, value: float, order_id: str):
+        """Log a trade execution"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            INSERT INTO strategy_trades 
+            (strategy_id, symbol, action, shares, price, value, order_id, executed_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (int(strategy_id), str(symbol), str(action), float(shares), 
+              float(price), float(value), str(order_id) if order_id else None, 
+              datetime.now().isoformat()))
+        
+        conn.commit()
+        conn.close()
+    
+    def record_daily_performance(self, strategy_id: int, portfolio_value: float, 
+                                cash: float, positions_value: float, return_pct: float, 
+                                num_positions: int):
+        """Record daily performance snapshot"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            INSERT INTO strategy_performance 
+            (strategy_id, date, portfolio_value, cash, positions_value, 
+             total_return_pct, num_positions, num_trades_today)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+        ''', (strategy_id, datetime.now().strftime('%Y-%m-%d'), 
+              portfolio_value, cash, positions_value, return_pct, num_positions))
+        
+        conn.commit()
+        conn.close()
+    
+    def get_latest_performance(self, strategy_id: int) -> Optional[Dict]:
+        """Get latest performance for a strategy"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT * FROM strategy_performance 
+            WHERE strategy_id = ? 
+            ORDER BY date DESC LIMIT 1
+        ''', (strategy_id,))
+        
+        row = cursor.fetchone()
+        conn.close()
+        
+        if row:
+            return {
+                'portfolio_value': row[3],
+                'cash': row[4],
+                'positions_value': row[5],
+                'total_return_pct': row[6],
+                'num_positions': row[8]
+            }
+        return None
+    
+    def get_strategy_trades(self, strategy_id: int) -> List[Dict]:
+        """Get all trades for a strategy"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT * FROM strategy_trades 
+            WHERE strategy_id = ? 
+            ORDER BY executed_at DESC
+        ''', (strategy_id,))
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        return [
+            {
+                'symbol': row[2],
+                'action': row[3],
+                'shares': row[4],
+                'price': row[5],
+                'value': row[6],
+                'executed_at': row[8]
+            }
+            for row in rows
+        ]
+    
     def get_strategy_performance(self, strategy_id: int, days: int = 30) -> List[Dict]:
         """Get performance history for a strategy"""
         conn = sqlite3.connect(self.db_path)

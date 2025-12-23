@@ -40,20 +40,31 @@ python3 src/main.py
 
 ## What It Does
 
-✅ Scans 36 stocks daily for oversold conditions  
-✅ Executes buy orders when signals are generated  
-✅ Automatically closes positions after 20 days  
-✅ Tracks all trades in local database  
-✅ Logs all activity for monitoring  
+✅ Runs 5 independent trading strategies simultaneously  
+✅ Each strategy has separate capital allocation and tracking  
+✅ Scans 36 stocks daily across all strategies  
+✅ Executes trades based on strategy-specific signals  
+✅ Tracks performance individually for each strategy  
+✅ Comprehensive dashboard for monitoring all strategies  
+
+## The 5 Strategies
+
+1. **RSI Mean Reversion** - Buy oversold stocks (RSI < 30) with low volatility
+2. **MA Crossover** - Golden cross trend following (50/200 MA)
+3. **Momentum** - Machine learning momentum prediction
+4. **News Sentiment** - Sentiment analysis + technical indicators
+5. **Volatility Breakout** - Bollinger Band breakouts with volume
+
+Each strategy operates independently with $20K capital allocation.
 
 ## Monitoring
 
 ```bash
-# View logs
-tail -f logs/trading.log
+# View multi-strategy performance dashboard
+python3 scripts/view_strategy_performance.py
 
-# Check positions
-sqlite3 data/trading_system.db "SELECT * FROM positions WHERE status='open'"
+# View logs
+tail -f logs/multi_strategy.log
 
 # Or check Alpaca dashboard
 https://app.alpaca.markets/paper/dashboard/overview
