@@ -114,17 +114,42 @@ class PortfolioBacktester:
                 continue
             
             # Generate signals from all strategies
+            historical_data = market_data[market_data.index <= date]
+            
             all_signals = []
-            for strategy in strategies:
-                try:
-                    # Check if strategy should be enabled in this regime
-                    if not regime_detector.should_enable_strategy(strategy.name, regime_adj):
-                        continue
-                    
-                    signals = strategy.generate_signals(daily_data)
-                    all_signals.extend(signals)
-                except Exception as e:
-                    logger.error(f"Error generating signals for {strategy.name}: {e}")
+            
+            # Check if signal injection is enabled (VALIDATION ONLY)
+            if signal_injection_engine and signal_injection_engine.is_enabled():
+                injected = signal_injection_engine.inject_signals(date, [])
+                if injected and len(injected) > 0:
+                    logger.info(f"[INJECTION] {date}: Received {len(injected)} injected signals")
+                    all_signals = injected
+                    if signal_tracer:
+                        signal_tracer.trace_generated(date, "INJECTION", all_signals)
+                else:
+                    logger.debug(f"[INJECTION] {date}: No signals injected on this date")
+            else:
+                # Normal signal generation
+                for strategy in strategies:
+                    try:
+                        # Check if strategy should be enabled in this regime
+                        if not regime_detector.should_enable_strategy(strategy.name, regime_adj):
+                            logger.debug(f"{date}: {strategy.name} disabled by regime")
+                            continue
+                        
+                        # Pass historical data so strategies can calculate indicators
+                        signals = strategy.generate_signals(historical_data)
+                        if signals and len(signals) > 0:
+                            logger.debug(f"{date}: {strategy.name} generated {len(signals)} signals")
+                            if signal_tracer:
+                                signal_tracer.trace_generated(date, strategy.name, signals)
+                            all_signals.extend(signals)
+                        else:
+                            logger.debug(f"{date}: {strategy.name} generated no signals")
+                    except Exception as e:
+                        logger.error(f"Error generating signals for {strategy.name}: {e}")
+                        import traceback
+                        logger.debug(traceback.format_exc())
             
             # Filter signals by correlation
             buy_signals = [s for s in all_signals if s.get('action') == 'BUY']
