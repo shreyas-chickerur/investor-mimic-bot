@@ -26,39 +26,56 @@ class RSIMeanReversionStrategy(TradingStrategy):
         self.entry_dates = {}  # Track when positions were entered
     
     def generate_signals(self, market_data: pd.DataFrame) -> List[Dict]:
-        """Generate buy signals for oversold stocks"""
+        """Generate buy signals for oversold stocks with improved filters"""
         signals = []
         
         for symbol in market_data['symbol'].unique():
             symbol_data = market_data[market_data['symbol'] == symbol].iloc[-1]
             
-            # Check if we have RSI data
-            if pd.isna(symbol_data.get('rsi')):
+            # Check if we have required data
+            if pd.isna(symbol_data.get('rsi')) or pd.isna(symbol_data.get('rsi_slope')):
                 continue
             
             rsi = symbol_data['rsi']
+            rsi_slope = symbol_data.get('rsi_slope', 0)
             price = symbol_data['close']
+            vwap = symbol_data.get('vwap', price)
             
-            # Buy signal: RSI < 30 and we don't already own it
-            if rsi < self.rsi_threshold and symbol not in self.positions:
-                shares = self.calculate_position_size(price, max_position_pct=0.10)
+            # IMPROVED Buy signal: RSI < 30 AND turning upward AND not too far from VWAP
+            if symbol not in self.positions:
+                distance_from_vwap = abs(price - vwap) / vwap
                 
-                signals.append({
-                    'symbol': symbol,
-                    'action': 'BUY',
-                    'shares': shares,
-                    'price': price,
-                    'value': shares * price,
-                    'confidence': (30 - rsi) / 30,  # Higher confidence for lower RSI
-                    'reasoning': f'RSI {rsi:.1f} < {self.rsi_threshold} (oversold)'
-                })
+                if (rsi < self.rsi_threshold and 
+                    rsi_slope > 0 and  # RSI turning upward (not catching falling knife)
+                    distance_from_vwap < 0.05):  # Within 5% of VWAP
+                    
+                    shares = self.calculate_position_size(price, max_position_pct=0.10)
+                    
+                    signals.append({
+                        'symbol': symbol,
+                        'action': 'BUY',
+                        'shares': shares,
+                        'price': price,
+                        'value': shares * price,
+                        'confidence': (30 - rsi) / 30,  # Higher confidence for lower RSI
+                        'reasoning': f'RSI {rsi:.1f} < {self.rsi_threshold}, slope {rsi_slope:.2f} > 0 (turning up)'
+                    })
             
-            # Sell signal: Held for 20 days
+            # IMPROVED Sell signal: RSI > 50 OR price >= VWAP OR held for 20 days
             elif symbol in self.positions:
                 days_held = self.entry_dates.get(symbol, 0)
-                if days_held >= self.hold_days:
-                    shares = self.positions[symbol]
-                    
+                shares = self.positions[symbol]
+                
+                # Exit conditions (any one triggers exit)
+                exit_reason = None
+                if rsi > 50:
+                    exit_reason = f'RSI {rsi:.1f} > 50 (mean reversion complete)'
+                elif price >= vwap:
+                    exit_reason = f'Price ${price:.2f} >= VWAP ${vwap:.2f} (profitable exit)'
+                elif days_held >= self.hold_days:
+                    exit_reason = f'Held for {days_held} days (time-based exit)'
+                
+                if exit_reason:
                     signals.append({
                         'symbol': symbol,
                         'action': 'SELL',
@@ -66,7 +83,7 @@ class RSIMeanReversionStrategy(TradingStrategy):
                         'price': price,
                         'value': shares * price,
                         'confidence': 1.0,
-                        'reasoning': f'Held for {days_held} days (target: {self.hold_days})'
+                        'reasoning': exit_reason
                     })
         
         return signals
