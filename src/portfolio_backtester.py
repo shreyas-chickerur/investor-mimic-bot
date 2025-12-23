@@ -193,6 +193,8 @@ class PortfolioBacktester:
         shares = signal['shares']
         quoted_price = signal['price']
         
+        logger.info(f"[EXECUTE_BUY] {date}: Attempting to buy {shares} {symbol} @ ${quoted_price:.2f}")
+        
         # Calculate execution price with costs
         exec_price, slippage, commission, total_cost = cost_model.calculate_execution_price(
             quoted_price, 'BUY', shares
@@ -200,18 +202,24 @@ class PortfolioBacktester:
         
         total_value = exec_price * shares + total_cost
         
+        logger.info(f"[EXECUTE_BUY] {date}: Total value needed: ${total_value:.2f}, Available cash: ${cash:.2f}")
+        
         # Check if we have enough cash
         if total_value > cash:
-            logger.debug(f"{date}: Insufficient cash for {symbol}")
+            logger.warning(f"[EXECUTE_BUY] {date}: ❌ REJECTED - Insufficient cash for {symbol}")
             return cash
         
         # Check portfolio heat
         current_exposure = sum(pos['shares'] * pos['entry_price'] 
                              for pos in self.positions.values())
         
+        logger.info(f"[EXECUTE_BUY] {date}: Current exposure: ${current_exposure:.2f}, Portfolio value: ${portfolio_value:.2f}")
+        
         if not portfolio_risk.can_add_position(total_value, current_exposure, portfolio_value):
-            logger.debug(f"{date}: Portfolio heat limit prevents {symbol} purchase")
+            logger.warning(f"[EXECUTE_BUY] {date}: ❌ REJECTED - Portfolio heat limit prevents {symbol} purchase")
             return cash
+        
+        logger.info(f"[EXECUTE_BUY] {date}: ✅ ALL CHECKS PASSED - Executing trade")
         
         # Execute trade
         self.positions[symbol] = {
@@ -223,6 +231,7 @@ class PortfolioBacktester:
         
         cash -= total_value
         
+        # Record the trade
         self.trades.append({
             'date': date,
             'symbol': symbol,
@@ -232,6 +241,8 @@ class PortfolioBacktester:
             'cost': total_cost,
             'value': total_value
         })
+        
+        logger.info(f"[EXECUTE_BUY] {date}: ✅ TRADE EXECUTED - Bought {shares} {symbol} @ ${exec_price:.2f}")
         
         logger.debug(f"{date}: BUY {shares} {symbol} @ ${exec_price:.2f} (cost: ${total_cost:.2f})")
         
