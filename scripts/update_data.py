@@ -59,7 +59,15 @@ def main():
     client = StockHistoricalDataClient(api_key, secret_key)
     
     # CRITICAL FIX: Get 300 days of data for MA strategies (need 200-day MA)
+    # LOOKAHEAD FIX: Use previous trading day only (not today)
     end_date = datetime.now()
+    
+    # If running after market close, use today; otherwise use previous day
+    if end_date.hour >= 16:  # After 4 PM
+        end_date = end_date
+    else:
+        end_date = end_date - timedelta(days=1)
+    
     start_date = end_date - timedelta(days=300)
     
     print(f"\nFetching data from {start_date.date()} to {end_date.date()}")
@@ -128,6 +136,32 @@ def main():
         
         # RSI
         group['rsi'] = calculate_rsi(group['close'])
+        
+        # RSI Slope (for improved mean reversion)
+        group['rsi_slope'] = group['rsi'].diff()
+        
+        # ATR for volatility-based position sizing
+        high_low = group['high'] - group['low']
+        high_close = abs(group['high'] - group['close'].shift())
+        low_close = abs(group['low'] - group['close'].shift())
+        true_range = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+        group['atr_20'] = true_range.rolling(20).mean()
+        
+        # VWAP (for improved exits)
+        group['vwap'] = (group['close'] * group['volume']).cumsum() / group['volume'].cumsum()
+        
+        # ADX for trend strength (MA Crossover improvement)
+        # Simplified ADX calculation
+        plus_dm = group['high'].diff()
+        minus_dm = -group['low'].diff()
+        plus_dm[plus_dm < 0] = 0
+        minus_dm[minus_dm < 0] = 0
+        
+        tr = true_range
+        plus_di = 100 * (plus_dm.rolling(14).mean() / tr.rolling(14).mean())
+        minus_di = 100 * (minus_dm.rolling(14).mean() / tr.rolling(14).mean())
+        dx = 100 * abs(plus_di - minus_di) / (plus_di + minus_di)
+        group['adx'] = dx.rolling(14).mean()
         
         # Future returns (for backtesting)
         group['future_return_5d'] = group['close'].pct_change(5).shift(-5)

@@ -2,7 +2,7 @@ name: Daily Paper Trading
 
 on:
   schedule:
-    - cron: '0 15 * * 1-5'  # 10:00 AM ET (3:00 PM UTC) on weekdays
+    - cron: '15 21 * * 1-5'  # 4:15 PM ET (9:15 PM UTC) on weekdays - AFTER market close
   workflow_dispatch:  # Allow manual trigger
 
 env:
