@@ -65,6 +65,8 @@ class PortfolioBacktester:
             correlation_filter: CorrelationFilter instance
             portfolio_risk: PortfolioRiskManager instance
             cost_model: ExecutionCostModel instance
+            signal_injection_engine: Optional signal injection for validation
+            signal_tracer: Optional signal flow tracer for debugging
             
         Returns:
             Dict with backtest results
