@@ -124,13 +124,14 @@ class PortfolioBacktester:
             
             # Filter signals by correlation
             buy_signals = [s for s in all_signals if s.get('action') == 'BUY']
+            sell_signals = [s for s in all_signals if s.get('action') == 'SELL']
             existing_symbols = list(self.positions.keys())
             
-            filtered_signals = correlation_filter.filter_signals(
-                buy_signals,
-                {sym: pos['shares'] for sym, pos in self.positions.items()},
-                daily_data
-            )
+            logger.debug(f"{date}: {len(buy_signals)} buy signals, {len(sell_signals)} sell signals before filtering")
+            
+            # For now, skip correlation filter to diagnose issue
+            filtered_signals = buy_signals + sell_signals
+            logger.debug(f"{date}: {len(filtered_signals)} signals after filtering")
             
             # Execute trades
             for signal in filtered_signals:

@@ -30,41 +30,48 @@ class RSIMeanReversionStrategy(TradingStrategy):
         signals = []
         
         for symbol in market_data['symbol'].unique():
-            symbol_data = market_data[market_data['symbol'] == symbol].iloc[-1]
+            symbol_data = market_data[market_data['symbol'] == symbol]
             
-            # Check if we have required data
-            if pd.isna(symbol_data.get('rsi')) or pd.isna(symbol_data.get('rsi_slope')):
+            if len(symbol_data) < 2:
                 continue
             
-            rsi = symbol_data['rsi']
-            rsi_slope = symbol_data.get('rsi_slope', 0)
-            price = symbol_data['close']
-            vwap = symbol_data.get('vwap', price)
+            # Get latest values
+            latest = symbol_data.iloc[-1]
             
-            # IMPROVED Buy signal: RSI < 30 AND turning upward AND not too far from VWAP
-            if symbol not in self.positions:
-                distance_from_vwap = abs(price - vwap) / vwap
-                atr = symbol_data.get('atr_20', None)
-                
-                if (rsi < self.rsi_threshold and 
-                    rsi_slope > 0 and  # RSI turning upward (not catching falling knife)
-                    distance_from_vwap < 0.05):  # Within 5% of VWAP
+            # Check if we have RSI
+            if 'rsi' not in symbol_data.columns or pd.isna(latest['rsi']):
+                continue
+            
+            rsi = latest['rsi']
+            price = latest['close']
+            
+            # Calculate RSI slope
+            if len(symbol_data) >= 2:
+                rsi_slope = symbol_data['rsi'].iloc[-1] - symbol_data['rsi'].iloc[-2]
+            else:
+                rsi_slope = 0
+            
+            # Get VWAP (use close as fallback)
+            vwap = latest.get('vwap', price)
+            atr = latest.get('atr_20', None)
+            
+            # IMPROVED Buy signal: RSI < 30 AND RSI slope > 0 (turning up)
+            if rsi < self.rsi_threshold and rsi_slope > 0 and symbol not in self.positions:
+                # Volatility-adjusted position sizing
+                shares = self.calculate_position_size(price, atr=atr, max_position_pct=0.10)
                     
-                    # Volatility-adjusted position sizing
-                    shares = self.calculate_position_size(price, atr=atr, max_position_pct=0.10)
-                    
-                    signals.append({
-                        'symbol': symbol,
-                        'action': 'BUY',
-                        'shares': shares,
-                        'price': price,
-                        'value': shares * price,
-                        'confidence': (30 - rsi) / 30,  # Higher confidence for lower RSI
-                        'reasoning': f'RSI {rsi:.1f} < {self.rsi_threshold}, slope {rsi_slope:.2f} > 0 (turning up)'
-                    })
+                signals.append({
+                    'symbol': symbol,
+                    'action': 'BUY',
+                    'shares': shares,
+                    'price': price,
+                    'value': shares * price,
+                    'confidence': (30 - rsi) / 30,  # Higher confidence for lower RSI
+                    'reasoning': f'RSI {rsi:.1f} < {self.rsi_threshold}, slope {rsi_slope:.2f} > 0 (turning up)'
+                })
             
             # IMPROVED Sell signal: RSI > 50 OR price >= VWAP OR held for 20 days
-            elif symbol in self.positions:
+            if symbol in self.positions:
                 days_held = self.entry_dates.get(symbol, 0)
                 shares = self.positions[symbol]
                 
