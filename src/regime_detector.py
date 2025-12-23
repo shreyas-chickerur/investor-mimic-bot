@@ -35,12 +35,17 @@ class RegimeDetector:
         """
         Get current VIX level
         
-        In production, this would fetch from API
-        For now, returns a default value
+        Fetches from VIX data source if available, otherwise returns default
         """
-        # TODO: Integrate with actual VIX data source
-        # For now, return moderate volatility
-        return 18.0
+        try:
+            from vix_data_fetcher import VIXDataFetcher
+            fetcher = VIXDataFetcher(source='yahoo')
+            vix = fetcher.get_current_vix()
+            return vix
+        except Exception as e:
+            logger.warning(f"Could not fetch VIX, using default: {e}")
+            # Return moderate volatility as fallback
+            return 18.0
     
     def detect_volatility_regime(self, vix: float = None) -> str:
         """
