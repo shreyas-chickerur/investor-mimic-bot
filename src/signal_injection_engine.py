@@ -66,34 +66,21 @@ class SignalInjectionEngine:
         if not self.enabled:
             return existing_signals or []
         
-        # Inject signals on first day only to avoid overwhelming the system
-        # In a real validation, you'd inject strategically
-        date_str = str(date.date()) if hasattr(date, 'date') else str(date)
+        # Inject signals on EVERY day to ensure we get trades
+        # Use templates to create signals
+        injected = []
+        for template in self.templates[:self.config['validation_mode']['signal_injection']['inject_count']]:
+            signal = template.copy()
+            signal['injected'] = True
+            signal['injection_date'] = str(date)
+            injected.append(signal)
         
-        # Only inject on specific dates (first day of backtest)
-        # This simulates having a few trade opportunities
-        if not hasattr(self, '_injection_dates'):
-            self._injection_dates = set()
-        
-        # Inject on first 3 days
-        if len(self._injection_dates) < 3:
-            self._injection_dates.add(date_str)
-            
-            # Use templates to create signals
-            injected = []
-            for template in self.templates[:self.config['validation_mode']['signal_injection']['inject_count']]:
-                signal = template.copy()
-                signal['injected'] = True
-                signal['injection_date'] = date_str
-                injected.append(signal)
-            
+        if len(injected) > 0:
             logger.info(f"[INJECTION] {date}: Injected {len(injected)} synthetic signals")
             for sig in injected:
                 logger.info(f"  [INJECTION] {sig['action']} {sig['symbol']} @ ${sig['price']:.2f}, {sig['shares']} shares")
-            
-            return injected
         
-        return []
+        return injected
     
     def mark_as_injected(self, signal: Dict) -> Dict:
         """Mark a signal as injected for tracking"""
