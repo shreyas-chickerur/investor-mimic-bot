@@ -58,9 +58,9 @@ def main():
     # Initialize client
     client = StockHistoricalDataClient(api_key, secret_key)
     
-    # Get last 100 days of data
+    # CRITICAL FIX: Get 300 days of data for MA strategies (need 200-day MA)
     end_date = datetime.now()
-    start_date = end_date - timedelta(days=100)
+    start_date = end_date - timedelta(days=300)
     
     print(f"\nFetching data from {start_date.date()} to {end_date.date()}")
     print(f"Symbols: {len(SYMBOLS)}")

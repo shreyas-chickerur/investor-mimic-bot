@@ -49,19 +49,29 @@ def sync_positions():
     imported = 0
     
     for pos in positions:
+        # CRITICAL FIX: Try to preserve entry date if it exists in database
+        cursor.execute('''
+            SELECT entry_date FROM positions 
+            WHERE symbol = ? AND status != 'open' 
+            ORDER BY entry_date DESC LIMIT 1
+        ''', (pos.symbol,))
+        
+        result = cursor.fetchone()
+        entry_date = result[0] if result else today
+        
         # Insert as open position
         cursor.execute('''
             INSERT INTO positions (symbol, entry_date, entry_price, shares, position_value, status)
             VALUES (?, ?, ?, ?, ?, 'open')
         ''', (
             pos.symbol,
-            today,  # We don't have actual entry date, use today
+            entry_date,  # Use preserved date or today
             float(pos.avg_entry_price),
             int(pos.qty),
             float(pos.market_value),
         ))
         imported += 1
-        print(f"  Imported: {pos.symbol} - {pos.qty} shares @ ${pos.avg_entry_price}")
+        print(f"  Imported: {pos.symbol} - {pos.qty} shares @ ${pos.avg_entry_price} (entry: {entry_date})")
     
     conn.commit()
     conn.close()
