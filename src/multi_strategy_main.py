@@ -255,6 +255,51 @@ class MultiStrategyRunner:
                 except Exception as e:
                     logger.error(f"Failed to execute {symbol}: {e}")
                     print(f"  ❌ Failed {symbol}: {e}")
+                    
+            elif action == 'SELL' and shares > 0:
+                try:
+                    order_data = MarketOrderRequest(
+                        symbol=symbol,
+                        qty=shares,
+                        side=OrderSide.SELL,
+                        time_in_force=TimeInForce.DAY
+                    )
+                    order = self.trading_client.submit_order(order_data)
+                    
+                    print(f"  ✅ SELL {shares} {symbol} @ ${price:.2f} (Order: {order.id})")
+                    
+                    # Release cash back
+                    self.cash_manager.release_cash(strategy.strategy_id, shares * price)
+                    
+                    # Log trade
+                    self.db.log_trade(
+                        strategy.strategy_id,
+                        symbol,
+                        'SELL',
+                        shares,
+                        price,
+                        shares * price,
+                        order.id
+                    )
+                    
+                    # CRITICAL FIX: Update strategy positions
+                    if symbol in strategy.positions:
+                        strategy.positions[symbol] -= shares
+                        if strategy.positions[symbol] <= 0:
+                            del strategy.positions[symbol]
+                    
+                    trade_record = {
+                        'strategy': strategy.name,
+                        'symbol': symbol,
+                        'shares': shares,
+                        'price': price,
+                        'action': 'SELL'
+                    }
+                    executed.append(trade_record)
+                    self.executed_trades.append(trade_record)
+                except Exception as e:
+                    logger.error(f"Failed to execute {symbol}: {e}")
+                    print(f"  ❌ Failed {symbol}: {e}")
         
         return executed
     
@@ -304,16 +349,21 @@ def main():
     print("MULTI-STRATEGY TRADING SYSTEM")
     print("=" * 80)
     
+    runner = None
+    
     try:
         runner = MultiStrategyRunner()
         
-        # Load market data
-        print("\n📊 Loading market data...")
+        # Load market data with validation
+        print("\n📊 Loading and validating market data...")
         market_data = runner.load_market_data()
         
         if market_data is None:
-            logger.error("Failed to load market data")
-            return
+            error_msg = "Failed to load market data"
+            logger.error(error_msg)
+            if runner:
+                runner.email_notifier.send_error_alert(error_msg, "\n".join(runner.errors))
+            sys.exit(1)
         
         # Run all strategies
         signals = runner.run_all_strategies(market_data)
@@ -325,11 +375,45 @@ def main():
         print(f"✅ EXECUTION COMPLETE - {len(signals)} trades executed")
         print("=" * 80)
         
+        # Send email summary
+        try:
+            positions = runner.trading_client.get_all_positions()
+            positions_data = [
+                {
+                    'symbol': p.symbol,
+                    'shares': float(p.qty),
+                    'entry_price': float(p.avg_entry_price),
+                    'current_price': float(p.current_price),
+                }
+                for p in positions
+            ]
+            
+            runner.email_notifier.send_daily_summary(
+                trades=runner.executed_trades,
+                positions=positions_data,
+                portfolio_value=runner.portfolio_value,
+                cash=runner.cash_available,
+                errors=runner.errors if runner.errors else None
+            )
+            logger.info("Email summary sent successfully")
+        except Exception as e:
+            logger.error(f"Failed to send email summary: {e}")
+        
         logger.info("Multi-strategy execution completed successfully")
         
     except Exception as e:
-        logger.error(f"Fatal error: {e}", exc_info=True)
+        error_msg = f"Fatal error: {e}"
+        logger.error(error_msg, exc_info=True)
         print(f"\n❌ FATAL ERROR: {e}")
+        
+        # Send error alert
+        if runner:
+            try:
+                import traceback
+                runner.email_notifier.send_error_alert(error_msg, traceback.format_exc())
+            except:
+                pass
+        
         sys.exit(1)
 
 if __name__ == "__main__":
