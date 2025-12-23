@@ -95,20 +95,51 @@ class DynamicAllocator:
             return allocations
         
         # Weight by Sharpe ratio
-        raw_allocations = {}
+        raw_weights = {}
         for strategy_id in strategy_ids:
             sharpe = sharpe_ratios.get(strategy_id, 0.0)
             weight = sharpe / total_sharpe
-            
-            # Apply min/max constraints
-            weight = max(self.min_allocation, min(self.max_allocation, weight))
-            raw_allocations[strategy_id] = weight
+            raw_weights[strategy_id] = weight
         
-        # Normalize to sum to 1.0
-        total_weight = sum(raw_allocations.values())
+        # Apply min/max constraints and normalize iteratively
+        constrained_weights = {}
+        remaining_ids = list(strategy_ids)
+        remaining_weight = 1.0
+        
+        # First pass: apply constraints
+        for strategy_id in strategy_ids:
+            weight = raw_weights[strategy_id]
+            
+            if weight < self.min_allocation:
+                constrained_weights[strategy_id] = self.min_allocation
+                remaining_weight -= self.min_allocation
+                remaining_ids.remove(strategy_id)
+            elif weight > self.max_allocation:
+                constrained_weights[strategy_id] = self.max_allocation
+                remaining_weight -= self.max_allocation
+                remaining_ids.remove(strategy_id)
+        
+        # Second pass: distribute remaining weight
+        if remaining_ids and remaining_weight > 0:
+            remaining_sharpe = sum(sharpe_ratios.get(sid, 0.0) for sid in remaining_ids)
+            if remaining_sharpe > 0:
+                for strategy_id in remaining_ids:
+                    sharpe = sharpe_ratios.get(strategy_id, 0.0)
+                    weight = (sharpe / remaining_sharpe) * remaining_weight
+                    # Ensure still within bounds
+                    weight = max(self.min_allocation, min(self.max_allocation, weight))
+                    constrained_weights[strategy_id] = weight
+            else:
+                # Equal distribution of remaining
+                equal_weight = remaining_weight / len(remaining_ids)
+                for strategy_id in remaining_ids:
+                    constrained_weights[strategy_id] = equal_weight
+        
+        # Final normalization to ensure sum = 1.0
+        total_weight = sum(constrained_weights.values())
         normalized_allocations = {
             sid: (weight / total_weight) * self.total_capital
-            for sid, weight in raw_allocations.items()
+            for sid, weight in constrained_weights.items()
         }
         
         # Log allocations
