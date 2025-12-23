@@ -16,7 +16,7 @@ class DataValidator:
     def __init__(self, max_age_hours: int = 24):
         self.max_age_hours = max_age_hours
     
-    def validate_data_file(self, data_path: Path) -> tuple[bool, list[str]]:
+    def validate_data_file(self, data_path: Path):
         """
         Validate training data file
         
@@ -94,7 +94,7 @@ class DataValidator:
         
         return True
 
-def validate_data(data_path: Path, max_age_hours: int = 24) -> tuple[bool, list[str]]:
+def validate_data(data_path: Path, max_age_hours: int = 24):
     """Convenience function to validate data"""
     validator = DataValidator(max_age_hours)
     return validator.validate_data_file(data_path)
