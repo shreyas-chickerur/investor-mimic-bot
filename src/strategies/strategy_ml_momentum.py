@@ -14,8 +14,6 @@ import pandas as pd
 import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import StandardScaler
 
 
 class MLMomentumStrategy(TradingStrategy):
@@ -28,7 +26,6 @@ class MLMomentumStrategy(TradingStrategy):
             capital=capital
         )
         self.hold_days = 5
-        self.entry_dates = {}
         # IMPROVED: Use Logistic Regression classifier
         self.model = LogisticRegression(max_iter=1000, random_state=42)
         self.scaler = StandardScaler()
@@ -82,14 +79,14 @@ class MLMomentumStrategy(TradingStrategy):
             X_train = self.scaler.fit_transform(X_train)
             # Train model
             self.model.fit(X_train, y_train)
-            self.is_trained = True
+            self.model_trained = True
     
     def generate_signals(self, market_data: pd.DataFrame) -> List[Dict]:
         """Generate signals using ML predictions"""
         signals = []
         
         # Train model if not trained
-        if not self.is_trained:
+        if not self.model_trained:
             self._train_model(market_data)
         
         for symbol in market_data['symbol'].unique():
@@ -102,14 +99,18 @@ class MLMomentumStrategy(TradingStrategy):
             
             # Get features and predict
             try:
+                if not self.model_trained:
+                    continue
+
                 features = self._prepare_features(symbol_data)
                 features_scaled = self.scaler.transform(features)
                 prediction = self.model.predict(features_scaled)[0]
                 confidence = self.model.predict_proba(features_scaled)[0][1]
                 
                 # Buy signal: Model predicts positive return with high confidence
-                if prediction == 1 and prob_positive > 0.6 and symbol not in self.positions:
+                if prediction == 1 and confidence > self.min_probability and symbol not in self.positions:
                     shares = self.calculate_position_size(price, max_position_pct=0.10)
+                    latest_date = symbol_data.index[-1]
                     
                     signals.append({
                         'symbol': symbol,
@@ -117,15 +118,17 @@ class MLMomentumStrategy(TradingStrategy):
                         'shares': shares,
                         'price': price,
                         'value': shares * price,
-                        'confidence': prob_positive,
-                        'reasoning': f'ML probability of positive return: {prob_positive*100:.1f}%'
+                        'confidence': confidence,
+                        'reasoning': f'ML probability of positive return: {confidence*100:.1f}%',
+                        'asof_date': latest_date
                     })
                 
                 # Sell signal: Held for target days or model predicts negative
                 elif symbol in self.positions:
-                    days_held = self.entry_dates.get(symbol, 0)
-                    if days_held >= self.hold_days or (prediction == 0 and prob_positive < 0.4):
+                    days_held = self.get_days_held(symbol, symbol_data.index[-1])
+                    if days_held >= self.hold_days or (prediction == 0 and confidence < 0.4):
                         shares = self.positions[symbol]
+                        latest_date = symbol_data.index[-1]
                         
                         signals.append({
                             'symbol': symbol,
@@ -134,7 +137,8 @@ class MLMomentumStrategy(TradingStrategy):
                             'price': price,
                             'value': shares * price,
                             'confidence': 1.0 if days_held >= self.hold_days else confidence,
-                            'reasoning': f'Held {days_held} days' if days_held >= self.hold_days else 'ML predicts reversal'
+                            'reasoning': f'Held {days_held} days' if days_held >= self.hold_days else 'ML predicts reversal',
+                            'asof_date': latest_date
                         })
             except:
                 continue

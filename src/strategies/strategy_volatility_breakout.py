@@ -25,7 +25,6 @@ class VolatilityBreakoutStrategy(TradingStrategy):
         self.bb_period = 20
         self.bb_std = 2
         self.hold_days = 7
-        self.entry_dates = {}
     
     def _calculate_bollinger_bands(self, prices: pd.Series):
         """Calculate Bollinger Bands"""
@@ -50,6 +49,7 @@ class VolatilityBreakoutStrategy(TradingStrategy):
             
             current = symbol_data.iloc[-1]
             previous = symbol_data.iloc[-2]
+            latest_date = symbol_data.index[-1]
             price = current['close']
             prev_price = previous['close']
             volume = current['volume']
@@ -76,12 +76,13 @@ class VolatilityBreakoutStrategy(TradingStrategy):
                     'price': price,
                     'value': shares * price,
                     'confidence': min((volume / avg_volume) / 2, 1.0),
-                    'reasoning': f'2-bar breakout above BB with {volume/avg_volume:.1f}x volume (false breakout protected)'
+                    'reasoning': f'2-bar breakout above BB with {volume/avg_volume:.1f}x volume (false breakout protected)',
+                    'asof_date': latest_date
                 })
             
             # Sell signal: Price drops below lower band or held long enough
             elif symbol in self.positions:
-                days_held = self.entry_dates.get(symbol, 0)
+                days_held = self.get_days_held(symbol, latest_date)
                 if price < current_lower or days_held >= self.hold_days:
                     shares = self.positions[symbol]
                     
@@ -92,7 +93,8 @@ class VolatilityBreakoutStrategy(TradingStrategy):
                         'price': price,
                         'value': shares * price,
                         'confidence': 1.0,
-                        'reasoning': f'Below BB lower band' if price < current_lower else f'Held {days_held} days'
+                        'reasoning': f'Below BB lower band' if price < current_lower else f'Held {days_held} days',
+                        'asof_date': latest_date
                     })
         
         return signals

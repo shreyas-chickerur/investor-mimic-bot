@@ -18,6 +18,7 @@ class TradingStrategy(ABC):
         self.capital = capital
         self.initial_capital = capital
         self.positions = {}  # {symbol: shares}
+        self.entry_dates = {}
         self.trade_history = []
         
     @abstractmethod
@@ -123,3 +124,14 @@ class TradingStrategy(ABC):
             'num_positions': len(self.positions),
             'num_trades': len(self.trade_history)
         }
+
+    def get_days_held(self, symbol: str, asof_date) -> int:
+        """Return days held for a symbol based on entry_dates."""
+        entry_date = self.entry_dates.get(symbol)
+        if not entry_date:
+            return 0
+
+        entry_ts = pd.to_datetime(entry_date)
+        asof_ts = pd.to_datetime(asof_date)
+        days_held = (asof_ts - entry_ts).days
+        return max(days_held, 0)

@@ -19,13 +19,43 @@ class PerformanceMetrics:
         self.daily_returns = []
         self.equity_curve = []
         
-    def add_trade(self, entry_price: float, exit_price: float, shares: int, 
-                  entry_date: datetime, exit_date: datetime, costs: float = 0):
+    def add_trade(self, entry_price, exit_price=None, shares: int = 0,
+                  entry_date: datetime = None, exit_date: datetime = None, costs: float = 0):
         """Record a completed trade"""
+        if isinstance(entry_price, str):
+            action = entry_price
+            symbol = exit_price
+            price = float(entry_date)
+            value = float(exit_date)
+            trade_date = datetime.now()
+            pnl = 0.0
+            return_pct = 0.0
+            hold_days = 0
+            self.trades.append({
+                'action': action,
+                'symbol': symbol,
+                'entry_price': price,
+                'exit_price': price,
+                'shares': shares,
+                'pnl': pnl,
+                'return_pct': return_pct,
+                'hold_days': hold_days,
+                'entry_date': trade_date,
+                'exit_date': trade_date,
+                'costs': costs,
+                'value': value
+            })
+            return
+
+        entry_price = float(entry_price)
+        exit_price = float(exit_price)
+        entry_date = entry_date or datetime.now()
+        exit_date = exit_date or datetime.now()
+
         pnl = (exit_price - entry_price) * shares - costs
         return_pct = ((exit_price - entry_price) / entry_price) * 100
         hold_days = (exit_date - entry_date).days
-        
+
         self.trades.append({
             'entry_price': entry_price,
             'exit_price': exit_price,
@@ -150,10 +180,14 @@ class PerformanceMetrics:
             'net_pnl': 0
         }
     
-    def get_summary(self) -> str:
+    def get_summary(self) -> Dict:
+        """Get raw metrics summary"""
+        return self.calculate_metrics()
+
+    def get_summary_text(self) -> str:
         """Get formatted metrics summary"""
         metrics = self.calculate_metrics()
-        
+
         summary = f"""
 Performance Metrics Summary
 {'=' * 50}

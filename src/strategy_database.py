@@ -268,32 +268,6 @@ class StrategyDatabase:
             }
         return None
     
-    def get_strategy_trades(self, strategy_id: int) -> List[Dict]:
-        """Get all trades for a strategy"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT * FROM strategy_trades 
-            WHERE strategy_id = ? 
-            ORDER BY executed_at DESC
-        ''', (strategy_id,))
-        
-        rows = cursor.fetchall()
-        conn.close()
-        
-        return [
-            {
-                'symbol': row[2],
-                'action': row[3],
-                'shares': row[4],
-                'price': row[5],
-                'value': row[6],
-                'executed_at': row[8]
-            }
-            for row in rows
-        ]
-    
     def get_strategy_performance(self, strategy_id: int, days: int = 30) -> List[Dict]:
         """Get performance history for a strategy"""
         conn = sqlite3.connect(self.db_path)
@@ -320,18 +294,26 @@ class StrategyDatabase:
             for row in rows
         ]
     
-    def get_strategy_trades(self, strategy_id: int, limit: int = 100) -> List[Dict]:
+    def get_strategy_trades(self, strategy_id: int, limit: Optional[int] = None) -> List[Dict]:
         """Get trade history for a strategy"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT symbol, action, shares, price, value, executed_at, profit_loss, return_pct
-            FROM strategy_trades
-            WHERE strategy_id = ?
-            ORDER BY executed_at DESC
-            LIMIT ?
-        ''', (strategy_id, limit))
+
+        if limit is None:
+            cursor.execute('''
+                SELECT symbol, action, shares, price, value, executed_at, profit_loss, return_pct
+                FROM strategy_trades
+                WHERE strategy_id = ?
+                ORDER BY executed_at DESC
+            ''', (strategy_id,))
+        else:
+            cursor.execute('''
+                SELECT symbol, action, shares, price, value, executed_at, profit_loss, return_pct
+                FROM strategy_trades
+                WHERE strategy_id = ?
+                ORDER BY executed_at DESC
+                LIMIT ?
+            ''', (strategy_id, limit))
         
         rows = cursor.fetchall()
         conn.close()

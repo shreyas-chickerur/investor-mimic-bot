@@ -135,11 +135,40 @@ class DynamicAllocator:
                 for strategy_id in remaining_ids:
                     constrained_weights[strategy_id] = equal_weight
         
-        # Final normalization to ensure sum = 1.0
-        total_weight = sum(constrained_weights.values())
+        # Final adjustment to ensure sum = 1.0 while respecting bounds
+        adjusted_weights = constrained_weights.copy()
+        residual = 1.0 - sum(adjusted_weights.values())
+        tolerance = 1e-6
+
+        while abs(residual) > tolerance:
+            adjustable = [
+                sid for sid, weight in adjusted_weights.items()
+                if (residual > 0 and weight < self.max_allocation)
+                or (residual < 0 and weight > self.min_allocation)
+            ]
+
+            if not adjustable:
+                break
+
+            share = residual / len(adjustable)
+            for sid in adjustable:
+                current = adjusted_weights[sid]
+                proposed = current + share
+
+                if residual > 0:
+                    capped = min(self.max_allocation, proposed)
+                else:
+                    capped = max(self.min_allocation, proposed)
+
+                adjusted_weights[sid] = capped
+                residual -= (capped - current)
+
+            if abs(residual) <= tolerance:
+                break
+
         normalized_allocations = {
-            sid: (weight / total_weight) * self.total_capital
-            for sid, weight in constrained_weights.items()
+            sid: weight * self.total_capital
+            for sid, weight in adjusted_weights.items()
         }
         
         # Log allocations

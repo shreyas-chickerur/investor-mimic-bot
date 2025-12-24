@@ -38,6 +38,7 @@ class PortfolioBacktester:
         self.initial_capital = initial_capital
         self.start_date = pd.to_datetime(start_date) if start_date else None
         self.end_date = pd.to_datetime(end_date) if end_date else None
+        self.cash = initial_capital
         
         # Results tracking
         self.equity_curve = []
@@ -90,7 +91,7 @@ class PortfolioBacktester:
         logger.info(f"Backtesting {len(dates)} days from {dates[0]} to {dates[-1]}")
         
         # Initialize portfolio
-        cash = self.initial_capital
+        cash = self.cash
         portfolio_value = self.initial_capital
         
         # Track daily
@@ -185,6 +186,7 @@ class PortfolioBacktester:
             self._record_daily_snapshot(date, portfolio_value, cash, positions_value)
         
         # Calculate final metrics
+        self.cash = cash
         results = self._calculate_results()
         
         logger.info(f"Backtest complete: Final value ${portfolio_value:,.2f}")
