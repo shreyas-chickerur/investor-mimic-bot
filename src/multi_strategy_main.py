@@ -24,8 +24,8 @@ from strategies.strategy_news_sentiment import NewsSentimentStrategy
 from strategies.strategy_ma_crossover import MACrossoverStrategy
 from strategies.strategy_volatility_breakout import VolatilityBreakoutStrategy
 from alpaca.trading.client import TradingClient
-from alpaca.trading.requests import MarketOrderRequest, GetOrdersRequest
-from alpaca.trading.enums import OrderSide, TimeInForce, QueryOrderStatus
+from alpaca.trading.requests import MarketOrderRequest
+from alpaca.trading.enums import OrderSide, TimeInForce
 import pandas as pd
 
 # Import new modules for professional-grade system
@@ -98,12 +98,77 @@ class MultiStrategyRunner:
         self.errors = []
         self.executed_trades = []
         self.confirmed_fills = []  # Track confirmed fills from Alpaca
-        self.pending_orders = []   # Track pending/rejected orders
+        self.pending_orders = []   # Track pending orders from Alpaca
+        self.rejected_orders = []  # Track rejected/canceled orders from Alpaca
         
         # Track P&L metrics
         self.initial_portfolio_value = self.portfolio_value
         self.peak_portfolio_value = self.portfolio_value
         self.cumulative_pnl = 0.0
+        self.max_drawdown = 0.0
+
+    def _refresh_account_values(self):
+        """Refresh account values from Alpaca."""
+        account = self.trading_client.get_account()
+        self.portfolio_value = float(account.portfolio_value)
+        self.cash_available = float(account.cash)
+        return account
+
+    def update_pnl_metrics(self):
+        """Calculate and update daily/cumulative P&L and drawdown."""
+        account = self._refresh_account_values()
+        final_portfolio_value = float(account.portfolio_value)
+        daily_pnl = final_portfolio_value - self.initial_portfolio_value
+        self.cumulative_pnl += daily_pnl
+
+        if final_portfolio_value > self.peak_portfolio_value:
+            self.peak_portfolio_value = final_portfolio_value
+
+        drawdown = 0.0
+        if self.peak_portfolio_value > 0:
+            drawdown = ((self.peak_portfolio_value - final_portfolio_value) / self.peak_portfolio_value) * 100
+
+        if drawdown > self.max_drawdown:
+            self.max_drawdown = drawdown
+
+        return {
+            'final_portfolio_value': final_portfolio_value,
+            'daily_pnl': daily_pnl,
+            'cumulative_pnl': self.cumulative_pnl,
+            'drawdown': drawdown,
+            'max_drawdown': self.max_drawdown
+        }
+
+    def verify_order_statuses(self):
+        """Verify order status with Alpaca and track confirmed fills."""
+        self.confirmed_fills = []
+        self.pending_orders = []
+        self.rejected_orders = []
+
+        for trade in self.executed_trades:
+            order_id = trade.get('order_id')
+            if not order_id:
+                self.pending_orders.append({**trade, 'status': 'UNKNOWN'})
+                continue
+
+            try:
+                order = self.trading_client.get_order_by_id(order_id)
+                status = str(getattr(order, 'status', 'UNKNOWN')).lower()
+                if status == 'filled':
+                    self.confirmed_fills.append(trade)
+                elif status in {'canceled', 'rejected', 'expired'}:
+                    self.rejected_orders.append({**trade, 'status': status})
+                else:
+                    self.pending_orders.append({**trade, 'status': status})
+            except Exception as exc:
+                logger.error(f"Failed to verify order {order_id}: {exc}")
+                self.pending_orders.append({**trade, 'status': 'ERROR'})
+
+        logger.info(
+            "Confirmed fills: %s/%s",
+            len(self.confirmed_fills),
+            len(self.executed_trades)
+        )
         
     def initialize_strategies(self):
         """Initialize all 5 strategies with equal capital allocation"""
@@ -386,7 +451,6 @@ class MultiStrategyRunner:
                         'order_id': order.id
                     }
                     self.executed_trades.append(trade_info)
-                    self.pending_orders.append(trade_info)
                     
                     executed.append({
                         'strategy': strategy.name,
@@ -444,7 +508,8 @@ class MultiStrategyRunner:
                         'symbol': symbol,
                         'shares': shares,
                         'price': price,
-                        'action': 'SELL'
+                        'action': 'SELL',
+                        'order_id': order.id
                     }
                     executed.append(trade_record)
                     self.executed_trades.append(trade_record)
@@ -589,6 +654,9 @@ def main():
         # Generate report
         runner.generate_performance_report()
 
+        pnl_metrics = runner.update_pnl_metrics()
+        runner.verify_order_statuses()
+
         print("\n" + "=" * 80)
         print(f"✅ EXECUTION COMPLETE - {len(signals)} trades executed")
         print("=" * 80)
@@ -623,6 +691,11 @@ def main():
             data_freshness_hours = (datetime.now() - latest_date).total_seconds() / 3600
             data_freshness = f"{data_freshness_hours:.1f}h old"
             regime = runner.regime_detector.get_status()
+            warnings = []
+            if runner.pending_orders:
+                warnings.append(
+                    f"{len(runner.pending_orders)} orders pending confirmation"
+                )
             portfolio_heat = 0.0
             if runner.portfolio_value > 0:
                 total_exposure = sum(
@@ -659,19 +732,19 @@ def main():
                 rejected_signals=[],
                 executed_signals=runner.executed_signals,
                 placed_orders=placed_orders,
-                filled_orders=placed_orders,
-                rejected_orders=[],
+                filled_orders=runner.confirmed_fills,
+                rejected_orders=runner.rejected_orders,
                 portfolio_heat=portfolio_heat,
-                daily_pnl=0.0,
-                cumulative_pnl=0.0,
-                drawdown=0.0,
-                max_drawdown=0.0,
+                daily_pnl=pnl_metrics['daily_pnl'],
+                cumulative_pnl=pnl_metrics['cumulative_pnl'],
+                drawdown=pnl_metrics['drawdown'],
+                max_drawdown=pnl_metrics['max_drawdown'],
                 circuit_breaker_state="ACTIVE" if runner.portfolio_risk.trading_halted else "INACTIVE",
                 open_positions=open_positions,
                 runtime_seconds=time.time() - start_time,
                 data_freshness=data_freshness,
                 errors=runner.errors,
-                warnings=[],
+                warnings=warnings,
                 reconciliation_status=runner.reconciliation_status
             )
             artifact['system_health']['reconciliation_discrepancies'] = runner.reconciliation_discrepancies
