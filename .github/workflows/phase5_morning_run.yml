@@ -110,12 +110,3 @@ jobs:
           artifacts/
           logs/
         retention-days: 30
-    
-    - name: Step 4 - Commit results
-      if: success()
-      run: |
-        git config --global user.name "GitHub Actions"
-        git config --global user.email "actions@github.com"
-        git add artifacts/
-        git commit -m "Phase 5 Day 1 Complete (Automated via GitHub Actions)" || echo "No changes to commit"
-        git push origin main
