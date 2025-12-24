@@ -1,4 +1,43 @@
-# Status Update - Phase 5 Readiness (Dec 24, 2025, 1:35 AM PST)
+# Status Update - Phase 5 Wiring + Observability (Dec 24, 2025, 1:35 AM PST)
+
+## Latest Update (Mar 01, 2025)
+
+Phase 5 wiring/state correctness and observability has been aligned with the trading.db schema. This update focuses on the paper trading operational validation requirements (Phase 5) and removes the legacy StrategyDatabase dependency from the daily run.
+
+### ✅ Key Changes Implemented
+
+**Single Source of Truth (trading.db):**
+- `multi_strategy_main.py` now uses `Phase5Database` instead of legacy `StrategyDatabase`.
+- Signals are logged to `signals` with `asof_date`, and each reaches exactly one terminal state.
+
+**Terminal State Coverage:**
+- Signals filtered by correlation: `FILTERED` with reason `Correlation filter`
+- Signals beyond top-3 throttle: `FILTERED` with reason `Top signal limit`
+- Rejections due to risk/cash: `REJECTED` or `FILTERED` with explicit reason
+- Execution errors: `ERROR` terminal state
+
+**Trade Execution Costs:**
+- Trades recorded with `requested_price`, `exec_price`, `slippage_cost`, `commission_cost`, `total_cost`, and `notional`
+- Console output now prints `exec_price` (not raw price)
+
+**Positions & Reconciliation:**
+- Positions updated in `positions` table after BUY/SELL executions
+- `broker_state` snapshot saved to `broker_state` table on reconciliation
+
+**Risk Heat Propagation:**
+- Total exposure now updates across strategies during a run
+
+**Account State Refresh:**
+- Fresh broker account state is fetched:
+  - at run start
+  - right before reconciliation
+  - after execution (before artifacts + email)
+
+**DB Schema Enhancements:**
+- `strategy_performance` table created in trading.db (used by runner for performance history)
+- Idempotent migration ensures trades table includes execution cost columns
+
+---
 
 ## Executive Summary
 

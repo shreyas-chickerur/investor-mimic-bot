@@ -29,6 +29,7 @@
 
 **Database Tables Created:**
 - `strategies` - Strategy definitions
+- `strategy_performance` - Daily performance snapshots
 - `signals` - Trading signals with terminal states
 - `trades` - Executed trades with full cost breakdown
 - `positions` - Current open positions
