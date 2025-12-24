@@ -43,6 +43,7 @@ class MACrossoverStrategy(TradingStrategy):
             
             current = symbol_data.iloc[-1]
             previous = symbol_data.iloc[-2]
+            latest_date = symbol_data.index[-1]
             
             price = current['close']
             ma_short_current = current['ma_short']
@@ -67,7 +68,8 @@ class MACrossoverStrategy(TradingStrategy):
                     'price': price,
                     'value': shares * price,
                     'confidence': min(adx / 40, 1.0),  # Higher confidence for stronger trends
-                    'reasoning': f'Golden cross: {self.short_window}MA crossed above {self.long_window}MA, ADX={adx:.1f}'
+                    'reasoning': f'Golden cross: {self.short_window}MA crossed above {self.long_window}MA, ADX={adx:.1f}',
+                    'asof_date': latest_date
                 })
             
             # Death cross: short MA crosses below long MA
@@ -82,7 +84,8 @@ class MACrossoverStrategy(TradingStrategy):
                     'price': price,
                     'value': shares * price,
                     'confidence': 0.8,
-                    'reasoning': f'Death cross: {self.short_window}MA crossed below {self.long_window}MA'
+                    'reasoning': f'Death cross: {self.short_window}MA crossed below {self.long_window}MA',
+                    'asof_date': latest_date
                 })
         
         return signals
