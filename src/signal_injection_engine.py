@@ -13,7 +13,10 @@ This is NEVER used in production trading.
 """
 import logging
 from typing import List, Dict
-import yaml
+try:
+    import yaml
+except ImportError:  # pragma: no cover - optional dependency
+    yaml = None
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -35,8 +38,20 @@ class SignalInjectionEngine:
         if config_path is None:
             config_path = Path(__file__).parent.parent / 'config' / 'validation_config.yaml'
         
-        with open(config_path, 'r') as f:
-            self.config = yaml.safe_load(f)
+        if yaml is None:
+            logger.warning("PyYAML not installed; signal injection disabled")
+            self.config = {
+                'validation_mode': {
+                    'signal_injection': {
+                        'enabled': False,
+                        'inject_count': 0
+                    }
+                },
+                'signal_injection_templates': []
+            }
+        else:
+            with open(config_path, 'r') as f:
+                self.config = yaml.safe_load(f)
         
         self.enabled = self.config['validation_mode']['signal_injection']['enabled']
         self.templates = self.config.get('signal_injection_templates', [])
