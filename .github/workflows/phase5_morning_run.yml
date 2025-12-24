@@ -29,6 +29,8 @@ jobs:
         python scripts/init_database.py --db trading.db
     
     - name: Update market data
+      env:
+        ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
       run: |
         python scripts/fetch_extended_historical_data.py
     
