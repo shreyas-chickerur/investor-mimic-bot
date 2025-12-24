@@ -24,8 +24,8 @@ from strategies.strategy_news_sentiment import NewsSentimentStrategy
 from strategies.strategy_ma_crossover import MACrossoverStrategy
 from strategies.strategy_volatility_breakout import VolatilityBreakoutStrategy
 from alpaca.trading.client import TradingClient
-from alpaca.trading.requests import MarketOrderRequest
-from alpaca.trading.enums import OrderSide, TimeInForce
+from alpaca.trading.requests import MarketOrderRequest, GetOrdersRequest
+from alpaca.trading.enums import OrderSide, TimeInForce, QueryOrderStatus
 import pandas as pd
 
 # Import new modules for professional-grade system
@@ -97,7 +97,14 @@ class MultiStrategyRunner:
         # Track errors and executed trades for email reporting
         self.errors = []
         self.executed_trades = []
-    
+        self.confirmed_fills = []  # Track confirmed fills from Alpaca
+        self.pending_orders = []   # Track pending/rejected orders
+        
+        # Track P&L metrics
+        self.initial_portfolio_value = self.portfolio_value
+        self.peak_portfolio_value = self.portfolio_value
+        self.cumulative_pnl = 0.0
+        
     def initialize_strategies(self):
         """Initialize all 5 strategies with equal capital allocation"""
         # CRITICAL FIX: Use portfolio value for allocation, not just cash
@@ -369,6 +376,17 @@ class MultiStrategyRunner:
                         shares * price,
                         order.id
                     )
+                    
+                    # Track as executed (will verify fill status later)
+                    trade_info = {
+                        'symbol': signal['symbol'],
+                        'action': signal['action'],
+                        'shares': shares,
+                        'price': signal['price'],
+                        'order_id': order.id
+                    }
+                    self.executed_trades.append(trade_info)
+                    self.pending_orders.append(trade_info)
                     
                     executed.append({
                         'strategy': strategy.name,
