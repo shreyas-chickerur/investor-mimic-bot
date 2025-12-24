@@ -8,6 +8,7 @@ CONFIGURATION:
 - Preferred 15 years (5475 days)
 - Daily OHLCV bars
 - Same 36 large-cap US stocks
+- PREMIUM API: Parallel requests enabled
 """
 import os
 import sys
@@ -37,24 +38,31 @@ STOCK_SYMBOLS = [
 ]
 
 class ExtendedDataFetcher:
-    """Fetch extended historical data"""
+    """Fetch extended historical data with premium API support"""
     
-    def __init__(self, api_key: str = None, years: int = 15):
+    def __init__(self, api_key: str = None, years: int = 15, premium: bool = True):
         """
         Initialize fetcher
         
         Args:
             api_key: Alpha Vantage API key
             years: Years of history to fetch (default 15)
+            premium: Use premium API features (default True)
         """
         self.api_key = api_key or os.getenv('ALPHA_VANTAGE_API_KEY')
         if not self.api_key:
             raise ValueError("ALPHA_VANTAGE_API_KEY not set")
         
         self.years = years
+        self.premium = premium
         self.base_url = "https://www.alphavantage.co/query"
         
-        logger.info(f"Fetcher initialized: {years} years of data")
+        # Premium: 75 requests/min, 15 workers optimal
+        # Free: 5 requests/min, 1 worker
+        self.max_workers = 15 if premium else 1
+        
+        logger.info(f"Fetcher initialized: {years} years, {'PREMIUM' if premium else 'FREE'} tier")
+        logger.info(f"Max parallel workers: {self.max_workers}")
     
     def fetch_stock_data(self, symbol: str) -> pd.DataFrame:
         """
