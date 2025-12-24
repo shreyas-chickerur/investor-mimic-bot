@@ -137,38 +137,76 @@ class ExtendedDataFetcher:
             logger.error(f"Error fetching {symbol}: {e}")
             return None
     
-    def fetch_all_stocks(self, delay_seconds: int = 12) -> pd.DataFrame:
-        """
-        Fetch data for all stocks
+    def fetch_all_stocks(self) -> pd.DataFrame:
+        """Fetch data for all stocks (parallel for premium, sequential for free)"""
+        if self.premium:
+            return self._fetch_parallel()
+        else:
+            return self._fetch_sequential()
+    
+    def _fetch_parallel(self) -> pd.DataFrame:
+        """Fetch stocks in parallel (premium API)"""
+        logger.info(f"Fetching {len(STOCK_SYMBOLS)} stocks in parallel ({self.max_workers} workers)...")
+        logger.info(f"Estimated time: {len(STOCK_SYMBOLS) / self.max_workers / 75 * 60:.1f} minutes")
         
-        Args:
-            delay_seconds: Delay between API calls (Alpha Vantage limit: 5 calls/min)
+        all_data = []
+        failed = []
+        
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            future_to_symbol = {executor.submit(self.fetch_stock_data, symbol): symbol 
+                              for symbol in STOCK_SYMBOLS}
             
-        Returns:
-            Combined DataFrame
-        """
-        logger.info(f"Fetching {len(STOCK_SYMBOLS)} stocks with {delay_seconds}s delay...")
+            for i, future in enumerate(as_completed(future_to_symbol), 1):
+                symbol = future_to_symbol[future]
+                try:
+                    df = future.result()
+                    if df is not None and len(df) > 0:
+                        all_data.append(df)
+                        logger.info(f"[{i}/{len(STOCK_SYMBOLS)}] ✅ {symbol}")
+                    else:
+                        failed.append(symbol)
+                        logger.warning(f"[{i}/{len(STOCK_SYMBOLS)}] ❌ {symbol} - No data")
+                except Exception as e:
+                    failed.append(symbol)
+                    logger.error(f"[{i}/{len(STOCK_SYMBOLS)}] ❌ {symbol} - {e}")
+        
+        if failed:
+            logger.warning(f"Failed to fetch {len(failed)} symbols: {failed}")
+        
+        if not all_data:
+            raise ValueError("No data fetched for any symbol")
+        
+        combined = pd.concat(all_data, ignore_index=True)
+        combined = combined.sort_values(['date', 'symbol'])
+        
+        logger.info(f"\nTotal records: {len(combined)}")
+        logger.info(f"Date range: {combined['date'].min().date()} to {combined['date'].max().date()}")
+        logger.info(f"Symbols: {combined['symbol'].nunique()}")
+        
+        return combined
+    
+    def _fetch_sequential(self) -> pd.DataFrame:
+        """Fetch stocks sequentially (free API)"""
+        delay_seconds = 12
+        logger.info(f"Fetching {len(STOCK_SYMBOLS)} stocks sequentially ({delay_seconds}s delay)...")
         logger.info(f"Estimated time: {len(STOCK_SYMBOLS) * delay_seconds / 60:.1f} minutes")
         
         all_data = []
         
         for i, symbol in enumerate(STOCK_SYMBOLS, 1):
-            logger.info(f"\n[{i}/{len(STOCK_SYMBOLS)}] {symbol}")
+            logger.info(f"[{i}/{len(STOCK_SYMBOLS)}] {symbol}")
             
             df = self.fetch_stock_data(symbol)
             
             if df is not None and len(df) > 0:
                 all_data.append(df)
             
-            # Delay to respect API limits
             if i < len(STOCK_SYMBOLS):
-                logger.info(f"Waiting {delay_seconds}s...")
                 time.sleep(delay_seconds)
         
         if not all_data:
             raise ValueError("No data fetched for any symbol")
         
-        # Combine all data
         combined = pd.concat(all_data, ignore_index=True)
         combined = combined.sort_values(['date', 'symbol'])
         
