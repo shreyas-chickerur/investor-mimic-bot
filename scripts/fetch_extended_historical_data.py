@@ -246,7 +246,7 @@ def main():
     logger.info("="*80)
     
     # Initialize fetcher (premium=True by default)
-    fetcher = ExtendedDataFetcher(years=15, premium=True)
+    fetcher = ExtendedDataFetcher(years=15)
     
     # Fetch all stock data
     logger.info("\nFetching stock data...")
