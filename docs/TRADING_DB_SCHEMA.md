@@ -24,7 +24,27 @@ Stores trading strategy definitions.
 
 ---
 
-### 2. `signals`
+### 2. `strategy_performance`
+
+Daily performance snapshots per strategy.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | INTEGER | PRIMARY KEY AUTOINCREMENT | Snapshot ID |
+| `strategy_id` | INTEGER | NOT NULL, FK → strategies.id | Strategy ID |
+| `date` | TEXT | NOT NULL | Snapshot date |
+| `portfolio_value` | REAL | NOT NULL | Total portfolio value |
+| `cash` | REAL | NOT NULL | Cash on hand |
+| `positions_value` | REAL | NOT NULL | Value of open positions |
+| `total_return_pct` | REAL | NOT NULL | Total return percentage |
+| `daily_return_pct` | REAL | | Daily return percentage |
+| `num_positions` | INTEGER | | Open positions count |
+| `num_trades_today` | INTEGER | | Trades executed today |
+| `created_at` | TEXT | DEFAULT CURRENT_TIMESTAMP | Creation timestamp |
+
+---
+
+### 3. `signals`
 
 Trading signals with terminal state tracking.
 
@@ -46,7 +66,7 @@ Trading signals with terminal state tracking.
 
 ---
 
-### 3. `trades`
+### 4. `trades`
 
 Executed trades with full cost breakdown.
 
@@ -74,7 +94,7 @@ Executed trades with full cost breakdown.
 
 ---
 
-### 4. `positions`
+### 5. `positions`
 
 Current open positions.
 
@@ -94,7 +114,7 @@ Current open positions.
 
 ---
 
-### 5. `broker_state`
+### 6. `broker_state`
 
 Daily broker state snapshots for reconciliation.
 
@@ -112,7 +132,7 @@ Daily broker state snapshots for reconciliation.
 
 ---
 
-### 6. `system_state`
+### 7. `system_state`
 
 System-wide state tracking.
 
