@@ -2,31 +2,26 @@
 
 **Auto-generated documentation for all scripts and Make commands**
 
-Last updated: Auto-updates on each run
+Last updated: 2025-12-24 01:34:13
 
 ---
 
 ## Make Commands
 
 ### Data Management
-- **`make update-data`** - Download latest market data for all symbols (runs `fetch_extended_historical_data.py`)
-- **`make clean-data`** - Remove all downloaded market data files
+- **`make update-data`** - No description
 
 ### Testing
-- **`make test`** - Run all tests (unit + integration)
-- **`make test-single`** - Run single strategy test for quick validation
+- **`make test`** - Testing
+- **`make test-single`** - No description
 
 ### Execution
-- **`make run`** - Execute the trading system (multi-strategy)
-- **`make dry-run`** - Run system in dry-run mode (no broker orders)
+- **`make run`** - Main execution
 
 ### Database
-- **`make init-db`** - Initialize trading database with all required tables
-- **`make reset-db`** - Reset database to clean state (WARNING: deletes all data)
 
 ### Utilities
-- **`make clean`** - Remove temporary files and caches
-- **`make help`** - Show all available Make commands
+- **`make clean`** - Cleanup
 
 ---
 
@@ -34,127 +29,70 @@ Last updated: Auto-updates on each run
 
 ### Data Scripts
 **`scripts/fetch_extended_historical_data.py`**
-- Downloads historical market data for all configured symbols
-- Updates: `data/SYMBOL.csv` files
-- Auto-runs: Via `make update-data`
-- Usage: `python3 scripts/fetch_extended_historical_data.py`
+- Fetch Extended Historical Data
 
-### Database Scripts
+**`scripts/fetch_historical_data_yfinance.py`**
+- Fetch Extended Historical Data using yfinance (FREE)
+
 **`scripts/init_database.py`**
-- Initializes trading database with all required tables
-- Creates: strategies, trades, system_state, positions tables
-- Safe to run multiple times (idempotent)
-- Usage: `python3 scripts/init_database.py [--db PATH]`
-- Auto-runs: In GitHub Actions before tests
+- Initialize trading database for CI/CD and fresh installations
+
+**`scripts/sync_database.py`**
+- Database Sync Script
+
+**`scripts/update_data.py`**
+- Quick Data Update Script
 
 ### Phase 5 Scripts
 **`scripts/fresh_start_phase5.py`**
-- Closes all broker positions and resets database for Phase 5
-- Steps: Close positions → Reset DB → Verify reconciliation
-- Usage: `python3 scripts/fresh_start_phase5.py`
-- When: One-time at Phase 5 start
-
-**`scripts/phase5_weekly_review.py`**
-- Analyzes last 7 days of Phase 5 execution
-- Shows: Success rate, signals, trades, failed days
-- Usage: `python3 scripts/phase5_weekly_review.py`
-- When: Every Friday during Phase 5
+- Phase 5 Fresh Start Script
 
 **`scripts/generate_phase5_report.py`**
-- Generates comprehensive Phase 5 completion report
-- Analyzes: All days, success criteria, incidents, statistics
-- Output: `docs/PHASE_5_COMPLETION_REPORT.md`
-- Usage: `python3 scripts/generate_phase5_report.py`
-- When: After 14-30 days of Phase 5
+- Generate Phase 5 Completion Report
 
-**`scripts/download_github_artifacts.py`**
-- Downloads all GitHub Actions artifacts (last 30 days)
-- Requires: GitHub CLI (`brew install gh`, `gh auth login`)
-- Downloads to: `artifacts_backup/TIMESTAMP/`
-- Usage: `python3 scripts/download_github_artifacts.py`
-- When: To backup or analyze CI/CD artifacts
+**`scripts/phase5_weekly_review.py`**
+- Phase 5 Weekly Review Script
 
 ### Testing Scripts
-**`scripts/test_single_strategy.py`**
-- Tests a single strategy in isolation
-- Quick validation for strategy logic
-- Usage: `python3 scripts/test_single_strategy.py`
-
 **`scripts/debug_single_signal.py`**
-- Debug execution pipeline for a single signal
-- Traces signal through all stages
-- Usage: `python3 scripts/debug_single_signal.py`
+- Deep-dive debugging: Trace a single signal through the entire execution pipeline
+
+**`scripts/run_simple_backtest.py`**
+- Simple backtest runner - focuses on getting trades to execute
 
 **`scripts/run_validation_backtest.py`**
-- Runs validation backtest to ensure trades execute
-- Quick smoke test for system functionality
-- Usage: `python3 scripts/run_validation_backtest.py`
+- Phase 4 Validation Backtest Runner
 
----
+**`scripts/run_walkforward_backtest.py`**
+- Walk-Forward Backtest Runner
 
-## Source Files (src/)
+**`scripts/stress_test_periods.py`**
+- Stress Test Framework
 
-### Main Execution
-**`src/multi_strategy_main.py`**
-- Main entry point for trading system
-- Orchestrates: Data loading, signal generation, execution, reconciliation
-- Usage: `python3 src/multi_strategy_main.py`
-- Environment: Set `ENABLE_BROKER_RECONCILIATION=true` for production
+**`scripts/test_backtest_minimal.py`**
+- Minimal backtest test to trace signal flow
 
-### Core Components
-**`src/portfolio_backtester.py`**
-- Portfolio-level backtesting engine
-- Manages: Multiple strategies, capital allocation, position tracking
+**`scripts/test_single_strategy.py`**
+- Test individual strategies to verify signal generation
 
-**`src/strategy_database.py`**
-- Database interface for strategy performance tracking
-- Tables: strategies, trades, performance, signals
+### Other Scripts
+**`scripts/add_missing_indicators.py`**
+- Add missing technical indicators to training data
 
-**`src/broker_reconciler.py`**
-- Reconciles local state with broker state
-- Ensures: Data integrity, no phantom positions/trades
-- Critical: Must pass with 0 discrepancies
+**`scripts/download_github_artifacts.py`**
+- Download all GitHub Actions artifacts for Phase 5
 
-**`src/cash_manager.py`**
-- Manages cash allocation across strategies
-- Tracks: Available cash, reserved cash, per-strategy budgets
+**`scripts/generate_docs.py`**
+- Auto-generate SCRIPTS_AND_COMMANDS.md documentation
 
-**`src/email_notifier.py`**
-- Sends email notifications for critical events
-- Methods: `send_daily_summary()`, `send_alert()`
+**`scripts/generate_validation_plots.py`**
+- Validation Plot Generation
 
-**`src/signal_flow_tracer.py`**
-- Traces signals through execution pipeline
-- Ensures: All signals reach terminal state (no silent drops)
+**`scripts/multi_strategy_analysis.py`**
+- Multi-Strategy Analysis - Check all 5 strategies for signals
 
-**`src/signal_flow_tracer_extended.py`**
-- Extended signal flow tracing with terminal state enforcement
-- Phase 5 requirement: Exactly one terminal state per signal
-
-**`src/dry_run_executor.py`**
-- Executes trades in dry-run mode (no broker orders)
-- For: Testing and validation without real trades
-
-### Strategy Files
-**`src/strategies/strategy_rsi_mean_reversion.py`**
-- RSI-based mean reversion strategy
-- Signals: Buy oversold, sell overbought
-
-**`src/strategies/strategy_ml_momentum.py`**
-- Machine learning momentum strategy
-- Model: Logistic regression with feature engineering
-
-**`src/strategies/strategy_news_sentiment.py`**
-- News sentiment-based trading strategy
-- Uses: NewsAPI or heuristic fallback
-
-**`src/strategies/strategy_ma_crossover.py`**
-- Moving average crossover strategy
-- Signals: Golden cross (buy), death cross (sell)
-
-**`src/strategies/strategy_volatility_breakout.py`**
-- Volatility breakout strategy
-- Signals: Price breaks out of volatility bands
+**`scripts/view_strategy_performance.py`**
+- View Multi-Strategy Performance Dashboard
 
 ---
 
@@ -223,4 +161,9 @@ python3 scripts/generate_phase5_report.py
 **Download CI/CD artifacts:**
 ```bash
 python3 scripts/download_github_artifacts.py
+```
+
+**Regenerate this documentation:**
+```bash
+python3 scripts/generate_docs.py
 ```
