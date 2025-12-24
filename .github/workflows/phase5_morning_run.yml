@@ -1,0 +1,113 @@
+name: Phase 5 Morning Execution
+
+on:
+  schedule:
+    # Runs at 6:30 AM PST (14:30 UTC) every day
+    - cron: '30 14 * * *'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  morning-execution:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.8'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Initialize database
+      run: |
+        python scripts/init_database.py --db trading.db
+    
+    - name: Step 1 - Verify positions cleared
+      env:
+        ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+        ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+        ALPACA_PAPER: true
+      run: |
+        python3 -c "
+        import sys
+        sys.path.insert(0, 'src')
+        from broker_reconciler import BrokerReconciler
+        
+        r = BrokerReconciler()
+        s = r.get_broker_state()
+        print(f'Positions: {len(s[\"positions\"])}')
+        print(f'Cash: \${s[\"cash\"]:,.2f}')
+        
+        if len(s['positions']) == 0:
+            print('✅ READY FOR DAY 1')
+            sys.exit(0)
+        else:
+            print(f'⚠️ {len(s[\"positions\"])} positions remain - aborting')
+            sys.exit(1)
+        "
+    
+    - name: Step 2 - Run Day 1 execution
+      env:
+        ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+        ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+        ALPACA_PAPER: true
+        ENABLE_BROKER_RECONCILIATION: true
+      run: |
+        python3 src/multi_strategy_main.py
+    
+    - name: Step 3 - Verify success
+      run: |
+        python3 -c "
+        import json
+        from datetime import datetime
+        from pathlib import Path
+        import sys
+        
+        date = datetime.now().strftime('%Y-%m-%d')
+        json_path = Path(f'artifacts/json/{date}.json')
+        
+        if json_path.exists():
+            with open(json_path) as f:
+                data = json.load(f)
+            
+            recon = data.get('reconciliation_status', 'UNKNOWN')
+            discrep = len(data.get('reconciliation_discrepancies', []))
+            
+            print(f'Reconciliation: {recon}')
+            print(f'Discrepancies: {discrep}')
+            
+            if 'PASS' in recon and discrep == 0:
+                print('✅ DAY 1 COMPLETE - Phase 5 started!')
+                sys.exit(0)
+            else:
+                print('❌ Reconciliation failed')
+                sys.exit(1)
+        else:
+            print(f'❌ No artifact found for {date}')
+            sys.exit(1)
+        "
+    
+    - name: Upload artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: phase5-day1-artifacts
+        path: |
+          artifacts/
+          logs/
+        retention-days: 30
+    
+    - name: Step 4 - Commit results
+      if: success()
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+        git add artifacts/ logs/
+        git commit -m "Phase 5 Day 1 Complete (Automated via GitHub Actions)" || echo "No changes to commit"
+        git push origin main
