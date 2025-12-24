@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 from datetime import datetime
 import logging
+import time
 
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
@@ -37,6 +38,8 @@ from regime_detector import RegimeDetector
 from dynamic_allocator import DynamicAllocator
 from execution_costs import ExecutionCostModel
 from performance_metrics import PerformanceMetrics
+from broker_reconciler import BrokerReconciler
+from daily_artifact_writer import DailyArtifactWriter, create_artifact_data
 
 # Setup logging - CRITICAL FIX: Ensure logs directory exists
 Path('logs').mkdir(exist_ok=True)
@@ -63,7 +66,11 @@ class MultiStrategyRunner:
         if not api_key or not secret_key:
             raise ValueError("Missing Alpaca credentials")
         
-        self.trading_client = TradingClient(api_key, secret_key, paper=True)
+        paper_mode = os.getenv('ALPACA_PAPER', 'true').lower() == 'true'
+        live_enabled = os.getenv('ALPACA_LIVE_ENABLED', 'false').lower() == 'true'
+        if not paper_mode and not live_enabled:
+            raise ValueError("Live trading disabled. Set ALPACA_LIVE_ENABLED=true to trade live.")
+        self.trading_client = TradingClient(api_key, secret_key, paper=paper_mode)
         
         # Get account info - CRITICAL FIX: Use portfolio value, not just cash
         account = self.trading_client.get_account()
@@ -82,6 +89,7 @@ class MultiStrategyRunner:
         self.dynamic_allocator = DynamicAllocator(self.portfolio_value)
         self.cost_model = ExecutionCostModel()
         self.performance_metrics = PerformanceMetrics()
+        self.broker_reconciler = BrokerReconciler(email_notifier=self.email_notifier)
         
         # Set daily start value for risk management
         self.portfolio_risk.set_daily_start_value(self.portfolio_value)
@@ -138,6 +146,7 @@ class MultiStrategyRunner:
             
             # Build positions dict
             positions = {}
+            entry_dates = {}
             for trade in trades:
                 if trade['action'] == 'BUY':
                     symbol = trade['symbol']
@@ -146,6 +155,7 @@ class MultiStrategyRunner:
                         positions[symbol] += shares
                     else:
                         positions[symbol] = shares
+                    entry_dates[symbol] = trade.get('executed_at')
                 elif trade['action'] == 'SELL':
                     symbol = trade['symbol']
                     shares = trade['shares']
@@ -153,12 +163,15 @@ class MultiStrategyRunner:
                         positions[symbol] -= shares
                         if positions[symbol] <= 0:
                             del positions[symbol]
+                            entry_dates.pop(symbol, None)
             
             strategy.positions = positions
+            strategy.entry_dates = entry_dates
             logger.info(f"  Loaded {len(positions)} positions for {strategy.name}")
         except Exception as e:
             logger.error(f"Error loading positions for {strategy.name}: {e}")
             strategy.positions = {}
+            strategy.entry_dates = {}
     
     def _create_strategy_instance(self, strategy_id, name, capital):
         """Create strategy instance based on name"""
@@ -182,6 +195,23 @@ class MultiStrategyRunner:
         if not data_file.exists():
             logger.error(f"Data file not found: {data_file}")
             return None
+
+        is_valid, errors = self.data_validator.validate_data_file(data_file)
+        if not is_valid:
+            auto_update = os.getenv('AUTO_UPDATE_DATA', 'false').lower() == 'true'
+            if auto_update:
+                logger.warning("Data validation failed; attempting auto-update.")
+                try:
+                    from scripts import update_data
+                    update_data.main()
+                    is_valid, errors = self.data_validator.validate_data_file(data_file)
+                except Exception as exc:
+                    errors.append(str(exc))
+            if not is_valid:
+                error_message = "Data validation failed:\n" + "\n".join(f"  - {e}" for e in errors)
+                self.errors.append(error_message)
+                logger.error(error_message)
+                return None
         
         df = pd.read_csv(data_file, index_col=0)
         df.index = pd.to_datetime(df.index)
@@ -198,6 +228,35 @@ class MultiStrategyRunner:
     def run_all_strategies(self, market_data):
         """Run all strategies and execute trades"""
         strategies = self.initialize_strategies()
+        self.raw_signals_by_strategy = {}
+        self.executed_signals = []
+        self.reconciliation_status = "SKIPPED"
+        self.reconciliation_discrepancies = []
+        current_prices = market_data.groupby('symbol')['close'].last().to_dict()
+        allocations = self._calculate_dynamic_allocations(strategies)
+        exposures = self._calculate_strategy_exposures(strategies, current_prices)
+        self._apply_allocations(strategies, allocations, exposures)
+        total_exposure = sum(exposures.values())
+
+        regime_adjustments = self.regime_detector.get_regime_adjustments(market_data=market_data)
+        self.portfolio_risk.max_portfolio_heat = regime_adjustments['max_portfolio_heat']
+
+        if not self.portfolio_risk.check_daily_loss_limit(self.portfolio_value):
+            logger.warning("Trading halted due to daily loss limit")
+            return []
+
+        if os.getenv('ENABLE_BROKER_RECONCILIATION', 'false').lower() == 'true':
+            local_positions = self._build_local_positions()
+            success, discrepancies = self.broker_reconciler.reconcile_daily(
+                local_positions=local_positions,
+                local_cash=self.cash_available
+            )
+            self.reconciliation_status = "PASS" if success else "FAIL"
+            self.reconciliation_discrepancies = discrepancies
+            if not success:
+                logger.error("Broker reconciliation failed; trading paused")
+                self.errors.extend(discrepancies)
+                return []
         
         print("\n" + "=" * 80)
         print("MULTI-STRATEGY EXECUTION")
@@ -210,11 +269,23 @@ class MultiStrategyRunner:
             print("-" * 80)
             
             try:
+                if not self.regime_detector.should_enable_strategy(strategy.name, regime_adjustments):
+                    logger.info(f"Skipping {strategy.name} due to regime adjustments")
+                    continue
+
                 signals = strategy.generate_signals(market_data)
+                self.raw_signals_by_strategy[strategy.name] = list(signals) if signals else []
                 
                 if signals and len(signals) > 0:
                     print(f"✅ Generated {len(signals)} signals")
-                    
+
+                    combined_positions = self._get_all_positions(strategies)
+                    signals = self.correlation_filter.filter_signals(
+                        signals,
+                        combined_positions,
+                        market_data
+                    )
+
                     # Log signals to database
                     for signal in signals:
                         self.db.log_signal(
@@ -226,22 +297,28 @@ class MultiStrategyRunner:
                         )
                     
                     # Execute trades
-                    executed = self._execute_strategy_trades(strategy, signals[:3])  # Top 3 signals
+                    executed = self._execute_strategy_trades(
+                        strategy,
+                        signals[:3],
+                        total_exposure,
+                        self.portfolio_value
+                    )  # Top 3 signals
+                    self.executed_signals.extend(executed)
                     all_signals.extend(executed)
                 else:
                     print("❌ No signals generated")
                 
                 # Record daily performance
-                current_prices = market_data.groupby('symbol')['close'].last().to_dict()
                 self._record_performance(strategy, current_prices)
                 
             except Exception as e:
                 logger.error(f"Error in {strategy.name}: {e}")
                 print(f"❌ Error: {e}")
+                self.errors.append(f"{strategy.name}: {e}")
         
         return all_signals
     
-    def _execute_strategy_trades(self, strategy, signals):
+    def _execute_strategy_trades(self, strategy, signals, total_exposure, portfolio_value):
         """Execute trades for a specific strategy"""
         executed = []
         
@@ -253,6 +330,18 @@ class MultiStrategyRunner:
             
             if action == 'BUY' and shares > 0:
                 try:
+                    exec_price, slippage_cost, commission_cost, total_cost = self.cost_model.calculate_execution_price(
+                        price, 'BUY', shares
+                    )
+                    trade_value = exec_price * shares + total_cost
+                    if not self.cash_manager.reserve_cash(strategy.strategy_id, trade_value):
+                        logger.warning(f"Skipping {symbol} - insufficient cash for strategy {strategy.strategy_id}")
+                        continue
+                    if not self.portfolio_risk.can_add_position(trade_value, total_exposure, portfolio_value):
+                        logger.warning(f"Skipping {symbol} - portfolio heat limit")
+                        self.cash_manager.release_cash(strategy.strategy_id, trade_value)
+                        continue
+
                     order_data = MarketOrderRequest(
                         symbol=symbol,
                         qty=shares,
@@ -263,6 +352,13 @@ class MultiStrategyRunner:
                     
                     print(f"  ✅ BUY {shares} {symbol} @ ${price:.2f} (Order: {order.id})")
                     
+                    strategy.add_position(symbol, shares)
+                    strategy.update_capital(-trade_value)
+                    entry_date = signal.get('asof_date') or datetime.now()
+                    strategy.entry_dates[symbol] = entry_date
+                    total_exposure += trade_value
+                    self.performance_metrics.add_trade('BUY', symbol, shares, exec_price, trade_value)
+
                     # Log trade
                     self.db.log_trade(
                         strategy.strategy_id,
@@ -278,7 +374,8 @@ class MultiStrategyRunner:
                         'strategy': strategy.name,
                         'symbol': symbol,
                         'shares': shares,
-                        'price': price
+                        'price': price,
+                        'action': 'BUY'
                     })
                     
                 except Exception as e:
@@ -287,6 +384,9 @@ class MultiStrategyRunner:
                     
             elif action == 'SELL' and shares > 0:
                 try:
+                    exec_price, slippage_cost, commission_cost, total_cost = self.cost_model.calculate_execution_price(
+                        price, 'SELL', shares
+                    )
                     order_data = MarketOrderRequest(
                         symbol=symbol,
                         qty=shares,
@@ -298,7 +398,9 @@ class MultiStrategyRunner:
                     print(f"  ✅ SELL {shares} {symbol} @ ${price:.2f} (Order: {order.id})")
                     
                     # Release cash back
-                    self.cash_manager.release_cash(strategy.strategy_id, shares * price)
+                    trade_value = exec_price * shares - total_cost
+                    self.cash_manager.release_cash(strategy.strategy_id, trade_value)
+                    strategy.update_capital(trade_value)
                     
                     # Log trade
                     self.db.log_trade(
@@ -316,6 +418,8 @@ class MultiStrategyRunner:
                         strategy.positions[symbol] -= shares
                         if strategy.positions[symbol] <= 0:
                             del strategy.positions[symbol]
+                            strategy.entry_dates.pop(symbol, None)
+                            total_exposure = max(total_exposure - trade_value, 0)
                     
                     trade_record = {
                         'strategy': strategy.name,
@@ -326,6 +430,7 @@ class MultiStrategyRunner:
                     }
                     executed.append(trade_record)
                     self.executed_trades.append(trade_record)
+                    self.performance_metrics.add_trade('SELL', symbol, shares, exec_price, trade_value)
                 except Exception as e:
                     logger.error(f"Failed to execute {symbol}: {e}")
                     print(f"  ❌ Failed {symbol}: {e}")
@@ -345,6 +450,71 @@ class MultiStrategyRunner:
             return_pct,
             len(strategy.positions)
         )
+
+    def _get_all_positions(self, strategies):
+        """Combine positions across strategies"""
+        combined = {}
+        for strategy in strategies:
+            for symbol, shares in strategy.positions.items():
+                combined[symbol] = combined.get(symbol, 0) + shares
+        return combined
+
+    def _build_local_positions(self):
+        """Build local positions with qty and avg price for reconciliation."""
+        local_positions = {}
+        strategies = self.db.get_all_strategies()
+        for strategy in strategies:
+            trades = self.db.get_strategy_trades(strategy['id'])
+            for trade in trades:
+                symbol = trade['symbol']
+                action = trade['action']
+                shares = trade['shares']
+                price = trade['price']
+                position = local_positions.setdefault(symbol, {'qty': 0, 'avg_price': 0})
+                if action == 'BUY':
+                    total_cost = position['avg_price'] * position['qty'] + price * shares
+                    position['qty'] += shares
+                    position['avg_price'] = total_cost / position['qty'] if position['qty'] else 0
+                elif action == 'SELL':
+                    position['qty'] -= shares
+                    if position['qty'] <= 0:
+                        local_positions.pop(symbol, None)
+        return local_positions
+
+    def _calculate_dynamic_allocations(self, strategies):
+        """Calculate strategy allocations from recent performance"""
+        performance_data = {}
+        for strategy in strategies:
+            history = self.db.get_strategy_performance(strategy.strategy_id, days=60)
+            if history:
+                values = [row['portfolio_value'] for row in reversed(history)]
+                returns = []
+                for idx in range(1, len(values)):
+                    prev = values[idx - 1]
+                    if prev:
+                        returns.append((values[idx] - prev) / prev)
+                performance_data[strategy.strategy_id] = returns
+            else:
+                performance_data[strategy.strategy_id] = []
+        strategy_ids = [strategy.strategy_id for strategy in strategies]
+        return self.dynamic_allocator.calculate_allocations(strategy_ids, performance_data)
+
+    def _calculate_strategy_exposures(self, strategies, current_prices):
+        """Calculate current exposure per strategy"""
+        exposures = {}
+        for strategy in strategies:
+            exposure = 0.0
+            for symbol, shares in strategy.positions.items():
+                exposure += shares * current_prices.get(symbol, 0)
+            exposures[strategy.strategy_id] = exposure
+        return exposures
+
+    def _apply_allocations(self, strategies, allocations, exposures):
+        """Apply capital allocations to strategies and cash manager"""
+        for strategy in strategies:
+            allocation = allocations.get(strategy.strategy_id, strategy.capital)
+            strategy.capital = max(allocation - exposures.get(strategy.strategy_id, 0), 0)
+        self.cash_manager.set_allocations(allocations, exposures)
     
     def generate_performance_report(self):
         """Generate performance report for all strategies"""
@@ -374,6 +544,7 @@ class MultiStrategyRunner:
 
 def main():
     """Main execution"""
+    start_time = time.time()
     print("=" * 80)
     print("MULTI-STRATEGY TRADING SYSTEM")
     print("=" * 80)
@@ -399,7 +570,7 @@ def main():
         
         # Generate report
         runner.generate_performance_report()
-        
+
         print("\n" + "=" * 80)
         print(f"✅ EXECUTION COMPLETE - {len(signals)} trades executed")
         print("=" * 80)
@@ -427,7 +598,69 @@ def main():
             logger.info("Email summary sent successfully")
         except Exception as e:
             logger.error(f"Failed to send email summary: {e}")
-        
+
+        try:
+            writer = DailyArtifactWriter()
+            latest_date = market_data.index.max()
+            data_freshness_hours = (datetime.now() - latest_date).total_seconds() / 3600
+            data_freshness = f"{data_freshness_hours:.1f}h old"
+            regime = runner.regime_detector.get_status()
+            portfolio_heat = 0.0
+            if runner.portfolio_value > 0:
+                total_exposure = sum(
+                    pos['shares'] * pos['current_price'] for pos in positions_data
+                )
+                portfolio_heat = (total_exposure / runner.portfolio_value) * 100
+
+            placed_orders = [
+                {
+                    'symbol': trade['symbol'],
+                    'side': trade['action'],
+                    'qty': trade['shares'],
+                    'price': trade['price']
+                }
+                for trade in runner.executed_trades
+            ]
+            open_positions = [
+                {
+                    'symbol': pos['symbol'],
+                    'qty': pos['shares'],
+                    'avg_price': pos['entry_price'],
+                    'market_value': pos['shares'] * pos['current_price'],
+                    'unrealized_pl': (pos['current_price'] - pos['entry_price']) * pos['shares'],
+                    'exposure_pct': (pos['shares'] * pos['current_price'] / runner.portfolio_value * 100)
+                    if runner.portfolio_value > 0 else 0
+                }
+                for pos in positions_data
+            ]
+
+            artifact = create_artifact_data(
+                vix=regime.get('vix', 0),
+                regime_classification=regime.get('volatility_regime', 'UNKNOWN'),
+                raw_signals=runner.raw_signals_by_strategy,
+                rejected_signals=[],
+                executed_signals=runner.executed_signals,
+                placed_orders=placed_orders,
+                filled_orders=placed_orders,
+                rejected_orders=[],
+                portfolio_heat=portfolio_heat,
+                daily_pnl=0.0,
+                cumulative_pnl=0.0,
+                drawdown=0.0,
+                max_drawdown=0.0,
+                circuit_breaker_state="ACTIVE" if runner.portfolio_risk.trading_halted else "INACTIVE",
+                open_positions=open_positions,
+                runtime_seconds=time.time() - start_time,
+                data_freshness=data_freshness,
+                errors=runner.errors,
+                warnings=[],
+                reconciliation_status=runner.reconciliation_status
+            )
+            artifact['system_health']['reconciliation_discrepancies'] = runner.reconciliation_discrepancies
+            writer.write_daily_artifact(datetime.now().strftime('%Y-%m-%d'), artifact)
+        except Exception as e:
+            logger.error(f"Failed to write daily artifact: {e}")
+
         logger.info("Multi-strategy execution completed successfully")
         
     except Exception as e:

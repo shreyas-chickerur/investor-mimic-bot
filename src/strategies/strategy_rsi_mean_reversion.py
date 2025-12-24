@@ -23,7 +23,6 @@ class RSIMeanReversionStrategy(TradingStrategy):
         )
         self.rsi_threshold = 30
         self.hold_days = 20
-        self.entry_dates = {}  # Track when positions were entered
     
     def generate_signals(self, market_data: pd.DataFrame) -> List[Dict]:
         """Generate buy signals for oversold stocks with improved filters"""
@@ -37,6 +36,7 @@ class RSIMeanReversionStrategy(TradingStrategy):
             
             # Get latest values
             latest = symbol_data.iloc[-1]
+            latest_date = symbol_data.index[-1]
             
             # Check if we have RSI
             if 'rsi' not in latest.index or pd.isna(latest['rsi']):
@@ -67,12 +67,13 @@ class RSIMeanReversionStrategy(TradingStrategy):
                     'price': price,
                     'value': shares * price,
                     'confidence': (30 - rsi) / 30,  # Higher confidence for lower RSI
-                    'reasoning': f'RSI {rsi:.1f} < {self.rsi_threshold}, slope {rsi_slope:.2f} > 0 (turning up)'
+                    'reasoning': f'RSI {rsi:.1f} < {self.rsi_threshold}, slope {rsi_slope:.2f} > 0 (turning up)',
+                    'asof_date': latest_date
                 })
             
             # IMPROVED Sell signal: RSI > 50 OR price >= VWAP OR held for 20 days
             if symbol in self.positions:
-                days_held = self.entry_dates.get(symbol, 0)
+                days_held = self.get_days_held(symbol, latest_date)
                 shares = self.positions[symbol]
                 
                 # Exit conditions (any one triggers exit)
@@ -92,7 +93,8 @@ class RSIMeanReversionStrategy(TradingStrategy):
                         'price': price,
                         'value': shares * price,
                         'confidence': 1.0,
-                        'reasoning': exit_reason
+                        'reasoning': exit_reason,
+                        'asof_date': latest_date
                     })
         
         return signals
