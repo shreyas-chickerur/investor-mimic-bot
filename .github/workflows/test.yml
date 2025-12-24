@@ -33,6 +33,10 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
     
+    - name: Initialize database
+      run: |
+        python scripts/init_database.py --db trading.db
+    
     - name: Verify data files exist
       run: |
         if [ ! -f "data/training_data.csv" ]; then
