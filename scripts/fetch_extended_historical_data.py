@@ -262,6 +262,10 @@ class ExtendedDataFetcher:
             tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
             symbol_data['atr_20'] = tr.rolling(window=20).mean()
             
+            # Volatility (20-day rolling standard deviation of returns)
+            returns = symbol_data['close'].pct_change()
+            symbol_data['volatility_20d'] = returns.rolling(window=20).std()
+            
             # VWAP (daily)
             symbol_data['vwap'] = (symbol_data['close'] * symbol_data['volume']).cumsum() / symbol_data['volume'].cumsum()
             
@@ -283,13 +287,19 @@ class ExtendedDataFetcher:
         return df
     
     def save_data(self, df: pd.DataFrame, output_path: str = 'data/extended_historical_data.csv'):
-        """Save data to CSV"""
+        """Save data to CSV (also saves to training_data.csv for compatibility)"""
         output_file = Path(output_path)
         output_file.parent.mkdir(exist_ok=True)
         
+        # Save to primary location
         df.to_csv(output_file, index=False)
         logger.info(f"Data saved to {output_file}")
         logger.info(f"File size: {output_file.stat().st_size / 1024 / 1024:.2f} MB")
+        
+        # Also save to training_data.csv for multi_strategy_main.py
+        training_file = output_file.parent / 'training_data.csv'
+        df.to_csv(training_file, index=False)
+        logger.info(f"Data also saved to {training_file}")
 
 def main():
     """Fetch extended historical data"""
