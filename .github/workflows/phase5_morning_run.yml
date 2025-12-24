@@ -28,6 +28,10 @@ jobs:
       run: |
         python scripts/init_database.py --db trading.db
     
+    - name: Update market data
+      run: |
+        python scripts/fetch_extended_historical_data.py
+    
     - name: Step 1 - Verify positions cleared
       env:
         ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
