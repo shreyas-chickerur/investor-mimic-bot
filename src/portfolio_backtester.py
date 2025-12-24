@@ -363,40 +363,94 @@ class PortfolioBacktester:
         equity_df = pd.DataFrame(self.equity_curve)
         trades_df = pd.DataFrame(self.trades) if self.trades else pd.DataFrame()
         
-        # Calculate metrics
+        # Calculate comprehensive metrics
         final_value = equity_df.iloc[-1]['portfolio_value']
         total_return = (final_value - self.initial_capital) / self.initial_capital
         
         # Annualized return
         days = (equity_df.iloc[-1]['date'] - equity_df.iloc[0]['date']).days
         annual_return = total_return * (365 / days) if days > 0 else 0
-        
-        # Sharpe ratio
-        if len(self.daily_returns) > 0:
-            returns_array = np.array(self.daily_returns)
-            sharpe = np.sqrt(252) * (returns_array.mean() / returns_array.std()) if returns_array.std() > 0 else 0
         else:
-            sharpe = 0
-        
-        # Max drawdown
-        running_max = equity_df['portfolio_value'].expanding().max()
-        drawdown = (equity_df['portfolio_value'] - running_max) / running_max
-        max_drawdown = abs(drawdown.min()) * 100
-        
-        # Calmar ratio
-        calmar = annual_return / (max_drawdown / 100) if max_drawdown > 0 else 0
-        
-        # Trade statistics
-        if len(trades_df) > 0:
-            completed_trades = trades_df[trades_df['action'] == 'SELL']
-            if len(completed_trades) > 0:
-                winning_trades = completed_trades[completed_trades['pnl'] > 0]
-                win_rate = len(winning_trades) / len(completed_trades) * 100
-                avg_win = winning_trades['pnl'].mean() if len(winning_trades) > 0 else 0
-                losing_trades = completed_trades[completed_trades['pnl'] <= 0]
-                avg_loss = losing_trades['pnl'].mean() if len(losing_trades) > 0 else 0
-                total_trades = len(completed_trades)
-            else:
+            sortino_ratio = sharpe_ratio  # No downside
+    else:
+        sortino_ratio = 0
+
+    # Calmar Ratio (return / max drawdown)
+    calmar_ratio = (total_return / abs(max_drawdown)) if max_drawdown < 0 else 0
+
+    # Win Rate and Profit Factor
+    if len(trades_df) > 0 and 'action' in trades_df.columns:
+        # Calculate P&L for each trade (simplified - need entry/exit pairs)
+        winning_trades = 0
+        losing_trades = 0
+        total_wins = 0
+        total_losses = 0
+
+        # This is simplified - real implementation would match buy/sell pairs
+        for i, trade in trades_df.iterrows():
+            if trade['action'] == 'SELL' and 'value' in trade:
+                # Estimate P&L (simplified)
+                pnl = trade.get('value', 0) - trade.get('cost', 0)
+                if pnl > 0:
+                    winning_trades += 1
+                    total_wins += pnl
+                else:
+                    losing_trades += 1
+                    total_losses += abs(pnl)
+
+        total_closed_trades = winning_trades + losing_trades
+        win_rate = (winning_trades / total_closed_trades * 100) if total_closed_trades > 0 else 0
+        profit_factor = (total_wins / total_losses) if total_losses > 0 else 0
+    else:
+        win_rate = 0
+        profit_factor = 0
+
+    # Annualized return (CAGR)
+    if len(equity_df) > 0:
+        days = len(equity_df)
+        years = days / 252
+        cagr = (((final_value / self.initial_capital) ** (1 / years)) - 1) * 100 if years > 0 else total_return
+    else:
+        cagr = 0
+
+    # Volatility (annualized)
+    annual_volatility = (np.std(self.daily_returns) * np.sqrt(252)) if len(self.daily_returns) > 1 else 0
+
+    return {
+        'final_value': final_value,
+        'total_return': total_return,
+        'total_trades': len(self.trades),
+        'max_drawdown': max_drawdown,
+        'sharpe_ratio': sharpe_ratio,
+        'sortino_ratio': sortino_ratio,
+        'calmar_ratio': calmar_ratio,
+        'win_rate': win_rate,
+        'profit_factor': profit_factor,
+        'cagr': cagr,
+        'annual_volatility': annual_volatility,
+        'equity_curve': equity_df,
+        'trades': trades_df,
+        'positions_at_start': self.positions_at_start,
+        'positions_at_end': len(self.positions)
+    }
+
+def print_results(self, results: Dict):
+    """Print backtest results in formatted way"""
+    print("\n" + "=" * 80)
+    print("PORTFOLIO BACKTEST RESULTS")
+    print("=" * 80)
+    print(f"\nInitial Capital:    ${results['initial_capital']:,.2f}")
+    print(f"Final Value:        ${results['final_value']:,.2f}")
+    print(f"Total Return:       {results['total_return']:.2f}%")
+    print(f"Annual Return:      {results['annual_return']:.2f}%")
+    print(f"\nSharpe Ratio:       {results['sharpe_ratio']:.2f}")
+    print(f"Max Drawdown:       {results['max_drawdown']:.2f}%")
+    print(f"Calmar Ratio:       {results['calmar_ratio']:.2f}")
+    print(f"\nTotal Trades:       {results['total_trades']}")
+    print(f"Win Rate:           {results['win_rate']:.1f}%")
+    print(f"Avg Win:            ${results['avg_win']:.2f}")
+    print(f"Avg Loss:           ${results['avg_loss']:.2f}")
+    print("=" * 80)
                 win_rate = 0
                 avg_win = 0
                 avg_loss = 0
