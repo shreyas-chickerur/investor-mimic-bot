@@ -370,114 +370,128 @@ class PortfolioBacktester:
         # Annualized return
         days = (equity_df.iloc[-1]['date'] - equity_df.iloc[0]['date']).days
         annual_return = total_return * (365 / days) if days > 0 else 0
+        
+        # Sharpe Ratio (annualized)
+        if len(self.daily_returns) > 1:
+            returns_array = np.array(self.daily_returns)
+            mean_return = np.mean(returns_array)
+            std_return = np.std(returns_array)
+            if std_return > 0:
+                sharpe_ratio = mean_return / std_return * np.sqrt(252)
+            else:
+                sharpe_ratio = np.nan  # Undefined: zero volatility
         else:
-            sortino_ratio = sharpe_ratio  # No downside
-    else:
-        sortino_ratio = 0
-
-    # Calmar Ratio (return / max drawdown)
-    calmar_ratio = (total_return / abs(max_drawdown)) if max_drawdown < 0 else 0
-
-    # Win Rate and Profit Factor
-    if len(trades_df) > 0 and 'action' in trades_df.columns:
-        # Calculate P&L for each trade (simplified - need entry/exit pairs)
-        winning_trades = 0
-        losing_trades = 0
-        total_wins = 0
-        total_losses = 0
-
-        # This is simplified - real implementation would match buy/sell pairs
-        for i, trade in trades_df.iterrows():
-            if trade['action'] == 'SELL' and 'value' in trade:
-                # Estimate P&L (simplified)
-                pnl = trade.get('value', 0) - trade.get('cost', 0)
-                if pnl > 0:
-                    winning_trades += 1
-                    total_wins += pnl
+            sharpe_ratio = np.nan  # Undefined: insufficient data
+        
+        # Sortino Ratio (downside deviation)
+        if len(self.daily_returns) > 1:
+            downside_returns = [r for r in self.daily_returns if r < 0]
+            if downside_returns:
+                downside_std = np.std(downside_returns)
+                if downside_std > 0:
+                    sortino_ratio = mean_return / downside_std * np.sqrt(252)
                 else:
-                    losing_trades += 1
-                    total_losses += abs(pnl)
-
-        total_closed_trades = winning_trades + losing_trades
-        win_rate = (winning_trades / total_closed_trades * 100) if total_closed_trades > 0 else 0
-        profit_factor = (total_wins / total_losses) if total_losses > 0 else 0
-    else:
-        win_rate = 0
-        profit_factor = 0
-
-    # Annualized return (CAGR)
-    if len(equity_df) > 0:
-        days = len(equity_df)
-        years = days / 252
-        cagr = (((final_value / self.initial_capital) ** (1 / years)) - 1) * 100 if years > 0 else total_return
-    else:
-        cagr = 0
-
-    # Volatility (annualized)
-    annual_volatility = (np.std(self.daily_returns) * np.sqrt(252)) if len(self.daily_returns) > 1 else 0
-
-    return {
-        'final_value': final_value,
-        'total_return': total_return,
-        'total_trades': len(self.trades),
-        'max_drawdown': max_drawdown,
-        'sharpe_ratio': sharpe_ratio,
-        'sortino_ratio': sortino_ratio,
-        'calmar_ratio': calmar_ratio,
-        'win_rate': win_rate,
-        'profit_factor': profit_factor,
-        'cagr': cagr,
-        'annual_volatility': annual_volatility,
-        'equity_curve': equity_df,
-        'trades': trades_df,
-        'positions_at_start': self.positions_at_start,
-        'positions_at_end': len(self.positions)
-    }
-
-def print_results(self, results: Dict):
-    """Print backtest results in formatted way"""
-    print("\n" + "=" * 80)
-    print("PORTFOLIO BACKTEST RESULTS")
-    print("=" * 80)
-    print(f"\nInitial Capital:    ${results['initial_capital']:,.2f}")
-    print(f"Final Value:        ${results['final_value']:,.2f}")
-    print(f"Total Return:       {results['total_return']:.2f}%")
-    print(f"Annual Return:      {results['annual_return']:.2f}%")
-    print(f"\nSharpe Ratio:       {results['sharpe_ratio']:.2f}")
-    print(f"Max Drawdown:       {results['max_drawdown']:.2f}%")
-    print(f"Calmar Ratio:       {results['calmar_ratio']:.2f}")
-    print(f"\nTotal Trades:       {results['total_trades']}")
-    print(f"Win Rate:           {results['win_rate']:.1f}%")
-    print(f"Avg Win:            ${results['avg_win']:.2f}")
-    print(f"Avg Loss:           ${results['avg_loss']:.2f}")
-    print("=" * 80)
-                win_rate = 0
-                avg_win = 0
-                avg_loss = 0
-                total_trades = 0
+                    sortino_ratio = np.nan  # Undefined: zero downside volatility
+            else:
+                sortino_ratio = np.inf  # Infinite: no downside (all positive returns)
         else:
-            win_rate = 0
-            avg_win = 0
-            avg_loss = 0
-            total_trades = 0
+            sortino_ratio = np.nan  # Undefined: insufficient data
         
-        results = {
-            'initial_capital': self.initial_capital,
+        # Calmar Ratio (return / max drawdown)
+        calmar_ratio = (total_return / abs(max_drawdown)) if max_drawdown < 0 else np.nan
+        
+        # Win Rate and Profit Factor
+        if len(trades_df) > 0 and 'action' in trades_df.columns:
+            # Calculate P&L for each trade (simplified - need entry/exit pairs)
+            winning_trades = 0
+            losing_trades = 0
+            total_wins = 0
+            total_losses = 0
+            
+            # This is simplified - real implementation would match buy/sell pairs
+            for i, trade in trades_df.iterrows():
+                if trade['action'] == 'SELL' and 'value' in trade:
+                    # Estimate P&L (simplified)
+                    pnl = trade.get('value', 0) - trade.get('cost', 0)
+                    if pnl > 0:
+                        winning_trades += 1
+                        total_wins += pnl
+                    else:
+                        losing_trades += 1
+                        total_losses += abs(pnl)
+            
+            total_closed_trades = winning_trades + losing_trades
+            if total_closed_trades > 0:
+                win_rate = (winning_trades / total_closed_trades * 100)
+            else:
+                win_rate = np.nan  # Undefined: no closed trades
+            
+            if total_losses > 0:
+                profit_factor = total_wins / total_losses
+            elif total_wins > 0:
+                profit_factor = np.inf  # Infinite: all winning trades
+            else:
+                profit_factor = np.nan  # Undefined: no trades
+        else:
+            win_rate = np.nan  # Undefined: no trade data
+            profit_factor = np.nan  # Undefined: no trade data
+        
+        # Annualized return (CAGR)
+        if len(equity_df) > 0:
+            days = len(equity_df)
+            years = days / 252
+            cagr = (((final_value / self.initial_capital) ** (1 / years)) - 1) * 100 if years > 0 else total_return
+        else:
+            cagr = np.nan  # Undefined: insufficient data
+        
+        # Volatility (annualized)
+        if len(self.daily_returns) > 1:
+            annual_volatility = np.std(self.daily_returns) * np.sqrt(252)
+        else:
+            annual_volatility = np.nan  # Undefined: insufficient data
+        
+        # Format metrics with proper labels for undefined values
+        def format_metric(value, format_str=".2f", suffix=""):
+            if np.isnan(value):
+                return "N/A (undefined)"
+            elif np.isinf(value):
+                return "∞ (infinite)"
+            else:
+                return f"{value:{format_str}}{suffix}"
+        
+        logger.info(f"Backtest complete: Final value ${final_value:,.2f}")
+        logger.info(f"Trades: {len(self.trades)}")
+        logger.info(f"Return: {total_return:.2f}%")
+        logger.info(f"Max DD: {max_drawdown:.2f}%")
+        logger.info(f"Sharpe: {format_metric(sharpe_ratio)}")
+        logger.info(f"Win Rate: {format_metric(win_rate, '.1f', '%')}")
+        logger.info(f"Sortino: {format_metric(sortino_ratio)}")
+        logger.info(f"Calmar: {format_metric(calmar_ratio)}")
+        
+        return {
             'final_value': final_value,
-            'total_return': total_return * 100,
-            'annual_return': annual_return * 100,
-            'sharpe_ratio': sharpe,
+            'total_return': total_return,
+            'total_trades': len(self.trades),
             'max_drawdown': max_drawdown,
-            'calmar_ratio': calmar,
-            'total_trades': total_trades,
+            'sharpe_ratio': sharpe_ratio,
+            'sharpe_label': 'N/A (undefined)' if np.isnan(sharpe_ratio) else f'{sharpe_ratio:.2f}',
+            'sortino_ratio': sortino_ratio,
+            'sortino_label': 'N/A (undefined)' if np.isnan(sortino_ratio) else '∞' if np.isinf(sortino_ratio) else f'{sortino_ratio:.2f}',
+            'calmar_ratio': calmar_ratio,
+            'calmar_label': 'N/A (undefined)' if np.isnan(calmar_ratio) else '∞' if np.isinf(calmar_ratio) else f'{calmar_ratio:.2f}',
             'win_rate': win_rate,
-            'avg_win': avg_win,
-            'avg_loss': avg_loss,
+            'win_rate_label': 'N/A (undefined)' if np.isnan(win_rate) else f'{win_rate:.1f}%',
+            'profit_factor': profit_factor,
+            'profit_factor_label': 'N/A (undefined)' if np.isnan(profit_factor) else '∞' if np.isinf(profit_factor) else f'{profit_factor:.2f}',
+            'cagr': cagr,
+            'cagr_label': 'N/A (undefined)' if np.isnan(cagr) else f'{cagr:.2f}%',
+            'annual_volatility': annual_volatility,
+            'annual_volatility_label': 'N/A (undefined)' if np.isnan(annual_volatility) else f'{annual_volatility:.2f}%',
             'equity_curve': equity_df,
-            'trades': trades_df
+            'trades': trades_df,
+            'positions_at_start': self.positions_at_start,
+            'positions_at_end': len(self.positions)
         }
-        
-        return results
     
     def print_results(self, results: Dict):
         """Print backtest results in formatted way"""
@@ -488,11 +502,11 @@ def print_results(self, results: Dict):
         print(f"Final Value:        ${results['final_value']:,.2f}")
         print(f"Total Return:       {results['total_return']:.2f}%")
         print(f"Annual Return:      {results['annual_return']:.2f}%")
-        print(f"\nSharpe Ratio:       {results['sharpe_ratio']:.2f}")
+        print(f"\nSharpe Ratio:       {results['sharpe_label']}")
         print(f"Max Drawdown:       {results['max_drawdown']:.2f}%")
-        print(f"Calmar Ratio:       {results['calmar_ratio']:.2f}")
+        print(f"Calmar Ratio:       {results['calmar_label']}")
         print(f"\nTotal Trades:       {results['total_trades']}")
-        print(f"Win Rate:           {results['win_rate']:.1f}%")
+        print(f"Win Rate:           {results['win_rate_label']}")
         print(f"Avg Win:            ${results['avg_win']:.2f}")
         print(f"Avg Loss:           ${results['avg_loss']:.2f}")
         print("=" * 80)

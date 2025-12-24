@@ -88,7 +88,7 @@ test-single:
 
 test-multi:
 	@echo "🧪 Testing multi-strategy system..."
-	python3 tests/test_alpaca_integration.py
+	python3 tests/test_integration.py
 
 # Cleanup
 clean:
