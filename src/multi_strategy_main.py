@@ -98,7 +98,8 @@ class MultiStrategyRunner:
         self.errors = []
         self.executed_trades = []
         self.confirmed_fills = []  # Track confirmed fills from Alpaca
-        self.pending_orders = []   # Track pending/rejected orders
+        self.pending_orders = []   # Track pending orders from Alpaca
+        self.rejected_orders = []  # Track rejected/canceled orders from Alpaca
         
         # Track P&L metrics
         self.initial_portfolio_value = self.portfolio_value
@@ -142,6 +143,7 @@ class MultiStrategyRunner:
         """Verify order status with Alpaca and track confirmed fills."""
         self.confirmed_fills = []
         self.pending_orders = []
+        self.rejected_orders = []
 
         for trade in self.executed_trades:
             order_id = trade.get('order_id')
@@ -151,9 +153,11 @@ class MultiStrategyRunner:
 
             try:
                 order = self.trading_client.get_order_by_id(order_id)
-                status = getattr(order, 'status', 'UNKNOWN')
+                status = str(getattr(order, 'status', 'UNKNOWN')).lower()
                 if status == 'filled':
                     self.confirmed_fills.append(trade)
+                elif status in {'canceled', 'rejected', 'expired'}:
+                    self.rejected_orders.append({**trade, 'status': status})
                 else:
                     self.pending_orders.append({**trade, 'status': status})
             except Exception as exc:
@@ -687,6 +691,11 @@ def main():
             data_freshness_hours = (datetime.now() - latest_date).total_seconds() / 3600
             data_freshness = f"{data_freshness_hours:.1f}h old"
             regime = runner.regime_detector.get_status()
+            warnings = []
+            if runner.pending_orders:
+                warnings.append(
+                    f"{len(runner.pending_orders)} orders pending confirmation"
+                )
             portfolio_heat = 0.0
             if runner.portfolio_value > 0:
                 total_exposure = sum(
@@ -724,7 +733,7 @@ def main():
                 executed_signals=runner.executed_signals,
                 placed_orders=placed_orders,
                 filled_orders=runner.confirmed_fills,
-                rejected_orders=runner.pending_orders,
+                rejected_orders=runner.rejected_orders,
                 portfolio_heat=portfolio_heat,
                 daily_pnl=pnl_metrics['daily_pnl'],
                 cumulative_pnl=pnl_metrics['cumulative_pnl'],
@@ -735,7 +744,7 @@ def main():
                 runtime_seconds=time.time() - start_time,
                 data_freshness=data_freshness,
                 errors=runner.errors,
-                warnings=[],
+                warnings=warnings,
                 reconciliation_status=runner.reconciliation_status
             )
             artifact['system_health']['reconciliation_discrepancies'] = runner.reconciliation_discrepancies
