@@ -22,7 +22,6 @@ class NewsSentimentStrategy(TradingStrategy):
             capital=capital
         )
         self.hold_days = 10
-        self.entry_dates = {}
     
     def _get_sentiment_score(self, symbol: str) -> float:
         """
@@ -40,15 +39,16 @@ class NewsSentimentStrategy(TradingStrategy):
         
         for symbol in market_data['symbol'].unique():
             symbol_data = market_data[market_data['symbol'] == symbol].iloc[-1]
-            
-            # Placeholder: In production, fetch real sentiment
-            sentiment_score = 0.5  # Neutral
+            latest_date = symbol_data.name
             
             price = symbol_data['close']
             rsi = symbol_data.get('rsi', 50)
             volume_ratio = symbol_data.get('volume_ratio', 1.0)
             atr = symbol_data.get('atr_20', None)
             returns_5d = symbol_data.get('returns_5d', 0)
+
+            # Placeholder: Use momentum as sentiment proxy until news API is integrated
+            sentiment_score = max(0.0, min(1.0, 0.5 + returns_5d))
             
             # IMPROVED: Sentiment as FILTER, momentum as TRIGGER
             # Buy signal: Momentum signal (positive 5d return) + sentiment confirmation
@@ -68,12 +68,13 @@ class NewsSentimentStrategy(TradingStrategy):
                     'price': price,
                     'value': shares * price,
                     'confidence': sentiment_score * 0.8,  # Slightly lower confidence
-                    'reasoning': f'Momentum {returns_5d*100:.1f}% + sentiment filter ({sentiment_score:.2f})'
+                    'reasoning': f'Momentum {returns_5d*100:.1f}% + sentiment filter ({sentiment_score:.2f})',
+                    'asof_date': latest_date
                 })
             
             # Sell signal: Negative sentiment or held long enough
             elif symbol in self.positions:
-                days_held = self.entry_dates.get(symbol, 0)
+                days_held = self.get_days_held(symbol, latest_date)
                 if sentiment_score < 0.4 or days_held >= self.hold_days:
                     shares = self.positions[symbol]
                     
@@ -83,8 +84,9 @@ class NewsSentimentStrategy(TradingStrategy):
                         'shares': shares,
                         'price': price,
                         'value': shares * price,
-                        'confidence': 1.0 - sentiment if sentiment < 0.4 else 1.0,
-                        'reasoning': f'Negative sentiment' if sentiment < 0.4 else f'Held {days_held} days'
+                        'confidence': 1.0 - sentiment_score if sentiment_score < 0.4 else 1.0,
+                        'reasoning': f'Negative sentiment' if sentiment_score < 0.4 else f'Held {days_held} days',
+                        'asof_date': latest_date
                     })
         
         return signals
