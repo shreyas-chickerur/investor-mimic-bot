@@ -50,6 +50,27 @@ class CashManager:
         self.allocated_cash[strategy_id] += amount
         self.reserved_cash -= amount
         logger.info(f"Released ${amount:.2f} to strategy {strategy_id}, new balance: ${self.allocated_cash[strategy_id]:.2f}")
+
+    def set_allocations(self, allocations: Dict[int, float], exposures: Dict[int, float] = None):
+        """
+        Update cash allocations per strategy.
+
+        Args:
+            allocations: Dict of {strategy_id: total capital allocation}
+            exposures: Dict of {strategy_id: current exposure} to reserve against allocations
+        """
+        self.total_cash = sum(allocations.values())
+        self.allocated_cash = {}
+        self.reserved_cash = 0
+
+        exposures = exposures or {}
+        for strategy_id, allocation in allocations.items():
+            exposure = exposures.get(strategy_id, 0)
+            available = max(allocation - exposure, 0)
+            self.allocated_cash[strategy_id] = available
+            self.reserved_cash += max(exposure, 0)
+
+        logger.info("Updated cash allocations per strategy")
     
     def prioritize_trades(self, all_trades: List[Dict]) -> List[Dict]:
         """
