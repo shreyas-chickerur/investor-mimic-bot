@@ -15,28 +15,37 @@ help:
 	@echo "  make positions        - Check current Alpaca positions"
 	@echo ""
 	@echo "🔧 SETUP & MAINTENANCE:"
-	@echo "  make install          - Install all dependencies"
-	@echo "  make sync-db          - Sync database with Alpaca positions"
-	@echo "  make update-data      - Update market data"
 	@echo ""
-	@echo "🧪 TESTING:"
-	@echo "  make test             - Run all tests"
-	@echo "  make test-single      - Test single RSI strategy"
-	@echo "  make test-multi       - Test multi-strategy system"
-	@echo ""
-	@echo "🧹 CLEANUP:"
-	@echo "  make clean            - Clean logs and temp files"
-	@echo "  make clean-all        - Clean everything including databases"
+	@echo "Maintenance:"
+	@echo "  make test              - Run tests"
+	@echo "  make clean             - Clean generated files"
 
-# Installation
-install:
-	@echo "📦 Installing dependencies..."
-	pip install -r requirements.txt
-	@echo "✅ Installation complete"
+init:
+	@echo "Initializing Phase 5 database..."
+	python3 scripts/init_database.py --db trading.db
+	@echo "✅ Database initialized"
 
-# Main execution
+fetch-data:
+	@echo "Fetching market data (premium API, ~18 seconds)..."
+	@set -a && source .env && set +a && python3 scripts/fetch_extended_historical_data.py
+	@echo "✅ Market data fetched"
+
+verify-positions:
+	@echo "Verifying broker positions..."
+	@set -a && source .env && set +a && python3 -c "\
+	import sys; \
+	sys.path.insert(0, 'src'); \
+	from broker_reconciler import BrokerReconciler; \
+	r = BrokerReconciler(); \
+	s = r.get_broker_state(); \
+	print(f'Positions: {len(s[\"positions\"])}'); \
+	print(f'Cash: \$${s[\"cash\"]:,.2f}'); \
+	exit(0 if len(s['positions']) == 0 else 1)"
+
 run:
-	@echo "🚀 Running multi-strategy trading system..."
+	@echo "Running Phase 5 execution..."
+	@set -a && source .env && set +a && export ENABLE_BROKER_RECONCILIATION=true && python3 src/multi_strategy_main.py
+	@echo "✅ Execution complete"
 	python3 src/multi_strategy_main.py
 
 # Single strategy (RSI only)
