@@ -12,7 +12,7 @@ Use for testing before live paper trading.
 """
 import os
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Tuple
 from datetime import datetime
 from dotenv import load_dotenv
 
