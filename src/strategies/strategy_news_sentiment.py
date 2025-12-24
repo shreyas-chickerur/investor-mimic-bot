@@ -8,6 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from strategy_base import TradingStrategy
+from news_sentiment import NewsSentimentProvider
 from typing import List, Dict
 import pandas as pd
 
@@ -22,16 +23,11 @@ class NewsSentimentStrategy(TradingStrategy):
             capital=capital
         )
         self.hold_days = 10
+        self.sentiment_provider = NewsSentimentProvider()
     
     def _get_sentiment_score(self, symbol: str) -> float:
-        """
-        Get news sentiment score for symbol
-        In production, this would call a news API
-        For now, using a simplified heuristic based on price momentum
-        """
-        # Placeholder: In production, integrate with news API
-        # For now, use price momentum as proxy for sentiment
-        return 0.5  # Neutral sentiment
+        """Get news sentiment score for symbol."""
+        return self.sentiment_provider.get_sentiment_score(symbol)
     
     def generate_signals(self, market_data: pd.DataFrame) -> List[Dict]:
         """Generate signals using sentiment as FILTER, not trigger"""
@@ -47,8 +43,9 @@ class NewsSentimentStrategy(TradingStrategy):
             atr = symbol_data.get('atr_20', None)
             returns_5d = symbol_data.get('returns_5d', 0)
 
-            # Placeholder: Use momentum as sentiment proxy until news API is integrated
-            sentiment_score = max(0.0, min(1.0, 0.5 + returns_5d))
+            sentiment_score = self._get_sentiment_score(symbol)
+            if sentiment_score is None:
+                sentiment_score = max(0.0, min(1.0, 0.5 + returns_5d))
             
             # IMPROVED: Sentiment as FILTER, momentum as TRIGGER
             # Buy signal: Momentum signal (positive 5d return) + sentiment confirmation

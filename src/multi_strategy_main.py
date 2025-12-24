@@ -37,6 +37,7 @@ from regime_detector import RegimeDetector
 from dynamic_allocator import DynamicAllocator
 from execution_costs import ExecutionCostModel
 from performance_metrics import PerformanceMetrics
+from broker_reconciler import BrokerReconciler
 
 # Setup logging - CRITICAL FIX: Ensure logs directory exists
 Path('logs').mkdir(exist_ok=True)
@@ -86,6 +87,7 @@ class MultiStrategyRunner:
         self.dynamic_allocator = DynamicAllocator(self.portfolio_value)
         self.cost_model = ExecutionCostModel()
         self.performance_metrics = PerformanceMetrics()
+        self.broker_reconciler = BrokerReconciler(email_notifier=self.email_notifier)
         
         # Set daily start value for risk management
         self.portfolio_risk.set_daily_start_value(self.portfolio_value)
@@ -236,6 +238,17 @@ class MultiStrategyRunner:
         if not self.portfolio_risk.check_daily_loss_limit(self.portfolio_value):
             logger.warning("Trading halted due to daily loss limit")
             return []
+
+        if os.getenv('ENABLE_BROKER_RECONCILIATION', 'false').lower() == 'true':
+            local_positions = self._build_local_positions()
+            success, discrepancies = self.broker_reconciler.reconcile_daily(
+                local_positions=local_positions,
+                local_cash=self.cash_available
+            )
+            if not success:
+                logger.error("Broker reconciliation failed; trading paused")
+                self.errors.extend(discrepancies)
+                return []
         
         print("\n" + "=" * 80)
         print("MULTI-STRATEGY EXECUTION")
@@ -435,6 +448,28 @@ class MultiStrategyRunner:
             for symbol, shares in strategy.positions.items():
                 combined[symbol] = combined.get(symbol, 0) + shares
         return combined
+
+    def _build_local_positions(self):
+        """Build local positions with qty and avg price for reconciliation."""
+        local_positions = {}
+        strategies = self.db.get_all_strategies()
+        for strategy in strategies:
+            trades = self.db.get_strategy_trades(strategy['id'])
+            for trade in trades:
+                symbol = trade['symbol']
+                action = trade['action']
+                shares = trade['shares']
+                price = trade['price']
+                position = local_positions.setdefault(symbol, {'qty': 0, 'avg_price': 0})
+                if action == 'BUY':
+                    total_cost = position['avg_price'] * position['qty'] + price * shares
+                    position['qty'] += shares
+                    position['avg_price'] = total_cost / position['qty'] if position['qty'] else 0
+                elif action == 'SELL':
+                    position['qty'] -= shares
+                    if position['qty'] <= 0:
+                        local_positions.pop(symbol, None)
+        return local_positions
 
     def _calculate_dynamic_allocations(self, strategies):
         """Calculate strategy allocations from recent performance"""
