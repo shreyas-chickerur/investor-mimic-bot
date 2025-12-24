@@ -260,10 +260,10 @@ class BrokerReconciler:
             try:
                 subject = "🚨 TRADING SYSTEM PAUSED - Reconciliation Failure"
                 disc_list = '\n'.join([f'- {disc}' for disc in discrepancies])
-                body = f"""
-CRITICAL ALERT: Trading system has been PAUSED due to reconciliation failure.
+                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                body = f"""CRITICAL ALERT: Trading system has been PAUSED due to reconciliation failure.
 
-Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+Time: {timestamp}
 Status: PAUSED - All trading blocked
 
 Discrepancies Found ({len(discrepancies)}):
@@ -276,8 +276,7 @@ Action Required:
 4. Run reconciliation again
 5. System will resume only after successful reconciliation
 
-DO NOT TRADE MANUALLY until this is resolved.
-                """
+DO NOT TRADE MANUALLY until this is resolved."""
                 self.email_notifier.send_alert(subject, body)
                 logger.info("✅ Email alert sent")
             except Exception as e:
