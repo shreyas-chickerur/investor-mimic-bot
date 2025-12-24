@@ -1,6 +1,6 @@
 {
   "date": "2025-12-23",
-  "generated_at": "2025-12-23T19:06:42.907633",
+  "generated_at": "2025-12-23T19:24:49.848765",
   "version": "1.0",
   "regime": {
     "vix": 18.5,
@@ -11,85 +11,39 @@
     "raw": {
       "Test_Strategy": [
         {
-          "symbol": "AAPL",
+          "symbol": "TEST",
           "action": "BUY",
-          "price": 150.0
-        },
-        {
-          "symbol": "MSFT",
-          "action": "BUY",
-          "price": 300.0
+          "price": 100.0
         }
       ]
     },
-    "rejected": [],
-    "executed": [
+    "rejected": [
       {
-        "symbol": "AAPL",
+        "symbol": "TEST",
         "action": "BUY",
-        "price": 150.0
-      },
-      {
-        "symbol": "MSFT",
-        "action": "BUY",
-        "price": 300.0
+        "price": 100.0
       }
-    ]
+    ],
+    "executed": []
   },
   "trades": {
     "placed": [],
-    "filled": [
-      {
-        "symbol": "AAPL",
-        "action": "BUY",
-        "shares": 10,
-        "price": 150.05,
-        "total_cost": 1502.0005,
-        "timestamp": "2025-12-23T19:06:42.469580",
-        "dry_run": true
-      },
-      {
-        "symbol": "MSFT",
-        "action": "BUY",
-        "shares": 5,
-        "price": 300.1,
-        "total_cost": 1502.0005,
-        "timestamp": "2025-12-23T19:06:42.469619",
-        "dry_run": true
-      }
-    ],
+    "filled": [],
     "rejected": []
   },
   "risk": {
-    "portfolio_heat": 15.0,
-    "daily_pnl": 0,
-    "cumulative_pnl": 0,
-    "drawdown": 0,
-    "max_drawdown": 0,
+    "portfolio_heat": 0.0,
+    "daily_pnl": 0.0,
+    "cumulative_pnl": 0.0,
+    "drawdown": 0.0,
+    "max_drawdown": 0.0,
     "circuit_breaker_state": "INACTIVE"
   },
   "positions": {
-    "open": [
-      {
-        "symbol": "AAPL",
-        "qty": 10,
-        "avg_price": 150.05,
-        "market_value": 1500.5,
-        "unrealized_pl": 0.0,
-        "exposure_pct": 1.5005450313563908
-      },
-      {
-        "symbol": "MSFT",
-        "qty": 5,
-        "avg_price": 300.1,
-        "market_value": 1500.5,
-        "unrealized_pl": 0.0,
-        "exposure_pct": 1.5005450313563908
-      }
-    ]
+    "open": []
   },
   "system_health": {
-    "runtime_seconds": 2.5,
+    "runtime_seconds": 1.5,
     "data_freshness": "DRY_RUN",
     "error_count": 0,
     "warning_count": 1,
