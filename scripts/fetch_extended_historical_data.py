@@ -153,12 +153,12 @@ class ExtendedDataFetcher:
         failed = []
         
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            # Submit in batches of 4 to avoid burst rate limit (5 req/sec max)
+            # Submit in batches of 3 to avoid burst rate limit (5 req/sec max)
             futures = []
             for i, symbol in enumerate(STOCK_SYMBOLS):
                 futures.append(executor.submit(self.fetch_stock_data, symbol))
-                if (i + 1) % 4 == 0 and i < len(STOCK_SYMBOLS) - 1:
-                    time.sleep(1)  # 1 second delay every 4 requests (4 req/sec)
+                if (i + 1) % 3 == 0 and i < len(STOCK_SYMBOLS) - 1:
+                    time.sleep(1)  # 1 second delay every 3 requests (3 req/sec)
             
             future_to_symbol = {futures[i]: STOCK_SYMBOLS[i] for i in range(len(STOCK_SYMBOLS))}
             
