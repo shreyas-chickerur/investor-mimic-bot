@@ -16,7 +16,9 @@ class RegimeDetector:
     def __init__(self, 
                  vix_low_threshold: float = 15.0,
                  vix_high_threshold: float = 25.0,
-                 trend_lookback: int = 50):
+                 trend_lookback: int = 50,
+                 vol_low_threshold: float = 0.15,
+                 vol_high_threshold: float = 0.25):
         """
         Initialize regime detector
         
@@ -28,6 +30,8 @@ class RegimeDetector:
         self.vix_low = vix_low_threshold
         self.vix_high = vix_high_threshold
         self.trend_lookback = trend_lookback
+        self.vol_low_threshold = vol_low_threshold
+        self.vol_high_threshold = vol_high_threshold
         
         logger.info(f"Regime Detector: VIX low={vix_low_threshold}, high={vix_high_threshold}")
     
@@ -40,8 +44,18 @@ class RegimeDetector:
         # For backtesting, use default moderate volatility
         # In production, this would fetch real VIX data
         return 18.0
+
+    def _get_market_proxy(self, market_data: pd.DataFrame) -> pd.Series:
+        """Build a market proxy series from available symbols."""
+        if market_data is None or market_data.empty:
+            return pd.Series(dtype=float)
+
+        if 'symbol' in market_data.columns:
+            return market_data.groupby(market_data.index)['close'].mean()
+
+        return market_data['close']
     
-    def detect_volatility_regime(self, vix: float = None) -> str:
+    def detect_volatility_regime(self, vix: float = None, market_data: pd.DataFrame = None) -> str:
         """
         Detect volatility regime based on VIX
         
@@ -49,6 +63,20 @@ class RegimeDetector:
             'low_volatility', 'normal', or 'high_volatility'
         """
         if vix is None:
+            if market_data is not None:
+                proxy = self._get_market_proxy(market_data)
+                if len(proxy) > 20:
+                    returns = proxy.pct_change().dropna()
+                    if len(returns) > 0:
+                        realized_vol = returns.std() * (252 ** 0.5)
+                        if realized_vol < self.vol_low_threshold:
+                            regime = 'low_volatility'
+                        elif realized_vol > self.vol_high_threshold:
+                            regime = 'high_volatility'
+                        else:
+                            regime = 'normal'
+                        logger.info(f"Volatility regime: {regime} (realized vol: {realized_vol:.2f})")
+                        return regime
             vix = self.get_vix_level()
         
         if vix < self.vix_low:
@@ -70,21 +98,35 @@ class RegimeDetector:
         Returns:
             'strong_trend', 'weak_trend', or 'choppy'
         """
-        # In production, would use SPY data
-        # For now, return neutral
+        proxy = self._get_market_proxy(market_data)
+        if len(proxy) < 200:
+            return 'weak_trend'
+
+        short_ma = proxy.rolling(window=50).mean().iloc[-1]
+        long_ma = proxy.rolling(window=200).mean().iloc[-1]
+        if long_ma == 0 or pd.isna(short_ma) or pd.isna(long_ma):
+            return 'weak_trend'
+
+        trend_strength = (short_ma - long_ma) / long_ma
+        if trend_strength > 0.02:
+            return 'strong_trend'
+        if abs(trend_strength) < 0.01:
+            return 'choppy'
         return 'weak_trend'
     
-    def get_regime_adjustments(self, vix: float = None) -> Dict:
+    def get_regime_adjustments(self, vix: float = None, market_data: pd.DataFrame = None) -> Dict:
         """
         Get regime-based adjustments for system parameters
         
         Returns:
             Dict with adjusted parameters based on regime
         """
-        vol_regime = self.detect_volatility_regime(vix)
+        vol_regime = self.detect_volatility_regime(vix, market_data)
+        trend_regime = self.detect_trend_regime(market_data) if market_data is not None else 'weak_trend'
         
         adjustments = {
             'volatility_regime': vol_regime,
+            'trend_regime': trend_regime,
             'max_portfolio_heat': 0.30,  # Default
             'enable_mean_reversion': True,
             'enable_breakout': True,
@@ -103,6 +145,10 @@ class RegimeDetector:
             adjustments['position_size_multiplier'] = 0.8  # Smaller positions
             adjustments['enable_breakout'] = False  # Disable breakout strategies
             logger.info("High volatility: Reducing heat to 20%, position size -20%, disabling breakouts")
+
+        if trend_regime == 'choppy':
+            adjustments['enable_trend_following'] = False
+            logger.info("Choppy regime: Disabling trend-following strategies")
         
         return adjustments
     
