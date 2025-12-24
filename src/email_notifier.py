@@ -29,6 +29,16 @@ class EmailNotifier:
         else:
             self.enabled = True
     
+    def send_alert(self, subject: str, message: str):
+        """Send critical alert email (for reconciliation failures, etc.)"""
+        
+        if not self.enabled:
+            logger.warning("Email notifications disabled - alert not sent")
+            return
+        
+        alert_subject = f"🚨 ALERT: {subject}"
+        self._send_email(alert_subject, message)
+    
     def send_daily_summary(self, 
                           trades: List[Dict],
                           positions: List[Dict],
