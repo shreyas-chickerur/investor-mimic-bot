@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 from datetime import datetime
 import logging
+import time
 
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
@@ -38,6 +39,7 @@ from dynamic_allocator import DynamicAllocator
 from execution_costs import ExecutionCostModel
 from performance_metrics import PerformanceMetrics
 from broker_reconciler import BrokerReconciler
+from daily_artifact_writer import DailyArtifactWriter, create_artifact_data
 
 # Setup logging - CRITICAL FIX: Ensure logs directory exists
 Path('logs').mkdir(exist_ok=True)
@@ -226,6 +228,10 @@ class MultiStrategyRunner:
     def run_all_strategies(self, market_data):
         """Run all strategies and execute trades"""
         strategies = self.initialize_strategies()
+        self.raw_signals_by_strategy = {}
+        self.executed_signals = []
+        self.reconciliation_status = "SKIPPED"
+        self.reconciliation_discrepancies = []
         current_prices = market_data.groupby('symbol')['close'].last().to_dict()
         allocations = self._calculate_dynamic_allocations(strategies)
         exposures = self._calculate_strategy_exposures(strategies, current_prices)
@@ -245,6 +251,8 @@ class MultiStrategyRunner:
                 local_positions=local_positions,
                 local_cash=self.cash_available
             )
+            self.reconciliation_status = "PASS" if success else "FAIL"
+            self.reconciliation_discrepancies = discrepancies
             if not success:
                 logger.error("Broker reconciliation failed; trading paused")
                 self.errors.extend(discrepancies)
@@ -266,6 +274,7 @@ class MultiStrategyRunner:
                     continue
 
                 signals = strategy.generate_signals(market_data)
+                self.raw_signals_by_strategy[strategy.name] = list(signals) if signals else []
                 
                 if signals and len(signals) > 0:
                     print(f"✅ Generated {len(signals)} signals")
@@ -294,6 +303,7 @@ class MultiStrategyRunner:
                         total_exposure,
                         self.portfolio_value
                     )  # Top 3 signals
+                    self.executed_signals.extend(executed)
                     all_signals.extend(executed)
                 else:
                     print("❌ No signals generated")
@@ -534,6 +544,7 @@ class MultiStrategyRunner:
 
 def main():
     """Main execution"""
+    start_time = time.time()
     print("=" * 80)
     print("MULTI-STRATEGY TRADING SYSTEM")
     print("=" * 80)
@@ -559,7 +570,7 @@ def main():
         
         # Generate report
         runner.generate_performance_report()
-        
+
         print("\n" + "=" * 80)
         print(f"✅ EXECUTION COMPLETE - {len(signals)} trades executed")
         print("=" * 80)
@@ -587,7 +598,69 @@ def main():
             logger.info("Email summary sent successfully")
         except Exception as e:
             logger.error(f"Failed to send email summary: {e}")
-        
+
+        try:
+            writer = DailyArtifactWriter()
+            latest_date = market_data.index.max()
+            data_freshness_hours = (datetime.now() - latest_date).total_seconds() / 3600
+            data_freshness = f"{data_freshness_hours:.1f}h old"
+            regime = runner.regime_detector.get_status()
+            portfolio_heat = 0.0
+            if runner.portfolio_value > 0:
+                total_exposure = sum(
+                    pos['shares'] * pos['current_price'] for pos in positions_data
+                )
+                portfolio_heat = (total_exposure / runner.portfolio_value) * 100
+
+            placed_orders = [
+                {
+                    'symbol': trade['symbol'],
+                    'side': trade['action'],
+                    'qty': trade['shares'],
+                    'price': trade['price']
+                }
+                for trade in runner.executed_trades
+            ]
+            open_positions = [
+                {
+                    'symbol': pos['symbol'],
+                    'qty': pos['shares'],
+                    'avg_price': pos['entry_price'],
+                    'market_value': pos['shares'] * pos['current_price'],
+                    'unrealized_pl': (pos['current_price'] - pos['entry_price']) * pos['shares'],
+                    'exposure_pct': (pos['shares'] * pos['current_price'] / runner.portfolio_value * 100)
+                    if runner.portfolio_value > 0 else 0
+                }
+                for pos in positions_data
+            ]
+
+            artifact = create_artifact_data(
+                vix=regime.get('vix', 0),
+                regime_classification=regime.get('volatility_regime', 'UNKNOWN'),
+                raw_signals=runner.raw_signals_by_strategy,
+                rejected_signals=[],
+                executed_signals=runner.executed_signals,
+                placed_orders=placed_orders,
+                filled_orders=placed_orders,
+                rejected_orders=[],
+                portfolio_heat=portfolio_heat,
+                daily_pnl=0.0,
+                cumulative_pnl=0.0,
+                drawdown=0.0,
+                max_drawdown=0.0,
+                circuit_breaker_state="ACTIVE" if runner.portfolio_risk.trading_halted else "INACTIVE",
+                open_positions=open_positions,
+                runtime_seconds=time.time() - start_time,
+                data_freshness=data_freshness,
+                errors=runner.errors,
+                warnings=[],
+                reconciliation_status=runner.reconciliation_status
+            )
+            artifact['system_health']['reconciliation_discrepancies'] = runner.reconciliation_discrepancies
+            writer.write_daily_artifact(datetime.now().strftime('%Y-%m-%d'), artifact)
+        except Exception as e:
+            logger.error(f"Failed to write daily artifact: {e}")
+
         logger.info("Multi-strategy execution completed successfully")
         
     except Exception as e:
