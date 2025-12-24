@@ -14,6 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 import os
+import subprocess
 import sqlite3
 from datetime import datetime
 from dotenv import load_dotenv
@@ -27,7 +28,15 @@ def verify_database_schema():
     print("1. VERIFYING DATABASE SCHEMA")
     print("="*80)
     
-    required_tables = ['strategies', 'signals', 'trades', 'positions', 'broker_state', 'system_state']
+    required_tables = [
+        'strategies',
+        'strategy_performance',
+        'signals',
+        'trades',
+        'positions',
+        'broker_state',
+        'system_state',
+    ]
     
     conn = sqlite3.connect('trading.db')
     cursor = conn.cursor()
@@ -74,10 +83,44 @@ def verify_database_schema():
     conn.close()
     return True
 
+def run_system(dry_run: bool) -> bool:
+    """Run the system in dry-run or real mode."""
+    mode = "DRY RUN" if dry_run else "REAL RUN"
+    print("\n" + "="*80)
+    print(f"2. RUNNING SYSTEM ({mode})")
+    print("="*80)
+
+    api_key = os.getenv('ALPACA_API_KEY')
+    secret_key = os.getenv('ALPACA_SECRET_KEY')
+
+    if not api_key or not secret_key:
+        print("⚠️  WARNING: Alpaca credentials not found, skipping system run")
+        return True
+
+    env = os.environ.copy()
+    if dry_run:
+        env['PHASE5_DRY_RUN'] = 'true'
+    else:
+        env.pop('PHASE5_DRY_RUN', None)
+
+    cmd = [sys.executable, 'src/multi_strategy_main.py']
+    print(f"Running command: {' '.join(cmd)} (PHASE5_DRY_RUN={env.get('PHASE5_DRY_RUN', 'false')})")
+
+    result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+    print(result.stdout)
+    if result.returncode != 0:
+        print(result.stderr)
+        print(f"❌ FAIL: System run failed ({mode})")
+        return False
+
+    print(f"✅ PASS: System run completed ({mode})")
+    return True
+
+
 def verify_broker_state():
     """Verify broker has 0 positions or reconciliation passed"""
     print("\n" + "="*80)
-    print("2. VERIFYING BROKER STATE")
+    print("4. VERIFYING BROKER STATE")
     print("="*80)
     
     api_key = os.getenv('ALPACA_API_KEY')
@@ -129,7 +172,7 @@ def verify_broker_state():
 def verify_terminal_states():
     """Verify all signals have terminal states"""
     print("\n" + "="*80)
-    print("3. VERIFYING TERMINAL STATES")
+    print("5. VERIFYING TERMINAL STATES")
     print("="*80)
     
     today = datetime.now().strftime('%Y-%m-%d')
@@ -194,7 +237,7 @@ def verify_terminal_states():
 def verify_trades():
     """Verify trades recorded with execution costs"""
     print("\n" + "="*80)
-    print("4. VERIFYING TRADES")
+    print("6. VERIFYING TRADES")
     print("="*80)
     
     today = datetime.now().strftime('%Y-%m-%d')
@@ -249,7 +292,7 @@ def verify_trades():
 def verify_artifacts():
     """Verify daily artifacts exist"""
     print("\n" + "="*80)
-    print("5. VERIFYING ARTIFACTS")
+    print("7. VERIFYING ARTIFACTS")
     print("="*80)
     
     today = datetime.now().strftime('%Y-%m-%d')
@@ -281,7 +324,7 @@ def verify_artifacts():
 def verify_broker_state_snapshot():
     """Verify broker state snapshot was saved"""
     print("\n" + "="*80)
-    print("6. VERIFYING BROKER STATE SNAPSHOT")
+    print("8. VERIFYING BROKER STATE SNAPSHOT")
     print("="*80)
     
     today = datetime.now().strftime('%Y-%m-%d')
@@ -320,6 +363,8 @@ def main():
     results = []
     
     results.append(("Database Schema", verify_database_schema()))
+    results.append(("System Dry Run", run_system(dry_run=True)))
+    results.append(("System Real Run", run_system(dry_run=False)))
     results.append(("Broker State", verify_broker_state()))
     results.append(("Terminal States", verify_terminal_states()))
     results.append(("Trades", verify_trades()))

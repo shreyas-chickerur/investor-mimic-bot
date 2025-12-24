@@ -115,9 +115,47 @@ class Phase5Database:
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+
+        # Strategy performance snapshots (optional but required by runner)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS strategy_performance (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                strategy_id INTEGER NOT NULL,
+                date TEXT NOT NULL,
+                portfolio_value REAL NOT NULL,
+                cash REAL NOT NULL,
+                positions_value REAL NOT NULL,
+                total_return_pct REAL NOT NULL,
+                daily_return_pct REAL,
+                num_positions INTEGER,
+                num_trades_today INTEGER,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (strategy_id) REFERENCES strategies(id)
+            )
+        ''')
+
+        self._ensure_trade_columns(cursor)
         
         conn.commit()
         conn.close()
+
+    def _ensure_trade_columns(self, cursor: sqlite3.Cursor):
+        """Ensure trades table has required execution cost columns."""
+        cursor.execute("PRAGMA table_info(trades)")
+        existing = {row[1] for row in cursor.fetchall()}
+
+        required_columns = {
+            'requested_price': 'REAL NOT NULL DEFAULT 0',
+            'exec_price': 'REAL NOT NULL DEFAULT 0',
+            'slippage_cost': 'REAL DEFAULT 0',
+            'commission_cost': 'REAL DEFAULT 0',
+            'total_cost': 'REAL DEFAULT 0',
+            'notional': 'REAL NOT NULL DEFAULT 0'
+        }
+
+        for column, definition in required_columns.items():
+            if column not in existing:
+                cursor.execute(f"ALTER TABLE trades ADD COLUMN {column} {definition}")
     
     def create_strategy(self, name: str, description: str, capital: float) -> int:
         """Create or get strategy"""
@@ -285,6 +323,87 @@ class Phase5Database:
         rows = cursor.fetchall()
         conn.close()
         
+        return [dict(row) for row in rows]
+
+    def get_strategy_trades(self, strategy_id: int) -> List[Dict]:
+        """Get trades for a strategy."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            SELECT id, strategy_id, signal_id, symbol, action, shares,
+                   exec_price AS price, requested_price, exec_price,
+                   slippage_cost, commission_cost, total_cost, notional,
+                   order_id, executed_at, pnl
+            FROM trades
+            WHERE strategy_id = ?
+            ORDER BY executed_at
+        ''', (strategy_id,))
+
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
+
+    def record_daily_performance(self, strategy_id: int, portfolio_value: float,
+                                 cash: float, positions_value: float, return_pct: float,
+                                 num_positions: int):
+        """Record daily performance snapshot."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            INSERT INTO strategy_performance
+            (strategy_id, date, portfolio_value, cash, positions_value,
+             total_return_pct, num_positions, num_trades_today)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+        ''', (
+            strategy_id,
+            datetime.now().strftime('%Y-%m-%d'),
+            portfolio_value,
+            cash,
+            positions_value,
+            return_pct,
+            num_positions
+        ))
+
+        conn.commit()
+        conn.close()
+
+    def get_latest_performance(self, strategy_id: int) -> Optional[Dict]:
+        """Get the latest performance record for a strategy."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            SELECT * FROM strategy_performance
+            WHERE strategy_id = ?
+            ORDER BY date DESC, created_at DESC
+            LIMIT 1
+        ''', (strategy_id,))
+
+        row = cursor.fetchone()
+        conn.close()
+
+        return dict(row) if row else None
+
+    def get_strategy_performance(self, strategy_id: int, days: int = 60) -> List[Dict]:
+        """Get recent performance records for a strategy."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            SELECT * FROM strategy_performance
+            WHERE strategy_id = ?
+            ORDER BY date DESC, created_at DESC
+            LIMIT ?
+        ''', (strategy_id, days))
+
+        rows = cursor.fetchall()
+        conn.close()
+
         return [dict(row) for row in rows]
     
     def get_todays_trades(self, date: str) -> List[Dict]:
