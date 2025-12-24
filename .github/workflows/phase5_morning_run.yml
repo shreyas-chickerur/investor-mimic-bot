@@ -110,3 +110,28 @@ jobs:
           artifacts/
           logs/
         retention-days: 30
+    
+    - name: Send failure notification
+      if: failure()
+      uses: dawidd6/action-send-mail@v3
+      with:
+        server_address: smtp.gmail.com
+        server_port: 587
+        username: ${{ secrets.EMAIL_USERNAME }}
+        password: ${{ secrets.EMAIL_PASSWORD }}
+        subject: "⚠️ Phase 5 Workflow Failed - ${{ github.run_number }}"
+        to: ${{ secrets.EMAIL_TO }}
+        from: Phase 5 Automation
+        body: |
+          Phase 5 Daily Execution Failed
+          
+          Run: ${{ github.run_number }}
+          Date: ${{ github.event.repository.updated_at }}
+          Workflow: ${{ github.workflow }}
+          
+          Failed Step: Check the logs at:
+          https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          
+          Please review the failure and take corrective action.
+          
+          Artifacts (if any): phase5-artifacts-${{ github.run_number }}
