@@ -95,7 +95,23 @@ jobs:
       with:
         name: test-logs
         path: logs/
-        retention-days: 7
+        retention-days: 30
+    
+    - name: Upload database snapshot
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: database-snapshot
+        path: trading.db
+        retention-days: 30
+    
+    - name: Upload artifacts (if generated)
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: trading-artifacts
+        path: artifacts/
+        retention-days: 30
     
     - name: Test summary
       if: always()
