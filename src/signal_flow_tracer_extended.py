@@ -186,7 +186,7 @@ def trace_rejected_broker(tracer, date, signal: Dict, reason: str):
     
     set_terminal_state(tracer, trace_id, 'REJECTED_BY_BROKER', reason)
 
-def validate_terminal_states(tracer) -> tuple[bool, List[str]]:
+def validate_terminal_states(tracer) -> Tuple[bool, List[str]]:
     """
     Validate that all generated signals have exactly one terminal state
     

@@ -12,7 +12,7 @@ Use for testing before live paper trading.
 """
 import os
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -184,7 +184,7 @@ class DryRunExecutor:
             return False, [f"Error reading broker state: {str(e)}"]
     
     def generate_dry_run_artifact(self, date: str, regime_data: Dict, 
-                                  signals_data: Dict, risk_data: Dict) -> tuple[str, str]:
+                                  signals_data: Dict, risk_data: Dict) -> Tuple[str, str]:
         """
         Generate daily artifact for dry run
         
