@@ -14,6 +14,7 @@ import pandas as pd
 import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
+import pickle
 
 
 class MLMomentumStrategy(TradingStrategy):
@@ -31,6 +32,21 @@ class MLMomentumStrategy(TradingStrategy):
         self.scaler = StandardScaler()
         self.model_trained = False
         self.min_probability = 0.6  # Minimum probability for buy signal
+        self.model_path = Path(__file__).parent.parent / "data" / "ml_momentum_model.pkl"
+        self.scaler_path = Path(__file__).parent.parent / "data" / "ml_momentum_scaler.pkl"
+        self._load_model()
+
+    def _load_model(self):
+        """Load model and scaler from disk if available."""
+        try:
+            if self.model_path.exists() and self.scaler_path.exists():
+                with open(self.model_path, "rb") as model_file:
+                    self.model = pickle.load(model_file)
+                with open(self.scaler_path, "rb") as scaler_file:
+                    self.scaler = pickle.load(scaler_file)
+                self.model_trained = True
+        except Exception:
+            self.model_trained = False
         
     def _prepare_features(self, symbol_data: pd.DataFrame) -> np.array:
         """Extract features for ML model"""
@@ -80,6 +96,18 @@ class MLMomentumStrategy(TradingStrategy):
             # Train model
             self.model.fit(X_train, y_train)
             self.model_trained = True
+            self._save_model()
+
+    def _save_model(self):
+        """Persist model and scaler to disk."""
+        try:
+            self.model_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.model_path, "wb") as model_file:
+                pickle.dump(self.model, model_file)
+            with open(self.scaler_path, "wb") as scaler_file:
+                pickle.dump(self.scaler, scaler_file)
+        except Exception:
+            pass
     
     def generate_signals(self, market_data: pd.DataFrame) -> List[Dict]:
         """Generate signals using ML predictions"""
