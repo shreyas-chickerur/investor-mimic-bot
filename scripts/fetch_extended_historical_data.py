@@ -19,6 +19,7 @@ import time
 from datetime import datetime, timedelta
 import logging
 import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logging.basicConfig(
     level=logging.INFO,
@@ -244,12 +245,12 @@ def main():
     logger.info("EXTENDED HISTORICAL DATA FETCH")
     logger.info("="*80)
     
-    # Initialize fetcher
-    fetcher = ExtendedDataFetcher(years=15)
+    # Initialize fetcher (premium=True by default)
+    fetcher = ExtendedDataFetcher(years=15, premium=True)
     
     # Fetch all stock data
     logger.info("\nFetching stock data...")
-    df = fetcher.fetch_all_stocks(delay_seconds=12)
+    df = fetcher.fetch_all_stocks()
     
     # Calculate technical indicators
     df = fetcher.calculate_technical_indicators(df)
