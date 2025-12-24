@@ -20,15 +20,18 @@ class SignalFlowTracer:
     Answers: "Why did this signal not become a trade?"
     """
     
-    def __init__(self, log_file: str = None):
+    def __init__(self, log_file: str = None, enforce_terminal_states: bool = True):
         """
         Initialize signal flow tracer
         
         Args:
             log_file: Path to detailed trace log file
+            enforce_terminal_states: If True, enforce exactly one terminal state per signal (Phase 5)
         """
         self.log_file = log_file
         self.traces = []
+        self.enforce_terminal_states = enforce_terminal_states
+        self.signal_terminal_states = {}  # {trace_id: terminal_state}
         
         if log_file:
             # Set up file logging

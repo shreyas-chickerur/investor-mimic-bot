@@ -1,6 +1,6 @@
 {
   "date": "2025-12-23",
-  "generated_at": "2025-12-23T17:35:00.532985",
+  "generated_at": "2025-12-23T18:55:51.216669",
   "version": "1.0",
   "regime": {
     "vix": 18.5,
@@ -9,53 +9,63 @@
   },
   "signals": {
     "raw": {
-      "RSI_Mean_Reversion": [
+      "Test_Strategy": [
         {
           "symbol": "AAPL",
           "action": "BUY",
           "price": 150.0
+        },
+        {
+          "symbol": "MSFT",
+          "action": "BUY",
+          "price": 300.0
         }
       ]
     },
-    "rejected": [
-      {
-        "symbol": "MSFT",
-        "reason": "REJECTED_BY_HEAT"
-      }
-    ],
+    "rejected": [],
     "executed": [
       {
         "symbol": "AAPL",
         "action": "BUY",
         "price": 150.0
+      },
+      {
+        "symbol": "MSFT",
+        "action": "BUY",
+        "price": 300.0
       }
     ]
   },
   "trades": {
-    "placed": [
-      {
-        "symbol": "AAPL",
-        "side": "BUY",
-        "qty": 10,
-        "price": 150.0
-      }
-    ],
+    "placed": [],
     "filled": [
       {
         "symbol": "AAPL",
-        "side": "BUY",
-        "qty": 10,
-        "price": 150.05
+        "action": "BUY",
+        "shares": 10,
+        "price": 150.05,
+        "total_cost": 1502.0005,
+        "timestamp": "2025-12-23T18:55:50.689643",
+        "dry_run": true
+      },
+      {
+        "symbol": "MSFT",
+        "action": "BUY",
+        "shares": 5,
+        "price": 300.1,
+        "total_cost": 1502.0005,
+        "timestamp": "2025-12-23T18:55:50.689775",
+        "dry_run": true
       }
     ],
     "rejected": []
   },
   "risk": {
-    "portfolio_heat": 15.5,
-    "daily_pnl": 250.0,
-    "cumulative_pnl": 1500.0,
-    "drawdown": -2.5,
-    "max_drawdown": -5.2,
+    "portfolio_heat": 15.0,
+    "daily_pnl": 0,
+    "cumulative_pnl": 0,
+    "drawdown": 0,
+    "max_drawdown": 0,
     "circuit_breaker_state": "INACTIVE"
   },
   "positions": {
@@ -64,19 +74,29 @@
         "symbol": "AAPL",
         "qty": 10,
         "avg_price": 150.05,
-        "market_value": 1505.0,
-        "unrealized_pl": 5.0,
-        "exposure_pct": 1.5
+        "market_value": 1500.5,
+        "unrealized_pl": 0.0,
+        "exposure_pct": 1.5005450313563908
+      },
+      {
+        "symbol": "MSFT",
+        "qty": 5,
+        "avg_price": 300.1,
+        "market_value": 1500.5,
+        "unrealized_pl": 0.0,
+        "exposure_pct": 1.5005450313563908
       }
     ]
   },
   "system_health": {
     "runtime_seconds": 2.5,
-    "data_freshness": "CURRENT",
+    "data_freshness": "DRY_RUN",
     "error_count": 0,
-    "warning_count": 0,
+    "warning_count": 1,
     "errors": [],
-    "warnings": [],
-    "reconciliation_status": "PASS"
+    "warnings": [
+      "DRY RUN MODE - No broker orders placed"
+    ],
+    "reconciliation_status": "DRY_RUN_READ_ONLY"
   }
 }
