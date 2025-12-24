@@ -27,12 +27,14 @@ GitHub secrets should already be configured. Verify:
 2. Confirm these secrets exist:
    - `ALPACA_API_KEY`
    - `ALPACA_SECRET_KEY`
+   - `ALPHA_VANTAGE_API_KEY`
 
 If missing, add them:
 - Click "New repository secret"
 - Name: `ALPACA_API_KEY`
 - Value: Your Alpaca API key
 - Repeat for `ALPACA_SECRET_KEY`
+- Add `ALPHA_VANTAGE_API_KEY` (for market data fetching)
 
 ### Step 2: Enable Workflow
 
