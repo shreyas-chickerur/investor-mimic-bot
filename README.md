@@ -1,40 +1,154 @@
 # Investor Mimic Bot
 
-Automated trading system that executes RSI-based mean reversion strategy on Alpaca paper trading.
+Multi-strategy quantitative trading system with portfolio-level risk management and automated execution.
 
-## Strategy
+## Phase 5: Automated Paper Trading
 
-- **Entry:** RSI < 30 + Volatility < 1.25x rolling median
-- **Exit:** Hold for 20 days
-- **Position Size:** 10% of capital per trade
-- **Max Positions:** 10 concurrent, 2 per symbol
+Fully automated daily execution with email notifications and live monitoring dashboard.
+
+### Features
+
+- **5 Trading Strategies**: RSI Mean Reversion, ML Momentum, News Sentiment, MA Crossover, Volatility Breakout
+- **Portfolio Risk Management**: Heat limits (30%), daily loss limits (-2%), correlation filtering
+- **Regime Detection**: VIX-based market regime adaptation
+- **Broker Reconciliation**: Automated position verification with Alpaca
+- **Execution Cost Modeling**: Realistic slippage and commission simulation
+- **Live Dashboard**: Real-time strategy performance monitoring
+- **Automated Execution**: GitHub Actions workflow runs daily at 6:30 AM PST
+- **Email Notifications**: Daily digest with trade summaries and failure alerts
+
+---
 
 ## Quick Start
 
-### Using Makefile (Easiest)
+### 1. Setup
 
 ```bash
-# 1. Install dependencies
-make install
+# Install dependencies
+pip install -r requirements.txt
 
-# 2. Configure credentials
+# Configure environment
 cp .env.example .env
-# Edit .env with your Alpaca API keys
+# Edit .env with your API keys:
+# - ALPACA_API_KEY
+# - ALPACA_SECRET_KEY
+# - ALPHA_VANTAGE_API_KEY (premium)
+# - EMAIL credentials (optional)
 
-# 3. Sync database
-make sync-db
-
-# 4. Run all strategies
-make run
-
-# 5. View dashboard
-make dashboard
-# Open http://localhost:5000 in browser
+# Initialize database
+make init
 ```
 
-### All Available Commands
+### 2. Fetch Market Data
+
 ```bash
-make help              # Show all commands
+# Fetch 15 years of historical data (~18 seconds with premium API)
+make fetch-data
+```
+
+### 3. Run Execution
+
+```bash
+# Run Phase 5 daily execution
+make run
+```
+
+### 4. Monitor Performance
+
+```bash
+# Start live dashboard at http://localhost:8080
+make dashboard
+
+# Stop dashboard
+make stop-dashboard
+```
+
+---
+
+## Live Monitoring Dashboard
+
+Access real-time strategy performance at **http://localhost:8080**
+
+**Features:**
+- Strategy P&L cards with win rates
+- Performance charts over time
+- Execution history with reconciliation status
+- Auto-refresh every 30 seconds
+
+**Start Dashboard:**
+```bash
+make dashboard
+```
+
+---
+
+## Automated Execution (GitHub Actions)
+
+### Schedule
+- **Runs:** Every weekday at 6:30 AM PST
+- **Duration:** 14-30 days of paper trading
+- **No manual intervention required**
+
+### Workflow Steps
+1. Initialize database
+2. Fetch fresh market data (~18s)
+3. Verify positions cleared
+4. Execute all 5 strategies
+5. Verify reconciliation
+6. Upload artifacts (30-day retention)
+7. Send email digest
+
+### Setup GitHub Secrets
+
+Add these secrets at: https://github.com/YOUR_USERNAME/investor-mimic-bot/settings/secrets/actions
+
+**Required:**
+- `ALPACA_API_KEY`
+- `ALPACA_SECRET_KEY`
+- `ALPHA_VANTAGE_API_KEY`
+
+**Optional (for email notifications):**
+- `EMAIL_USERNAME` (Gmail address)
+- `EMAIL_PASSWORD` (Gmail app password)
+- `EMAIL_TO` (recipient email)
+
+---
+
+## Email Notifications
+
+### Daily Digest (Success)
+Sent every morning after successful execution:
+- Reconciliation status
+- Market regime (VIX level)
+- All trades executed (symbol, shares, price, strategy)
+- Portfolio risk metrics (heat, P&L)
+- System health (runtime, errors, warnings)
+- Links to artifacts and dashboard
+
+### Failure Alerts
+Sent immediately if any step fails:
+- Error details
+- Direct link to workflow logs
+- Artifact name for debugging
+
+---
+
+## Available Commands
+
+```bash
+# Setup & Initialization
+make init              # Initialize database for Phase 5
+make fetch-data        # Fetch market data (premium API, ~18s)
+
+# Execution
+make run               # Run Phase 5 daily execution
+make verify-positions  # Verify broker positions are cleared
+
+# Monitoring
+make dashboard         # Start live monitoring dashboard (port 8080)
+make stop-dashboard    # Stop dashboard server
+
+# Maintenance
 make run               # Run all 5 strategies
 make dashboard         # Web dashboard
 make analyze           # Analyze signals
