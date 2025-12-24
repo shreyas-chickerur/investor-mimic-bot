@@ -82,13 +82,15 @@ jobs:
             with open(json_path) as f:
                 data = json.load(f)
             
-            recon = data.get('reconciliation_status', 'UNKNOWN')
-            discrep = len(data.get('reconciliation_discrepancies', []))
+            # Reconciliation status is in system_health
+            system_health = data.get('system_health', {})
+            recon = system_health.get('reconciliation_status', 'UNKNOWN')
+            discrep = system_health.get('reconciliation_discrepancies', [])
             
             print(f'Reconciliation: {recon}')
-            print(f'Discrepancies: {discrep}')
+            print(f'Discrepancies: {len(discrep)}')
             
-            if 'PASS' in recon and discrep == 0:
+            if 'PASS' in recon and len(discrep) == 0:
                 print('✅ DAY 1 COMPLETE - Phase 5 started!')
                 sys.exit(0)
             else:
