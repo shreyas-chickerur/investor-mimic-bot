@@ -48,9 +48,10 @@ class BrokerReconciler:
         self.paper = os.getenv('ALPACA_PAPER', 'true').lower() == 'true'
         
         if not self.api_key or not self.secret_key:
-            raise ValueError("Alpaca API credentials not found in environment")
-        
-        self.client = TradingClient(self.api_key, self.secret_key, paper=self.paper)
+            logger.warning("Alpaca API credentials not found in environment")
+            self.client = None
+        else:
+            self.client = TradingClient(self.api_key, self.secret_key, paper=self.paper)
         self.email_notifier = email_notifier
         self.is_paused = False
         self.last_reconciliation = None
@@ -76,6 +77,8 @@ class BrokerReconciler:
         discrepancies = []
         
         try:
+            if self.client is None:
+                raise ValueError("Alpaca client not configured")
             # 1. Reconcile positions
             position_discrepancies = self._reconcile_positions(local_positions)
             discrepancies.extend(position_discrepancies)

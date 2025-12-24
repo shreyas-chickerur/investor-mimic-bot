@@ -138,6 +138,7 @@ class MultiStrategyRunner:
             
             # Build positions dict
             positions = {}
+            entry_dates = {}
             for trade in trades:
                 if trade['action'] == 'BUY':
                     symbol = trade['symbol']
@@ -146,6 +147,7 @@ class MultiStrategyRunner:
                         positions[symbol] += shares
                     else:
                         positions[symbol] = shares
+                    entry_dates[symbol] = trade.get('executed_at')
                 elif trade['action'] == 'SELL':
                     symbol = trade['symbol']
                     shares = trade['shares']
@@ -153,12 +155,15 @@ class MultiStrategyRunner:
                         positions[symbol] -= shares
                         if positions[symbol] <= 0:
                             del positions[symbol]
+                            entry_dates.pop(symbol, None)
             
             strategy.positions = positions
+            strategy.entry_dates = entry_dates
             logger.info(f"  Loaded {len(positions)} positions for {strategy.name}")
         except Exception as e:
             logger.error(f"Error loading positions for {strategy.name}: {e}")
             strategy.positions = {}
+            strategy.entry_dates = {}
     
     def _create_strategy_instance(self, strategy_id, name, capital):
         """Create strategy instance based on name"""
@@ -181,6 +186,14 @@ class MultiStrategyRunner:
         
         if not data_file.exists():
             logger.error(f"Data file not found: {data_file}")
+            return None
+
+        try:
+            self.data_validator.validate_before_trading(data_file)
+        except ValueError as exc:
+            error_message = str(exc)
+            self.errors.append(error_message)
+            logger.error(error_message)
             return None
         
         df = pd.read_csv(data_file, index_col=0)
@@ -238,6 +251,7 @@ class MultiStrategyRunner:
             except Exception as e:
                 logger.error(f"Error in {strategy.name}: {e}")
                 print(f"❌ Error: {e}")
+                self.errors.append(f"{strategy.name}: {e}")
         
         return all_signals
     
@@ -253,6 +267,11 @@ class MultiStrategyRunner:
             
             if action == 'BUY' and shares > 0:
                 try:
+                    trade_value = shares * price
+                    if not self.cash_manager.reserve_cash(strategy.strategy_id, trade_value):
+                        logger.warning(f"Skipping {symbol} - insufficient cash for strategy {strategy.strategy_id}")
+                        continue
+
                     order_data = MarketOrderRequest(
                         symbol=symbol,
                         qty=shares,
@@ -263,6 +282,11 @@ class MultiStrategyRunner:
                     
                     print(f"  ✅ BUY {shares} {symbol} @ ${price:.2f} (Order: {order.id})")
                     
+                    strategy.add_position(symbol, shares)
+                    strategy.update_capital(-trade_value)
+                    entry_date = signal.get('asof_date') or datetime.now()
+                    strategy.entry_dates[symbol] = entry_date
+
                     # Log trade
                     self.db.log_trade(
                         strategy.strategy_id,
@@ -278,7 +302,8 @@ class MultiStrategyRunner:
                         'strategy': strategy.name,
                         'symbol': symbol,
                         'shares': shares,
-                        'price': price
+                        'price': price,
+                        'action': 'BUY'
                     })
                     
                 except Exception as e:
@@ -298,7 +323,9 @@ class MultiStrategyRunner:
                     print(f"  ✅ SELL {shares} {symbol} @ ${price:.2f} (Order: {order.id})")
                     
                     # Release cash back
-                    self.cash_manager.release_cash(strategy.strategy_id, shares * price)
+                    trade_value = shares * price
+                    self.cash_manager.release_cash(strategy.strategy_id, trade_value)
+                    strategy.update_capital(trade_value)
                     
                     # Log trade
                     self.db.log_trade(
@@ -316,6 +343,7 @@ class MultiStrategyRunner:
                         strategy.positions[symbol] -= shares
                         if strategy.positions[symbol] <= 0:
                             del strategy.positions[symbol]
+                            strategy.entry_dates.pop(symbol, None)
                     
                     trade_record = {
                         'strategy': strategy.name,
