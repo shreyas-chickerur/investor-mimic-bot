@@ -262,7 +262,7 @@ def run_volatile_period_test(market_data):
         logger.info(f"Trades: {actual_trades}")
         logger.info(f"Return: {results.get('total_return', 0):.2f}%")
         logger.info(f"Max DD: {results.get('max_drawdown', 0):.2f}%")
-        logger.info(f"Sharpe: {results.get('sharpe_ratio', 0):.2f}, Win Rate: {results.get('win_rate', 0):.1f}%")
+        logger.info(f"Sharpe: {results.get('sharpe_label', 'N/A')}, Win Rate: {results.get('win_rate_label', 'N/A')}")
         
         # Window boundary guardrail test
         guardrail_passed, guardrail_msg = test_window_boundary_guardrail(

@@ -44,6 +44,7 @@ class PortfolioBacktester:
         self.trades = []
         self.daily_returns = []
         self.positions = {}  # {symbol: {shares, entry_price, entry_date, strategy_id}}
+        self.positions_at_start = 0  # Track positions at window start
         
         logger.info(f"Backtester initialized: ${initial_capital:,.2f}, "
                    f"{start_date} to {end_date}")
@@ -74,6 +75,9 @@ class PortfolioBacktester:
             Dict with backtest results
         """
         logger.info("Starting portfolio-level backtest...")
+        
+        # Track positions at start for guardrail
+        self.positions_at_start = len(self.positions)
         
         # Get unique dates
         dates = sorted(market_data.index.unique())
@@ -365,11 +369,12 @@ class PortfolioBacktester:
         
         # Calculate comprehensive metrics
         final_value = equity_df.iloc[-1]['portfolio_value']
-        total_return = (final_value - self.initial_capital) / self.initial_capital
+        total_return = ((final_value - self.initial_capital) / self.initial_capital) * 100
         
-        # Annualized return
-        days = (equity_df.iloc[-1]['date'] - equity_df.iloc[0]['date']).days
-        annual_return = total_return * (365 / days) if days > 0 else 0
+        # Calculate max drawdown
+        equity_df['cummax'] = equity_df['portfolio_value'].cummax()
+        equity_df['drawdown'] = (equity_df['portfolio_value'] - equity_df['cummax']) / equity_df['cummax'] * 100
+        max_drawdown = equity_df['drawdown'].min()
         
         # Sharpe Ratio (annualized)
         if len(self.daily_returns) > 1:
@@ -398,7 +403,12 @@ class PortfolioBacktester:
             sortino_ratio = np.nan  # Undefined: insufficient data
         
         # Calmar Ratio (return / max drawdown)
-        calmar_ratio = (total_return / abs(max_drawdown)) if max_drawdown < 0 else np.nan
+        if max_drawdown < -0.01:  # At least 0.01% drawdown
+            calmar_ratio = total_return / abs(max_drawdown)
+        elif max_drawdown < 0 and total_return > 0:
+            calmar_ratio = np.inf  # Infinite: positive return with negligible drawdown
+        else:
+            calmar_ratio = np.nan  # Undefined: no drawdown or negative return
         
         # Win Rate and Profit Factor
         if len(trades_df) > 0 and 'action' in trades_df.columns:
