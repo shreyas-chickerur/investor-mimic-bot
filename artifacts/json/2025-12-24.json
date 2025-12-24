@@ -1,0 +1,47 @@
+{
+  "date": "2025-12-24",
+  "generated_at": "2025-12-24T13:44:29.263816",
+  "version": "1.0",
+  "regime": {
+    "vix": 18.0,
+    "classification": "normal",
+    "volatility_state": "NORMAL"
+  },
+  "signals": {
+    "raw": {},
+    "rejected": [],
+    "executed": []
+  },
+  "trades": {
+    "placed": [],
+    "filled": [],
+    "rejected": []
+  },
+  "risk": {
+    "portfolio_heat": 0.0,
+    "daily_pnl": 0.0,
+    "cumulative_pnl": 0.0,
+    "drawdown": 0.0,
+    "max_drawdown": 0.0,
+    "circuit_breaker_state": "INACTIVE"
+  },
+  "positions": {
+    "open": []
+  },
+  "system_health": {
+    "runtime_seconds": 2.090607166290283,
+    "data_freshness": "13.7h old",
+    "error_count": 2,
+    "warning_count": 0,
+    "errors": [
+      "Position mismatch: AVGO exists locally but not in broker",
+      "Position mismatch: TXN exists locally but not in broker"
+    ],
+    "warnings": [],
+    "reconciliation_status": "FAIL",
+    "reconciliation_discrepancies": [
+      "Position mismatch: AVGO exists locally but not in broker",
+      "Position mismatch: TXN exists locally but not in broker"
+    ]
+  }
+}
