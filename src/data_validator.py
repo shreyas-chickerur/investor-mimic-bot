@@ -7,7 +7,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from pathlib import Path
 import logging
-from zoneinfo import ZoneInfo
+from dateutil import tz
 from pandas.tseries.holiday import USFederalHolidayCalendar
 from pandas.tseries.offsets import CustomBusinessDay
 
@@ -62,7 +62,7 @@ class DataValidator:
             # Check data freshness
             latest_date = df.index.max()
             now_utc = datetime.utcnow()
-            market_now = datetime.now(tz=ZoneInfo("America/New_York"))
+            market_now = datetime.now(tz=tz.gettz("America/New_York"))
             expected_latest_date = self._expected_latest_date(market_now)
             age_hours = (now_utc - latest_date).total_seconds() / 3600
             
