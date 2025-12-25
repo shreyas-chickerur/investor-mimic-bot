@@ -79,7 +79,7 @@ jobs:
         ALPACA_LIVE_ENABLED: 'false'
         ENABLE_BROKER_RECONCILIATION: 'true'
         PHASE5_SIGNAL_INJECTION: 'false'
-        DATA_MAX_AGE_HOURS: '72'
+        DATA_MAX_AGE_HOURS: '96'
       run: |
         echo "=== Phase 5 Daily Run - $(date) ==="
         echo "Environment:"
