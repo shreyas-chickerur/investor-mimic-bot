@@ -21,13 +21,13 @@ help:
 	@echo "  make clean             - Clean generated files"
 
 init:
-	@echo "Initializing Phase 5 database..."
-	python3 scripts/init_database.py --db trading.db
+	@echo "Initializing database..."
+	python3 scripts/setup_database.py --db trading.db
 	@echo "✅ Database initialized"
 
 fetch-data:
 	@echo "Fetching market data (premium API, ~18 seconds)..."
-	@set -a && source .env && set +a && python3 scripts/fetch_extended_historical_data.py
+	@set -a && source .env && set +a && python3 scripts/fetch_historical_data.py
 	@echo "✅ Market data fetched"
 
 verify-positions:
@@ -43,10 +43,9 @@ verify-positions:
 	exit(0 if len(s['positions']) == 0 else 1)"
 
 run:
-	@echo "Running Phase 5 execution..."
-	@set -a && source .env && set +a && export ENABLE_BROKER_RECONCILIATION=true && python3 src/multi_strategy_main.py
+	@echo "Running trading execution..."
+	@set -a && source .env && set +a && export ENABLE_BROKER_RECONCILIATION=true && python3 src/execution_engine.py
 	@echo "✅ Execution complete"
-	python3 src/multi_strategy_main.py
 
 # Single strategy (RSI only)
 run-single:
@@ -62,12 +61,12 @@ dashboard:
 # Analysis
 analyze:
 	@echo "🔍 Analyzing all strategies for signals..."
-	python3 scripts/multi_strategy_analysis.py
+	python3 scripts/analyze_signals.py
 
 # Monitoring
 view:
 	@echo "📊 Strategy Performance Dashboard"
-	python3 scripts/view_strategy_performance.py
+	python3 scripts/view_performance.py
 
 logs:
 	@echo "📋 Recent trading logs:"

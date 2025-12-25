@@ -66,7 +66,7 @@ Portfolio Value: $100,402.61
 **Once positions = 0, run:**
 ```bash
 export ENABLE_BROKER_RECONCILIATION=true
-python3 src/multi_strategy_main.py
+python3 src/execution_engine.py
 ```
 
 **Watch for:**
@@ -209,7 +209,7 @@ git push origin main
 
 ### Daily Execution Schedule
 - **Time:** 4:15 PM ET (after market close)
-- **Command:** `export ENABLE_BROKER_RECONCILIATION=true && python3 src/multi_strategy_main.py`
+- **Command:** `export ENABLE_BROKER_RECONCILIATION=true && python3 src/execution_engine.py`
 - **Duration:** 14-30 consecutive trading days
 
 ### Daily Monitoring
@@ -249,7 +249,7 @@ python3 -c "import sys; sys.path.insert(0, 'src'); from broker_reconciler import
 
 **Run Day 1:**
 ```bash
-export ENABLE_BROKER_RECONCILIATION=true && python3 src/multi_strategy_main.py
+export ENABLE_BROKER_RECONCILIATION=true && python3 src/execution_engine.py
 ```
 
 **Check Day 1 results:**

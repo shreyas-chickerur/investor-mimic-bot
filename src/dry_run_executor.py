@@ -219,7 +219,7 @@ class DryRunExecutor:
             })
         
         # Create artifact data
-        from daily_artifact_writer import create_artifact_data
+        from artifact_writer import create_artifact_data
         
         artifact_data = create_artifact_data(
             vix=regime_data.get('vix', 0),
@@ -271,8 +271,8 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     
     from broker_reconciler import BrokerReconciler
-    from daily_artifact_writer import DailyArtifactWriter
-    from signal_flow_tracer import SignalFlowTracer
+    from artifact_writer import DailyArtifactWriter
+    from signal_tracer import SignalFlowTracer
     
     # Initialize components
     reconciler = BrokerReconciler()

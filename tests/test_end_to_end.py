@@ -181,7 +181,7 @@ def test_signal_injection():
     print("="*80)
     
     from signal_injection_engine import SignalInjectionEngine
-    from signal_flow_tracer import SignalFlowTracer
+    from signal_tracer import SignalFlowTracer
     
     # Initialize
     injection_engine = SignalInjectionEngine()

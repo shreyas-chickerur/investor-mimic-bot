@@ -35,7 +35,7 @@ jobs:
     
     - name: Initialize database
       run: |
-        python scripts/init_database.py --db trading.db
+        python scripts/setup_database.py --db trading.db
     
     - name: Verify data files exist
       run: |
@@ -54,7 +54,7 @@ jobs:
         print('Testing imports...')
         from portfolio_backtester import PortfolioBacktester
         from signal_injection_engine import SignalInjectionEngine
-        from signal_flow_tracer import SignalFlowTracer
+        from signal_tracer import SignalFlowTracer
         from strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
         from strategies.strategy_ma_crossover import MACrossoverStrategy
         from strategies.strategy_ml_momentum import MLMomentumStrategy

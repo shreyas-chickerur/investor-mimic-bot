@@ -102,15 +102,15 @@ class TestWorkflowExecution(unittest.TestCase):
     """Test the automated workflow execution"""
     
     def test_workflow_file_exists(self):
-        """Test that GitHub Actions workflow file exists"""
-        workflow_path = '.github/workflows/daily-trading.yml'
-        self.assertTrue(os.path.exists(workflow_path), 
-                       f"Workflow file not found: {workflow_path}")
-        print("✓ Workflow file exists")
+        """Test that workflow file exists"""
+        self.assertTrue(
+            os.path.exists('.github/workflows/phase5_morning_run.yml'),
+            "Workflow file not found: .github/workflows/phase5_morning_run.yml"
+        )
     
     def test_workflow_schedule(self):
         """Test that workflow has correct schedule"""
-        with open('.github/workflows/daily-trading.yml', 'r') as f:
+        with open('.github/workflows/phase5_morning_run.yml', 'r') as f:
             content = f.read()
         
         self.assertIn('schedule:', content, "Missing schedule configuration")

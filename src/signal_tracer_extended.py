@@ -260,7 +260,7 @@ def print_terminal_state_summary(tracer):
 
 if __name__ == "__main__":
     # Test terminal state enforcement
-    from signal_flow_tracer import SignalFlowTracer
+    from signal_tracer import SignalFlowTracer
     
     logging.basicConfig(level=logging.INFO)
     

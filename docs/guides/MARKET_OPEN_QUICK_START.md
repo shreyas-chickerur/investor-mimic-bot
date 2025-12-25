@@ -33,7 +33,7 @@ else:
 
 ```bash
 export ENABLE_BROKER_RECONCILIATION=true
-python3 src/multi_strategy_main.py
+python3 src/execution_engine.py
 ```
 
 **Watch for:** `✅ Reconciliation PASSED`, `Discrepancies: 0`
@@ -84,7 +84,7 @@ git push origin main
 
 **Daily command:**
 ```bash
-export ENABLE_BROKER_RECONCILIATION=true && python3 src/multi_strategy_main.py
+export ENABLE_BROKER_RECONCILIATION=true && python3 src/execution_engine.py
 ```
 
 ---

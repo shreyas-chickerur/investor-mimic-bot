@@ -9,8 +9,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 import unittest
-from signal_flow_tracer import SignalFlowTracer
-from signal_flow_tracer_extended import (
+from signal_tracer import SignalFlowTracer
+from signal_tracer_extended import (
     set_terminal_state,
     trace_executed_terminal,
     trace_rejected_correlation,

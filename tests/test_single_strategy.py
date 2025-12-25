@@ -7,46 +7,45 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 import pandas as pd
-import logging
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+import pytest
 
 # Import strategies
 from strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
 from strategies.strategy_ma_crossover import MACrossoverStrategy
 from strategies.strategy_volatility_breakout import VolatilityBreakoutStrategy
 
-def test_strategy(strategy_class, name, market_data):
-    """Test a single strategy"""
-    logger.info(f"\n{'='*60}")
-    logger.info(f"Testing: {name}")
-    logger.info(f"{'='*60}")
-    
-    try:
-        strategy = strategy_class(1, 20000)
-        
-        # Test on recent data per symbol to avoid single-symbol tails
-        recent_data = market_data.groupby("symbol", group_keys=False).tail(1000)
-        logger.info(f"Data: {len(recent_data)} rows, {recent_data['symbol'].nunique()} symbols")
-        logger.info(f"Date range: {recent_data.index.min()} to {recent_data.index.max()}")
-        
-        signals = strategy.generate_signals(recent_data)
-        
-        if signals and len(signals) > 0:
-            logger.info(f"✅ Generated {len(signals)} signals")
-            for i, sig in enumerate(signals[:3]):
-                logger.info(f"  Signal {i+1}: {sig['action']} {sig['symbol']} @ ${sig['price']:.2f}")
-        else:
-            logger.warning(f"❌ No signals generated")
-        
-        return len(signals) if signals else 0
-        
-    except Exception as e:
-        logger.error(f"❌ Error: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
-        return 0
+@pytest.fixture(scope="module")
+def market_data():
+    """Load market data for testing"""
+    data_file = Path(__file__).parent.parent / 'data' / 'training_data.csv'
+    df = pd.read_csv(data_file, index_col=0)
+    df.index = pd.to_datetime(df.index)
+    df = df.sort_index()
+    return df
+
+def test_rsi_strategy(market_data):
+    """Test RSI Mean Reversion strategy"""
+    strategy = RSIMeanReversionStrategy(1, 20000)
+    recent_data = market_data.groupby("symbol", group_keys=False).tail(1000)
+    signals = strategy.generate_signals(recent_data)
+    assert signals is not None
+    assert isinstance(signals, list)
+
+def test_ma_crossover_strategy(market_data):
+    """Test MA Crossover strategy"""
+    strategy = MACrossoverStrategy(1, 20000)
+    recent_data = market_data.groupby("symbol", group_keys=False).tail(1000)
+    signals = strategy.generate_signals(recent_data)
+    assert signals is not None
+    assert isinstance(signals, list)
+
+def test_volatility_breakout_strategy(market_data):
+    """Test Volatility Breakout strategy"""
+    strategy = VolatilityBreakoutStrategy(1, 20000)
+    recent_data = market_data.groupby("symbol", group_keys=False).tail(1000)
+    signals = strategy.generate_signals(recent_data)
+    assert signals is not None
+    assert isinstance(signals, list)
 
 def main():
     """Test all strategies"""

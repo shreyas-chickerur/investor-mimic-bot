@@ -26,13 +26,13 @@ jobs:
     
     - name: Initialize database
       run: |
-        python scripts/init_database.py --db trading.db
+        python scripts/setup_database.py --db trading.db
     
     - name: Update market data
       env:
         ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
       run: |
-        python scripts/fetch_extended_historical_data.py
+        python scripts/fetch_historical_data.py
     
     - name: Step 1 - Verify positions cleared
       env:
@@ -65,7 +65,7 @@ jobs:
         ALPACA_PAPER: true
         ENABLE_BROKER_RECONCILIATION: true
       run: |
-        python3 src/multi_strategy_main.py
+        python3 src/execution_engine.py
     
     - name: Step 3 - Verify success
       run: |

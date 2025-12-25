@@ -17,7 +17,7 @@ sys.path.insert(0, str(project_root / 'src'))
 from dotenv import load_dotenv
 load_dotenv()
 
-from phase5_database import Phase5Database
+from database import Phase5Database
 from strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
 from strategies.strategy_ml_momentum import MLMomentumStrategy
 from strategies.strategy_news_sentiment import NewsSentimentStrategy
@@ -39,7 +39,7 @@ from dynamic_allocator import DynamicAllocator
 from execution_costs import ExecutionCostModel
 from performance_metrics import PerformanceMetrics
 from broker_reconciler import BrokerReconciler
-from daily_artifact_writer import DailyArtifactWriter, create_artifact_data
+from artifact_writer import DailyArtifactWriter, create_artifact_data
 
 # Setup logging - CRITICAL FIX: Ensure logs directory exists
 Path('logs').mkdir(exist_ok=True)
