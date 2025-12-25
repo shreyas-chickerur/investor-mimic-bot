@@ -367,190 +367,190 @@ class MultiStrategyRunner:
 
         regime_adjustments = self.regime_detector.get_regime_adjustments(market_data=market_data)
         self.portfolio_risk.max_portfolio_heat = regime_adjustments['max_portfolio_heat']
+        all_signals = []
 
-        if not self.portfolio_risk.check_daily_loss_limit(self.portfolio_value):
-            logger.warning("Trading halted due to daily loss limit")
-            return []
-        
-        # Save START snapshot
-        logger.info("Saving START broker snapshot...")
-        account = self.trading_client.get_account()
-        broker_positions = self.trading_client.get_all_positions()
-        self.db.save_broker_state(
-            snapshot_date=self.asof_date,
-            snapshot_type='START',
-            cash=float(account.cash),
-            portfolio_value=float(account.portfolio_value),
-            buying_power=float(account.buying_power),
-            positions=[{'symbol': p.symbol, 'qty': float(p.qty), 'market_value': float(p.market_value)} for p in broker_positions],
-            reconciliation_status='SKIPPED',
-            discrepancies=[]
-        )
-
-        if os.getenv('ENABLE_BROKER_RECONCILIATION', 'false').lower() == 'true':
-            # CRITICAL: Refresh account before reconciliation
-            logger.info("Refreshing account state before reconciliation...")
-            self._refresh_account_state()
-            
-            local_positions = self._build_local_positions()
-            success, discrepancies = self.broker_reconciler.reconcile_daily(
-                local_positions=local_positions,
-                local_cash=self.cash_available
-            )
-            self.reconciliation_status = "PASS" if success else "FAIL"
-            self.reconciliation_discrepancies = discrepancies
-            
-            # Save RECONCILIATION snapshot
-            logger.info(f"Saving RECONCILIATION snapshot (status: {self.reconciliation_status})...")
+        try:
+            # Save START snapshot
+            logger.info("Saving START broker snapshot...")
             account = self.trading_client.get_account()
             broker_positions = self.trading_client.get_all_positions()
             self.db.save_broker_state(
                 snapshot_date=self.asof_date,
-                snapshot_type='RECONCILIATION',
+                snapshot_type='START',
+                cash=float(account.cash),
+                portfolio_value=float(account.portfolio_value),
+                buying_power=float(account.buying_power),
+                positions=[{'symbol': p.symbol, 'qty': float(p.qty), 'market_value': float(p.market_value)} for p in broker_positions],
+                reconciliation_status='SKIPPED',
+                discrepancies=[]
+            )
+
+            if not self.portfolio_risk.check_daily_loss_limit(self.portfolio_value):
+                logger.warning("Trading halted due to daily loss limit")
+                return []
+
+            if os.getenv('ENABLE_BROKER_RECONCILIATION', 'false').lower() == 'true':
+                # CRITICAL: Refresh account before reconciliation
+                logger.info("Refreshing account state before reconciliation...")
+                self._refresh_account_state()
+                
+                local_positions = self._build_local_positions()
+                success, discrepancies = self.broker_reconciler.reconcile_daily(
+                    local_positions=local_positions,
+                    local_cash=self.cash_available
+                )
+                self.reconciliation_status = "PASS" if success else "FAIL"
+                self.reconciliation_discrepancies = discrepancies
+                
+                # Save RECONCILIATION snapshot
+                logger.info(f"Saving RECONCILIATION snapshot (status: {self.reconciliation_status})...")
+                account = self.trading_client.get_account()
+                broker_positions = self.trading_client.get_all_positions()
+                self.db.save_broker_state(
+                    snapshot_date=self.asof_date,
+                    snapshot_type='RECONCILIATION',
+                    cash=float(account.cash),
+                    portfolio_value=float(account.portfolio_value),
+                    buying_power=float(account.buying_power),
+                    positions=[{'symbol': p.symbol, 'qty': float(p.qty), 'market_value': float(p.market_value)} for p in broker_positions],
+                    reconciliation_status=self.reconciliation_status,
+                    discrepancies=discrepancies
+                )
+                
+                if not success:
+                    logger.error("Broker reconciliation failed; trading paused")
+                    self.errors.extend(discrepancies)
+                    return []
+            
+            print("\n" + "=" * 80)
+            print("MULTI-STRATEGY EXECUTION")
+            print("=" * 80)
+            
+            # PHASE 5 VALIDATION: Inject synthetic signals if enabled
+            injected_signals = []
+            if self.signal_injection_enabled:
+                logger.info("=" * 80)
+                logger.info("PHASE 5 SIGNAL INJECTION - Generating validation signals")
+                logger.info("=" * 80)
+                
+                current_prices = self._get_last_close_map(market_data)
+                logger.info(f"Extracted prices for {len(current_prices)} symbols")
+                
+                available_symbols = list(current_prices.keys())[:2]
+                
+                for symbol in available_symbols:
+                    if symbol in current_prices:
+                        injected_signal = {
+                            'symbol': symbol,
+                            'action': 'BUY',
+                            'confidence': 0.75,
+                            'reasoning': 'PHASE5_VALIDATION: Synthetic signal for non-zero path proof',
+                            'price': current_prices[symbol],
+                            'injected': True,
+                            'injection_source': 'PHASE5_VALIDATION'
+                        }
+                        injected_signals.append(injected_signal)
+                        logger.info(f"  [INJECTION] BUY {symbol} @ ${current_prices[symbol]:.2f}")
+                
+                logger.info(f"Generated {len(injected_signals)} validation signals")
+                logger.info("These signals will go through normal correlation filter, risk checks, and sizing")
+                logger.info("=" * 80)
+            
+            for strategy in strategies:
+                print(f"\n📈 {strategy.name}")
+                print("-" * 80)
+                
+                try:
+                    if not self.regime_detector.should_enable_strategy(strategy.name, regime_adjustments):
+                        logger.info(f"Skipping {strategy.name} due to regime adjustments")
+                        continue
+
+                    signals = strategy.generate_signals(market_data)
+                    
+                    # PHASE 5 VALIDATION: Route injected signals to RSI Mean Reversion
+                    if self.signal_injection_enabled and strategy.name == "RSI Mean Reversion" and len(injected_signals) > 0:
+                        logger.info(f"  [INJECTION] Routing {len(injected_signals)} validation signals to {strategy.name}")
+                        signals = injected_signals + (signals if signals else [])
+                        injected_signals = []
+                    
+                    self.raw_signals_by_strategy[strategy.name] = list(signals) if signals else []
+                    
+                    if signals and len(signals) > 0:
+                        print(f"✅ Generated {len(signals)} signals")
+
+                        combined_positions = self._get_all_positions(strategies)
+                        signals = self.correlation_filter.filter_signals(
+                            signals,
+                            combined_positions,
+                            market_data
+                        )
+
+                        # Log signals to database
+                        signal_ids = []
+                        for signal in signals:
+                            signal_id = self.db.log_signal(
+                                strategy.strategy_id,
+                                signal.get('symbol'),
+                                signal.get('action', 'BUY'),
+                                signal.get('confidence', 0.5),
+                                signal.get('reasoning', ''),
+                                self.asof_date
+                            )
+                            signal_ids.append(signal_id)
+                            signal['signal_id'] = signal_id
+                        
+                        # Execute trades
+                        executed = self._execute_strategy_trades(
+                            strategy,
+                            signals[:3],
+                            total_exposure,
+                            self.portfolio_value
+                        )  # Top 3 signals
+                        self.executed_signals.extend(executed)
+                        all_signals.extend(executed)
+                        
+                        # Set terminal states for all signals
+                        for i, signal in enumerate(signals[:3]):
+                            signal_id = signal.get('signal_id')
+                            if signal_id:
+                                was_executed = any(e.get('symbol') == signal.get('symbol') for e in executed)
+                                if was_executed:
+                                    self.db.update_signal_terminal_state(signal_id, 'EXECUTED', 'trade_submitted')
+                                else:
+                                    self.db.update_signal_terminal_state(signal_id, 'FILTERED', 'risk_or_cash_limit')
+                        
+                        # Mark remaining signals as FILTERED
+                        for signal in signals[3:]:
+                            signal_id = signal.get('signal_id')
+                            if signal_id:
+                                self.db.update_signal_terminal_state(signal_id, 'FILTERED', 'top_3_throttle')
+                    else:
+                        print("❌ No signals generated")
+                    
+                    # Record daily performance
+                    self._record_performance(strategy, current_prices)
+                    
+                except Exception as e:
+                    logger.error(f"Error in {strategy.name}: {e}")
+                    print(f"❌ Error: {e}")
+                    self.errors.append(f"{strategy.name}: {e}")
+            
+            return all_signals
+        finally:
+            # Save END snapshot (always)
+            logger.info("Saving END broker snapshot...")
+            account = self.trading_client.get_account()
+            broker_positions = self.trading_client.get_all_positions()
+            self.db.save_broker_state(
+                snapshot_date=self.asof_date,
+                snapshot_type='END',
                 cash=float(account.cash),
                 portfolio_value=float(account.portfolio_value),
                 buying_power=float(account.buying_power),
                 positions=[{'symbol': p.symbol, 'qty': float(p.qty), 'market_value': float(p.market_value)} for p in broker_positions],
                 reconciliation_status=self.reconciliation_status,
-                discrepancies=discrepancies
+                discrepancies=self.reconciliation_discrepancies
             )
-            
-            if not success:
-                logger.error("Broker reconciliation failed; trading paused")
-                self.errors.extend(discrepancies)
-                return []
-        
-        print("\n" + "=" * 80)
-        print("MULTI-STRATEGY EXECUTION")
-        print("=" * 80)
-        
-        all_signals = []
-        
-        # PHASE 5 VALIDATION: Inject synthetic signals if enabled
-        injected_signals = []
-        if self.signal_injection_enabled:
-            logger.info("=" * 80)
-            logger.info("PHASE 5 SIGNAL INJECTION - Generating validation signals")
-            logger.info("=" * 80)
-            
-            current_prices = self._get_last_close_map(market_data)
-            logger.info(f"Extracted prices for {len(current_prices)} symbols")
-            
-            available_symbols = list(current_prices.keys())[:2]
-            
-            for symbol in available_symbols:
-                if symbol in current_prices:
-                    injected_signal = {
-                        'symbol': symbol,
-                        'action': 'BUY',
-                        'confidence': 0.75,
-                        'reasoning': 'PHASE5_VALIDATION: Synthetic signal for non-zero path proof',
-                        'price': current_prices[symbol],
-                        'injected': True,
-                        'injection_source': 'PHASE5_VALIDATION'
-                    }
-                    injected_signals.append(injected_signal)
-                    logger.info(f"  [INJECTION] BUY {symbol} @ ${current_prices[symbol]:.2f}")
-            
-            logger.info(f"Generated {len(injected_signals)} validation signals")
-            logger.info("These signals will go through normal correlation filter, risk checks, and sizing")
-            logger.info("=" * 80)
-        
-        for strategy in strategies:
-            print(f"\n📈 {strategy.name}")
-            print("-" * 80)
-            
-            try:
-                if not self.regime_detector.should_enable_strategy(strategy.name, regime_adjustments):
-                    logger.info(f"Skipping {strategy.name} due to regime adjustments")
-                    continue
-
-                signals = strategy.generate_signals(market_data)
-                
-                # PHASE 5 VALIDATION: Route injected signals to RSI Mean Reversion
-                if self.signal_injection_enabled and strategy.name == "RSI Mean Reversion" and len(injected_signals) > 0:
-                    logger.info(f"  [INJECTION] Routing {len(injected_signals)} validation signals to {strategy.name}")
-                    signals = injected_signals + (signals if signals else [])
-                    injected_signals = []
-                
-                self.raw_signals_by_strategy[strategy.name] = list(signals) if signals else []
-                
-                if signals and len(signals) > 0:
-                    print(f"✅ Generated {len(signals)} signals")
-
-                    combined_positions = self._get_all_positions(strategies)
-                    signals = self.correlation_filter.filter_signals(
-                        signals,
-                        combined_positions,
-                        market_data
-                    )
-
-                    # Log signals to database
-                    signal_ids = []
-                    for signal in signals:
-                        signal_id = self.db.log_signal(
-                            strategy.strategy_id,
-                            signal.get('symbol'),
-                            signal.get('action', 'BUY'),
-                            signal.get('confidence', 0.5),
-                            signal.get('reasoning', ''),
-                            self.asof_date
-                        )
-                        signal_ids.append(signal_id)
-                        signal['signal_id'] = signal_id
-                    
-                    # Execute trades
-                    executed = self._execute_strategy_trades(
-                        strategy,
-                        signals[:3],
-                        total_exposure,
-                        self.portfolio_value
-                    )  # Top 3 signals
-                    self.executed_signals.extend(executed)
-                    all_signals.extend(executed)
-                    
-                    # Set terminal states for all signals
-                    for i, signal in enumerate(signals[:3]):
-                        signal_id = signal.get('signal_id')
-                        if signal_id:
-                            was_executed = any(e.get('symbol') == signal.get('symbol') for e in executed)
-                            if was_executed:
-                                self.db.update_signal_terminal_state(signal_id, 'EXECUTED', 'trade_submitted')
-                            else:
-                                self.db.update_signal_terminal_state(signal_id, 'FILTERED', 'risk_or_cash_limit')
-                    
-                    # Mark remaining signals as FILTERED
-                    for signal in signals[3:]:
-                        signal_id = signal.get('signal_id')
-                        if signal_id:
-                            self.db.update_signal_terminal_state(signal_id, 'FILTERED', 'top_3_throttle')
-                else:
-                    print("❌ No signals generated")
-                
-                # Record daily performance
-                self._record_performance(strategy, current_prices)
-                
-            except Exception as e:
-                logger.error(f"Error in {strategy.name}: {e}")
-                print(f"❌ Error: {e}")
-                self.errors.append(f"{strategy.name}: {e}")
-        
-        # Save END snapshot (always)
-        logger.info("Saving END broker snapshot...")
-        account = self.trading_client.get_account()
-        broker_positions = self.trading_client.get_all_positions()
-        self.db.save_broker_state(
-            snapshot_date=self.asof_date,
-            snapshot_type='END',
-            cash=float(account.cash),
-            portfolio_value=float(account.portfolio_value),
-            buying_power=float(account.buying_power),
-            positions=[{'symbol': p.symbol, 'qty': float(p.qty), 'market_value': float(p.market_value)} for p in broker_positions],
-            reconciliation_status=self.reconciliation_status,
-            discrepancies=self.reconciliation_discrepancies
-        )
-        
-        return all_signals
     
     def _execute_strategy_trades(self, strategy, signals, total_exposure, portfolio_value):
         """Execute trades for a specific strategy"""
@@ -653,12 +653,15 @@ class MultiStrategyRunner:
                     # Log trade
                     self.db.log_trade(
                         strategy.strategy_id,
+                        signal.get('signal_id'),
                         symbol,
                         'SELL',
                         shares,
                         price,
-                        shares * price,
-                        order.id
+                        exec_price,
+                        slippage_cost,
+                        commission_cost,
+                        str(order.id)
                     )
                     
                     # CRITICAL FIX: Update strategy positions
