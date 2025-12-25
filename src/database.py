@@ -312,6 +312,21 @@ class Phase5Database:
         conn.close()
         
         return [dict(row) for row in rows]
+
+    def get_position(self, strategy_id: int, symbol: str) -> Optional[Dict]:
+        """Get a single position for a strategy and symbol."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        cursor.execute(
+            'SELECT * FROM positions WHERE strategy_id = ? AND symbol = ?',
+            (strategy_id, symbol)
+        )
+        row = cursor.fetchone()
+        conn.close()
+
+        return dict(row) if row else None
     
     def get_todays_trades(self, date: str) -> List[Dict]:
         """Get trades for a specific date"""
@@ -382,8 +397,13 @@ class Phase5Database:
         
         rows = cursor.fetchall()
         conn.close()
-        
-        return [dict(row) for row in rows]
+
+        trades = [dict(row) for row in rows]
+        for trade in trades:
+            if trade.get('price') is None:
+                trade['price'] = trade.get('exec_price') or trade.get('requested_price') or 0.0
+
+        return trades
     
     def get_strategy_performance(self, strategy_id: int, days: int = 30) -> List[Dict]:
         """Get strategy performance history (stub - returns empty for now)"""
