@@ -38,7 +38,15 @@ jobs:
     
     - name: Create required directories
       run: |
-        mkdir -p artifacts/json artifacts/markdown logs
+        mkdir -p artifacts/json artifacts/markdown logs data
+    
+    - name: Fetch market data
+      env:
+        ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+        ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+      run: |
+        echo "=== Fetching Market Data ==="
+        python3 scripts/update_data.py || echo "Warning: Data fetch failed, will attempt to continue"
     
     - name: Safety check - Verify paper trading mode
       env:
