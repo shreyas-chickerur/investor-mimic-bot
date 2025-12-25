@@ -136,16 +136,22 @@ jobs:
                 data = json.load(f)
             
             # Extract key metrics
-            trades = data.get('trades', [])
+            trades = data.get('trades', {})
             signals = data.get('signals', {})
             risk = data.get('risk', {})
             positions = data.get('positions', {})
             regime = data.get('regime', {})
+
+            placed_trades = trades.get('placed', []) if isinstance(trades, dict) else trades
+            filled_trades = trades.get('filled', []) if isinstance(trades, dict) else []
+            trades_display = filled_trades or placed_trades
+            open_positions = positions.get('open', []) if isinstance(positions, dict) else positions
+            raw_signals = signals.get('raw', {}) if isinstance(signals, dict) else {}
             
             # Calculate summary stats
-            total_trades = len(trades)
-            buy_trades = sum(1 for t in trades if t.get('action') == 'BUY')
-            sell_trades = sum(1 for t in trades if t.get('action') == 'SELL')
+            total_trades = len(trades_display)
+            buy_trades = sum(1 for t in trades_display if t.get('action') == 'BUY')
+            sell_trades = sum(1 for t in trades_display if t.get('action') == 'SELL')
             
             # Generate summary
             summary = f'''📊 PHASE 5 DAILY DIGEST - {date}
@@ -155,7 +161,7 @@ jobs:
         ═══════════════════════════════════════════════════════════
         
         ✅ Reconciliation: {data.get('system_health', {}).get('reconciliation_status', 'UNKNOWN')}
-        📈 Market Regime: {regime.get('type', 'unknown').upper()} (VIX: {regime.get('vix', 'N/A')})
+        📈 Market Regime: {regime.get('classification', 'unknown').upper()} (VIX: {regime.get('vix', 'N/A')})
         
         ═══════════════════════════════════════════════════════════
         TRADING ACTIVITY
@@ -165,16 +171,16 @@ jobs:
         • BUY orders: {buy_trades}
         • SELL orders: {sell_trades}
         
-        Signals Generated: {sum(len(s.get('signals', [])) for s in signals.values())}
-        Active Positions: {len(positions)}
+        Signals Generated: {sum(len(items) for items in raw_signals.values())}
+        Active Positions: {len(open_positions)}
         
         ═══════════════════════════════════════════════════════════
         TRADES EXECUTED
         ═══════════════════════════════════════════════════════════
         '''
             
-            if trades:
-                for i, trade in enumerate(trades, 1):
+            if trades_display:
+                for i, trade in enumerate(trades_display, 1):
                     summary += f'''
         {i}. {trade.get('action')} {trade.get('shares', 0)} shares of {trade.get('symbol')}
            Strategy: {trade.get('strategy')}
