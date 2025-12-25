@@ -7,14 +7,23 @@ import sqlite3
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
 import json
+import random
+import string
 
 
 class Phase5Database:
     """Database adapter for Phase 5 with proper schema"""
     
-    def __init__(self, db_path='trading.db'):
+    def __init__(self, db_path='trading.db', run_id=None):
         self.db_path = db_path
+        self.run_id = run_id or self._generate_run_id()
         self._init_database()
+    
+    def _generate_run_id(self) -> str:
+        """Generate unique run_id: YYYYMMDD_HHMMSS_<random_suffix>"""
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        suffix = ''.join(random.choices(string.ascii_lowercase + string.digits, k=4))
+        return f"{timestamp}_{suffix}"
     
     def _init_database(self):
         """Initialize Phase 5 database schema"""
@@ -38,6 +47,7 @@ class Phase5Database:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS signals (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL,
                 strategy_id INTEGER NOT NULL,
                 symbol TEXT NOT NULL,
                 signal_type TEXT NOT NULL,
@@ -52,10 +62,14 @@ class Phase5Database:
             )
         ''')
         
+        # Add index on run_id for performance
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_signals_run_id ON signals(run_id)')
+        
         # Trades table with execution costs
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS trades (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL,
                 strategy_id INTEGER NOT NULL,
                 signal_id INTEGER,
                 symbol TEXT NOT NULL,
@@ -74,6 +88,9 @@ class Phase5Database:
                 FOREIGN KEY (signal_id) REFERENCES signals(id)
             )
         ''')
+        
+        # Add index on run_id for performance
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_trades_run_id ON trades(run_id)')
         
         # Positions table
         cursor.execute('''
@@ -96,7 +113,9 @@ class Phase5Database:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS broker_state (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL,
                 snapshot_date TEXT NOT NULL,
+                snapshot_type TEXT NOT NULL,
                 cash REAL NOT NULL,
                 portfolio_value REAL NOT NULL,
                 buying_power REAL NOT NULL,
@@ -106,6 +125,9 @@ class Phase5Database:
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+        
+        # Add index on run_id for performance
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_broker_state_run_id ON broker_state(run_id)')
         
         # System state
         cursor.execute('''
@@ -149,9 +171,9 @@ class Phase5Database:
         
         cursor.execute('''
             INSERT INTO signals 
-            (strategy_id, symbol, signal_type, confidence, reasoning, asof_date)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (strategy_id, symbol, signal_type, confidence, reasoning, asof_date))
+            (run_id, strategy_id, symbol, signal_type, confidence, reasoning, asof_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (self.run_id, strategy_id, symbol, signal_type, confidence, reasoning, asof_date))
         
         signal_id = cursor.lastrowid
         conn.commit()
@@ -190,10 +212,10 @@ class Phase5Database:
         
         cursor.execute('''
             INSERT INTO trades 
-            (strategy_id, signal_id, symbol, action, shares, requested_price, exec_price,
+            (run_id, strategy_id, signal_id, symbol, action, shares, requested_price, exec_price,
              slippage_cost, commission_cost, total_cost, notional, order_id, executed_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (strategy_id, signal_id, symbol, action, shares, requested_price, exec_price,
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (self.run_id, strategy_id, signal_id, symbol, action, shares, requested_price, exec_price,
               slippage_cost, commission_cost, total_cost, notional, order_id,
               datetime.now().isoformat()))
         
@@ -241,19 +263,23 @@ class Phase5Database:
         conn.commit()
         conn.close()
     
-    def save_broker_state(self, snapshot_date: str, cash: float, portfolio_value: float,
-                         buying_power: float, positions: List[Dict],
+    def save_broker_state(self, snapshot_date: str, snapshot_type: str, cash: float, 
+                         portfolio_value: float, buying_power: float, positions: List[Dict],
                          reconciliation_status: str, discrepancies: List[str]):
-        """Save broker state snapshot"""
+        """Save broker state snapshot
+        
+        Args:
+            snapshot_type: 'START', 'RECONCILIATION', or 'END'
+        """
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
         cursor.execute('''
             INSERT INTO broker_state 
-            (snapshot_date, cash, portfolio_value, buying_power, positions_json,
-             reconciliation_status, discrepancies_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (snapshot_date, cash, portfolio_value, buying_power,
+            (run_id, snapshot_date, snapshot_type, cash, portfolio_value, buying_power, 
+             positions_json, reconciliation_status, discrepancies_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (self.run_id, snapshot_date, snapshot_type, cash, portfolio_value, buying_power,
               json.dumps(positions), reconciliation_status, json.dumps(discrepancies)))
         
         conn.commit()
@@ -306,34 +332,36 @@ class Phase5Database:
         
         return [dict(row) for row in rows]
     
-    def get_signals_without_terminal_state(self, asof_date: str) -> List[Dict]:
-        """Get signals that haven't reached terminal state"""
+    def get_signals_without_terminal_state(self, run_id: Optional[str] = None) -> List[Dict]:
+        """Get signals that haven't reached terminal state for a run"""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
+        rid = run_id or self.run_id
         cursor.execute('''
             SELECT * FROM signals 
-            WHERE asof_date = ? AND terminal_state IS NULL
-        ''', (asof_date,))
+            WHERE run_id = ? AND terminal_state IS NULL
+        ''', (rid,))
         
         rows = cursor.fetchall()
         conn.close()
         
         return [dict(row) for row in rows]
     
-    def verify_terminal_states(self, asof_date: str) -> Tuple[int, int]:
+    def verify_terminal_states(self, run_id: Optional[str] = None) -> Tuple[int, int]:
         """Verify all signals have terminal states. Returns (total, with_terminal)"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        cursor.execute('SELECT COUNT(*) FROM signals WHERE asof_date = ?', (asof_date,))
+        rid = run_id or self.run_id
+        cursor.execute('SELECT COUNT(*) FROM signals WHERE run_id = ?', (rid,))
         total = cursor.fetchone()[0]
         
         cursor.execute('''
             SELECT COUNT(*) FROM signals 
-            WHERE asof_date = ? AND terminal_state IS NOT NULL
-        ''', (asof_date,))
+            WHERE run_id = ? AND terminal_state IS NOT NULL
+        ''', (rid,))
         with_terminal = cursor.fetchone()[0]
         
         conn.close()

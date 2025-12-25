@@ -57,7 +57,10 @@ class MultiStrategyRunner:
     """Runs all 5 strategies with independent tracking"""
     
     def __init__(self):
-        self.db = StrategyDatabase()
+        self.db = Phase5Database('trading.db')
+        self.run_id = self.db.run_id  # Get run_id from database
+        self.asof_date = datetime.now().strftime('%Y-%m-%d')
+        logger.info(f"Phase 5 Run ID: {self.run_id}")
         
         # Get Alpaca credentials
         api_key = os.getenv('ALPACA_API_KEY')
@@ -318,6 +321,10 @@ class MultiStrategyRunner:
             return []
 
         if os.getenv('ENABLE_BROKER_RECONCILIATION', 'false').lower() == 'true':
+            # CRITICAL: Refresh account before reconciliation
+            logger.info("Refreshing account state before reconciliation...")
+            self._refresh_account_state()
+            
             local_positions = self._build_local_positions()
             success, discrepancies = self.broker_reconciler.reconcile_daily(
                 local_positions=local_positions,
