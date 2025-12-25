@@ -382,8 +382,13 @@ class Phase5Database:
         
         rows = cursor.fetchall()
         conn.close()
-        
-        return [dict(row) for row in rows]
+
+        trades = [dict(row) for row in rows]
+        for trade in trades:
+            if trade.get('price') is None:
+                trade['price'] = trade.get('exec_price') or trade.get('requested_price') or 0.0
+
+        return trades
     
     def get_strategy_performance(self, strategy_id: int, days: int = 30) -> List[Dict]:
         """Get strategy performance history (stub - returns empty for now)"""
