@@ -7,6 +7,9 @@ import pandas as pd
 from datetime import datetime, timedelta
 from pathlib import Path
 import logging
+from zoneinfo import ZoneInfo
+from pandas.tseries.holiday import USFederalHolidayCalendar
+from pandas.tseries.offsets import CustomBusinessDay
 
 logger = logging.getLogger(__name__)
 
@@ -15,20 +18,27 @@ class DataValidator:
     
     def __init__(self, max_age_hours: int = 24):
         self.max_age_hours = max_age_hours
+        self._holiday_calendar = USFederalHolidayCalendar()
+        self._business_day = CustomBusinessDay(calendar=self._holiday_calendar)
+
+    def _is_holiday(self, date: datetime.date) -> bool:
+        holidays = self._holiday_calendar.holidays(start=date, end=date)
+        return not holidays.empty
+
+    def _previous_business_day(self, date: datetime.date) -> datetime.date:
+        return (pd.Timestamp(date) - self._business_day).date()
 
     def _expected_latest_date(self, now: datetime) -> datetime.date:
-        """Determine the expected latest trading date based on current time."""
-        if now.weekday() >= 5:
-            days_since_friday = now.weekday() - 4
-            return (now.date() - timedelta(days=days_since_friday))
+        """Determine the expected latest trading date based on market time."""
+        today = now.date()
+        if now.weekday() >= 5 or self._is_holiday(today):
+            return self._previous_business_day(today)
 
-        if now.hour >= 16:
-            return now.date()
+        market_close = now.replace(hour=16, minute=0, second=0, microsecond=0)
+        if now >= market_close:
+            return today
 
-        if now.weekday() == 0:
-            return now.date() - timedelta(days=3)
-
-        return now.date() - timedelta(days=1)
+        return self._previous_business_day(today)
     
     def validate_data_file(self, data_path: Path):
         """
@@ -51,9 +61,10 @@ class DataValidator:
             
             # Check data freshness
             latest_date = df.index.max()
-            now = datetime.now()
-            expected_latest_date = self._expected_latest_date(now)
-            age_hours = (now - latest_date).total_seconds() / 3600
+            now_utc = datetime.utcnow()
+            market_now = datetime.now(tz=ZoneInfo("America/New_York"))
+            expected_latest_date = self._expected_latest_date(market_now)
+            age_hours = (now_utc - latest_date).total_seconds() / 3600
             
             if latest_date.date() < expected_latest_date and age_hours > self.max_age_hours:
                 errors.append(
