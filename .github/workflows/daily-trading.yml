@@ -17,6 +17,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Restore trading database cache
+        uses: actions/cache@v4
+        with:
+          path: trading.db
+          key: trading-db-${{ github.run_id }}
+          restore-keys: |
+            trading-db-
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -36,6 +44,9 @@ jobs:
         env:
           ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+          ALPACA_PAPER: "true"
+          ENABLE_BROKER_RECONCILIATION: "true"
+          PHASE5_SIGNAL_INJECTION: "false"
           SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
           SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
@@ -59,10 +70,9 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: trading-databases-${{ github.run_number }}
+          name: trading-database-${{ github.run_number }}
           path: |
-            data/trading_system.db
-            data/strategy_performance.db
+            trading.db
           retention-days: 30
           if-no-files-found: ignore
 
@@ -70,10 +80,9 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: trading-databases-latest
+          name: trading-database-latest
           path: |
-            data/trading_system.db
-            data/strategy_performance.db
+            trading.db
           retention-days: 90
           if-no-files-found: ignore
       
