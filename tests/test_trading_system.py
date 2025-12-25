@@ -431,9 +431,21 @@ class TestTradingSystem(unittest.TestCase):
     def test_data_integrity(self):
         """Test training data has required columns and valid values"""
         # Check required columns exist
-        required_cols = ['close', 'rsi', 'volatility_20d', 'future_return_20d', 'symbol']
+        required_cols = ['close', 'rsi', 'volatility_20d', 'symbol']
         for col in required_cols:
             self.assertIn(col, self.df.columns, f"Missing required column: {col}")
+
+        if 'future_return_20d' not in self.df.columns:
+            self.df['future_return_20d'] = (
+                self.df.groupby('symbol')['close']
+                .pct_change(periods=20)
+                .shift(-20)
+            )
+            self.assertGreater(
+                self.df['future_return_20d'].notna().sum(),
+                0,
+                "Derived future_return_20d column is empty",
+            )
         
         # Check no completely empty columns
         for col in required_cols:

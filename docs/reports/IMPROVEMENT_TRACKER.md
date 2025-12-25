@@ -444,7 +444,7 @@ SELL if:
 
 ## Resources & References
 
-- Original system: `ALGORITHM_SPECIFICATION.md`
+- Original system: `docs/reports/ALGORITHM_SPECIFICATION.md`
 - ChatGPT review: Saved in project notes
 - Industry standards: Quantopian lectures, QuantConnect docs
 
