@@ -204,14 +204,25 @@ class Phase5InvariantChecker:
         if len(snapshots) == 0:
             return False, "No broker state snapshots found"
         
-        # At minimum, we need END snapshot
+        # REQUIRED: At minimum 2 snapshots (START and END)
+        has_start = 'START' in snapshots
         has_end = 'END' in snapshots
+        
+        if not has_start:
+            return False, f"Missing START snapshot. Found: {snapshots}"
         
         if not has_end:
             return False, f"Missing END snapshot. Found: {snapshots}"
         
-        # Ideal: START, RECONCILIATION (if enabled), END
+        if len(snapshots) < 2:
+            return False, f"Need at least 2 snapshots (START + END). Found {len(snapshots)}: {snapshots}"
+        
+        # Check for RECONCILIATION if it should be there
+        has_reconciliation = 'RECONCILIATION' in snapshots
+        
         message = f"Found {len(snapshots)} snapshot(s): {', '.join(snapshots)}"
+        if has_reconciliation:
+            message += " ✅ (includes RECONCILIATION)"
         
         return True, message
     

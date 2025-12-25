@@ -367,3 +367,37 @@ class Phase5Database:
         conn.close()
         
         return (total, with_terminal)
+    
+    def get_strategy_trades(self, strategy_id: int) -> List[Dict]:
+        """Get all trades for a strategy"""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT * FROM trades 
+            WHERE strategy_id = ?
+            ORDER BY executed_at DESC
+        ''', (strategy_id,))
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        return [dict(row) for row in rows]
+    
+    def get_strategy_performance(self, strategy_id: int, days: int = 30) -> List[Dict]:
+        """Get strategy performance history (stub - returns empty for now)"""
+        # Phase 5 doesn't track performance snapshots yet
+        # Return empty list to avoid breaking dynamic allocation
+        return []
+    
+    def get_latest_performance(self, strategy_id: int) -> Dict:
+        """Get latest performance snapshot (stub - returns None for now)"""
+        # Phase 5 doesn't track performance snapshots yet
+        return None
+    
+    def record_daily_performance(self, strategy_id: int, **kwargs):
+        """Record daily performance (stub - Phase 5 doesn't track this yet)"""
+        # Phase 5 doesn't track daily performance snapshots
+        # This is a no-op to maintain compatibility
+        pass
