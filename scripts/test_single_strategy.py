@@ -26,8 +26,8 @@ def test_strategy(strategy_class, name, market_data):
     try:
         strategy = strategy_class(1, 20000)
         
-        # Test on recent data
-        recent_data = market_data.tail(1000)
+        # Test on recent data per symbol to avoid single-symbol tails
+        recent_data = market_data.groupby("symbol", group_keys=False).tail(1000)
         logger.info(f"Data: {len(recent_data)} rows, {recent_data['symbol'].nunique()} symbols")
         logger.info(f"Date range: {recent_data.index.min()} to {recent_data.index.max()}")
         
@@ -60,6 +60,7 @@ def main():
     
     df = pd.read_csv(data_file, index_col=0)
     df.index = pd.to_datetime(df.index)
+    df = df.sort_index()
     
     logger.info(f"Loaded {len(df)} rows, {df['symbol'].nunique()} symbols")
     
