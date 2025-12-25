@@ -290,25 +290,22 @@ def verify_broker_state_snapshot():
     cursor = conn.cursor()
     
     cursor.execute("""
-        SELECT snapshot_date, cash, portfolio_value, reconciliation_status
-        FROM broker_state 
-        WHERE snapshot_date = ?
+        SELECT snapshot_type FROM broker_state 
+        WHERE snapshot_date = ? 
+        ORDER BY created_at
     """, (today,))
+    snapshots = [row[0] for row in cursor.fetchall()]
+    snapshot_count = len(snapshots)
     
-    row = cursor.fetchone()
-    
-    if not row:
-        print(f"❌ FAIL: No broker state snapshot for {today}")
+    if snapshot_count == 0:
+        print(f"❌ FAIL: No broker state snapshots for {today}")
         conn.close()
         return False
-    
-    snapshot_date, cash, portfolio_value, recon_status = row
-    print(f"✅ PASS: Broker state snapshot exists for {snapshot_date}")
-    print(f"  Cash: ${cash:,.2f}")
-    print(f"  Portfolio Value: ${portfolio_value:,.2f}")
-    print(f"  Reconciliation: {recon_status}")
-    
-    conn.close()
+    elif snapshot_count < 2:
+        print(f"❌ FAIL: Only {snapshot_count} snapshot(s) found. Need at least 2 (START + END)")
+        print(f"   Found: {', '.join(snapshots)}")
+        conn.close()
+        return False
     return True
 
 def main():
