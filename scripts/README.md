@@ -42,6 +42,10 @@ Utility scripts for the trading system. Use `make` commands when available for e
 - Checks database integrity and execution correctness
 - Validates signal terminal states, broker snapshots, costs
 
+**`import_check.py`** - Lightweight import check
+- Usage: `python3 scripts/import_check.py`
+- Verifies core modules and workflow scripts import cleanly
+
 **`verify_execution.py`** - Verify execution criteria
 - Usage: `python3 scripts/verify_execution.py`
 - Validates execution meets acceptance criteria

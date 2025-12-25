@@ -1,4 +1,4 @@
-.PHONY: help install run dashboard test clean sync-db view-performance analyze-signals
+.PHONY: help install run dashboard test clean sync-db view-performance analyze-signals import-check
 
 # Default target
 help:
@@ -89,6 +89,10 @@ update-data:
 test:
 	@echo "🧪 Running all tests..."
 	python3 -m pytest tests/ -v
+
+import-check:
+	@echo "🔎 Running import check..."
+	python3 scripts/import_check.py
 
 test-single:
 	@echo "🧪 Testing single strategy..."
