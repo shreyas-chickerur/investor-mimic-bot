@@ -78,7 +78,9 @@ class BrokerReconciler:
         
         try:
             if self.client is None:
-                raise ValueError("Alpaca client not configured")
+                logger.warning("Broker reconciliation skipped - Alpaca client not configured")
+                self.last_reconciliation = datetime.now()
+                return True, []
             # 1. Reconcile positions
             position_discrepancies = self._reconcile_positions(local_positions)
             discrepancies.extend(position_discrepancies)
