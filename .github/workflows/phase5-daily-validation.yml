@@ -75,6 +75,7 @@ jobs:
         ALPACA_LIVE_ENABLED: 'false'
         ENABLE_BROKER_RECONCILIATION: 'true'
         PHASE5_SIGNAL_INJECTION: 'false'
+        DATA_MAX_AGE_HOURS: '72'
       run: |
         echo "=== Phase 5 Daily Run - $(date) ==="
         echo "Environment:"
@@ -82,6 +83,7 @@ jobs:
         echo "  ALPACA_LIVE_ENABLED: $ALPACA_LIVE_ENABLED"
         echo "  ENABLE_BROKER_RECONCILIATION: $ENABLE_BROKER_RECONCILIATION"
         echo "  PHASE5_SIGNAL_INJECTION: $PHASE5_SIGNAL_INJECTION"
+        echo "  DATA_MAX_AGE_HOURS: $DATA_MAX_AGE_HOURS"
         echo ""
         python3 src/multi_strategy_main.py
     
