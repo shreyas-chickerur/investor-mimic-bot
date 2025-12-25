@@ -28,13 +28,13 @@ Last updated: 2025-12-24 01:34:13
 ## Scripts Directory
 
 ### Data Scripts
-**`scripts/fetch_extended_historical_data.py`**
+**`scripts/fetch_historical_data.py`**
 - Fetch Extended Historical Data
 
 **`scripts/fetch_historical_data_yfinance.py`**
 - Fetch Extended Historical Data using yfinance (FREE)
 
-**`scripts/init_database.py`**
+**`scripts/setup_database.py`**
 - Initialize trading database for CI/CD and fresh installations
 
 **`scripts/sync_database.py`**
@@ -88,10 +88,10 @@ Last updated: 2025-12-24 01:34:13
 **`scripts/generate_validation_plots.py`**
 - Validation Plot Generation
 
-**`scripts/multi_strategy_analysis.py`**
+**`scripts/analyze_signals.py`**
 - Multi-Strategy Analysis - Check all 5 strategies for signals
 
-**`scripts/view_strategy_performance.py`**
+**`scripts/view_performance.py`**
 - View Multi-Strategy Performance Dashboard
 
 ---
@@ -135,7 +135,7 @@ Usage: python3 scripts/my_script.py [args]
 **Daily execution (Phase 5):**
 ```bash
 export ENABLE_BROKER_RECONCILIATION=true
-python3 src/multi_strategy_main.py
+python3 src/execution_engine.py
 ```
 
 **Update market data:**
@@ -145,7 +145,7 @@ make update-data
 
 **Initialize database:**
 ```bash
-python3 scripts/init_database.py
+python3 scripts/setup_database.py
 ```
 
 **Weekly review:**

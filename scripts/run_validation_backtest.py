@@ -31,7 +31,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 from signal_injection_engine import SignalInjectionEngine
-from signal_flow_tracer import SignalFlowTracer
+from signal_tracer import SignalFlowTracer
 from portfolio_backtester import PortfolioBacktester
 from regime_detector import RegimeDetector
 from correlation_filter import CorrelationFilter

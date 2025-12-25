@@ -85,17 +85,17 @@ jobs:
         echo "  PHASE5_SIGNAL_INJECTION: $PHASE5_SIGNAL_INJECTION"
         echo "  DATA_MAX_AGE_HOURS: $DATA_MAX_AGE_HOURS"
         echo ""
-        python3 src/multi_strategy_main.py
+        python3 src/execution_engine.py
     
     - name: Verify invariants
       run: |
-        echo "=== Checking Phase 5 Invariants ==="
-        python3 scripts/check_phase5_invariants.py --latest
+        echo "=== Validating System ==="
+        python3 scripts/validate_system.py --latest
     
     - name: Verify Day 1 criteria
       run: |
-        echo "=== Verifying Phase 5 Day 1 Criteria ==="
-        python3 scripts/verify_phase5_day1.py
+        echo "=== Verifying Execution ==="
+        python3 scripts/verify_execution.py
     
     - name: Extract run metrics
       if: always()

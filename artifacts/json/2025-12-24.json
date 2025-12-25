@@ -1,6 +1,6 @@
 {
   "date": "2025-12-24",
-  "generated_at": "2025-12-24T13:44:29.263816",
+  "generated_at": "2025-12-24T18:58:34.421798",
   "version": "1.0",
   "regime": {
     "vix": 18.0,
@@ -8,12 +8,65 @@
     "volatility_state": "NORMAL"
   },
   "signals": {
-    "raw": {},
+    "raw": {
+      "RSI Mean Reversion": [
+        {
+          "symbol": "AAPL",
+          "action": "BUY",
+          "confidence": 0.75,
+          "reasoning": "PHASE5_VALIDATION: Synthetic signal for non-zero path proof",
+          "price": 273.81,
+          "injected": true,
+          "injection_source": "PHASE5_VALIDATION",
+          "signal_id": 31
+        },
+        {
+          "symbol": "ABBV",
+          "action": "BUY",
+          "confidence": 0.75,
+          "reasoning": "PHASE5_VALIDATION: Synthetic signal for non-zero path proof",
+          "price": 229.96,
+          "injected": true,
+          "injection_source": "PHASE5_VALIDATION",
+          "signal_id": 32
+        },
+        {
+          "symbol": "NFLX",
+          "action": "BUY",
+          "shares": 21,
+          "price": 93.64,
+          "value": 1966.44,
+          "confidence": 0.21158782544921023,
+          "reasoning": "RSI 23.7 < 30, slope 1.50 > 0 (turning up)",
+          "asof_date": "2025-12-24 00:00:00",
+          "signal_id": 33
+        }
+      ],
+      "ML Momentum": [],
+      "News Sentiment": [],
+      "MA Crossover": [],
+      "Volatility Breakout": []
+    },
     "rejected": [],
-    "executed": []
+    "executed": [
+      {
+        "strategy": "RSI Mean Reversion",
+        "symbol": "NFLX",
+        "shares": 21,
+        "price": 93.64,
+        "action": "BUY"
+      }
+    ]
   },
   "trades": {
-    "placed": [],
+    "placed": [
+      {
+        "symbol": "NFLX",
+        "side": "BUY",
+        "qty": 21,
+        "price": 93.64
+      }
+    ],
     "filled": [],
     "rejected": []
   },
@@ -29,19 +82,15 @@
     "open": []
   },
   "system_health": {
-    "runtime_seconds": 2.090607166290283,
-    "data_freshness": "13.7h old",
-    "error_count": 2,
-    "warning_count": 0,
-    "errors": [
-      "Position mismatch: AVGO exists locally but not in broker",
-      "Position mismatch: TXN exists locally but not in broker"
+    "runtime_seconds": 3.0899078845977783,
+    "data_freshness": "19.0h old",
+    "error_count": 0,
+    "warning_count": 1,
+    "errors": [],
+    "warnings": [
+      "1 orders pending confirmation"
     ],
-    "warnings": [],
-    "reconciliation_status": "FAIL",
-    "reconciliation_discrepancies": [
-      "Position mismatch: AVGO exists locally but not in broker",
-      "Position mismatch: TXN exists locally but not in broker"
-    ]
+    "reconciliation_status": "PASS",
+    "reconciliation_discrepancies": []
   }
 }
