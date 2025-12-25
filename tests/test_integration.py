@@ -16,44 +16,43 @@ def test_all_modules_import():
         print("✅ RegimeDetector imports")
     except Exception as e:
         print(f"❌ RegimeDetector: {e}")
-        return False
+        raise AssertionError(f"RegimeDetector import failed: {e}") from e
     
     try:
         from dynamic_allocator import DynamicAllocator
         print("✅ DynamicAllocator imports")
     except Exception as e:
         print(f"❌ DynamicAllocator: {e}")
-        return False
+        raise AssertionError(f"DynamicAllocator import failed: {e}") from e
     
     try:
         from correlation_filter import CorrelationFilter
         print("✅ CorrelationFilter imports")
     except Exception as e:
         print(f"❌ CorrelationFilter: {e}")
-        return False
+        raise AssertionError(f"CorrelationFilter import failed: {e}") from e
     
     try:
         from portfolio_risk_manager import PortfolioRiskManager
         print("✅ PortfolioRiskManager imports")
     except Exception as e:
         print(f"❌ PortfolioRiskManager: {e}")
-        return False
+        raise AssertionError(f"PortfolioRiskManager import failed: {e}") from e
     
     try:
         from execution_costs import ExecutionCostModel
         print("✅ ExecutionCostModel imports")
     except Exception as e:
         print(f"❌ ExecutionCostModel: {e}")
-        return False
+        raise AssertionError(f"ExecutionCostModel import failed: {e}") from e
     
     try:
         from performance_metrics import PerformanceMetrics
         print("✅ PerformanceMetrics imports")
     except Exception as e:
         print(f"❌ PerformanceMetrics: {e}")
-        return False
+        raise AssertionError(f"PerformanceMetrics import failed: {e}") from e
     
-    return True
 
 def test_regime_detection():
     """Test regime detection functionality"""
@@ -79,7 +78,6 @@ def test_regime_detection():
     assert adjustments_normal['max_portfolio_heat'] == 0.30, "Normal VIX should keep heat at 30%"
     print(f"✅ Normal VIX (18): Heat = {adjustments_normal['max_portfolio_heat']*100}%")
     
-    return True
 
 def test_dynamic_allocation():
     """Test dynamic capital allocation"""
@@ -117,7 +115,6 @@ def test_dynamic_allocation():
     
     print(f"✅ Dynamic allocation: Total = ${total:,.2f}, within constraints")
     
-    return True
 
 def test_correlation_filter():
     """Test correlation filtering with dual windows"""
@@ -145,7 +142,6 @@ def test_correlation_filter():
     
     print(f"✅ Correlation check: corr={corr:.2f}, acceptable={is_acceptable}")
     
-    return True
 
 def test_portfolio_risk():
     """Test portfolio risk management"""
@@ -173,7 +169,6 @@ def test_portfolio_risk():
     assert can_add_ok, "Should accept position within limits"
     print("✅ Acceptable position allowed")
     
-    return True
 
 def test_execution_costs():
     """Test execution cost modeling"""
@@ -205,7 +200,6 @@ def test_execution_costs():
     assert exec_price_sell < 100.0, "Sell execution price should be lower than quoted"
     print(f"✅ SELL 100 @ $100: exec=${exec_price_sell:.2f}, costs=${total_cost_sell:.2f}")
     
-    return True
 
 def test_performance_metrics():
     """Test performance metrics calculation"""
@@ -242,7 +236,6 @@ def test_performance_metrics():
     assert metrics['win_rate'] == 50.0, "Should have 50% win rate"
     print(f"✅ Metrics: {metrics['total_trades']} trades, {metrics['win_rate']:.1f}% win rate")
     
-    return True
 
 def run_all_tests():
     """Run all integration tests"""
@@ -265,12 +258,9 @@ def run_all_tests():
     
     for name, test_func in tests:
         try:
-            if test_func():
-                passed += 1
-                print(f"\n✅ {name} PASSED\n")
-            else:
-                failed += 1
-                print(f"\n❌ {name} FAILED\n")
+            test_func()
+            passed += 1
+            print(f"\n✅ {name} PASSED\n")
         except Exception as e:
             failed += 1
             print(f"\n❌ {name} FAILED: {e}\n")

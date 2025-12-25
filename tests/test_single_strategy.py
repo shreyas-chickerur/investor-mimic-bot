@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
+import logging
 import pandas as pd
 import pytest
 
@@ -13,6 +14,9 @@ import pytest
 from strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
 from strategies.strategy_ma_crossover import MACrossoverStrategy
 from strategies.strategy_volatility_breakout import VolatilityBreakoutStrategy
+
+logging.basicConfig(level=logging.INFO, format="%(message)s")
+logger = logging.getLogger(__name__)
 
 @pytest.fixture(scope="module")
 def market_data():
@@ -46,6 +50,16 @@ def test_volatility_breakout_strategy(market_data):
     signals = strategy.generate_signals(recent_data)
     assert signals is not None
     assert isinstance(signals, list)
+
+def test_strategy(strategy_class, name, market_data):
+    """Run a single strategy and return signal count."""
+    logger.info(f"\nTesting {name}...")
+    strategy = strategy_class(1, 20000)
+    recent_data = market_data.groupby("symbol", group_keys=False).tail(1000)
+    signals = strategy.generate_signals(recent_data)
+    count = len(signals) if signals else 0
+    logger.info(f"Generated {count} signals")
+    return count
 
 def main():
     """Test all strategies"""
