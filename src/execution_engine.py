@@ -265,30 +265,15 @@ class MultiStrategyRunner:
     def _load_strategy_positions(self, strategy):
         """Load current positions for a strategy from database"""
         try:
-            # Get all open trades for this strategy
-            trades = self.db.get_strategy_trades(strategy.strategy_id)
-            
-            # Build positions dict
             positions = {}
             entry_dates = {}
-            for trade in trades:
-                if trade['action'] == 'BUY':
-                    symbol = trade['symbol']
-                    shares = trade['shares']
-                    if symbol in positions:
-                        positions[symbol] += shares
-                    else:
-                        positions[symbol] = shares
-                    entry_dates[symbol] = trade.get('executed_at')
-                elif trade['action'] == 'SELL':
-                    symbol = trade['symbol']
-                    shares = trade['shares']
-                    if symbol in positions:
-                        positions[symbol] -= shares
-                        if positions[symbol] <= 0:
-                            del positions[symbol]
-                            entry_dates.pop(symbol, None)
-            
+            for position in self.db.get_positions(strategy.strategy_id):
+                symbol = position['symbol']
+                shares = float(position['shares'])
+                if shares > 0:
+                    positions[symbol] = shares
+                    entry_dates[symbol] = position.get('last_updated')
+
             strategy.positions = positions
             strategy.entry_dates = entry_dates
             logger.info(f"  Loaded {len(positions)} positions for {strategy.name}")
@@ -592,6 +577,7 @@ class MultiStrategyRunner:
                     strategy.entry_dates[symbol] = entry_date
                     total_exposure += trade_value
                     self.performance_metrics.add_trade('BUY', symbol, shares, exec_price, trade_value)
+                    self._update_position_record(strategy.strategy_id, symbol, shares, exec_price)
 
                     # Log trade with full execution details
                     signal_id = signal.get('signal_id')
@@ -671,6 +657,7 @@ class MultiStrategyRunner:
                             del strategy.positions[symbol]
                             strategy.entry_dates.pop(symbol, None)
                             total_exposure = max(total_exposure - trade_value, 0)
+                    self._update_position_record(strategy.strategy_id, symbol, -shares, exec_price)
                     
                     trade_record = {
                         'strategy': strategy.name,
@@ -707,24 +694,46 @@ class MultiStrategyRunner:
     def _build_local_positions(self):
         """Build local positions with qty and avg price for reconciliation."""
         local_positions = {}
-        strategies = self.db.get_all_strategies()
-        for strategy in strategies:
-            trades = self.db.get_strategy_trades(strategy['id'])
-            for trade in trades:
-                symbol = trade['symbol']
-                action = trade['action']
-                shares = trade['shares']
-                price = trade['price']
-                position = local_positions.setdefault(symbol, {'qty': 0, 'avg_price': 0})
-                if action == 'BUY':
-                    total_cost = position['avg_price'] * position['qty'] + price * shares
-                    position['qty'] += shares
-                    position['avg_price'] = total_cost / position['qty'] if position['qty'] else 0
-                elif action == 'SELL':
-                    position['qty'] -= shares
-                    if position['qty'] <= 0:
-                        local_positions.pop(symbol, None)
+        for position in self.db.get_positions():
+            symbol = position['symbol']
+            shares = float(position['shares'])
+            avg_price = float(position['avg_price'])
+            if shares <= 0:
+                continue
+            combined = local_positions.setdefault(symbol, {'qty': 0.0, 'avg_price': 0.0})
+            total_cost = combined['avg_price'] * combined['qty'] + avg_price * shares
+            combined['qty'] += shares
+            combined['avg_price'] = total_cost / combined['qty'] if combined['qty'] else 0.0
         return local_positions
+
+    def _update_position_record(self, strategy_id, symbol, shares_delta, exec_price):
+        """Persist position updates for reconciliation."""
+        existing = self.db.get_position(strategy_id, symbol)
+        if existing:
+            current_shares = float(existing['shares'])
+            current_avg = float(existing['avg_price'])
+        else:
+            current_shares = 0.0
+            current_avg = 0.0
+
+        new_shares = current_shares + shares_delta
+        if new_shares <= 0:
+            self.db.delete_position(strategy_id, symbol)
+            return
+
+        if shares_delta > 0:
+            total_cost = current_avg * current_shares + exec_price * shares_delta
+            avg_price = total_cost / new_shares
+        else:
+            avg_price = current_avg
+
+        self.db.update_position(
+            strategy_id=strategy_id,
+            symbol=symbol,
+            shares=new_shares,
+            avg_price=avg_price,
+            current_price=exec_price
+        )
 
     def _calculate_dynamic_allocations(self, strategies):
         """Calculate strategy allocations from recent performance"""
