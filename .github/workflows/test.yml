@@ -95,6 +95,7 @@ jobs:
       with:
         name: test-logs
         path: logs/
+        if-no-files-found: ignore
         retention-days: 30
     
     - name: Upload database snapshot
@@ -111,6 +112,7 @@ jobs:
       with:
         name: trading-artifacts
         path: artifacts/
+        if-no-files-found: ignore
         retention-days: 30
     
     - name: Test summary
