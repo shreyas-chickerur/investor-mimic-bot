@@ -320,7 +320,10 @@ class MultiStrategyRunner:
             logger.error(f"Data file not found: {data_file}")
             return None
 
-        is_valid, errors = self.data_validator.validate_data_file(data_file)
+        # Allow configurable max age for automated runs (weekends/holidays)
+        max_age_hours = int(os.getenv('DATA_MAX_AGE_HOURS', '24'))
+        validator = DataValidator(max_age_hours=max_age_hours)
+        is_valid, errors = validator.validate_data_file(data_file)
         if not is_valid:
             auto_update = os.getenv('AUTO_UPDATE_DATA', 'false').lower() == 'true'
             if auto_update:
@@ -328,7 +331,7 @@ class MultiStrategyRunner:
                 try:
                     from scripts import update_data
                     update_data.main()
-                    is_valid, errors = self.data_validator.validate_data_file(data_file)
+                    is_valid, errors = validator.validate_data_file(data_file)
                 except Exception as exc:
                     errors.append(str(exc))
             if not is_valid:
