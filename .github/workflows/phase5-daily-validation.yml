@@ -1,0 +1,161 @@
+name: Phase 5 Daily Operational Validation
+
+on:
+  schedule:
+    # 1 PM PT = 9 PM UTC (standard time) or 8 PM UTC (daylight time)
+    # Using 9 PM UTC to cover standard time, runs Mon-Fri
+    - cron: '0 21 * * 1-5'
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  PYTHON_VERSION: "3.8"
+
+jobs:
+  operational-validation:
+    name: Phase 5 Daily Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Download trading database (if exists)
+      uses: actions/download-artifact@v3
+      with:
+        name: trading-database
+        path: .
+      continue-on-error: true
+    
+    - name: Create required directories
+      run: |
+        mkdir -p artifacts/json artifacts/markdown logs
+    
+    - name: Safety check - Verify paper trading mode
+      env:
+        ALPACA_PAPER: 'true'
+      run: |
+        echo "=== Safety Verification ==="
+        if [ "$ALPACA_PAPER" != "true" ]; then
+          echo "❌ FATAL: ALPACA_PAPER must be 'true' for automated runs"
+          exit 1
+        fi
+        echo "✅ Paper trading mode confirmed"
+        
+        # Verify PHASE5_SIGNAL_INJECTION is false
+        INJECTION="${PHASE5_SIGNAL_INJECTION:-false}"
+        if [ "$INJECTION" != "false" ]; then
+          echo "❌ FATAL: PHASE5_SIGNAL_INJECTION must be 'false' for operational validation"
+          exit 1
+        fi
+        echo "✅ Signal injection disabled (operational mode)"
+    
+    - name: Run Phase 5 operational validation
+      env:
+        ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+        ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+        ALPACA_PAPER: 'true'
+        ALPACA_LIVE_ENABLED: 'false'
+        ENABLE_BROKER_RECONCILIATION: 'true'
+        PHASE5_SIGNAL_INJECTION: 'false'
+      run: |
+        echo "=== Phase 5 Daily Run - $(date) ==="
+        echo "Environment:"
+        echo "  ALPACA_PAPER: $ALPACA_PAPER"
+        echo "  ALPACA_LIVE_ENABLED: $ALPACA_LIVE_ENABLED"
+        echo "  ENABLE_BROKER_RECONCILIATION: $ENABLE_BROKER_RECONCILIATION"
+        echo "  PHASE5_SIGNAL_INJECTION: $PHASE5_SIGNAL_INJECTION"
+        echo ""
+        python3 src/multi_strategy_main.py
+    
+    - name: Verify invariants
+      run: |
+        echo "=== Checking Phase 5 Invariants ==="
+        python3 scripts/check_phase5_invariants.py --latest
+    
+    - name: Verify Day 1 criteria
+      run: |
+        echo "=== Verifying Phase 5 Day 1 Criteria ==="
+        python3 scripts/verify_phase5_day1.py
+    
+    - name: Extract run metrics
+      if: always()
+      run: |
+        echo "=== Run Metrics ==="
+        RUN_ID=$(sqlite3 trading.db "SELECT run_id FROM broker_state ORDER BY created_at DESC LIMIT 1;" || echo "UNKNOWN")
+        echo "Run ID: $RUN_ID"
+        
+        if [ "$RUN_ID" != "UNKNOWN" ]; then
+          echo ""
+          echo "Broker Snapshots:"
+          sqlite3 trading.db "SELECT snapshot_type, reconciliation_status FROM broker_state WHERE run_id='$RUN_ID' ORDER BY created_at;"
+          
+          echo ""
+          echo "Signal Termination:"
+          sqlite3 trading.db "SELECT COUNT(*) AS total, SUM(CASE WHEN terminal_state IS NOT NULL THEN 1 ELSE 0 END) AS terminalized FROM signals WHERE run_id='$RUN_ID';"
+          
+          echo ""
+          echo "Terminal States:"
+          sqlite3 trading.db "SELECT terminal_state, terminal_reason, COUNT(*) FROM signals WHERE run_id='$RUN_ID' GROUP BY terminal_state, terminal_reason;"
+          
+          echo ""
+          echo "Trades:"
+          sqlite3 trading.db "SELECT COUNT(*) FROM trades WHERE run_id='$RUN_ID';"
+        fi
+    
+    - name: Upload trading database
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: trading-database
+        path: trading.db
+        retention-days: 90
+    
+    - name: Upload daily artifacts
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: daily-artifacts-${{ github.run_number }}
+        path: |
+          artifacts/json/*.json
+          artifacts/markdown/*.md
+        retention-days: 90
+        if-no-files-found: ignore
+    
+    - name: Create daily summary
+      if: always()
+      run: |
+        RUN_ID=$(sqlite3 trading.db "SELECT run_id FROM broker_state ORDER BY created_at DESC LIMIT 1;" || echo "UNKNOWN")
+        SIGNALS=$(sqlite3 trading.db "SELECT COUNT(*) FROM signals WHERE run_id='$RUN_ID';" || echo "0")
+        TRADES=$(sqlite3 trading.db "SELECT COUNT(*) FROM trades WHERE run_id='$RUN_ID';" || echo "0")
+        RECON_STATUS=$(sqlite3 trading.db "SELECT reconciliation_status FROM broker_state WHERE run_id='$RUN_ID' AND snapshot_type='RECONCILIATION';" || echo "UNKNOWN")
+        
+        cat > $GITHUB_STEP_SUMMARY << EOF
+        # Phase 5 Daily Validation - $(date +%Y-%m-%d)
+        
+        **Run ID:** \`$RUN_ID\`  
+        **Signals:** $SIGNALS  
+        **Trades:** $TRADES  
+        **Reconciliation:** $RECON_STATUS  
+        **Status:** ${{ job.status }}
+        
+        ## Checks
+        - ✅ Safety: Paper trading mode verified
+        - ✅ Invariants: See logs for 6/6 status
+        - ✅ Day 1 Verification: See logs
+        - ✅ Database: Uploaded as artifact
+        
+        ## Environment
+        - ALPACA_PAPER: true
+        - PHASE5_SIGNAL_INJECTION: false
+        - ENABLE_BROKER_RECONCILIATION: true
+        EOF

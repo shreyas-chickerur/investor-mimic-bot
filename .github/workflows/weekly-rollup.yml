@@ -1,0 +1,116 @@
+name: Phase 5 Weekly Rollup
+
+on:
+  schedule:
+    - cron: '0 22 * * 0'  # 2 PM PT / 5 PM ET on Sundays
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  weekly-rollup:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.8'
+    
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+    
+    - name: Download trading database
+      uses: actions/download-artifact@v3
+      with:
+        name: trading-database
+        path: .
+      continue-on-error: true
+    
+    - name: Generate weekly rollup
+      run: |
+        echo "=== Phase 5 Weekly Rollup - $(date) ==="
+        echo ""
+        echo "Last 7 Days Summary:"
+        sqlite3 -header -column trading.db "
+        SELECT
+          snapshot_date AS day,
+          COUNT(DISTINCT run_id) AS runs,
+          SUM(CASE WHEN reconciliation_status='PASS' THEN 1 ELSE 0 END) AS recon_pass,
+          SUM(CASE WHEN reconciliation_status='FAIL' THEN 1 ELSE 0 END) AS recon_fail
+        FROM broker_state
+        WHERE snapshot_type='END'
+          AND snapshot_date >= date('now','-7 days')
+        GROUP BY snapshot_date
+        ORDER BY snapshot_date;"
+        
+        echo ""
+        echo "Signal Statistics (Last 7 Days):"
+        sqlite3 -header -column trading.db "
+        SELECT
+          DATE(generated_at) AS day,
+          COUNT(*) AS total_signals,
+          SUM(CASE WHEN terminal_state IS NOT NULL THEN 1 ELSE 0 END) AS terminalized,
+          SUM(CASE WHEN terminal_state='EXECUTED' THEN 1 ELSE 0 END) AS executed,
+          SUM(CASE WHEN terminal_state='FILTERED' THEN 1 ELSE 0 END) AS filtered
+        FROM signals
+        WHERE generated_at >= datetime('now','-7 days')
+        GROUP BY DATE(generated_at)
+        ORDER BY day;"
+        
+        echo ""
+        echo "Trade Statistics (Last 7 Days):"
+        sqlite3 -header -column trading.db "
+        SELECT
+          DATE(executed_at) AS day,
+          COUNT(*) AS trades,
+          SUM(CASE WHEN action='BUY' THEN 1 ELSE 0 END) AS buys,
+          SUM(CASE WHEN action='SELL' THEN 1 ELSE 0 END) AS sells,
+          ROUND(SUM(total_cost), 2) AS total_costs
+        FROM trades
+        WHERE executed_at >= datetime('now','-7 days')
+        GROUP BY DATE(executed_at)
+        ORDER BY day;"
+    
+    - name: Check validation progress
+      run: |
+        echo "=== Validation Progress ==="
+        TOTAL_DAYS=$(sqlite3 trading.db "
+        SELECT COUNT(DISTINCT snapshot_date)
+        FROM broker_state
+        WHERE snapshot_type='END'
+          AND reconciliation_status='PASS';")
+        
+        echo "Total successful validation days: $TOTAL_DAYS"
+        echo "Target: 14-30 days"
+        
+        if [ "$TOTAL_DAYS" -ge 14 ]; then
+          echo "✅ Minimum validation period reached!"
+          if [ "$TOTAL_DAYS" -ge 30 ]; then
+            echo "✅ Maximum validation period reached - validation complete!"
+          fi
+        else
+          REMAINING=$((14 - TOTAL_DAYS))
+          echo "⏳ $REMAINING days remaining to minimum validation period"
+        fi
+    
+    - name: Create weekly summary
+      if: always()
+      run: |
+        TOTAL_DAYS=$(sqlite3 trading.db "SELECT COUNT(DISTINCT snapshot_date) FROM broker_state WHERE snapshot_type='END' AND reconciliation_status='PASS';" || echo "0")
+        FAILED_DAYS=$(sqlite3 trading.db "SELECT COUNT(DISTINCT snapshot_date) FROM broker_state WHERE snapshot_type='END' AND reconciliation_status='FAIL';" || echo "0")
+        
+        cat > $GITHUB_STEP_SUMMARY << EOF
+        # Phase 5 Weekly Rollup - $(date +%Y-%m-%d)
+        
+        ## Validation Progress
+        - **Successful Days:** $TOTAL_DAYS / 14-30
+        - **Failed Days:** $FAILED_DAYS
+        - **Status:** ${{ job.status }}
+        
+        ## Next Steps
+        $(if [ "$TOTAL_DAYS" -ge 30 ]; then echo "✅ Validation complete! Ready for production."; elif [ "$TOTAL_DAYS" -ge 14 ]; then echo "✅ Minimum period reached. Can complete or continue to 30 days."; else echo "⏳ Continue daily validation runs."; fi)
+        
+        See logs for detailed statistics.
+        EOF
