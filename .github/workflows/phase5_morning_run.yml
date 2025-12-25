@@ -82,6 +82,7 @@ PY
         ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
         ALPACA_PAPER: true
         ENABLE_BROKER_RECONCILIATION: true
+        DATA_MAX_AGE_HOURS: '72'
       run: |
         python3 src/execution_engine.py
     
