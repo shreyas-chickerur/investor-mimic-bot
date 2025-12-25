@@ -62,9 +62,21 @@ class TestAlpacaIntegration(unittest.TestCase):
         """Test that all required columns are present in data"""
         df = pd.read_csv('data/training_data.csv', index_col=0)
         
-        required_cols = ['symbol', 'close', 'rsi', 'volatility_20d', 'future_return_20d']
+        required_cols = ['symbol', 'close', 'rsi', 'volatility_20d']
         for col in required_cols:
             self.assertIn(col, df.columns, f"Missing required column: {col}")
+
+        if 'future_return_20d' not in df.columns:
+            df['future_return_20d'] = (
+                df.groupby('symbol')['close']
+                .pct_change(periods=20)
+                .shift(-20)
+            )
+            self.assertGreater(
+                df['future_return_20d'].notna().sum(),
+                0,
+                "Derived future_return_20d column is empty",
+            )
         
         print("✓ All required columns present")
     

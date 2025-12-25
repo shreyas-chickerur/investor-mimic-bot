@@ -328,14 +328,14 @@ RESULTS: 7/7 tests passing (100%)
 ### Documentation (`docs/`)
 - `GUIDE.md` - User guide
 - `AUTOMATION_GUIDE.md` - GitHub Actions setup
-- `EXPERT_FEEDBACK_ROUND2.md` - Expert review analysis
+- `docs/reports/EXPERT_FEEDBACK_ROUND2.md` - Expert review analysis
 
 ### Root Documentation
 - `README.md` - Project overview
-- `ALGORITHM_SPECIFICATION.md` - Technical specification
-- `IMPROVEMENT_TRACKER.md` - Implementation progress
-- `FINAL_IMPLEMENTATION_REPORT.md` - Detailed implementation
-- `COMPLETE_SYSTEM_DOCUMENTATION.md` - This document
+- `docs/reports/ALGORITHM_SPECIFICATION.md` - Technical specification
+- `docs/reports/IMPROVEMENT_TRACKER.md` - Implementation progress
+- `docs/reports/FINAL_IMPLEMENTATION_REPORT.md` - Detailed implementation
+- `docs/reports/COMPLETE_SYSTEM_DOCUMENTATION.md` - This document
 
 ---
 

@@ -332,8 +332,8 @@ src/
 - `src/regime_detector.py` (148 lines)
 - `src/dynamic_allocator.py` (137 lines)
 - `tests/test_integration.py` (329 lines)
-- `EXPERT_FEEDBACK_ROUND2.md` (documentation)
-- `FINAL_IMPLEMENTATION_REPORT.md` (this document)
+- `docs/reports/EXPERT_FEEDBACK_ROUND2.md` (documentation)
+- `docs/reports/FINAL_IMPLEMENTATION_REPORT.md` (this document)
 
 ### Enhanced Files
 - `src/correlation_filter.py` - Added dual-window correlation

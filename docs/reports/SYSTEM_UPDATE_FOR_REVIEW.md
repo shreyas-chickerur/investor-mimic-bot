@@ -377,10 +377,10 @@ All calculated during data update, available to all strategies.
 
 ## Documentation Created
 
-1. **`IMPROVEMENT_TRACKER.md`** - Complete implementation log
-2. **`ALGORITHM_SPECIFICATION.md`** - Technical specification
-3. **`VERIFICATION_REPORT.md`** - System verification results
-4. **`SYSTEM_UPDATE_FOR_REVIEW.md`** - This document
+1. **`docs/reports/IMPROVEMENT_TRACKER.md`** - Complete implementation log
+2. **`docs/reports/ALGORITHM_SPECIFICATION.md`** - Technical specification
+3. **`docs/reports/VERIFICATION_REPORT.md`** - System verification results
+4. **`docs/reports/SYSTEM_UPDATE_FOR_REVIEW.md`** - This document
 
 ---
 
@@ -495,7 +495,7 @@ All calculated during data update, available to all strategies.
 
 ## Expert Feedback Received ✅
 
-**See `EXPERT_FEEDBACK_ROUND2.md` for complete analysis**
+**See `docs/reports/EXPERT_FEEDBACK_ROUND2.md` for complete analysis**
 
 ### Key Findings
 
