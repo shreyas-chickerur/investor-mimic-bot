@@ -71,7 +71,7 @@ jobs:
     
     - name: Test signal generation
       run: |
-        python scripts/test_single_strategy.py
+        python tests/test_single_strategy.py
     
     - name: Test execution pipeline
       run: |
