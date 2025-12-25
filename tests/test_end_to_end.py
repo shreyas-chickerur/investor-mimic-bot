@@ -31,7 +31,6 @@ def test_data_pipeline():
     print(f"✅ Loaded {len(df):,} rows")
     print(f"✅ {df['symbol'].nunique()} symbols")
     print(f"✅ Date range: {df.index.min().date()} to {df.index.max().date()}")
-    return True
 
 
 def test_strategy_initialization():
@@ -58,7 +57,6 @@ def test_strategy_initialization():
         assert hasattr(strategy, 'generate_signals'), f"{strategy.name} missing generate_signals"
         print(f"✅ {strategy.name} initialized")
     
-    return True
 
 
 def test_signal_generation():
@@ -86,7 +84,6 @@ def test_signal_generation():
         total_signals += len(signals)
     
     print(f"✅ Total signals generated: {total_signals}")
-    return True
 
 
 def test_risk_management():
@@ -124,7 +121,6 @@ def test_risk_management():
     assert total_cost > 0, "Invalid total cost"
     print(f"✅ Execution costs: price=${exec_price:.2f}, cost=${total_cost:.2f}")
     
-    return True
 
 
 def test_backtester_integration():
@@ -171,7 +167,6 @@ def test_backtester_integration():
     print(f"   Total return: {results['total_return']:.2%}")
     print(f"   Trades: {len(backtester.trades)}")
     
-    return True
 
 
 def test_signal_injection():
@@ -199,7 +194,6 @@ def test_signal_injection():
     else:
         print("⚠️ Signal injection disabled (expected in production)")
     
-    return True
 
 
 def test_execution_pipeline():
@@ -245,7 +239,6 @@ def test_execution_pipeline():
     else:
         print("⚠️ Trade rejected (may be expected based on conditions)")
     
-    return True
 
 
 def test_performance_metrics():
@@ -271,7 +264,6 @@ def test_performance_metrics():
     print(f"   Total trades: {summary['total_trades']}")
     print(f"   Win rate: {summary.get('win_rate', 0):.1%}")
     
-    return True
 
 
 def run_all_tests():
