@@ -47,23 +47,23 @@ jobs:
         max_attempts=3
         attempt=1
         while [ "$attempt" -le "$max_attempts" ]; do
-          python3 -c "
-          import sys
-          sys.path.insert(0, 'src')
-          from broker_reconciler import BrokerReconciler
+          python3 - <<'PY'
+import sys
+sys.path.insert(0, 'src')
+from broker_reconciler import BrokerReconciler
 
-          r = BrokerReconciler()
-          s = r.get_broker_state()
-          print(f'Positions: {len(s[\"positions\"])}')
-          print(f'Cash: \${s[\"cash\"]:,.2f}')
+r = BrokerReconciler()
+s = r.get_broker_state()
+print(f"Positions: {len(s['positions'])}")
+print(f"Cash: ${s['cash']:,.2f}")
 
-          if len(s['positions']) == 0:
-              print('✅ READY FOR DAY 1')
-              sys.exit(0)
-          else:
-              print(f'⚠️ {len(s[\"positions\"])} positions remain')
-              sys.exit(1)
-          "
+if len(s["positions"]) == 0:
+    print("✅ READY FOR DAY 1")
+    sys.exit(0)
+else:
+    print(f"⚠️ {len(s['positions'])} positions remain")
+    sys.exit(1)
+PY
           if [ "$?" -eq 0 ]; then
             exit 0
           fi
