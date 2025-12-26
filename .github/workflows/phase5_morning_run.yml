@@ -1,4 +1,4 @@
-name: Phase 5 Morning Execution
+name: Phase 5 Morning Run
 
 on:
   schedule:
