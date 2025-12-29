@@ -105,112 +105,10 @@ jobs:
       run: |
         python3 scripts/generate_email_chart.py
     
-    - name: Generate daily summary
+    - name: Generate daily email digest
       if: success()
       run: |
-        python3 -c "
-        import json
-        from datetime import datetime
-        from pathlib import Path
-        
-        date = datetime.now().strftime('%Y-%m-%d')
-        artifact_path = Path(f'artifacts/json/{date}.json')
-        
-        if artifact_path.exists():
-            with open(artifact_path) as f:
-                data = json.load(f)
-            
-            # Extract key metrics
-            trades = data.get('trades', {})
-            signals = data.get('signals', {})
-            risk = data.get('risk', {})
-            positions = data.get('positions', {})
-            regime = data.get('regime', {})
-
-            placed_trades = trades.get('placed', []) if isinstance(trades, dict) else trades
-            filled_trades = trades.get('filled', []) if isinstance(trades, dict) else []
-            trades_display = filled_trades or placed_trades
-            open_positions = positions.get('open', []) if isinstance(positions, dict) else positions
-            raw_signals = signals.get('raw', {}) if isinstance(signals, dict) else {}
-            
-            # Calculate summary stats
-            total_trades = len(trades_display)
-            buy_trades = sum(1 for t in trades_display if t.get('action') == 'BUY')
-            sell_trades = sum(1 for t in trades_display if t.get('action') == 'SELL')
-            
-            # Generate summary
-            summary = f'''📊 PHASE 5 DAILY DIGEST - {date}
-        
-        ═══════════════════════════════════════════════════════════
-        EXECUTION SUMMARY
-        ═══════════════════════════════════════════════════════════
-        
-        ✅ Reconciliation: {data.get('system_health', {}).get('reconciliation_status', 'UNKNOWN')}
-        📈 Market Regime: {regime.get('classification', 'unknown').upper()} (VIX: {regime.get('vix', 'N/A')})
-        
-        ═══════════════════════════════════════════════════════════
-        TRADING ACTIVITY
-        ═══════════════════════════════════════════════════════════
-        
-        Total Trades Executed: {total_trades}
-        • BUY orders: {buy_trades}
-        • SELL orders: {sell_trades}
-        
-        Signals Generated: {sum(len(items) for items in raw_signals.values())}
-        Active Positions: {len(open_positions)}
-        
-        ═══════════════════════════════════════════════════════════
-        TRADES EXECUTED
-        ═══════════════════════════════════════════════════════════
-        '''
-            
-            if trades_display:
-                for i, trade in enumerate(trades_display, 1):
-                    summary += f'''
-        {i}. {trade.get('action')} {trade.get('shares', 0)} shares of {trade.get('symbol')}
-           Strategy: {trade.get('strategy')}
-           Price: \${trade.get('price', 0):.2f}
-           Order ID: {trade.get('order_id', 'N/A')}
-        '''
-            else:
-                summary += '\nNo trades executed today.\n'
-            
-            summary += f'''
-        ═══════════════════════════════════════════════════════════
-        PORTFOLIO RISK
-        ═══════════════════════════════════════════════════════════
-        
-        Portfolio Heat: {risk.get('portfolio_heat', 0):.1f}%
-        Daily P&L: \${risk.get('daily_pnl', 0):.2f}
-        Max Heat Allowed: {risk.get('max_heat', 30):.0f}%
-        
-        ═══════════════════════════════════════════════════════════
-        SYSTEM HEALTH
-        ═══════════════════════════════════════════════════════════
-        
-        Runtime: {data.get('system_health', {}).get('runtime_seconds', 0):.1f}s
-        Data Freshness: {data.get('system_health', {}).get('data_freshness', 'N/A')}
-        Errors: {data.get('system_health', {}).get('error_count', 0)}
-        Warnings: {data.get('system_health', {}).get('warning_count', 0)}
-        
-        ═══════════════════════════════════════════════════════════
-        
-        📁 Artifacts: phase5-artifacts-${{ github.run_number }}
-        📊 Dashboard: http://localhost:8080
-        🔗 Workflow: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        
-        This is an automated daily digest. No action required.
-        '''
-            
-            # Save summary to file
-            with open('/tmp/daily_summary.txt', 'w') as f:
-                f.write(summary)
-            
-            print('Summary generated successfully')
-        else:
-            print('No artifact found for today')
-            exit(1)
-        "
+        python3 scripts/generate_daily_email.py
     
     - name: Send daily digest email
       if: success()
@@ -220,10 +118,10 @@ jobs:
         server_port: 587
         username: ${{ secrets.EMAIL_USERNAME }}
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: "📊 Phase 5 Daily Digest - ${{ github.run_number }}"
+        subject: "📊 Daily Trading Digest - ${{ github.run_number }}"
         to: ${{ secrets.EMAIL_TO }}
-        from: Phase 5 Automation
-        body: file:///tmp/daily_summary.txt
+        from: Trading System
+        html_body: file:///tmp/daily_email.html
     
     - name: Send failure notification
       if: failure()
