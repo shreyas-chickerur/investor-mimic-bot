@@ -2,9 +2,9 @@
 
 **Automated portfolio-level trading system with 5 independent strategies, regime-aware risk management, and broker reconciliation.**
 
-[![Phase 5](https://img.shields.io/badge/Phase-5%20Complete-success)](docs/reports/PHASE_5_FINAL_COMPLETE.md)
 [![Paper Trading](https://img.shields.io/badge/Status-Paper%20Trading-blue)](https://app.alpaca.markets/paper/dashboard/overview)
-[![Automated](https://img.shields.io/badge/Execution-Automated-green)](.github/workflows/phase5_morning_run.yml)
+[![Automated](https://img.shields.io/badge/Execution-Automated-green)](.github/workflows/daily_trading.yml)
+[![Validated](https://img.shields.io/badge/System-Validated-success)](docs/reports/EMPIRICAL_VALIDATION_REPORT.md)
 
 ---
 
@@ -154,7 +154,7 @@ This is a **production-ready quantitative trading system** designed for automate
 
 ### Database Schema (`trading.db`)
 
-**Single source of truth for Phase 5 operational validation.**
+**Single source of truth for operational trading validation.**
 
 #### Core Tables
 
@@ -267,7 +267,7 @@ RECIPIENT_EMAIL=recipient@email.com
 - `SENDER_PASSWORD` (optional)
 - `RECIPIENT_EMAIL` (optional)
 
-**Workflow File:** [`.github/workflows/phase5_morning_run.yml`](.github/workflows/phase5_morning_run.yml)
+**Workflow File:** [`.github/workflows/daily_trading.yml`](.github/workflows/daily_trading.yml)
 
 ### Monitoring Infrastructure
 
@@ -385,7 +385,7 @@ investor-mimic-bot/
 - [Automation](docs/github-actions/GITHUB_ACTIONS_AUTOMATION.md) - Workflow details
 
 **Reports & Validation:**
-- [Phase 5 Complete](docs/reports/PHASE_5_FINAL_COMPLETE.md) - Latest status
+- [System Status](docs/reports/SYSTEM_STATUS.md) - Latest status
 - [Empirical Validation](docs/reports/EMPIRICAL_VALIDATION_REPORT.md) - Backtest results
 - [Algorithm Specification](docs/reports/ALGORITHM_SPECIFICATION.md) - Detailed algorithm docs
 
@@ -402,11 +402,11 @@ investor-mimic-bot/
 
 ```bash
 # Setup & Initialization
-make init              # Initialize Phase 5 database schema
+make init              # Initialize database schema
 make fetch-data        # Fetch 15 years of historical data (~18 seconds)
 
 # Daily Execution
-make run               # Run Phase 5 daily execution (all 5 strategies)
+make run               # Run daily execution (all 5 strategies)
 make verify-positions  # Verify broker positions are cleared
 
 # Monitoring
@@ -683,7 +683,7 @@ git push origin main
 # Enable workflows if prompted
 
 # 4. Workflow will run automatically weekdays at 6:30 AM PST
-# Or trigger manually: Actions → phase5_morning_run → Run workflow
+# Or trigger manually: Actions → daily_trading → Run workflow
 ```
 
 ### Verification
