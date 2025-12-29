@@ -286,6 +286,80 @@ RECIPIENT_EMAIL=recipient@email.com
 
 ---
 
+## 📁 Project Structure
+
+### Key Directories
+
+```
+investor-mimic-bot/
+├── .github/workflows/       # GitHub Actions workflows
+│   └── daily_trading.yml    # Daily automated execution (6:30 AM PST)
+├── artifacts/               # Daily execution artifacts (JSON + Markdown)
+│   ├── json/               # Daily artifact JSON files
+│   └── markdown/           # Daily markdown summaries
+├── config/                 # Configuration files
+├── dashboard/              # Web dashboard UI
+│   └── strategy_performance.html  # Strategy performance dashboard
+├── data/                   # Market data and training data
+├── docs/                   # Documentation
+│   ├── guides/            # Setup and usage guides
+│   ├── reference/         # Technical reference docs
+│   ├── reports/           # Validation and status reports
+│   └── README.md          # Documentation index
+├── examples/               # Sample data and mock templates
+│   ├── send_sample_email.py      # Sample email generator
+│   ├── sample_data/              # Sample artifacts
+│   └── README.md                 # Examples documentation
+├── scripts/                # Utility and execution scripts
+│   ├── setup_database.py         # Database initialization
+│   ├── fetch_historical_data.py  # Market data fetching
+│   ├── check_broker_state.py     # Broker state verification
+│   ├── generate_strategy_performance.py  # Strategy analysis
+│   ├── generate_strategy_chart.py        # Chart generation
+│   ├── generate_daily_email.py           # Email generation
+│   ├── serve_dashboard.py                # Dashboard server
+│   ├── validate_system.py                # System validation
+│   ├── verify_execution.py               # Execution verification
+│   ├── analyze_signals.py                # Signal analysis
+│   ├── sync_database.py                  # Database sync
+│   ├── update_data.py                    # Data updates
+│   └── view_performance.py               # Performance viewer
+├── src/                    # Core trading system code
+│   ├── execution_engine.py       # Main execution engine
+│   ├── broker_reconciler.py      # Broker reconciliation
+│   ├── portfolio_risk_manager.py # Risk management
+│   ├── regime_detector.py        # Market regime detection
+│   ├── email_notifier.py         # Email notifications
+│   ├── database.py               # Database interface
+│   └── strategies/               # Trading strategies
+│       ├── strategy_rsi_mean_reversion.py
+│       ├── strategy_ml_momentum.py
+│       ├── strategy_news_sentiment.py
+│       ├── strategy_ma_crossover.py
+│       └── strategy_volatility_breakout.py
+├── tests/                  # Test suite
+├── .env                    # Environment variables (local)
+├── .env.example            # Environment template
+├── Makefile                # Common commands
+├── README.md               # This file
+├── requirements.txt        # Python dependencies
+└── trading.db              # SQLite database
+```
+
+### Key Files
+
+**Configuration:**
+- `.env` - Local environment variables (API keys, credentials)
+- `.env.example` - Template for environment setup
+- `requirements.txt` - Python package dependencies
+- `Makefile` - Common command shortcuts
+
+**Database:**
+- `trading.db` - SQLite database (strategies, signals, trades, positions)
+
+**Workflows:**
+- `.github/workflows/daily_trading.yml` - Automated daily execution
+
 ## 📚 Documentation
 
 ### Quick Links
@@ -314,6 +388,9 @@ RECIPIENT_EMAIL=recipient@email.com
 - [Phase 5 Complete](docs/reports/PHASE_5_FINAL_COMPLETE.md) - Latest status
 - [Empirical Validation](docs/reports/EMPIRICAL_VALIDATION_REPORT.md) - Backtest results
 - [Algorithm Specification](docs/reports/ALGORITHM_SPECIFICATION.md) - Detailed algorithm docs
+
+**Examples:**
+- [Examples README](examples/README.md) - Sample data and mock templates
 
 **Full Documentation Index:** [`docs/README.md`](docs/README.md)
 
@@ -382,15 +459,62 @@ python3 scripts/serve_dashboard.py
 - Top performer highlighting
 - Responsive design for mobile/desktop
 
-#### Send Sample Email (Mock Data)
+#### Database & System Management
 ```bash
-# Standard daily email
+# Initialize database schema
+python3 scripts/setup_database.py --db trading.db
+
+# Sync database with broker
+python3 scripts/sync_database.py
+
+# Update market data
+python3 scripts/update_data.py
+
+# Validate system invariants
+python3 scripts/validate_system.py --latest
+
+# Verify execution criteria
+python3 scripts/verify_execution.py
+
+# Check broker state
+python3 scripts/check_broker_state.py
+
+# Import check (verify all modules load)
+python3 scripts/import_check.py
+```
+
+#### Email & Notifications
+```bash
+# Generate daily email digest
+python3 scripts/generate_daily_email.py
+
+# Generate daily email with visuals (Mon/Wed/Fri)
+python3 scripts/generate_daily_email.py --include-visuals
+
+# Generate performance chart for email
+python3 scripts/generate_email_chart.py
+
+# Send sample email (mock data)
 python3 examples/send_sample_email.py
 
-# Weekly email with visuals (Mon/Wed/Fri style)
+# Send sample email with visuals
 python3 examples/send_sample_email.py --include-visuals
 ```
-Generates sample email with mock data (4 trades, 4 positions, strategy performance)
+
+#### Analysis & Debugging
+```bash
+# Analyze all strategies for signals (dry-run)
+python3 scripts/analyze_signals.py
+
+# Debug single signal flow
+python3 scripts/debug_single_signal.py
+
+# View strategy performance (CLI)
+python3 scripts/view_performance.py
+
+# Run validation backtest
+python3 scripts/run_validation_backtest.py
+```
 
 #### Send Test Email (Current Data)
 ```bash
