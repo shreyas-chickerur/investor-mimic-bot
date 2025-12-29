@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Phase 5 Database Adapter
-Single source of truth for Phase 5 paper trading operational validation
+Trading Database Adapter
+Single source of truth for paper trading operational validation
 """
 import sqlite3
 from typing import List, Dict, Optional, Tuple
@@ -11,8 +11,8 @@ import random
 import string
 
 
-class Phase5Database:
-    """Database adapter for Phase 5 with proper schema"""
+class TradingDatabase:
+    """Database adapter for trading system with proper schema"""
     
     def __init__(self, db_path='trading.db', run_id=None):
         self.db_path = db_path
@@ -26,7 +26,7 @@ class Phase5Database:
         return f"{timestamp}_{suffix}"
     
     def _init_database(self):
-        """Initialize Phase 5 database schema"""
+        """Initialize trading database schema"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -407,17 +407,21 @@ class Phase5Database:
     
     def get_strategy_performance(self, strategy_id: int, days: int = 30) -> List[Dict]:
         """Get strategy performance history (stub - returns empty for now)"""
-        # Phase 5 doesn't track performance snapshots yet
+        # Performance snapshots not yet implemented
         # Return empty list to avoid breaking dynamic allocation
         return []
     
     def get_latest_performance(self, strategy_id: int) -> Dict:
         """Get latest performance snapshot (stub - returns None for now)"""
-        # Phase 5 doesn't track performance snapshots yet
+        # Performance snapshots not yet implemented
         return None
     
     def record_daily_performance(self, strategy_id: int, **kwargs):
-        """Record daily performance (stub - Phase 5 doesn't track this yet)"""
-        # Phase 5 doesn't track daily performance snapshots
+        """Record daily performance (stub - not yet implemented)"""
+        # Daily performance snapshots not yet implemented
         # This is a no-op to maintain compatibility
         pass
+
+
+# Backward compatibility alias
+Phase5Database = TradingDatabase

@@ -26,7 +26,7 @@ class SignalFlowTracer:
         
         Args:
             log_file: Path to detailed trace log file
-            enforce_terminal_states: If True, enforce exactly one terminal state per signal (Phase 5)
+            enforce_terminal_states: If True, enforce exactly one terminal state per signal
         """
         self.log_file = log_file
         self.traces = []

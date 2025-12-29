@@ -2,7 +2,7 @@
 """
 Signal Flow Tracer - Terminal State Extensions
 
-Phase 5: Adds terminal state enforcement to existing SignalFlowTracer.
+Adds terminal state enforcement to existing SignalFlowTracer.
 Every signal must reach exactly one terminal state.
 
 Terminal States:

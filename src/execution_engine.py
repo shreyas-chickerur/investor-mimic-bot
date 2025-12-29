@@ -17,7 +17,7 @@ sys.path.insert(0, str(project_root / 'src'))
 from dotenv import load_dotenv
 load_dotenv()
 
-from database import Phase5Database
+from database import TradingDatabase
 from strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
 from strategies.strategy_ml_momentum import MLMomentumStrategy
 from strategies.strategy_news_sentiment import NewsSentimentStrategy
@@ -57,7 +57,7 @@ class MultiStrategyRunner:
     """Runs all 5 strategies with independent tracking"""
     
     def __init__(self):
-        self.db = Phase5Database('trading.db')
+        self.db = TradingDatabase('trading.db')
         self.run_id = self.db.run_id
         self.asof_date = datetime.now().strftime('%Y-%m-%d')
         
@@ -65,7 +65,7 @@ class MultiStrategyRunner:
         import time
         current_dt = datetime.now()
         logger.info("=" * 80)
-        logger.info("PHASE 5 STARTUP - DATETIME VERIFICATION")
+        logger.info("TRADING SYSTEM STARTUP - DATETIME VERIFICATION")
         logger.info("=" * 80)
         logger.info(f"Current datetime: {current_dt}")
         logger.info(f"Timezone: {time.tzname}")
@@ -86,13 +86,13 @@ class MultiStrategyRunner:
             raise ValueError("Live trading disabled. Set ALPACA_LIVE_ENABLED=true to trade live.")
         self.trading_client = TradingClient(api_key, secret_key, paper=self.paper_mode)
         
-        # PHASE 5 VALIDATION: Signal injection
-        self.signal_injection_enabled = os.getenv('PHASE5_SIGNAL_INJECTION', 'false').lower() == 'true'
+        # VALIDATION MODE: Signal injection for testing
+        self.signal_injection_enabled = os.getenv('SIGNAL_INJECTION', 'false').lower() == 'true'
         if self.signal_injection_enabled:
             if not self.paper_mode:
                 raise ValueError("Signal injection requires ALPACA_PAPER=true")
             logger.warning("=" * 80)
-            logger.warning("PHASE5_SIGNAL_INJECTION ENABLED - VALIDATION ONLY")
+            logger.warning("SIGNAL_INJECTION ENABLED - VALIDATION MODE ONLY")
             logger.warning("=" * 80)
         
         # Get account info - CRITICAL FIX: Use portfolio value, not just cash
@@ -411,11 +411,11 @@ class MultiStrategyRunner:
             print("MULTI-STRATEGY EXECUTION")
             print("=" * 80)
             
-            # PHASE 5 VALIDATION: Inject synthetic signals if enabled
+            # VALIDATION MODE: Inject synthetic signals if enabled
             injected_signals = []
             if self.signal_injection_enabled:
                 logger.info("=" * 80)
-                logger.info("PHASE 5 SIGNAL INJECTION - Generating validation signals")
+                logger.info("SIGNAL INJECTION - Generating validation signals")
                 logger.info("=" * 80)
                 
                 current_prices = self._get_last_close_map(market_data)
@@ -429,10 +429,10 @@ class MultiStrategyRunner:
                             'symbol': symbol,
                             'action': 'BUY',
                             'confidence': 0.75,
-                            'reasoning': 'PHASE5_VALIDATION: Synthetic signal for non-zero path proof',
+                            'reasoning': 'VALIDATION: Synthetic signal for testing',
                             'price': current_prices[symbol],
                             'injected': True,
-                            'injection_source': 'PHASE5_VALIDATION'
+                            'injection_source': 'VALIDATION_MODE'
                         }
                         injected_signals.append(injected_signal)
                         logger.info(f"  [INJECTION] BUY {symbol} @ ${current_prices[symbol]:.2f}")
@@ -452,7 +452,7 @@ class MultiStrategyRunner:
 
                     signals = strategy.generate_signals(market_data)
                     
-                    # PHASE 5 VALIDATION: Route injected signals to RSI Mean Reversion
+                    # VALIDATION MODE: Route injected signals to RSI Mean Reversion
                     if self.signal_injection_enabled and strategy.name == "RSI Mean Reversion" and len(injected_signals) > 0:
                         logger.info(f"  [INJECTION] Routing {len(injected_signals)} validation signals to {strategy.name}")
                         signals = injected_signals + (signals if signals else [])

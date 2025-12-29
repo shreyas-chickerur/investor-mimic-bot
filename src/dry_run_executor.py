@@ -2,7 +2,7 @@
 """
 Dry Run Executor
 
-Phase 5: Executes full trading pipeline WITHOUT placing broker orders.
+Executes full trading pipeline WITHOUT placing broker orders.
 - Generates artifacts
 - Performs reconciliation reads
 - Logs terminal states
