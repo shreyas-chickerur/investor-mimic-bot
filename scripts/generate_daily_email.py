@@ -9,11 +9,39 @@ import sys
 import json
 from pathlib import Path
 from datetime import datetime
+import sqlite3
+from collections import defaultdict
 
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / 'src'))
 
-def generate_email_body(artifact_path: str) -> str:
+def get_strategy_performance_today(db_path='trading.db'):
+    """Get today's strategy performance from database"""
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    
+    query = '''
+        SELECT 
+            s.name as strategy,
+            COUNT(*) as trades,
+            SUM(CASE WHEN t.pnl > 0 THEN 1 ELSE 0 END) as wins,
+            SUM(CASE WHEN t.pnl < 0 THEN 1 ELSE 0 END) as losses,
+            SUM(t.pnl) as total_pnl,
+            AVG(t.pnl) as avg_pnl
+        FROM trades t
+        JOIN strategies s ON t.strategy_id = s.id
+        WHERE DATE(t.executed_at) = DATE('now')
+        AND t.pnl IS NOT NULL
+        GROUP BY s.name
+        ORDER BY total_pnl DESC
+    '''
+    
+    results = conn.execute(query).fetchall()
+    conn.close()
+    
+    return [dict(row) for row in results]
+
+def generate_email_body(artifact_path: str, db_path='trading.db') -> str:
     """Generate HTML email body from artifact JSON"""
     
     with open(artifact_path) as f:
@@ -51,6 +79,9 @@ def generate_email_body(artifact_path: str) -> str:
     # Count trades by action
     buys = [t for t in trades if t.get('action') == 'BUY']
     sells = [t for t in trades if t.get('action') == 'SELL']
+    
+    # Get strategy performance
+    strategy_perf = get_strategy_performance_today(db_path)
     
     # Build trades table
     trades_html = ""
@@ -108,6 +139,37 @@ def generate_email_body(artifact_path: str) -> str:
         positions_html += "</table>"
     else:
         positions_html = "<p style='color: #666; font-style: italic;'>No open positions</p>"
+    
+    # Build strategy performance table
+    strategy_html = ""
+    if strategy_perf:
+        strategy_html = "<table style='width: 100%; border-collapse: collapse; margin-top: 10px;'>"
+        strategy_html += "<tr style='background: #f8f9fa; border-bottom: 2px solid #dee2e6;'>"
+        strategy_html += "<th style='padding: 10px; text-align: left;'>Strategy</th>"
+        strategy_html += "<th style='padding: 10px; text-align: right;'>Trades</th>"
+        strategy_html += "<th style='padding: 10px; text-align: right;'>Win Rate</th>"
+        strategy_html += "<th style='padding: 10px; text-align: right;'>Avg P&L</th>"
+        strategy_html += "<th style='padding: 10px; text-align: right;'>Total P&L</th>"
+        strategy_html += "</tr>"
+        
+        for i, strat in enumerate(strategy_perf):
+            win_rate = (strat['wins'] / strat['trades'] * 100) if strat['trades'] > 0 else 0
+            pnl_color = '#28a745' if strat['total_pnl'] >= 0 else '#dc3545'
+            
+            # Highlight top performer
+            bg_color = '#e8f5e9' if i == 0 and strat['total_pnl'] > 0 else 'white'
+            
+            strategy_html += f"<tr style='border-bottom: 1px solid #dee2e6; background: {bg_color};'>"
+            strategy_html += f"<td style='padding: 10px; font-weight: {'bold' if i == 0 else 'normal'};'>{strat['strategy']}</td>"
+            strategy_html += f"<td style='padding: 10px; text-align: right;'>{strat['trades']}</td>"
+            strategy_html += f"<td style='padding: 10px; text-align: right;'>{win_rate:.1f}%</td>"
+            strategy_html += f"<td style='padding: 10px; text-align: right;'>${strat['avg_pnl']:.2f}</td>"
+            strategy_html += f"<td style='padding: 10px; text-align: right; color: {pnl_color}; font-weight: bold;'>${strat['total_pnl']:+.2f}</td>"
+            strategy_html += "</tr>"
+        
+        strategy_html += "</table>"
+    else:
+        strategy_html = "<p style='color: #666; font-style: italic;'>No strategy data available</p>"
     
     # Build complete HTML email
     pnl_color = '#10b981' if daily_pnl >= 0 else '#dc3545'
@@ -172,6 +234,14 @@ def generate_email_body(artifact_path: str) -> str:
             {trades_html}
         </div>
         
+        <!-- Strategy Performance -->
+        <div style="margin-bottom: 30px;">
+            <h2 style="color: #2c5282; border-bottom: 2px solid #4A90E2; padding-bottom: 10px; font-size: 20px; font-weight: 600;">
+                Strategy Performance (Today)
+            </h2>
+            {strategy_html}
+        </div>
+        
         <!-- Current Positions -->
         <div style="margin-bottom: 30px;">
             <h2 style="color: #2c5282; border-bottom: 2px solid #4A90E2; padding-bottom: 10px; font-size: 20px; font-weight: 600;">
@@ -202,7 +272,7 @@ if __name__ == "__main__":
         sys.exit(1)
     
     # Generate email HTML
-    html = generate_email_body(str(artifact_path))
+    html = generate_email_body(str(artifact_path), db_path='trading.db')
     
     # Save to file for workflow to use
     output_path = '/tmp/daily_email.html'

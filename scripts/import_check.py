@@ -20,6 +20,9 @@ MODULES = [
     "artifact_writer",
     "scripts.generate_email_chart",
     "scripts.check_broker_state",
+    "scripts.generate_daily_email",
+    "scripts.generate_strategy_performance",
+    "scripts.generate_strategy_chart",
 ]
 
 
