@@ -1,26 +1,24 @@
-name: Phase 5 Daily Operational Validation
+name: Daily Trading Execution
 
 on:
   schedule:
-    # 1 PM PT = 9 PM UTC (standard time) or 8 PM UTC (daylight time)
-    # Using 9 PM UTC to cover standard time, runs Mon-Fri
-    - cron: '0 21 * * 1-5'
+    # Runs at 6:30 AM PST (14:30 UTC) every day
+    - cron: '30 14 * * *'
   workflow_dispatch:  # Allow manual trigger
 
 env:
   PYTHON_VERSION: "3.8"
 
 jobs:
-  operational-validation:
-    name: Phase 5 Daily Validation
+  daily-execution:
     runs-on: ubuntu-latest
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PYTHON_VERSION }}
     
@@ -33,24 +31,26 @@ jobs:
       run: |
         python3 scripts/import_check.py
     
-    - name: Download trading database (if exists)
+    - name: Download previous database (if exists)
       uses: actions/download-artifact@v4
       with:
         name: trading-database
         path: .
       continue-on-error: true
     
+    - name: Initialize database
+      run: |
+        python scripts/setup_database.py --db trading.db
+    
     - name: Create required directories
       run: |
         mkdir -p artifacts/json artifacts/markdown logs data
     
-    - name: Fetch market data
+    - name: Update market data
       env:
-        ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
-        ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+        ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
       run: |
-        echo "=== Fetching Market Data ==="
-        python3 scripts/update_data.py || echo "Warning: Data fetch failed, will attempt to continue"
+        python scripts/fetch_historical_data.py
     
     - name: Safety check - Verify paper trading mode
       env:
@@ -66,12 +66,20 @@ jobs:
         # Verify PHASE5_SIGNAL_INJECTION is false
         INJECTION="${PHASE5_SIGNAL_INJECTION:-false}"
         if [ "$INJECTION" != "false" ]; then
-          echo "❌ FATAL: PHASE5_SIGNAL_INJECTION must be 'false' for operational validation"
+          echo "❌ FATAL: PHASE5_SIGNAL_INJECTION must be 'false' for production"
           exit 1
         fi
-        echo "✅ Signal injection disabled (operational mode)"
+        echo "✅ Signal injection disabled (production mode)"
     
-    - name: Run Phase 5 operational validation
+    - name: Pre-execution broker state check
+      env:
+        ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+        ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+        ALPACA_PAPER: true
+      run: |
+        python3 scripts/check_broker_state.py
+    
+    - name: Run daily execution
       env:
         ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
         ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
@@ -79,9 +87,9 @@ jobs:
         ALPACA_LIVE_ENABLED: 'false'
         ENABLE_BROKER_RECONCILIATION: 'true'
         PHASE5_SIGNAL_INJECTION: 'false'
-        DATA_MAX_AGE_HOURS: '96'
+        DATA_MAX_AGE_HOURS: '72'
       run: |
-        echo "=== Phase 5 Daily Run - $(date) ==="
+        echo "=== Daily Trading Execution - $(date) ==="
         echo "Environment:"
         echo "  ALPACA_PAPER: $ALPACA_PAPER"
         echo "  ALPACA_LIVE_ENABLED: $ALPACA_LIVE_ENABLED"
@@ -91,12 +99,45 @@ jobs:
         echo ""
         python3 src/execution_engine.py
     
-    - name: Verify invariants
+    - name: Verify reconciliation passed
+      run: |
+        python3 -c "
+        import json
+        from datetime import datetime
+        from pathlib import Path
+        import sys
+        
+        date = datetime.now().strftime('%Y-%m-%d')
+        json_path = Path(f'artifacts/json/{date}.json')
+        
+        if json_path.exists():
+            with open(json_path) as f:
+                data = json.load(f)
+            
+            system_health = data.get('system_health', {})
+            recon = system_health.get('reconciliation_status', 'UNKNOWN')
+            discrep = system_health.get('reconciliation_discrepancies', [])
+            
+            print(f'Reconciliation: {recon}')
+            print(f'Discrepancies: {len(discrep)}')
+            
+            if 'PASS' in recon and len(discrep) == 0:
+                print('✅ Execution complete - Reconciliation passed')
+                sys.exit(0)
+            else:
+                print('❌ Reconciliation failed')
+                sys.exit(1)
+        else:
+            print(f'❌ No artifact found for {date}')
+            sys.exit(1)
+        "
+    
+    - name: Validate system invariants
       run: |
         echo "=== Validating System ==="
         python3 scripts/validate_system.py --latest
     
-    - name: Verify Day 1 criteria
+    - name: Verify execution criteria
       run: |
         echo "=== Verifying Execution ==="
         python3 scripts/verify_execution.py
@@ -134,18 +175,40 @@ jobs:
         path: trading.db
         retention-days: 90
     
-    - name: Upload daily artifacts
+    - name: Upload artifacts
       if: always()
       uses: actions/upload-artifact@v4
       with:
         name: daily-artifacts-${{ github.run_number }}
         path: |
-          artifacts/json/*.json
-          artifacts/markdown/*.md
+          artifacts/
+          logs/
         retention-days: 90
-        if-no-files-found: ignore
     
-    - name: Create daily summary
+    - name: Generate performance chart
+      if: success()
+      run: |
+        python3 scripts/generate_email_chart.py
+    
+    - name: Generate daily email digest
+      if: success()
+      run: |
+        python3 scripts/generate_daily_email.py
+    
+    - name: Send daily digest email
+      if: success()
+      uses: dawidd6/action-send-mail@v3
+      with:
+        server_address: smtp.gmail.com
+        server_port: 587
+        username: ${{ secrets.EMAIL_USERNAME }}
+        password: ${{ secrets.EMAIL_PASSWORD }}
+        subject: "📊 Daily Trading Digest - ${{ github.run_number }}"
+        to: ${{ secrets.EMAIL_TO }}
+        from: Trading System
+        html_body: file:///tmp/daily_email.html
+    
+    - name: Create GitHub summary
       if: always()
       run: |
         RUN_ID=$(sqlite3 trading.db "SELECT run_id FROM broker_state ORDER BY created_at DESC LIMIT 1;" || echo "UNKNOWN")
@@ -154,7 +217,7 @@ jobs:
         RECON_STATUS=$(sqlite3 trading.db "SELECT reconciliation_status FROM broker_state WHERE run_id='$RUN_ID' AND snapshot_type='RECONCILIATION';" || echo "UNKNOWN")
         
         cat > $GITHUB_STEP_SUMMARY << EOF
-        # Phase 5 Daily Validation - $(date +%Y-%m-%d)
+        # Daily Trading Execution - $(date +%Y-%m-%d)
         
         **Run ID:** \`$RUN_ID\`  
         **Signals:** $SIGNALS  
@@ -162,14 +225,45 @@ jobs:
         **Reconciliation:** $RECON_STATUS  
         **Status:** ${{ job.status }}
         
-        ## Checks
+        ## Validation Checks
         - ✅ Safety: Paper trading mode verified
-        - ✅ Invariants: See logs for 6/6 status
-        - ✅ Day 1 Verification: See logs
-        - ✅ Database: Uploaded as artifact
+        - ✅ System Invariants: Validated
+        - ✅ Execution Criteria: Verified
+        - ✅ Database: Uploaded (90 day retention)
+        - ✅ Artifacts: Uploaded (90 day retention)
         
         ## Environment
         - ALPACA_PAPER: true
         - PHASE5_SIGNAL_INJECTION: false
         - ENABLE_BROKER_RECONCILIATION: true
+        - DATA_MAX_AGE_HOURS: 72
+        
+        ## Artifacts
+        - Database: \`trading-database\`
+        - Daily artifacts: \`daily-artifacts-${{ github.run_number }}\`
         EOF
+    
+    - name: Send failure notification
+      if: failure()
+      uses: dawidd6/action-send-mail@v3
+      with:
+        server_address: smtp.gmail.com
+        server_port: 587
+        username: ${{ secrets.EMAIL_USERNAME }}
+        password: ${{ secrets.EMAIL_PASSWORD }}
+        subject: "⚠️ Daily Trading Workflow Failed - ${{ github.run_number }}"
+        to: ${{ secrets.EMAIL_TO }}
+        from: Trading System
+        body: |
+          Daily Trading Execution Failed
+          
+          Run: ${{ github.run_number }}
+          Date: ${{ github.event.repository.updated_at }}
+          Workflow: ${{ github.workflow }}
+          
+          Failed Step: Check the logs at:
+          https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          
+          Please review the failure and take corrective action.
+          
+          Artifacts (if any): daily-artifacts-${{ github.run_number }}
