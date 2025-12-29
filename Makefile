@@ -1,4 +1,6 @@
-.PHONY: help install run dashboard test clean sync-db view-performance analyze-signals import-check
+.PHONY: help install run dashboard test clean sync-db view-performance analyze-signals import-check \
+	perf-report perf-chart perf-dashboard email-daily email-weekly email-sample \
+	validate verify-system check-broker debug-signal backtest
 
 # Default target
 help:
@@ -9,16 +11,46 @@ help:
 	@echo "  make dashboard        - Open web dashboard (http://localhost:5000)"
 	@echo "  make analyze          - Analyze all strategies for signals"
 	@echo ""
-	@echo "📈 MONITORING:"
+	@echo "📈 STRATEGY PERFORMANCE:"
+	@echo "  make perf-report      - Generate 30-day performance report"
+	@echo "  make perf-chart       - Generate performance charts (7 days)"
+	@echo "  make perf-dashboard   - Start performance dashboard UI"
+	@echo ""
+	@echo "📧 EMAIL & NOTIFICATIONS:"
+	@echo "  make email-daily      - Generate daily email digest"
+	@echo "  make email-weekly     - Generate weekly email with visuals"
+	@echo "  make email-sample     - Generate sample email (mock data)"
+	@echo "  make email-chart      - Generate performance chart for email"
+	@echo ""
+	@echo "✅ SYSTEM VALIDATION:"
+	@echo "  make validate         - Validate system invariants"
+	@echo "  make verify-system    - Verify execution criteria"
+	@echo "  make check-broker     - Check broker state"
+	@echo "  make import-check     - Verify all modules load"
+	@echo ""
+	@echo "🐛 ANALYSIS & DEBUGGING:"
+	@echo "  make debug-signal     - Debug single signal flow"
+	@echo "  make backtest         - Run validation backtest"
+	@echo ""
+	@echo "📊 MONITORING:"
 	@echo "  make view             - View strategy performance (CLI)"
 	@echo "  make logs             - View recent trading logs"
 	@echo "  make positions        - Check current Alpaca positions"
 	@echo ""
-	@echo "🔧 SETUP & MAINTENANCE:"
+	@echo "🔧 DATABASE & DATA:"
+	@echo "  make init             - Initialize database schema"
+	@echo "  make sync-db          - Sync database with broker"
+	@echo "  make update-data      - Update market data"
+	@echo "  make fetch-data       - Fetch historical data"
 	@echo ""
-	@echo "Maintenance:"
-	@echo "  make test              - Run tests"
-	@echo "  make clean             - Clean generated files"
+	@echo "🧪 TESTING:"
+	@echo "  make test             - Run all tests"
+	@echo "  make test-single      - Test single strategy"
+	@echo "  make test-multi       - Test multi-strategy integration"
+	@echo ""
+	@echo "🧹 MAINTENANCE:"
+	@echo "  make clean            - Clean logs and temporary files"
+	@echo "  make clean-all        - Deep clean (including databases)"
 
 init:
 	@echo "Initializing database..."
@@ -114,6 +146,67 @@ clean-all: clean
 	@echo "🧹 Deep cleaning (including databases)..."
 	rm -f data/*.db
 	@echo "⚠️  Databases removed - will be recreated on next run"
+
+# Strategy Performance
+perf-report:
+	@echo "📊 Generating 30-day strategy performance report..."
+	python3 scripts/generate_strategy_performance.py --days 30
+
+perf-chart:
+	@echo "📈 Generating strategy performance charts..."
+	python3 scripts/generate_strategy_chart.py --days 7
+
+perf-dashboard:
+	@echo "🌐 Starting strategy performance dashboard..."
+	@echo "📊 Open http://localhost:8080/dashboard/strategy_performance.html"
+	python3 scripts/serve_dashboard.py
+
+# Email & Notifications
+email-daily:
+	@echo "📧 Generating daily email digest..."
+	python3 scripts/generate_daily_email.py
+	@echo "✅ Email generated: /tmp/daily_email.html"
+
+email-weekly:
+	@echo "📊 Generating weekly email with visuals..."
+	python3 scripts/generate_daily_email.py --include-visuals
+	@echo "✅ Email with charts generated: /tmp/daily_email.html"
+
+email-sample:
+	@echo "📧 Generating sample email with mock data..."
+	python3 examples/send_sample_email.py
+	@echo "✅ Sample email generated: /tmp/sample_email.html"
+
+email-sample-visual:
+	@echo "📊 Generating sample email with visuals..."
+	python3 examples/send_sample_email.py --include-visuals
+	@echo "✅ Sample email with charts generated: /tmp/sample_email.html"
+
+email-chart:
+	@echo "📈 Generating performance chart for email..."
+	python3 scripts/generate_email_chart.py
+
+# System Validation & Management
+validate:
+	@echo "✅ Validating system invariants..."
+	python3 scripts/validate_system.py --latest
+
+verify-system:
+	@echo "🔍 Verifying execution criteria..."
+	python3 scripts/verify_execution.py
+
+check-broker:
+	@echo "💼 Checking broker state..."
+	python3 scripts/check_broker_state.py
+
+# Analysis & Debugging
+debug-signal:
+	@echo "🐛 Debugging single signal flow..."
+	python3 scripts/debug_single_signal.py
+
+backtest:
+	@echo "📊 Running validation backtest..."
+	python3 scripts/run_validation_backtest.py
 
 # Development helpers
 dev-dashboard:

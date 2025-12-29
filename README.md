@@ -416,9 +416,9 @@ make logs              # View recent trading logs
 make positions         # Check current Alpaca positions
 
 # Strategy Performance Analysis
-python3 scripts/generate_strategy_performance.py --days 30  # Generate performance report
-python3 scripts/generate_strategy_chart.py --days 7         # Generate performance charts
-python3 scripts/serve_dashboard.py                          # Start strategy dashboard UI
+make perf-report       # Generate 30-day performance report
+make perf-chart        # Generate 7-day performance charts
+make perf-dashboard    # Start strategy dashboard UI
 
 # Analysis
 make analyze           # Analyze all strategies for signals (dry-run)
@@ -442,13 +442,13 @@ make clean-all         # Deep clean (including databases)
 #### Strategy Performance Analysis
 ```bash
 # Generate 30-day performance report
-python3 scripts/generate_strategy_performance.py --days 30
+make perf-report
 
-# Generate strategy performance charts
-python3 scripts/generate_strategy_chart.py --days 7
+# Generate 7-day performance charts
+make perf-chart
 
-# View strategy performance dashboard
-python3 scripts/serve_dashboard.py
+# Start interactive performance dashboard
+make perf-dashboard
 # Then open: http://localhost:8080/dashboard/strategy_performance.html
 ```
 
@@ -462,58 +462,61 @@ python3 scripts/serve_dashboard.py
 #### Database & System Management
 ```bash
 # Initialize database schema
-python3 scripts/setup_database.py --db trading.db
+make init
 
 # Sync database with broker
-python3 scripts/sync_database.py
+make sync-db
 
 # Update market data
-python3 scripts/update_data.py
+make update-data
+
+# Fetch historical data
+make fetch-data
 
 # Validate system invariants
-python3 scripts/validate_system.py --latest
+make validate
 
 # Verify execution criteria
-python3 scripts/verify_execution.py
+make verify-system
 
 # Check broker state
-python3 scripts/check_broker_state.py
+make check-broker
 
 # Import check (verify all modules load)
-python3 scripts/import_check.py
+make import-check
 ```
 
 #### Email & Notifications
 ```bash
 # Generate daily email digest
-python3 scripts/generate_daily_email.py
+make email-daily
 
-# Generate daily email with visuals (Mon/Wed/Fri)
-python3 scripts/generate_daily_email.py --include-visuals
+# Generate weekly email with visuals (Mon/Wed/Fri style)
+make email-weekly
 
 # Generate performance chart for email
-python3 scripts/generate_email_chart.py
+make email-chart
 
 # Send sample email (mock data)
-python3 examples/send_sample_email.py
+make email-sample
 
 # Send sample email with visuals
-python3 examples/send_sample_email.py --include-visuals
+make email-sample-visual
 ```
 
 #### Analysis & Debugging
 ```bash
 # Analyze all strategies for signals (dry-run)
-python3 scripts/analyze_signals.py
+make analyze
 
 # Debug single signal flow
-python3 scripts/debug_single_signal.py
+make debug-signal
 
 # View strategy performance (CLI)
-python3 scripts/view_performance.py
+make view
 
 # Run validation backtest
-python3 scripts/run_validation_backtest.py
+make backtest
 ```
 
 #### Send Test Email (Current Data)
