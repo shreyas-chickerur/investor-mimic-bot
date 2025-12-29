@@ -19,9 +19,10 @@ This is a **production-ready quantitative trading system** designed for automate
 - **Regime Detection** - VIX-based market regime adaptation (NORMAL/HIGH_VOL/CRISIS)
 - **Broker Reconciliation** - Automated position/cash verification before every execution
 - **Execution Cost Modeling** - Realistic slippage (0.05%) and commission ($1/trade) simulation
-- **Live Monitoring** - Real-time web dashboard with strategy performance tracking
+- **Strategy Performance Tracking** - Per-strategy metrics, rankings, and visual analytics
+- **Web Dashboard UI** - Beautiful interactive dashboard with charts and performance tables
 - **Automated Execution** - GitHub Actions workflow runs daily at 6:30 AM PST
-- **Email Notifications** - Daily digest with trade summaries and failure alerts
+- **Email Notifications** - Daily digest with trade summaries, weekly visual reports (Mon/Wed/Fri)
 
 ### System Architecture
 
@@ -270,15 +271,17 @@ RECIPIENT_EMAIL=recipient@email.com
 
 ### Monitoring Infrastructure
 
-**Live Dashboard:**
-- Flask web server (port 8080)
-- Real-time strategy performance
-- Auto-refresh every 30 seconds
-- Charts: P&L, win rates, trade history
+**Strategy Performance Dashboard:**
+- Modern web UI with interactive charts (Chart.js)
+- Real-time performance metrics and rankings
+- Visual analytics: cumulative P&L, win rates, Sharpe ratios
+- Access via: `python3 scripts/serve_dashboard.py` → http://localhost:8080/dashboard/strategy_performance.html
 
 **Email Notifications:**
-- Daily digest (blue/orange theme)
-- Failure alerts (immediate)
+- **Daily digest** (every day): Portfolio metrics, trades, strategy performance table
+- **Weekly visual reports** (Mon/Wed/Fri): Embedded strategy charts and trend analysis
+- **Failure alerts**: Immediate notifications for workflow failures
+- Beautiful HTML emails with blue/orange theme
 - SMTP via Gmail
 
 ---
@@ -335,6 +338,11 @@ make view              # View strategy performance (CLI)
 make logs              # View recent trading logs
 make positions         # Check current Alpaca positions
 
+# Strategy Performance Analysis
+python3 scripts/generate_strategy_performance.py --days 30  # Generate performance report
+python3 scripts/generate_strategy_chart.py --days 7         # Generate performance charts
+python3 scripts/serve_dashboard.py                          # Start strategy dashboard UI
+
 # Analysis
 make analyze           # Analyze all strategies for signals (dry-run)
 
@@ -353,6 +361,26 @@ make clean-all         # Deep clean (including databases)
 ```
 
 ### Advanced Workflows
+
+#### Strategy Performance Analysis
+```bash
+# Generate 30-day performance report
+python3 scripts/generate_strategy_performance.py --days 30
+
+# Generate strategy performance charts
+python3 scripts/generate_strategy_chart.py --days 7
+
+# View strategy performance dashboard
+python3 scripts/serve_dashboard.py
+# Then open: http://localhost:8080/dashboard/strategy_performance.html
+```
+
+**Dashboard Features:**
+- Real-time stats cards (total trades, P&L, win rate, top strategy)
+- Interactive charts (cumulative P&L bar chart, win rate doughnut chart)
+- Detailed performance table with color-coded metrics
+- Top performer highlighting
+- Responsive design for mobile/desktop
 
 #### Send Test Email (Sample Data)
 ```bash
