@@ -203,7 +203,15 @@ jobs:
     - name: Generate daily email digest
       if: success()
       run: |
-        python3 scripts/generate_daily_email.py
+        # Check if today is Mon/Wed/Fri for visual reports
+        DAY_OF_WEEK=$(date +%u)  # 1=Mon, 3=Wed, 5=Fri
+        if [ "$DAY_OF_WEEK" = "1" ] || [ "$DAY_OF_WEEK" = "3" ] || [ "$DAY_OF_WEEK" = "5" ]; then
+          echo "📊 Generating email with strategy performance visuals (Mon/Wed/Fri)"
+          python3 scripts/generate_daily_email.py --include-visuals
+        else
+          echo "📧 Generating standard daily email"
+          python3 scripts/generate_daily_email.py
+        fi
     
     - name: Send daily digest email
       if: success()

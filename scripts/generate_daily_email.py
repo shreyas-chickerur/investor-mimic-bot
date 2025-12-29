@@ -41,8 +41,14 @@ def get_strategy_performance_today(db_path='trading.db'):
     
     return [dict(row) for row in results]
 
-def generate_email_body(artifact_path: str, db_path='trading.db') -> str:
-    """Generate HTML email body from artifact JSON"""
+def generate_email_body(artifact_path: str, db_path='trading.db', include_visuals=False) -> str:
+    """Generate HTML email body from artifact JSON
+    
+    Args:
+        artifact_path: Path to daily artifact JSON
+        db_path: Path to trading database
+        include_visuals: If True, embed strategy performance charts (Mon/Wed/Fri)
+    """
     
     with open(artifact_path) as f:
         data = json.load(f)
@@ -139,6 +145,17 @@ def generate_email_body(artifact_path: str, db_path='trading.db') -> str:
         positions_html += "</table>"
     else:
         positions_html = "<p style='color: #666; font-style: italic;'>No open positions</p>"
+    
+    # Load strategy chart if visuals are enabled
+    strategy_chart_html = ""
+    if include_visuals:
+        try:
+            chart_path = Path('/tmp/strategy_chart.html')
+            if chart_path.exists():
+                with open(chart_path) as f:
+                    strategy_chart_html = f.read()
+        except Exception as e:
+            print(f"Warning: Could not load strategy chart: {e}")
     
     # Build strategy performance table
     strategy_html = ""
@@ -242,6 +259,17 @@ def generate_email_body(artifact_path: str, db_path='trading.db') -> str:
             {strategy_html}
         </div>
         
+        <!-- Strategy Performance Charts (Mon/Wed/Fri only) -->
+        {f'''
+        <div style="margin-bottom: 30px;">
+            <h2 style="color: #2c5282; border-bottom: 2px solid #4A90E2; padding-bottom: 10px; font-size: 20px; font-weight: 600;">
+                Weekly Strategy Analysis
+            </h2>
+            <p style="color: #6b7280; margin-bottom: 15px;">7-day cumulative performance and 30-day win rate comparison</p>
+            {strategy_chart_html}
+        </div>
+        ''' if include_visuals and strategy_chart_html else ''}
+        
         <!-- Current Positions -->
         <div style="margin-bottom: 30px;">
             <h2 style="color: #2c5282; border-bottom: 2px solid #4A90E2; padding-bottom: 10px; font-size: 20px; font-weight: 600;">
@@ -263,6 +291,13 @@ def generate_email_body(artifact_path: str, db_path='trading.db') -> str:
     return html
 
 if __name__ == "__main__":
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Generate daily email digest')
+    parser.add_argument('--include-visuals', action='store_true', 
+                       help='Include strategy performance charts (Mon/Wed/Fri)')
+    args = parser.parse_args()
+    
     # Get today's artifact path
     date = datetime.now().strftime('%Y-%m-%d')
     artifact_path = Path(f'artifacts/json/{date}.json')
@@ -272,12 +307,14 @@ if __name__ == "__main__":
         sys.exit(1)
     
     # Generate email HTML
-    html = generate_email_body(str(artifact_path), db_path='trading.db')
+    html = generate_email_body(str(artifact_path), db_path='trading.db', 
+                              include_visuals=args.include_visuals)
     
     # Save to file for workflow to use
     output_path = '/tmp/daily_email.html'
     with open(output_path, 'w') as f:
         f.write(html)
     
-    print(f"✅ Email HTML generated: {output_path}")
+    visual_status = "with visuals" if args.include_visuals else "standard"
+    print(f"✅ Email HTML generated ({visual_status}): {output_path}")
     sys.exit(0)
