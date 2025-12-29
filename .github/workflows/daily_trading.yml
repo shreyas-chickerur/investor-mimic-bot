@@ -185,6 +185,16 @@ jobs:
           logs/
         retention-days: 90
     
+    - name: Generate strategy performance report
+      if: success()
+      run: |
+        python3 scripts/generate_strategy_performance.py --days 30
+    
+    - name: Generate strategy performance chart
+      if: success()
+      run: |
+        python3 scripts/generate_strategy_chart.py --days 7
+    
     - name: Generate performance chart
       if: success()
       run: |
