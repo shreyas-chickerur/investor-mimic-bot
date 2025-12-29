@@ -19,7 +19,7 @@ MODULES = [
     "database",
     "artifact_writer",
     "scripts.generate_email_chart",
-    "scripts.generate_validation_plots",
+    "scripts.check_broker_state",
 ]
 
 
