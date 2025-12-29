@@ -382,11 +382,15 @@ python3 scripts/serve_dashboard.py
 - Top performer highlighting
 - Responsive design for mobile/desktop
 
-#### Send Test Email (Sample Data)
+#### Send Sample Email (Mock Data)
 ```bash
-python3 scripts/test_email.py
+# Standard daily email
+python3 examples/send_sample_email.py
+
+# Weekly email with visuals (Mon/Wed/Fri style)
+python3 examples/send_sample_email.py --include-visuals
 ```
-Sends email with pre-defined sample data (5 trades, 7 positions, 2 warnings)
+Generates sample email with mock data (4 trades, 4 positions, strategy performance)
 
 #### Send Test Email (Current Data)
 ```bash
