@@ -152,9 +152,14 @@ This is a **production-ready quantitative trading system** designed for automate
 - Full audit trail in logs and database
 
 **Regime Detection (VIX-based):**
-- **NORMAL:** VIX < 20 → All strategies active, 30% heat limit
-- **HIGH_VOL:** VIX 20-30 → Reduce position sizes, 25% heat limit
-- **CRISIS:** VIX > 30 → Defensive mode, 20% heat limit, disable momentum strategies
+- **NORMAL:** VIX < 20 → All strategies active, 30% heat limit, 60-day correlation window
+- **HIGH_VOL:** VIX 20-30 → Reduce position sizes, 25% heat limit, 20-day correlation window
+- **CRISIS:** VIX > 30 → Defensive mode, 20% heat limit, 20-day correlation window, disable momentum strategies
+
+**Adaptive Risk Controls:**
+- Regime-dependent portfolio heat limits automatically adjust
+- Correlation filter uses shorter windows in volatile markets
+- Multi-window correlation detection catches regime shifts
 
 ---
 
