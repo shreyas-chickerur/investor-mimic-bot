@@ -12,6 +12,27 @@
 
 This is a **production-ready quantitative trading system** designed for automated paper trading with Alpaca Markets. The system runs 5 independent trading strategies simultaneously, each with its own capital allocation, risk controls, and performance tracking.
 
+### 🎯 Key Features
+
+### **5 Trading Strategies:**
+- **RSI Mean Reversion** - Conditional reversion with RSI slope, VWAP proximity, multi-conditional exits
+- **MA Crossover (Trend Following)** - 20/50 MA crossover with volume confirmation
+- **Volatility Breakout** - Bollinger Band breakouts with volume surge
+- **Momentum** - 20-day momentum with trend confirmation
+- **ML Predictive** - Logistic regression classifier with 10+ features
+
+### **Critical Safety Features:**
+- **Catastrophe Stop Losses** - 3x ATR stops on all positions, automatic execution
+- **Data Quality Validation** - 5 comprehensive checks before trading
+- **Critical Alerting** - Email alerts for drawdown (>15%), no-trade (>7d), reconciliation failures, database integrity
+- **Portfolio Heat Limits** - Regime-dependent (30%/25%/20%)
+- **Daily Loss Circuit Breaker** - Halts trading at -2% daily loss
+- **Regime Detection** - VIX-based market regime adaptation (NORMAL/HIGH_VOL/CRISIS)
+- **Broker Reconciliation** - Automated position/cash verification before every execution
+- **Execution Cost Modeling** - Realistic slippage (0.05%) and commission ($1/trade) simulation
+- **Strategy Performance Tracking** - Per-strategy metrics, rankings, and visual analytics
+- **Web Dashboard UI** - Beautiful interactive dashboard with charts and performance tables
+
 ### Key Features
 
 - **5 Trading Strategies** - RSI Mean Reversion, ML Momentum, News Sentiment, MA Crossover, Volatility Breakout
@@ -160,6 +181,15 @@ This is a **production-ready quantitative trading system** designed for automate
 - Regime-dependent portfolio heat limits automatically adjust
 - Correlation filter uses shorter windows in volatile markets
 - Multi-window correlation detection catches regime shifts
+- ATR-based position sizing (1% portfolio risk per trade)
+- Execution cost modeling (slippage + commission)
+
+**Backtesting Infrastructure:**
+- Walk-forward validation framework (2yr train, 6mo test, 6mo step)
+- Portfolio-level metrics (Sharpe, Sortino, Calmar, drawdown)
+- Historical data fetcher (15 years, 36 stocks + VIX)
+- Performance reports and plots (equity, drawdown, rolling Sharpe)
+- Stress testing across major market events (2008, 2020, 2022)
 
 ---
 

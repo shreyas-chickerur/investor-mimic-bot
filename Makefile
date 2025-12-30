@@ -1,6 +1,6 @@
 .PHONY: help install run dashboard test clean sync-db view-performance analyze-signals import-check \
 	perf-report perf-chart perf-dashboard email-daily email-weekly email-sample \
-	validate verify-system check-broker debug-signal backtest
+	validate verify-system check-broker debug-signal backtest fetch-backtest-data run-backtest
 
 # Default target
 help:
@@ -31,6 +31,11 @@ help:
 	@echo "🐛 ANALYSIS & DEBUGGING:"
 	@echo "  make debug-signal     - Debug single signal flow"
 	@echo "  make backtest         - Run validation backtest"
+	@echo ""
+	@echo "📊 BACKTESTING:"
+	@echo "  make fetch-backtest-data  - Fetch 15 years historical data"
+	@echo "  make run-backtest         - Run walk-forward backtest"
+	@echo "  make backtest-full        - Fetch data + run backtest"
 	@echo ""
 	@echo "📊 MONITORING:"
 	@echo "  make view             - View strategy performance (CLI)"
@@ -207,6 +212,36 @@ debug-signal:
 backtest:
 	@echo "📊 Running validation backtest..."
 	python3 scripts/run_validation_backtest.py
+
+# Backtesting with historical data
+fetch-backtest-data:
+	@echo "📥 Fetching 15 years of historical data..."
+	@echo "   - 36 large-cap stocks"
+	@echo "   - VIX data for regime detection"
+	@echo "   - Using yfinance API"
+	@echo ""
+	python3 scripts/fetch_backtest_data.py
+	@echo ""
+	@echo "✅ Historical data saved to data/backtest_data.csv"
+
+run-backtest:
+	@echo "📊 Running walk-forward backtest..."
+	@echo "   - Training: 2 years"
+	@echo "   - Testing: 6 months"
+	@echo "   - Step: 6 months"
+	@echo ""
+	python3 scripts/run_backtest.py
+	@echo ""
+	@echo "✅ Results saved to artifacts/backtest/"
+
+backtest-full: fetch-backtest-data run-backtest
+	@echo ""
+	@echo "🎉 Complete backtesting finished!"
+	@echo "📊 View results:"
+	@echo "   - Report: artifacts/backtest/performance_report.md"
+	@echo "   - Equity: artifacts/backtest/equity_curve.png"
+	@echo "   - Drawdown: artifacts/backtest/drawdown.png"
+	@echo "   - Sharpe: artifacts/backtest/rolling_sharpe.png"
 
 # Development helpers
 dev-dashboard:
