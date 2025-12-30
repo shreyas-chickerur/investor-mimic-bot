@@ -682,6 +682,15 @@ class MultiStrategyRunner:
                     total_exposure += trade_value
                     self.performance_metrics.add_trade('BUY', symbol, shares, exec_price, trade_value)
                     self._update_position_record(strategy.strategy_id, symbol, shares, exec_price)
+                    
+                    # CRITICAL: Set stop loss for new position
+                    atr = signal.get('atr', 0)
+                    if atr and atr > 0:
+                        self.stop_loss_manager.set_stop_loss(symbol, exec_price, atr)
+                        stop_price = self.stop_loss_manager.get_stop_price(symbol)
+                        logger.info(f"Stop loss set for {symbol}: ${stop_price:.2f} (3x ATR from ${exec_price:.2f})")
+                    else:
+                        logger.warning(f"No ATR available for {symbol}, stop loss not set")
 
                     # Log trade with full execution details
                     signal_id = signal.get('signal_id')
@@ -759,7 +768,11 @@ class MultiStrategyRunner:
                         strategy.positions[symbol] -= shares
                         if strategy.positions[symbol] <= 0:
                             del strategy.positions[symbol]
-                            strategy.entry_dates.pop(symbol, None)
+                            if symbol in strategy.entry_dates:
+                                del strategy.entry_dates[symbol]
+                            # Remove stop loss when position is fully closed
+                            self.stop_loss_manager.remove_stop_loss(symbol)
+                            logger.info(f"Stop loss removed for {symbol} (position closed)")
                             total_exposure = max(total_exposure - trade_value, 0)
                     self._update_position_record(strategy.strategy_id, symbol, -shares, exec_price)
                     

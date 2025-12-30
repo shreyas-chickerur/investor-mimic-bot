@@ -143,6 +143,14 @@ This is a **production-ready quantitative trading system** designed for automate
 - **Position Sizing:** ATR-based, 1% portfolio risk per trade
 - **Execution Costs:** 0.05% slippage + $1 commission per trade
 
+**Catastrophe Stop Losses:**
+- 3x ATR stop losses on all positions
+- Automatic execution when stops are hit
+- Prevents single position from causing >25% loss
+- Set automatically when positions are opened
+- Removed automatically when positions are closed
+- Full audit trail in logs and database
+
 **Regime Detection (VIX-based):**
 - **NORMAL:** VIX < 20 → All strategies active, 30% heat limit
 - **HIGH_VOL:** VIX 20-30 → Reduce position sizes, 25% heat limit
