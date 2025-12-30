@@ -114,6 +114,11 @@ class MultiStrategyRunner:
         self.performance_metrics = PerformanceMetrics()
         self.broker_reconciler = BrokerReconciler(email_notifier=self.email_notifier)
         
+        # Initialize stop loss manager (3x ATR catastrophe stops)
+        from stop_loss_manager import StopLossManager
+        self.stop_loss_manager = StopLossManager(atr_multiplier=3.0)
+        logger.info("Stop Loss Manager initialized: 3x ATR catastrophe stops enabled")
+        
         # Set daily start value for risk management
         self.portfolio_risk.set_daily_start_value(self.portfolio_value)
         
@@ -337,10 +342,109 @@ class MultiStrategyRunner:
         logger.info(f"Loaded {len(df)} rows for {df['symbol'].nunique()} symbols")
         return df
     
+    def check_stop_losses(self, market_data):
+        """
+        Check all positions for catastrophe stop losses
+        Returns list of positions that hit stops
+        """
+        positions_to_close = []
+        current_prices = self._get_last_close_map(market_data)
+        
+        # Get all current positions from database
+        all_positions = self.db.get_positions()
+        
+        for position in all_positions:
+            symbol = position['symbol']
+            strategy_id = position['strategy_id']
+            
+            if symbol not in current_prices:
+                logger.warning(f"No current price for {symbol}, skipping stop check")
+                continue
+            
+            current_price = current_prices[symbol]
+            
+            # Check if stop loss is hit
+            if self.stop_loss_manager.check_stop_loss(symbol, current_price):
+                stop_price = self.stop_loss_manager.get_stop_price(symbol)
+                logger.warning(f"CATASTROPHE STOP HIT: {symbol} at ${current_price:.2f} "
+                             f"(stop: ${stop_price:.2f}, entry: ${position.get('entry_price', 0):.2f})")
+                
+                positions_to_close.append({
+                    'symbol': symbol,
+                    'strategy_id': strategy_id,
+                    'shares': position['shares'],
+                    'current_price': current_price,
+                    'stop_price': stop_price,
+                    'entry_price': position.get('entry_price', 0),
+                    'reason': 'CATASTROPHE_STOP_LOSS'
+                })
+        
+        return positions_to_close
+    
+    def execute_stop_loss_exits(self, positions_to_close):
+        """
+        Execute sell orders for positions that hit stop losses
+        """
+        for position in positions_to_close:
+            try:
+                symbol = position['symbol']
+                shares = abs(position['shares'])
+                
+                logger.info(f"Executing stop loss exit: SELL {shares} {symbol}")
+                
+                # Create market order to close position
+                order_data = MarketOrderRequest(
+                    symbol=symbol,
+                    qty=shares,
+                    side=OrderSide.SELL,
+                    time_in_force=TimeInForce.DAY
+                )
+                
+                order = self.trading_client.submit_order(order_data)
+                
+                # Record the trade
+                self.db.record_trade(
+                    strategy_id=position['strategy_id'],
+                    signal_id=None,
+                    symbol=symbol,
+                    action='SELL',
+                    shares=shares,
+                    requested_price=position['current_price'],
+                    exec_price=position['current_price'],
+                    slippage_cost=0.0,
+                    commission_cost=0.0,
+                    total_cost=0.0,
+                    notional=shares * position['current_price'],
+                    order_id=str(order.id),
+                    executed_at=datetime.now().isoformat()
+                )
+                
+                # Remove stop loss tracking
+                self.stop_loss_manager.remove_stop_loss(symbol)
+                
+                logger.info(f"Stop loss exit executed: {symbol} order {order.id}")
+                
+            except Exception as e:
+                logger.error(f"Error executing stop loss exit for {symbol}: {e}")
+                self.errors.append(f"Stop loss exit failed for {symbol}: {e}")
+    
     def run_all_strategies(self, market_data):
         """Run all strategies and execute trades"""
         strategies = self.initialize_strategies()
         self.raw_signals_by_strategy = {}
+        
+        # CRITICAL: Check stop losses BEFORE generating new signals
+        logger.info("=" * 80)
+        logger.info("CHECKING CATASTROPHE STOP LOSSES")
+        logger.info("=" * 80)
+        positions_to_close = self.check_stop_losses(market_data)
+        
+        if positions_to_close:
+            logger.warning(f"Found {len(positions_to_close)} positions at stop loss")
+            self.execute_stop_loss_exits(positions_to_close)
+        else:
+            logger.info("No stop losses triggered")
+        logger.info("=" * 80)
         self.executed_signals = []
         self.reconciliation_status = "SKIPPED"
         self.reconciliation_discrepancies = []

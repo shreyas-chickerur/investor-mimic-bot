@@ -103,6 +103,10 @@ class TradingDatabase:
                 current_price REAL,
                 market_value REAL,
                 unrealized_pnl REAL,
+                entry_price REAL,
+                entry_date TEXT,
+                atr REAL,
+                stop_loss_price REAL,
                 last_updated TEXT NOT NULL,
                 FOREIGN KEY (strategy_id) REFERENCES strategies(id),
                 UNIQUE(strategy_id, symbol)
