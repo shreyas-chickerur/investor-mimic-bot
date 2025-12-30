@@ -51,15 +51,28 @@ def test_volatility_breakout_strategy(market_data):
     assert signals is not None
     assert isinstance(signals, list)
 
-def test_strategy(strategy_class, name, market_data):
-    """Run a single strategy and return signal count."""
-    logger.info(f"\nTesting {name}...")
+@pytest.mark.parametrize("strategy_name", ["RSI", "Trend", "Breakout"])
+def test_strategy(strategy_name, market_data):
+    """Run a single strategy and verify signal generation."""
+    logger.info(f"\nTesting {strategy_name}...")
+    if strategy_name == "RSI":
+        strategy_class = RSIMeanReversionStrategy
+    elif strategy_name == "Trend":
+        strategy_class = MACrossoverStrategy
+    elif strategy_name == "Breakout":
+        strategy_class = VolatilityBreakoutStrategy
+    else:
+        raise ValueError("Invalid strategy name")
+    
     strategy = strategy_class(1, 20000)
     recent_data = market_data.groupby("symbol", group_keys=False).tail(1000)
     signals = strategy.generate_signals(recent_data)
     count = len(signals) if signals else 0
     logger.info(f"Generated {count} signals")
-    return count
+    
+    # Assert instead of return
+    assert signals is not None
+    assert isinstance(signals, list)
 
 def main():
     """Test all strategies"""

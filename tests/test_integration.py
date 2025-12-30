@@ -137,10 +137,11 @@ def test_correlation_filter():
     cf.update_price_history('AAPL', pd.Series(base_prices))
     cf.update_price_history('MSFT', pd.Series(correlated_prices))
     
-    # Check correlation
-    is_acceptable, corr, symbol = cf.check_correlation('MSFT', ['AAPL'])
+    # Test correlation filter
+    existing_positions = {'AAPL': 100}
+    should_filter, reason, correlations = cf.should_filter_signal('MSFT', existing_positions)
     
-    print(f"✅ Correlation check: corr={corr:.2f}, acceptable={is_acceptable}")
+    print(f"✅ Correlation check: should_filter={should_filter}, reason={reason}")
     
 
 def test_portfolio_risk():
