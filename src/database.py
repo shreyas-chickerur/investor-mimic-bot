@@ -62,8 +62,11 @@ class TradingDatabase:
             )
         ''')
         
-        # Add index on run_id for performance
+        # Create indexes for common queries (Phase 3.1 optimization)
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_signals_run_id ON signals(run_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_signals_symbol ON signals(symbol)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_signals_terminal_state ON signals(terminal_state)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_signals_generated_at ON signals(generated_at)')
         
         # Trades table with execution costs
         cursor.execute('''

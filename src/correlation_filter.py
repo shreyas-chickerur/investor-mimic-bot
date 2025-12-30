@@ -107,39 +107,49 @@ class CorrelationFilter:
         
         return long_corr, short_corr
     
-    def check_correlation(self, new_symbol: str, existing_symbols: List[str]) -> tuple:
+    def should_filter_signal(self, signal_symbol: str, existing_positions: Dict[str, float], 
+                           regime: str = "NORMAL") -> tuple:
         """
-        Check if new symbol is too correlated with existing positions
-        Uses both long and short windows to catch regime shifts
+        Check if signal should be filtered due to correlation
+        Uses adaptive windows based on market regime
         
         Args:
-            new_symbol: Symbol to check
-            existing_symbols: List of currently held symbols
+            signal_symbol: Symbol of new signal
+            existing_positions: Dict of {symbol: shares} for existing positions
+            regime: Market regime (NORMAL, HIGH_VOL, CRISIS)
             
         Returns:
-            (is_acceptable, max_correlation_found, correlated_symbol)
+            (should_filter: bool, reason: str, correlations: dict)
         """
-        if not existing_symbols:
-            return True, 0.0, None
+        if not existing_positions:
+            return False, "No existing positions", {}
         
-        max_corr = 0.0
-        max_corr_symbol = None
+        correlations = {}
+        use_short_window = regime in ["HIGH_VOL", "CRISIS"]
         
-        for existing_symbol in existing_symbols:
-            long_corr, short_corr = self.calculate_correlation_multi_window(new_symbol, existing_symbol)
+        for pos_symbol in existing_positions.keys():
+            if pos_symbol == signal_symbol:
+                continue
             
-            # Track maximum correlation
-            if abs(long_corr) > abs(max_corr):
-                max_corr = long_corr
-                max_corr_symbol = existing_symbol
+            # Use adaptive windows based on regime
+            if use_short_window:
+                long_corr, short_corr = self.calculate_correlation_multi_window(signal_symbol, pos_symbol)
+                # In volatile regimes, use short window to detect rapid correlation changes
+                corr = short_corr if abs(short_corr) > 0.1 else long_corr
+                correlations[pos_symbol] = {'long': long_corr, 'short': short_corr, 'used': corr}
+            else:
+                corr = self.calculate_correlation(signal_symbol, pos_symbol)
+                correlations[pos_symbol] = {'long': corr, 'short': None, 'used': corr}
             
-            # Reject if EITHER window exceeds threshold (catches regime shifts)
-            if abs(long_corr) > self.max_correlation or abs(short_corr) > self.max_correlation:
-                logger.warning(f"Rejecting {new_symbol}: correlation with {existing_symbol} "
-                             f"(60d: {long_corr:.2f}, 20d: {short_corr:.2f}) exceeds {self.max_correlation}")
-                return False, max(abs(long_corr), abs(short_corr)), existing_symbol
+            used_corr = correlations[pos_symbol]['used']
+            
+            if abs(used_corr) > self.max_correlation:
+                window_type = "short" if use_short_window else "long"
+                reason = f"High correlation with {pos_symbol}: {used_corr:.2f} ({window_type} window, regime: {regime})"
+                logger.warning(f"Filtering {signal_symbol}: {reason}")
+                return True, reason, correlations
         
-        return True, max_corr, max_corr_symbol
+        return False, "Passed correlation filter", correlations
     
     def filter_signals(self, 
                       signals: List[Dict],
