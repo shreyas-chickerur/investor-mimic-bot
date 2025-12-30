@@ -1,248 +1,614 @@
 # Makefile Command Reference
 
-Complete guide to all available commands for the Multi-Strategy Trading System.
+Complete guide to all available commands for the Multi-Strategy Trading System. Each command includes prerequisites, usage, and expected outcomes.
 
 ---
 
 ## 🚀 Main Commands
 
 ### `make run`
-Run all 5 trading strategies simultaneously.
+**Purpose:** Execute all 5 trading strategies with live broker integration
+
+**Before running:**
+- Run `make init` and `make fetch-data` first
+- Ensure `ALPACA_API_KEY` and `ALPACA_SECRET_KEY` are set in `.env`
+- Check broker state: `make check-broker`
+- Verify market data is current: `make update-data`
+
+**Command:**
 ```bash
 make run
 ```
-- Executes multi-strategy system
-- Scans 36 stocks across all strategies
-- Places trades based on signals
-- Logs all activity
+
+**After running:**
+- Trades executed and recorded in database
+- Artifacts generated in `artifacts/json/` and `artifacts/markdown/`
+- Check results: `make view` or `make perf-report`
+- Review logs: `make logs`
+
+---
 
 ### `make dashboard`
-Open the web-based monitoring dashboard.
+**Purpose:** Open the web-based monitoring dashboard
+
+**Before running:**
+- Ensure port 5000 is available
+- Database should have execution data for meaningful display
+
+**Command:**
 ```bash
 make dashboard
 ```
-- Starts Flask server on http://localhost:5000
-- Real-time strategy performance
+
+**After running:**
+- Server starts on http://localhost:5000
+- Real-time strategy performance displayed
 - Auto-refreshes every 30 seconds
-- Shows trades, positions, and returns
+- Press Ctrl+C to stop server
+
+---
 
 ### `make analyze`
-Analyze all strategies for current signals.
+**Purpose:** Analyze all strategies for signals (dry-run, no trading)
+
+**Before running:**
+- Requires market data: `make fetch-data` or `make update-data`
+- No trades will be executed
+
+**Command:**
 ```bash
 make analyze
 ```
-- Scans market for opportunities
-- Shows signals from all 5 strategies
-- Displays top candidates
-- No trades executed (analysis only)
+
+**After running:**
+- Shows signals each strategy would generate
+- Use to test strategy logic without trading
+- Review signal quality before live execution
 
 ---
 
 ## 📈 Monitoring Commands
 
 ### `make view`
-View strategy performance in terminal.
+**Purpose:** View strategy performance dashboard (CLI)
+
+**Before running:**
+- Requires database with trade history
+- Run `make run` first for meaningful data
+
+**Command:**
 ```bash
 make view
 ```
-- CLI-based performance dashboard
-- Shows all 5 strategies
-- Individual P&L and metrics
-- Recent trades and signals
+
+**After running:**
+- Shows performance summary for all strategies
+- Displays recent trades and signals
+- Use regularly to monitor system health
+
+---
 
 ### `make logs`
-View recent trading logs.
+**Purpose:** View recent trading logs (last 50 lines)
+
+**Before running:**
+- Logs must exist in `logs/multi_strategy.log`
+- Run `make run` to generate logs
+
+**Command:**
 ```bash
 make logs
 ```
-- Shows last 50 log entries
-- Trading execution details
-- Error messages if any
+
+**After running:**
+- Shows last 50 log lines
+- Use to debug issues or verify execution
+- Full logs in `logs/multi_strategy.log`
+
+---
 
 ### `make positions`
-Check current Alpaca positions.
+**Purpose:** Check current Alpaca positions
+
+**Before running:**
+- Ensure Alpaca credentials are set in `.env`
+
+**Command:**
 ```bash
 make positions
 ```
+
+**After running:**
 - Lists all open positions
-- Shows shares and entry prices
-- Direct from Alpaca API
+- Shows symbol, quantity, entry price
+- Use to verify broker state
 
 ---
 
 ## 🔧 Setup & Maintenance
 
-### `make install`
-Install all dependencies.
+### `make init`
+**Purpose:** Initialize database schema with all required tables
+
+**Before running:**
+- Ensure `.env` file exists with required credentials
+- No prior setup needed
+
+**Command:**
 ```bash
-make install
+make init
 ```
-- Installs Python packages from requirements.txt
-- One-time setup command
+
+**After running:**
+- `trading.db` file created in project root
+- All tables (strategies, signals, trades, positions, etc.) initialized
+- Verify: `ls -lh trading.db` should show the database file
+
+---
+
+### `make fetch-data`
+**Purpose:** Fetch 15 years of historical market data for all 36 stocks
+
+**Before running:**
+- Run `make init` first
+- Ensure `ALPHA_VANTAGE_API_KEY` is set in `.env`
+- Premium API key recommended for faster fetching
+
+**Command:**
+```bash
+make fetch-data
+```
+
+**After running:**
+- Takes ~18 seconds with premium API
+- Market data stored in `trading.db`
+- Verify: `sqlite3 trading.db "SELECT COUNT(*) FROM market_data;"`
+
+---
 
 ### `make sync-db`
-Sync database with Alpaca positions.
+**Purpose:** Sync local database with Alpaca broker state
+
+**Before running:**
+- Ensure Alpaca credentials are set
+- Database must exist: `make init`
+
+**Command:**
 ```bash
 make sync-db
 ```
-- Reconciles local database with Alpaca
-- Fixes any discrepancies
-- Run if positions don't match
+
+**After running:**
+- Local positions updated from broker
+- Cash balance synchronized
+- Use after manual broker changes
+
+---
 
 ### `make update-data`
-Update market data.
+**Purpose:** Update market data with latest prices
+
+**Before running:**
+- Requires `ALPHA_VANTAGE_API_KEY`
+- Database must exist
+
+**Command:**
 ```bash
 make update-data
 ```
-- Fetches latest stock data
-- Updates training_data.csv
-- Run if data is stale
+
+**After running:**
+- Latest market data fetched
+- Database updated with new prices
+- Run before `make run` for current data
 
 ---
 
 ## 🧪 Testing Commands
 
 ### `make test`
-Run all tests.
+**Purpose:** Run all tests (pytest)
+
+**Before running:**
+- Install pytest: `pip install pytest`
+- No other prerequisites
+
+**Command:**
 ```bash
 make test
 ```
-- Runs pytest on all test files
-- Comprehensive test suite
-- Shows pass/fail results
+
+**After running:**
+- All tests executed
+- Shows pass/fail for each test
+- Fix any failures before deployment
+
+---
 
 ### `make test-single`
-Test single RSI strategy.
+**Purpose:** Test single strategy execution
+
+**Before running:**
+- Database and market data required
+
+**Command:**
 ```bash
 make test-single
 ```
-- Tests core trading system
-- Validates signal generation
-- Quick sanity check
+
+**After running:**
+- Single strategy tested in isolation
+- Use to debug strategy-specific issues
+
+---
 
 ### `make test-multi`
-Test multi-strategy system.
+**Purpose:** Test multi-strategy integration
+
+**Before running:**
+- Database and market data required
+
+**Command:**
 ```bash
 make test-multi
 ```
-- Tests all 5 strategies
-- Alpaca integration tests
-- Full system validation
+
+**After running:**
+- Tests all strategies working together
+- Verifies portfolio-level risk management
 
 ---
 
 ## 🧹 Cleanup Commands
 
 ### `make clean`
-Clean logs and temporary files.
+**Purpose:** Clean logs and temporary files
+
+**Before running:**
+- No prerequisites
+- Safe to run anytime
+
+**Command:**
 ```bash
 make clean
 ```
-- Removes log files
-- Deletes Python cache
-- Keeps databases intact
+
+**After running:**
+- Logs cleared from `logs/`
+- Python cache files removed
+- Temporary files deleted
+
+---
 
 ### `make clean-all`
-Deep clean including databases.
+**Purpose:** Deep clean including databases (⚠️ DESTRUCTIVE)
+
+**Before running:**
+- ⚠️ **WARNING:** Deletes all databases
+- Backup `trading.db` if needed
+
+**Command:**
 ```bash
 make clean-all
 ```
-- Removes all logs
-- Deletes databases
-- Fresh start (use with caution)
+
+**After running:**
+- All databases deleted
+- Logs and cache cleared
+- Run `make init` to reinitialize
 
 ---
 
-## 🔐 Helper Commands
+## ✅ System Validation Commands
 
-### `make check-secrets`
-Verify API credentials are set.
-```bash
-make check-secrets
-```
-- Checks .env file
-- Validates Alpaca keys
-- Shows what's missing
+### `make validate`
+**Purpose:** Validate system invariants and data integrity
 
-### `make quickstart`
-Show quick start guide.
+**Before running:**
+- Requires database with execution data
+- Run after `make run`
+
+**Command:**
 ```bash
-make quickstart
+make validate
 ```
-- Displays setup steps
-- Helpful for first-time users
+
+**After running:**
+- Checks 6 system invariants
+- Reports PASS/FAIL for each
+- Review output for any failures
 
 ---
 
-## 📊 Development Commands
+### `make verify-system`
+**Purpose:** Verify execution criteria and reconciliation
 
-### `make run-single`
-Run only the RSI strategy (legacy).
-```bash
-make run-single
-```
-- Single strategy mode
-- For testing/debugging
-- Uses src/main.py
+**Before running:**
+- Requires completed execution
+- Database must have latest run data
 
-### `make dev-dashboard`
-Start dashboard in development mode.
+**Command:**
 ```bash
-make dev-dashboard
+make verify-system
 ```
-- Flask debug mode enabled
-- Auto-reloads on code changes
-- For development only
+
+**After running:**
+- Verifies signals have terminal states
+- Checks reconciliation passed
+- Confirms artifact generation
+
+---
+
+### `make check-broker`
+**Purpose:** Display current broker state (positions, cash, portfolio value)
+
+**Before running:**
+- Ensure Alpaca credentials are set
+- No other prerequisites
+
+**Command:**
+```bash
+make check-broker
+```
+
+**After running:**
+- Shows current positions and cash
+- Displays portfolio value
+- Use before/after trading to verify state
+
+---
+
+### `make import-check`
+**Purpose:** Verify all Python modules load correctly
+
+**Before running:**
+- Run after any code changes
+- Ensures dependencies are installed
+
+**Command:**
+```bash
+make import-check
+```
+
+**After running:**
+- Reports success or import errors
+- Fix any missing dependencies before running system
+
+---
+
+## 📊 Strategy Performance Commands
+
+### `make perf-report`
+**Purpose:** Generate comprehensive 30-day strategy performance report
+
+**Before running:**
+- Requires trades in database (run `make run` first)
+- No prerequisites for first-time use (will show "No trades")
+
+**Command:**
+```bash
+make perf-report
+```
+
+**After running:**
+- Report printed to console
+- Data saved to `/tmp/strategy_performance.json`
+- Shows: P&L, win rates, Sharpe ratios, profit factors
+
+---
+
+### `make perf-chart`
+**Purpose:** Generate visual performance charts (7-day cumulative P&L and win rates)
+
+**Before running:**
+- Requires trades in database
+- Install matplotlib if not present
+
+**Command:**
+```bash
+make perf-chart
+```
+
+**After running:**
+- Chart saved to `/tmp/strategy_chart.html`
+- Embedded base64 image ready for email
+- Open in browser to view
+
+---
+
+### `make perf-dashboard`
+**Purpose:** Start interactive web dashboard for strategy performance
+
+**Before running:**
+- Ensure port 8080 is available
+- Run `make perf-report` first to generate data
+
+**Command:**
+```bash
+make perf-dashboard
+```
+
+**After running:**
+- Server starts on http://localhost:8080
+- Open http://localhost:8080/dashboard/strategy_performance.html
+- Press Ctrl+C to stop server
+
+---
+
+## 📧 Email & Notification Commands
+
+### `make email-daily`
+**Purpose:** Generate daily email digest (standard format)
+
+**Before running:**
+- Requires today's artifact: run `make run` first
+- Artifact must exist in `artifacts/json/YYYY-MM-DD.json`
+
+**Command:**
+```bash
+make email-daily
+```
+
+**After running:**
+- Email HTML generated at `/tmp/daily_email.html`
+- Open in browser to preview
+- Contains: portfolio metrics, trades, positions, strategy performance
+
+---
+
+### `make email-weekly`
+**Purpose:** Generate weekly email with embedded performance charts
+
+**Before running:**
+- Run `make perf-chart` first to generate charts
+- Requires today's artifact
+
+**Command:**
+```bash
+make email-weekly
+```
+
+**After running:**
+- Email HTML with charts at `/tmp/daily_email.html`
+- Includes 7-day performance visualizations
+- Larger file size due to embedded images
+
+---
+
+### `make email-sample`
+**Purpose:** Generate sample email with mock data (for testing)
+
+**Before running:**
+- No prerequisites - uses mock data
+
+**Command:**
+```bash
+make email-sample
+```
+
+**After running:**
+- Sample email at `/tmp/sample_email.html`
+- Shows example format with realistic data
+- Use to preview email design
+
+---
+
+## 🐛 Analysis & Debugging Commands
+
+### `make debug-signal`
+**Purpose:** Debug single signal flow with detailed tracing
+
+**Before running:**
+- Requires specific signal to debug
+- May need to modify script for target signal
+
+**Command:**
+```bash
+make debug-signal
+```
+
+**After running:**
+- Detailed trace of signal lifecycle
+- Shows why signal was accepted/rejected
+- Use for troubleshooting signal issues
+
+---
+
+### `make backtest`
+**Purpose:** Run validation backtest on historical data
+
+**Before running:**
+- Requires historical data: `make fetch-data`
+- Takes several minutes to complete
+
+**Command:**
+```bash
+make backtest
+```
+
+**After running:**
+- Backtest results in console
+- Performance metrics calculated
+- Use to validate strategy performance
 
 ---
 
 ## 💡 Common Workflows
 
-### First Time Setup
+### First-time Setup
 ```bash
-make install          # Install dependencies
-make sync-db          # Sync with Alpaca
-make run              # Run strategies
-make dashboard        # View results
+make init          # Initialize database
+make fetch-data    # Get historical data (15 years, ~18 seconds)
+make check-broker  # Verify broker connection
 ```
 
-### Daily Monitoring
+### Daily Workflow
 ```bash
-make dashboard        # Open web dashboard
-# Or
-make view            # CLI dashboard
+make check-broker  # Check current state
+make update-data   # Get latest prices
+make run           # Execute strategies
+make view          # View results
 ```
 
-### Before Trading
+### Performance Analysis
 ```bash
-make analyze         # Check for signals
-make positions       # Verify current positions
-make run            # Execute trades
+make perf-report      # Generate 30-day report
+make perf-chart       # Create charts
+make perf-dashboard   # View interactive dashboard
+```
+
+### Email Generation
+```bash
+make run              # Execute trades first
+make perf-chart       # Generate charts
+make email-weekly     # Generate email with visuals
+# Open /tmp/daily_email.html to preview
 ```
 
 ### Troubleshooting
 ```bash
-make logs           # Check for errors
-make sync-db        # Fix database issues
-make check-secrets  # Verify credentials
+make import-check  # Verify imports
+make logs          # Check logs
+make validate      # Verify system health
+make check-broker  # Verify broker state
+```
+
+### Testing Before Live Trading
+```bash
+make analyze       # Dry-run signal analysis
+make email-sample  # Preview email format
+make test          # Run all tests
 ```
 
 ---
 
 ## 🎯 Tips
 
-1. **Use `make help`** - Shows all available commands
-2. **Dashboard is best** - Web interface easier than CLI
-3. **Sync regularly** - Run `make sync-db` if positions look wrong
-4. **Check logs** - `make logs` shows what happened
-5. **Test first** - Use `make analyze` before `make run`
+1. **Use `make help`** - Shows all available commands with categories
+2. **Check prerequisites** - Each command lists what's needed before running
+3. **Review outputs** - Each command tells you what to check after running
+4. **Start simple** - Use `make init`, `make fetch-data`, then `make run`
+5. **Monitor regularly** - Use `make view` or `make perf-dashboard` daily
+6. **Test first** - Use `make analyze` before `make run` to see signals
+7. **Backup data** - Before `make clean-all`, backup `trading.db`
 
 ---
 
 ## 📝 Notes
 
-- All commands run from project root
-- Requires `.env` file with Alpaca credentials
-- Dashboard runs on port 5000
+- All commands run from project root directory
+- Requires `.env` file with Alpaca and Alpha Vantage credentials
+- Main dashboard runs on port 5000, performance dashboard on port 8080
 - Logs saved in `logs/` directory
-- Databases in `data/` directory
+- Database: `trading.db` in project root
+- Artifacts saved in `artifacts/json/` and `artifacts/markdown/`
+- Email previews saved to `/tmp/` directory
+
+---
+
+## 🔗 Related Documentation
+
+- [Main README](../../README.md) - Complete system documentation
+- [Quick Start Guide](QUICK_START.md) - Getting started tutorial
+- [Scripts Reference](SCRIPTS_AND_COMMANDS.md) - Direct script usage
+- [GitHub Actions Setup](../github-actions/GITHUB_ACTIONS_SETUP.md) - Automated execution
