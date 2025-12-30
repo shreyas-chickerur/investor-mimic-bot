@@ -7,6 +7,7 @@ Tests the automated workflow and Alpaca API integration
 
 import sys
 import os
+from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src'))
 
@@ -102,19 +103,18 @@ class TestWorkflowExecution(unittest.TestCase):
     """Test the automated workflow execution"""
     
     def test_workflow_file_exists(self):
-        """Test that workflow file exists"""
-        self.assertTrue(
-            os.path.exists('.github/workflows/phase5_morning_run.yml'),
-            "Workflow file not found: .github/workflows/phase5_morning_run.yml"
-        )
+        """Test that GitHub Actions workflow file exists"""
+        workflow_path = Path('.github/workflows/daily_trading.yml')
+        self.assertTrue(workflow_path.exists(), 
+                       f"Workflow file not found: {workflow_path}")
     
     def test_workflow_schedule(self):
         """Test that workflow has correct schedule"""
-        with open('.github/workflows/phase5_morning_run.yml', 'r') as f:
+        workflow_path = Path('.github/workflows/daily_trading.yml')
+        with open(workflow_path, 'r') as f:
             content = f.read()
-        
-        self.assertIn('schedule:', content, "Missing schedule configuration")
-        self.assertIn('cron:', content, "Missing cron schedule")
+            self.assertIn('schedule:', content, "Workflow missing schedule")
+            self.assertIn('cron:', content, "Workflow missing cron schedule")
         self.assertIn('workflow_dispatch:', content, "Missing manual trigger")
         print("✓ Workflow schedule configured")
     
