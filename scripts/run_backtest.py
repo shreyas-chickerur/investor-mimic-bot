@@ -246,10 +246,10 @@ Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
         df = self.prepare_data(data_file)
         
         # Load trades from database
-        db = TradingDatabase()
+        import sqlite3
         
         try:
-            conn = db.get_connection()
+            conn = sqlite3.connect('trading.db')
             trades_df = pd.read_sql_query("""
                 SELECT 
                     executed_at as date,
@@ -262,6 +262,7 @@ Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
                 FROM trades
                 ORDER BY executed_at
             """, conn)
+            conn.close()
             
             if len(trades_df) == 0:
                 logger.warning("No trades found in database. Run live trading first to generate backtest data.")
