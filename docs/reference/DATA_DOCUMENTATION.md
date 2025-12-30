@@ -87,10 +87,11 @@
 - **Total Records:** 119,817
 - **Expected Records:** 120,672 (32 symbols × 3,771 days)
 - **Missing Records:** 855 (0.7%)
-- **Missing Values:** 16,512 in technical indicators
+- **Missing Values (Raw):** 16,512 in technical indicators
+- **Missing Values (Cleaned):** 0 (after imputation)
 
 ### Missing Data Analysis
-Missing values occur primarily in:
+Missing values occurred primarily in:
 1. **Early periods** - Technical indicators require historical data (e.g., 200-day SMA needs 200 days)
 2. **ABBV** - Started trading in 2013 (spinoff from Abbott)
 3. **META** - IPO in 2012
@@ -100,6 +101,71 @@ Missing values occur primarily in:
 - ✅ Chronological order maintained
 - ✅ All symbols have consistent date ranges (except ABBV, META)
 - ✅ OHLC relationships valid (High ≥ Close ≥ Low, High ≥ Open ≥ Low)
+- ✅ Missing values handled via forward-fill imputation
+
+## Data Cleaning & Imputation
+
+### Methodology
+
+**Raw Data:** `data/training_data.csv` (16,512 missing values)  
+**Cleaned Data:** `data/training_data_clean.csv` (0 missing values)  
+**Cleaning Script:** `scripts/clean_data.py`
+
+### Imputation Strategy
+
+#### OHLCV Data
+- **Method:** Forward-fill (use last known price)
+- **Fallback:** Backward-fill for start of series
+- **Columns:** open, high, low, close, adjusted_close, volume
+- **Rationale:** Price continuity assumption - use last known price until new data available
+
+#### Technical Indicators
+
+**Price-based Indicators** (SMA, Bollinger Bands, VWAP)
+- **Method:** Forward-fill → Backward-fill → Use close price
+- **Rationale:** Price-based indicators should track actual prices
+
+**RSI (Relative Strength Index)**
+- **Method:** Forward-fill → Backward-fill → 50 (neutral)
+- **Rationale:** RSI of 50 indicates neutral momentum (neither overbought nor oversold)
+
+**RSI Slope**
+- **Method:** Forward-fill → Backward-fill → 0 (no change)
+- **Rationale:** Zero slope indicates no momentum change
+
+**Volatility Indicators** (ATR, Volatility)
+- **Method:** Forward-fill → Backward-fill → Median value
+- **Rationale:** Use historical median as reasonable estimate
+
+**ADX (Average Directional Index)**
+- **Method:** Forward-fill → Backward-fill → 25 (neutral)
+- **Rationale:** ADX of 25 indicates moderate trend strength
+
+### Impact on Analysis
+
+**Benefits:**
+1. ✅ Complete dataset - all strategies can use full 15 years
+2. ✅ No NaN errors during backtesting
+3. ✅ Consistent signals across all periods
+
+**Limitations:**
+1. ⚠️ First 200 days use imputed values for 200-day SMA
+2. ⚠️ Assumes price continuity (forward-fill)
+3. ⚠️ Early period indicators may be less accurate
+
+**Recommendations:**
+- Consider excluding first 200 trading days from critical analysis
+- Monitor for unrealistic indicator values
+- Validate strategy performance with and without early period data
+
+### Cleaning Report
+
+Full cleaning report available at: `artifacts/data_cleaning_report.md`
+
+**To re-clean data:**
+```bash
+python3 scripts/clean_data.py
+```
 
 ## Data Collection Method
 
