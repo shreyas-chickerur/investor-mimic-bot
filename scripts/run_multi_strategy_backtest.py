@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from datetime import datetime, timedelta
 import logging
+from tqdm import tqdm
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -316,7 +317,8 @@ class StrategyBacktester:
         
         trading_days = sorted(data.index.unique())
         
-        for i, date in enumerate(trading_days):
+        # Use tqdm for progress bar
+        for date in tqdm(trading_days, desc=f"{self.strategy_name}", unit="day"):
             # Generate signals based on strategy type
             if strategy_type == 'rsi':
                 signals = self.generate_signals_rsi(data, date)
@@ -342,12 +344,8 @@ class StrategyBacktester:
                 'cash': self.cash,
                 'positions': len(self.positions)
             })
-            
-            # Progress update
-            if (i + 1) % 500 == 0:
-                logger.info(f"  Day {i+1}/{len(trading_days)}: Portfolio = ${portfolio_value:,.2f}, Positions = {len(self.positions)}, Trades = {len(self.trades)}")
         
-        logger.info(f"\n✅ {self.strategy_name} backtest complete!")
+        logger.info(f"✅ {self.strategy_name} complete!")
         logger.info(f"  Total trades: {len(self.trades)}")
         logger.info(f"  Final portfolio: ${portfolio_value:,.2f}")
         

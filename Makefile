@@ -213,35 +213,29 @@ backtest:
 	@echo "📊 Running validation backtest..."
 	python3 scripts/run_validation_backtest.py
 
-# Backtesting with historical data
-fetch-backtest-data:
-	@echo "📥 Fetching 15 years of historical data..."
-	@echo "   - 36 large-cap stocks"
-	@echo "   - VIX data for regime detection"
-	@echo "   - Using yfinance API"
+# Data Cleaning & Backtesting
+clean-data:
+	@echo "🧹 Cleaning historical data..."
+	@echo "   - Forward-fill missing values"
+	@echo "   - Impute technical indicators"
 	@echo ""
-	python3 scripts/fetch_backtest_data.py
+	python3 scripts/clean_data.py
 	@echo ""
-	@echo "✅ Historical data saved to data/backtest_data.csv"
+	@echo "✅ Clean data saved to data/training_data_clean.csv"
 
-run-backtest:
-	@echo "📊 Running walk-forward backtest..."
-	@echo "   - Training: 2 years"
-	@echo "   - Testing: 6 months"
-	@echo "   - Step: 6 months"
+backtest-multi-strategy:
+	@echo "📊 Running multi-strategy backtest..."
+	@echo "   - RSI Mean Reversion"
+	@echo "   - MA Crossover"
+	@echo "   - Volatility Breakout"
+	@echo "   - Momentum"
+	@echo "   - ML Momentum"
 	@echo ""
-	python3 scripts/run_backtest.py
+	python3 scripts/run_multi_strategy_backtest.py
 	@echo ""
 	@echo "✅ Results saved to artifacts/backtest/"
-
-backtest-full: fetch-backtest-data run-backtest
-	@echo ""
-	@echo "🎉 Complete backtesting finished!"
-	@echo "📊 View results:"
-	@echo "   - Report: artifacts/backtest/performance_report.md"
-	@echo "   - Equity: artifacts/backtest/equity_curve.png"
-	@echo "   - Drawdown: artifacts/backtest/drawdown.png"
-	@echo "   - Sharpe: artifacts/backtest/rolling_sharpe.png"
+	@echo "   - Report: artifacts/backtest/multi_strategy_comparison.md"
+	@echo "   - Plot: artifacts/backtest/strategy_comparison.png"
 
 # Development helpers
 dev-dashboard:
