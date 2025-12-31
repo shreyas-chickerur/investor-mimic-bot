@@ -55,8 +55,8 @@ class RSIMeanReversionStrategy(TradingStrategy):
             vwap = latest.get('vwap', price)
             atr = latest.get('atr_20', None)
             
-            # IMPROVED Buy signal: RSI < 30 AND RSI slope > 0 (turning up)
-            if rsi < self.rsi_threshold and rsi_slope > 0 and symbol not in self.positions:
+            # Buy signal: RSI < 35 (relaxed from 30) AND RSI slope > 0 (turning up)
+            if rsi < 35 and rsi_slope > 0 and symbol not in self.positions:
                 # Volatility-adjusted position sizing
                 shares = self.calculate_position_size(price, atr=atr, max_position_pct=0.10)
                     

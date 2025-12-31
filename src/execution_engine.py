@@ -294,7 +294,8 @@ class MultiStrategyRunner:
             "ML Momentum": MLMomentumStrategy,
             "News Sentiment": NewsSentimentStrategy,
             "MA Crossover": MACrossoverStrategy,
-            "Volatility Breakout": VolatilityBreakoutStrategy
+            # Volatility Breakout disabled - underperforming
+            # "Volatility Breakout": VolatilityBreakoutStrategy
         }
         
         strategy_class = strategy_map.get(name)
