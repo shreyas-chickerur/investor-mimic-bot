@@ -53,9 +53,10 @@ class MACrossoverStrategy(TradingStrategy):
             adx = current.get('adx', 0)
             atr = current.get('atr_20', None)
             
-            # IMPROVED Golden cross: short MA crosses above long MA AND strong trend
+            # Golden cross: short MA crosses above long MA AND trend confirmation
+            # Relaxed ADX threshold from 25 to 20 for more opportunities
             if (ma_short_prev <= ma_long_prev and ma_short_current > ma_long_current and 
-                adx > self.adx_threshold and  # Strong trend confirmation
+                adx > 20 and  # Trend confirmation (relaxed from 25)
                 symbol not in self.positions):
                 
                 # Volatility-adjusted position sizing

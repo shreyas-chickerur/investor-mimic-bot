@@ -14,12 +14,13 @@ This is a **production-ready quantitative trading system** designed for automate
 
 ### 🎯 Key Features
 
-### **5 Trading Strategies:**
-- **RSI Mean Reversion** - Conditional reversion with RSI slope, VWAP proximity, multi-conditional exits
-- **MA Crossover (Trend Following)** - 20/50 MA crossover with volume confirmation
-- **Volatility Breakout** - Bollinger Band breakouts with volume surge
+### **4 Active Trading Strategies:**
+- **RSI Mean Reversion** - Conditional reversion with RSI slope (threshold: 35), VWAP proximity
+- **MA Crossover (Trend Following)** - 20/50 MA crossover with ADX confirmation (threshold: 20)
 - **Momentum** - 20-day momentum with trend confirmation
 - **ML Predictive** - Logistic regression classifier with 10+ features
+
+**Note:** Volatility Breakout strategy disabled (underperformed in 15-year backtest: +15% vs +150%+ for top strategies)
 
 ### **Critical Safety Features:**
 - **Catastrophe Stop Losses** - 3x ATR stops on all positions, automatic execution
@@ -33,9 +34,8 @@ This is a **production-ready quantitative trading system** designed for automate
 - **Strategy Performance Tracking** - Per-strategy metrics, rankings, and visual analytics
 - **Web Dashboard UI** - Beautiful interactive dashboard with charts and performance tables
 
-### Key Features
-
-- **5 Trading Strategies** - RSI Mean Reversion, ML Momentum, News Sentiment, MA Crossover, Volatility Breakout
+### Current Production Features
+1. **4 Trading Strategies** (RSI, Trend, Momentum, ML - Volatility Breakout disabled)
 - **Portfolio Risk Management** - 30% heat limit, -2% daily loss limit, correlation filtering (>0.7 rejection)
 - **Regime Detection** - VIX-based market regime adaptation (NORMAL/HIGH_VOL/CRISIS)
 - **Broker Reconciliation** - Automated position/cash verification before every execution
