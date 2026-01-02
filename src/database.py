@@ -145,6 +145,68 @@ class TradingDatabase:
             )
         ''')
         
+        # Signal funnel tracking (portfolio-level per run)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS signal_funnel (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL,
+                strategy_id INTEGER NOT NULL,
+                strategy_name TEXT NOT NULL,
+                raw_signals_count INTEGER DEFAULT 0,
+                after_regime_count INTEGER DEFAULT 0,
+                after_correlation_count INTEGER DEFAULT 0,
+                after_risk_count INTEGER DEFAULT 0,
+                executed_count INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (strategy_id) REFERENCES strategies(id)
+            )
+        ''')
+        
+        # Signal rejection reasons (per-signal detail)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS signal_rejections (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL,
+                signal_id INTEGER,
+                strategy_id INTEGER NOT NULL,
+                symbol TEXT NOT NULL,
+                stage TEXT NOT NULL,
+                reason_code TEXT NOT NULL,
+                details_json TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (signal_id) REFERENCES signals(id),
+                FOREIGN KEY (strategy_id) REFERENCES strategies(id)
+            )
+        ''')
+        
+        # Order intents (idempotency tracking)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS order_intents (
+                intent_id TEXT PRIMARY KEY,
+                run_id TEXT NOT NULL,
+                strategy_id INTEGER NOT NULL,
+                symbol TEXT NOT NULL,
+                side TEXT NOT NULL,
+                target_qty REAL NOT NULL,
+                status TEXT NOT NULL,
+                broker_order_id TEXT,
+                error_code TEXT,
+                error_message TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                submitted_at TEXT,
+                acked_at TEXT,
+                filled_at TEXT,
+                FOREIGN KEY (strategy_id) REFERENCES strategies(id)
+            )
+        ''')
+        
+        # Add indexes for performance
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_signal_funnel_run_id ON signal_funnel(run_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_signal_rejections_run_id ON signal_rejections(run_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_signal_rejections_stage ON signal_rejections(stage)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_order_intents_run_id ON order_intents(run_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_order_intents_status ON order_intents(status)')
+        
         conn.commit()
         conn.close()
     
@@ -204,8 +266,8 @@ class TradingDatabase:
     
     def log_trade(self, strategy_id: int, signal_id: Optional[int], symbol: str, 
                   action: str, shares: float, requested_price: float, exec_price: float,
-                  slippage_cost: float, commission_cost: float, order_id: str) -> int:
-        """Log a trade with execution costs"""
+                  slippage_cost: float, commission_cost: float, order_id: str, pnl: Optional[float] = None) -> int:
+        """Log a trade with execution costs and P&L"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -220,11 +282,11 @@ class TradingDatabase:
         cursor.execute('''
             INSERT INTO trades 
             (run_id, strategy_id, signal_id, symbol, action, shares, requested_price, exec_price,
-             slippage_cost, commission_cost, total_cost, notional, order_id, executed_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             slippage_cost, commission_cost, total_cost, notional, order_id, executed_at, pnl)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (self.run_id, strategy_id, signal_id, symbol, action, shares, requested_price, exec_price,
               slippage_cost, commission_cost, total_cost, notional, order_id,
-              datetime.now().isoformat()))
+              datetime.now().isoformat(), pnl))
         
         trade_id = cursor.lastrowid
         conn.commit()
@@ -428,6 +490,231 @@ class TradingDatabase:
         # Daily performance snapshots not yet implemented
         # This is a no-op to maintain compatibility
         pass
+    
+    def save_signal_funnel(self, strategy_id: int, strategy_name: str, 
+                           raw: int, regime: int, correlation: int, risk: int, executed: int):
+        """Save signal funnel counts for a strategy"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO signal_funnel 
+            (run_id, strategy_id, strategy_name, raw_signals_count, after_regime_count,
+             after_correlation_count, after_risk_count, executed_count)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (self.run_id, strategy_id, strategy_name, raw, regime, correlation, risk, executed))
+        conn.commit()
+        conn.close()
+    
+    def log_signal_rejection(self, strategy_id: int, symbol: str, stage: str, 
+                             reason_code: str, details: dict = None, signal_id: int = None):
+        """Log why a signal was rejected"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO signal_rejections 
+            (run_id, signal_id, strategy_id, symbol, stage, reason_code, details_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (self.run_id, signal_id, strategy_id, symbol, stage, reason_code, 
+              json.dumps(details) if details else None))
+        conn.commit()
+        conn.close()
+    
+    def create_order_intent(self, strategy_id: int, symbol: str, side: str, 
+                           target_qty: float) -> str:
+        """Create order intent with deterministic ID"""
+        import hashlib
+        timestamp_bucket = datetime.now().strftime('%Y%m%d_%H')
+        intent_string = f"{self.run_id}_{strategy_id}_{symbol}_{side}_{target_qty}_{timestamp_bucket}"
+        intent_id = hashlib.sha256(intent_string.encode()).hexdigest()[:16]
+        
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT intent_id, status FROM order_intents WHERE intent_id = ?', (intent_id,))
+        existing = cursor.fetchone()
+        
+        if existing:
+            conn.close()
+            return existing[0]
+        
+        cursor.execute('''
+            INSERT INTO order_intents 
+            (intent_id, run_id, strategy_id, symbol, side, target_qty, status)
+            VALUES (?, ?, ?, ?, ?, ?, 'CREATED')
+        ''', (intent_id, self.run_id, strategy_id, symbol, side, target_qty))
+        conn.commit()
+        conn.close()
+        
+        return intent_id
+    
+    def update_order_intent_status(self, intent_id: str, status: str, 
+                                   broker_order_id: str = None, error: str = None):
+        """Update order intent status"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        timestamp_field = {
+            'SUBMITTED': 'submitted_at',
+            'ACKED': 'acked_at',
+            'FILLED': 'filled_at'
+        }.get(status)
+        
+        if timestamp_field:
+            cursor.execute(f'''
+                UPDATE order_intents 
+                SET status = ?, broker_order_id = ?, {timestamp_field} = ?
+                WHERE intent_id = ?
+            ''', (status, broker_order_id, datetime.now().isoformat(), intent_id))
+        else:
+            cursor.execute('''
+                UPDATE order_intents 
+                SET status = ?, broker_order_id = ?, error_message = ?
+                WHERE intent_id = ?
+            ''', (status, broker_order_id, error, intent_id))
+        
+        conn.commit()
+        conn.close()
+    
+    def get_signal_funnel_summary(self, run_id: str = None) -> List[Dict]:
+        """Get funnel summary for email reporting"""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        rid = run_id or self.run_id
+        cursor.execute('SELECT * FROM signal_funnel WHERE run_id = ?', (rid,))
+        rows = cursor.fetchall()
+        conn.close()
+        
+        return [dict(row) for row in rows]
+    
+    def get_signal_rejections_summary(self, run_id: str = None, limit: int = 10) -> List[Dict]:
+        """Get top rejection reasons for email reporting"""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        rid = run_id or self.run_id
+        cursor.execute('''
+            SELECT stage, reason_code, COUNT(*) as count, 
+                   GROUP_CONCAT(symbol, ', ') as symbols
+            FROM signal_rejections 
+            WHERE run_id = ?
+            GROUP BY stage, reason_code
+            ORDER BY count DESC
+            LIMIT ?
+        ''', (rid, limit))
+        rows = cursor.fetchall()
+        conn.close()
+        
+        return [dict(row) for row in rows]
+    
+    def get_order_intent_by_id(self, intent_id: str) -> Optional[Dict]:
+        """Get order intent by ID"""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT * FROM order_intents WHERE intent_id = ?', (intent_id,))
+        row = cursor.fetchone()
+        conn.close()
+        
+        return dict(row) if row else None
+    
+    def check_duplicate_order_intent(self, strategy_id: int, symbol: str, 
+                                    side: str, target_qty: float) -> Optional[str]:
+        """
+        Check if an order intent already exists for this exact order.
+        
+        Returns intent_id if duplicate found, None otherwise.
+        """
+        intent_id = self.create_order_intent(strategy_id, symbol, side, target_qty)
+        
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT intent_id, status FROM order_intents
+            WHERE intent_id = ?
+        ''', (intent_id,))
+        
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result and result[1] in ['SUBMITTED', 'ACKED', 'FILLED']:
+            return result[0]
+        
+        return None
+    
+    def count_duplicate_order_intents(self, hours: int = 24) -> int:
+        """
+        Count duplicate order intents in the last N hours.
+        
+        Args:
+            hours: Number of hours to look back
+        
+        Returns:
+            Count of duplicate intents
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cutoff_time = (datetime.now() - timedelta(hours=hours)).isoformat()
+        
+        cursor.execute('''
+            SELECT intent_id, COUNT(*) as count
+            FROM order_intents
+            WHERE created_at >= ?
+            GROUP BY intent_id
+            HAVING count > 1
+        ''', (cutoff_time,))
+        
+        duplicates = cursor.fetchall()
+        conn.close()
+        
+        return len(duplicates)
+    
+    def get_system_state(self, key: str) -> Optional[str]:
+        """
+        Get system state value by key.
+        
+        Args:
+            key: State key
+        
+        Returns:
+            State value or None if not found
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT value FROM system_state
+            WHERE key = ?
+        ''', (key,))
+        
+        result = cursor.fetchone()
+        conn.close()
+        
+        return result[0] if result else None
+    
+    def set_system_state(self, key: str, value: str):
+        """
+        Set system state value.
+        
+        Args:
+            key: State key
+            value: State value
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            INSERT OR REPLACE INTO system_state (key, value, timestamp)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+        ''', (key, value))
+        
+        conn.commit()
+        conn.close()
 
 
 # Backward compatibility alias

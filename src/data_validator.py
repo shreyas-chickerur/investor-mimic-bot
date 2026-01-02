@@ -15,6 +15,8 @@ import numpy as np
 from datetime import datetime, timedelta
 from pathlib import Path
 import logging
+import os
+from typing import Tuple, List
 from dateutil import tz
 from pandas.tseries.holiday import USFederalHolidayCalendar
 from pandas.tseries.offsets import CustomBusinessDay
@@ -66,7 +68,7 @@ class DataValidator:
 
         return self._previous_business_day(today)
     
-    def validate_data_file(self, data_path: Path):
+    def validate_data_file(self, data_path: Path) -> Tuple[bool, List[str]]:
         """
         Validate training data file
         
@@ -85,18 +87,20 @@ class DataValidator:
             df = pd.read_csv(data_path, index_col=0)
             df.index = pd.to_datetime(df.index)
             
-            # Check data freshness
+            # Check data freshness - configurable threshold
             latest_date = df.index.max()
             now_utc = datetime.utcnow()
             market_now = datetime.now(tz=tz.gettz("America/New_York"))
             expected_latest_date = self._expected_latest_date(market_now)
             age_hours = (now_utc - latest_date).total_seconds() / 3600
             
-            if latest_date.date() < expected_latest_date and age_hours > self.max_age_hours:
+            max_age_hours = int(os.getenv('DATA_VALIDATOR_MAX_AGE_HOURS', '96'))
+            if latest_date.date() < expected_latest_date and age_hours > max_age_hours:
+                expected_date = (datetime.now() - timedelta(hours=max_age_hours)).strftime('%Y-%m-%d')
                 errors.append(
                     "Data is "
-                    f"{age_hours:.1f} hours old (max: {self.max_age_hours}); "
-                    f"expected at least {expected_latest_date}"
+                    f"{age_hours:.1f} hours old (max: {max_age_hours}); "
+                    f"expected at least {expected_date}"
                 )
             
             # Check required columns

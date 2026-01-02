@@ -40,6 +40,16 @@ from execution_costs import ExecutionCostModel
 from performance_metrics import PerformanceMetrics
 from broker_reconciler import BrokerReconciler
 from artifact_writer import DailyArtifactWriter, create_artifact_data
+from kill_switch_service import KillSwitchService
+from signal_funnel_tracker import SignalFunnelTracker
+from universe_provider import UniverseProvider
+from pending_signals_manager import PendingSignalsManager
+from structured_logger import StructuredLogger
+from drawdown_stop_manager import DrawdownStopManager
+from data_quality_checker import DataQualityChecker
+from dry_run_wrapper import DryRunWrapper, get_dry_run_wrapper
+from strategy_health_scorer import StrategyHealthScorer
+from pnl_calculator import PnLCalculator
 
 # Setup logging - CRITICAL FIX: Ensure logs directory exists
 Path('logs').mkdir(exist_ok=True)
@@ -119,6 +129,26 @@ class MultiStrategyRunner:
         self.stop_loss_manager = StopLossManager(atr_multiplier=3.0)
         logger.info("Stop Loss Manager initialized: 3x ATR catastrophe stops enabled")
         
+        # Initialize production-readiness modules
+        self.kill_switch = KillSwitchService(self.db, self.email_notifier)
+        self.funnel_tracker = SignalFunnelTracker(self.db)
+        self.universe_provider = UniverseProvider()
+        self.pending_signals = PendingSignalsManager(self.db, decay_days=3)
+        self.structured_logger = StructuredLogger(self.run_id)
+        logger.info("Production-readiness modules initialized: kill switches, funnel tracking, universe provider, pending signals, structured logging")
+        
+        # Initialize live trading safety modules
+        self.drawdown_manager = DrawdownStopManager(self.db, self.email_notifier)
+        self.data_quality_checker = DataQualityChecker()
+        self.dry_run = get_dry_run_wrapper()
+        self.health_scorer = StrategyHealthScorer(self.db)
+        self.pnl_calculator = PnLCalculator(self.db)
+        logger.info("Live trading safety modules initialized: drawdown stop, data quality, DRY_RUN mode, health scoring, P&L calculator")
+        
+        # Track blocked symbols from data quality checks
+        self.blocked_symbols = set()
+        self.data_quality_report = {}
+        
         # Set daily start value for risk management
         self.portfolio_risk.set_daily_start_value(self.portfolio_value)
         
@@ -131,7 +161,7 @@ class MultiStrategyRunner:
         
         # Track P&L metrics
         self.initial_portfolio_value = self.portfolio_value
-        self.peak_portfolio_value = self.portfolio_value
+        self.peak_portfolio_value = self._get_peak_portfolio_value()
         self.cumulative_pnl = 0.0
         self.max_drawdown = 0.0
 
@@ -145,6 +175,20 @@ class MultiStrategyRunner:
     def _refresh_account_state(self):
         """Alias for compatibility"""
         return self._refresh_account_values()
+    
+    def _get_peak_portfolio_value(self):
+        """Get peak portfolio value from database or current value."""
+        peak_str = self.db.get_system_state('peak_portfolio_value')
+        if peak_str:
+            try:
+                return float(peak_str)
+            except:
+                pass
+        return self.portfolio_value
+    
+    def _save_peak_portfolio_value(self, peak_value):
+        """Save peak portfolio value to database."""
+        self.db.set_system_state('peak_portfolio_value', str(peak_value))
     
     def _get_last_close_map(self, market_data) -> dict:
         """Extract last close price per symbol from market_data DataFrame"""
@@ -180,6 +224,7 @@ class MultiStrategyRunner:
 
         if final_portfolio_value > self.peak_portfolio_value:
             self.peak_portfolio_value = final_portfolio_value
+            self._save_peak_portfolio_value(final_portfolio_value)
 
         drawdown = 0.0
         if self.peak_portfolio_value > 0:
@@ -240,9 +285,12 @@ class MultiStrategyRunner:
             strategies = []
             for strat in existing:
                 strategy = self._create_strategy_instance(strat['id'], strat['name'], capital_per_strategy)
-                # CRITICAL FIX: Load positions from Alpaca for each strategy
-                self._load_strategy_positions(strategy)
-                strategies.append(strategy)
+                if strategy is not None:
+                    # CRITICAL FIX: Load positions from Alpaca for each strategy
+                    self._load_strategy_positions(strategy)
+                    strategies.append(strategy)
+                else:
+                    logger.warning(f"Failed to create strategy instance for: {strat.get('name', 'Unknown')}")
             return strategies
         
         # Create new strategies
@@ -253,7 +301,8 @@ class MultiStrategyRunner:
             ("ML Momentum", "Machine learning momentum prediction", MLMomentumStrategy),
             ("News Sentiment", "News sentiment + technical indicators", NewsSentimentStrategy),
             ("MA Crossover", "Golden cross (50/200 MA) trend following", MACrossoverStrategy),
-            ("Volatility Breakout", "Bollinger Band breakouts with volume", VolatilityBreakoutStrategy)
+            # Volatility Breakout disabled - underperforming (+15% over 15 years in backtest)
+            # ("Volatility Breakout", "Bollinger Band breakouts with volume", VolatilityBreakoutStrategy)
         ]
         
         strategies = []
@@ -269,6 +318,10 @@ class MultiStrategyRunner:
     
     def _load_strategy_positions(self, strategy):
         """Load current positions for a strategy from database"""
+        if strategy is None:
+            logger.error("Cannot load positions: strategy is None")
+            return
+            
         try:
             positions = {}
             entry_dates = {}
@@ -283,7 +336,8 @@ class MultiStrategyRunner:
             strategy.entry_dates = entry_dates
             logger.info(f"  Loaded {len(positions)} positions for {strategy.name}")
         except Exception as e:
-            logger.error(f"Error loading positions for {strategy.name}: {e}")
+            strategy_name = getattr(strategy, 'name', 'Unknown')
+            logger.error(f"Error loading positions for {strategy_name}: {e}")
             strategy.positions = {}
             strategy.entry_dates = {}
     
@@ -294,8 +348,7 @@ class MultiStrategyRunner:
             "ML Momentum": MLMomentumStrategy,
             "News Sentiment": NewsSentimentStrategy,
             "MA Crossover": MACrossoverStrategy,
-            # Volatility Breakout disabled - underperforming
-            # "Volatility Breakout": VolatilityBreakoutStrategy
+            "Volatility Breakout": VolatilityBreakoutStrategy
         }
         
         strategy_class = strategy_map.get(name)
@@ -434,6 +487,80 @@ class MultiStrategyRunner:
         strategies = self.initialize_strategies()
         self.raw_signals_by_strategy = {}
         
+        # CRITICAL: Check kill switches BEFORE any trading
+        logger.info("=" * 80)
+        logger.info("CHECKING KILL SWITCHES")
+        logger.info("=" * 80)
+        
+        kill_context = {
+            'reconciliation_status': 'UNKNOWN',
+            'daily_drawdown': 0.0,
+            'consecutive_failures': 0,
+            'rejected_orders_count': 0,
+            'total_orders': 0
+        }
+        
+        if not self.kill_switch.check_all_switches(kill_context):
+            logger.critical("Trading halted by kill switch")
+            self.errors.append("Trading halted by kill switch: " + ", ".join(self.kill_switch.kill_reasons))
+            self.structured_logger.log_kill_switch(
+                reason=", ".join(self.kill_switch.kill_reasons),
+                details={'context': kill_context}
+            )
+            return []
+        
+        logger.info("✅ All kill switches passed")
+        logger.info("=" * 80)
+        
+        # CRITICAL: Check drawdown stop BEFORE trading
+        logger.info("=" * 80)
+        logger.info("CHECKING DRAWDOWN STOP")
+        logger.info("=" * 80)
+        
+        is_stopped, reason, details = self.drawdown_manager.check_drawdown_stop(
+            current_portfolio_value=self.portfolio_value,
+            peak_portfolio_value=self.peak_portfolio_value
+        )
+        
+        if is_stopped:
+            logger.critical(f"Trading halted by drawdown stop: {reason}")
+            self.errors.append(f"Drawdown stop triggered: {reason}")
+            return []
+        
+        # Check if trading allowed (cooldown state)
+        if not self.drawdown_manager.is_trading_allowed():
+            state = self.drawdown_manager.get_current_state()
+            logger.warning(f"Trading not allowed: {state['state']} state")
+            self.errors.append(f"Trading blocked: {state['state']} state (cooldown active)")
+            return []
+        
+        # Get sizing multiplier (for rampup mode)
+        sizing_multiplier = self.drawdown_manager.get_sizing_multiplier()
+        if sizing_multiplier < 1.0:
+            logger.info(f"Rampup mode active: {sizing_multiplier:.0%} sizing")
+        
+        logger.info("✅ Drawdown stop check passed")
+        logger.info("=" * 80)
+        
+        # CRITICAL: Check data quality BEFORE trading
+        logger.info("=" * 80)
+        logger.info("CHECKING DATA QUALITY")
+        logger.info("=" * 80)
+        
+        self.blocked_symbols, self.data_quality_report = self.data_quality_checker.check_data_quality(
+            market_data, datetime.now()
+        )
+        
+        if self.blocked_symbols:
+            logger.warning(f"Data quality: {len(self.blocked_symbols)} symbols blocked")
+            # Filter market_data to exclude blocked symbols
+            market_data = market_data[~market_data['symbol'].isin(self.blocked_symbols)]
+            logger.info(f"Filtered market data: {len(market_data['symbol'].unique())} symbols remaining")
+        else:
+            logger.info("✅ All symbols passed data quality checks")
+        
+        logger.info("=" * 80)
+        
         # CRITICAL: Check stop losses BEFORE generating new signals
         logger.info("=" * 80)
         logger.info("CHECKING CATASTROPHE STOP LOSSES")
@@ -479,38 +606,68 @@ class MultiStrategyRunner:
                 logger.warning("Trading halted due to daily loss limit")
                 return []
 
-            if os.getenv('ENABLE_BROKER_RECONCILIATION', 'false').lower() == 'true':
-                # CRITICAL: Refresh account before reconciliation
-                logger.info("Refreshing account state before reconciliation...")
-                self._refresh_account_state()
+            # CRITICAL: Hard reconciliation gate (MANDATORY)
+            logger.info("=" * 80)
+            logger.info("BROKER RECONCILIATION (MANDATORY GATE)")
+            logger.info("=" * 80)
+            
+            # Refresh account before reconciliation
+            logger.info("Refreshing account state before reconciliation...")
+            self._refresh_account_state()
+            
+            local_positions = self._build_local_positions()
+            success, discrepancies = self.broker_reconciler.reconcile_daily(
+                local_positions=local_positions,
+                local_cash=self.cash_available
+            )
+            
+            self.reconciliation_status = "PASS" if success else "FAIL"
+            self.reconciliation_discrepancies = discrepancies
+            
+            # Update kill context
+            kill_context['reconciliation_status'] = self.reconciliation_status
+            
+            # Save RECONCILIATION snapshot
+            logger.info(f"Saving RECONCILIATION snapshot (status: {self.reconciliation_status})...")
+            account = self.trading_client.get_account()
+            broker_positions = self.trading_client.get_all_positions()
+            self.db.save_broker_state(
+                snapshot_date=self.asof_date,
+                snapshot_type='RECONCILIATION',
+                cash=float(account.cash),
+                portfolio_value=float(account.portfolio_value),
+                buying_power=float(account.buying_power),
+                positions=[{'symbol': p.symbol, 'qty': float(p.qty), 'market_value': float(p.market_value)} for p in broker_positions],
+                reconciliation_status=self.reconciliation_status,
+                discrepancies=discrepancies
+            )
+            
+            # HARD GATE: Block trading on failure
+            if not success:
+                logger.critical("🛑 RECONCILIATION FAILED - TRADING BLOCKED")
+                logger.critical("Discrepancies:")
+                for disc in discrepancies:
+                    logger.critical(f"  - {disc}")
                 
-                local_positions = self._build_local_positions()
-                success, discrepancies = self.broker_reconciler.reconcile_daily(
-                    local_positions=local_positions,
-                    local_cash=self.cash_available
+                self.errors.extend(discrepancies)
+                
+                # Send critical alert
+                self.email_notifier.send_alert(
+                    "Reconciliation Failure - Trading Blocked",
+                    f"Broker/DB mismatch detected:\n\n" + "\n".join(f"  • {d}" for d in discrepancies)
                 )
-                self.reconciliation_status = "PASS" if success else "FAIL"
-                self.reconciliation_discrepancies = discrepancies
                 
-                # Save RECONCILIATION snapshot
-                logger.info(f"Saving RECONCILIATION snapshot (status: {self.reconciliation_status})...")
-                account = self.trading_client.get_account()
-                broker_positions = self.trading_client.get_all_positions()
-                self.db.save_broker_state(
-                    snapshot_date=self.asof_date,
-                    snapshot_type='RECONCILIATION',
-                    cash=float(account.cash),
-                    portfolio_value=float(account.portfolio_value),
-                    buying_power=float(account.buying_power),
-                    positions=[{'symbol': p.symbol, 'qty': float(p.qty), 'market_value': float(p.market_value)} for p in broker_positions],
-                    reconciliation_status=self.reconciliation_status,
-                    discrepancies=discrepancies
+                # Log to structured logger
+                self.structured_logger.log_event(
+                    'RECONCILIATION_CHECK',
+                    {'status': 'FAIL', 'discrepancies': discrepancies},
+                    stage='RECONCILIATION'
                 )
                 
-                if not success:
-                    logger.error("Broker reconciliation failed; trading paused")
-                    self.errors.extend(discrepancies)
-                    return []
+                return []
+            
+            logger.info("✅ Reconciliation passed")
+            logger.info("=" * 80)
             
             print("\n" + "=" * 80)
             print("MULTI-STRATEGY EXECUTION")
@@ -551,11 +708,24 @@ class MultiStrategyRunner:
                 print("-" * 80)
                 
                 try:
+                    # Check if strategy is enabled (kill switch)
+                    if not self.kill_switch.is_strategy_enabled(strategy.name):
+                        logger.info(f"Skipping {strategy.name} - disabled by kill switch")
+                        self.funnel_tracker.record_raw_signals(strategy.strategy_id, 0)
+                        self.funnel_tracker.record_after_regime(strategy.strategy_id, 0)
+                        continue
+                    
                     if not self.regime_detector.should_enable_strategy(strategy.name, regime_adjustments):
                         logger.info(f"Skipping {strategy.name} due to regime adjustments")
+                        self.funnel_tracker.record_raw_signals(strategy.strategy_id, 0)
+                        self.funnel_tracker.record_after_regime(strategy.strategy_id, 0)
                         continue
 
                     signals = strategy.generate_signals(market_data)
+                    
+                    # FUNNEL STAGE 1: Raw signals
+                    raw_count = len(signals) if signals else 0
+                    self.funnel_tracker.record_raw_signals(strategy.strategy_id, raw_count)
                     
                     # VALIDATION MODE: Route injected signals to RSI Mean Reversion
                     if self.signal_injection_enabled and strategy.name == "RSI Mean Reversion" and len(injected_signals) > 0:
@@ -567,13 +737,31 @@ class MultiStrategyRunner:
                     
                     if signals and len(signals) > 0:
                         print(f"✅ Generated {len(signals)} signals")
+                        
+                        # FUNNEL STAGE 2: After regime (already passed above)
+                        self.funnel_tracker.record_after_regime(strategy.strategy_id, len(signals))
 
+                        # FUNNEL STAGE 3: Correlation filter with size attenuation
                         combined_positions = self._get_all_positions(strategies)
-                        signals = self.correlation_filter.filter_signals(
+                        signals_before_corr = len(signals)
+                        signals = self.correlation_filter.filter_signals_with_sizing(
                             signals,
                             combined_positions,
                             market_data
                         )
+                        
+                        # Log correlation rejections
+                        for sig in self.raw_signals_by_strategy[strategy.name]:
+                            if sig not in signals:
+                                self.funnel_tracker.log_rejection(
+                                    strategy.strategy_id,
+                                    sig.get('symbol'),
+                                    'CORRELATION',
+                                    'high_correlation',
+                                    {'threshold': 0.8}
+                                )
+                        
+                        self.funnel_tracker.record_after_correlation(strategy.strategy_id, len(signals))
 
                         # Log signals to database
                         signal_ids = []
@@ -589,17 +777,35 @@ class MultiStrategyRunner:
                             signal_ids.append(signal_id)
                             signal['signal_id'] = signal_id
                         
+                        # FUNNEL STAGE 4: Risk/cash limits (tracked in _execute_strategy_trades)
+                        signals_before_risk = len(signals[:3])  # Top 3 signals
+                        
                         # Execute trades
                         executed = self._execute_strategy_trades(
                             strategy,
                             signals[:3],
                             total_exposure,
                             self.portfolio_value
-                        )  # Top 3 signals
+                        )
+                        
+                        # FUNNEL STAGE 5: Executed
+                        self.funnel_tracker.record_executed(strategy.strategy_id, len(executed))
+                        
+                        # Log risk rejections
+                        for sig in signals[:3]:
+                            if not any(e.get('symbol') == sig.get('symbol') for e in executed):
+                                self.funnel_tracker.log_rejection(
+                                    strategy.strategy_id,
+                                    sig.get('symbol'),
+                                    'RISK',
+                                    'insufficient_cash_or_heat',
+                                    signal_id=sig.get('signal_id')
+                                )
+                        
                         self.executed_signals.extend(executed)
                         all_signals.extend(executed)
                         
-                        # Set terminal states for all signals
+                        # Set terminal states
                         for i, signal in enumerate(signals[:3]):
                             signal_id = signal.get('signal_id')
                             if signal_id:
@@ -614,8 +820,22 @@ class MultiStrategyRunner:
                             signal_id = signal.get('signal_id')
                             if signal_id:
                                 self.db.update_signal_terminal_state(signal_id, 'FILTERED', 'top_3_throttle')
+                                self.funnel_tracker.log_rejection(
+                                    strategy.strategy_id,
+                                    signal.get('symbol'),
+                                    'THROTTLE',
+                                    'top_3_limit',
+                                    signal_id=signal_id
+                                )
                     else:
                         print("❌ No signals generated")
+                        self.funnel_tracker.record_after_regime(strategy.strategy_id, 0)
+                        self.funnel_tracker.record_after_correlation(strategy.strategy_id, 0)
+                        self.funnel_tracker.record_after_risk(strategy.strategy_id, 0)
+                        self.funnel_tracker.record_executed(strategy.strategy_id, 0)
+                    
+                    # Save funnel data to database
+                    self.funnel_tracker.save_to_database(strategy.strategy_id, strategy.name)
                     
                     # Record daily performance
                     self._record_performance(strategy, current_prices)
@@ -624,6 +844,40 @@ class MultiStrategyRunner:
                     logger.error(f"Error in {strategy.name}: {e}")
                     print(f"❌ Error: {e}")
                     self.errors.append(f"{strategy.name}: {e}")
+            
+            # Generate artifacts after all strategies complete
+            logger.info("=" * 80)
+            logger.info("GENERATING ARTIFACTS")
+            logger.info("=" * 80)
+            
+            for strategy in strategies:
+                # Generate funnel artifact
+                funnel_path = self.funnel_tracker.generate_funnel_artifact(
+                    strategy.strategy_id, strategy.name, self.run_id
+                )
+                if funnel_path:
+                    logger.info(f"Generated funnel artifact: {funnel_path}")
+                
+                # Generate rejections artifact
+                rejections_path = self.funnel_tracker.generate_rejections_artifact(
+                    strategy.strategy_id, strategy.name, self.run_id
+                )
+                if rejections_path:
+                    logger.info(f"Generated rejections artifact: {rejections_path}")
+            
+            # Generate why_no_trade artifact (only if no trades)
+            why_no_trade_path = self.funnel_tracker.generate_why_no_trade_artifact(self.run_id)
+            if why_no_trade_path:
+                logger.info(f"Generated why_no_trade artifact: {why_no_trade_path}")
+            
+            # Generate weekly health summary (on Mondays)
+            if datetime.now().weekday() == 0:
+                logger.info("Generating weekly health summary...")
+                strategies_list = [(s.strategy_id, s.name) for s in strategies]
+                health_path = self.health_scorer.generate_health_summary(strategies_list)
+                logger.info(f"Generated health summary: {health_path}")
+            
+            logger.info("=" * 80)
             
             return all_signals
         finally:
@@ -654,10 +908,26 @@ class MultiStrategyRunner:
             
             if action == 'BUY' and shares > 0:
                 try:
+                    # Apply size multiplier from correlation attenuation
+                    size_mult = signal.get('size_multiplier', 1.0)
+                    # Apply drawdown sizing multiplier (rampup mode)
+                    drawdown_mult = self.drawdown_manager.get_sizing_multiplier()
+                    combined_mult = size_mult * drawdown_mult
+                    adjusted_shares = int(shares * combined_mult)
+                    
+                    if adjusted_shares == 0:
+                        logger.info(f"Skipping {symbol} - size multiplier reduced shares to 0")
+                        continue
+                    
+                    logger.info(f"Size adjustment for {symbol}: {shares} → {adjusted_shares} "
+                               f"(corr_mult={size_mult:.2f}, drawdown_mult={drawdown_mult:.2f}, "
+                               f"combined={combined_mult:.2f})")
+                    
                     exec_price, slippage_cost, commission_cost, total_cost = self.cost_model.calculate_execution_price(
-                        price, 'BUY', shares
+                        price, 'BUY', adjusted_shares
                     )
-                    trade_value = exec_price * shares + total_cost
+                    trade_value = exec_price * adjusted_shares + total_cost
+                    
                     if not self.cash_manager.reserve_cash(strategy.strategy_id, trade_value):
                         logger.warning(f"Skipping {symbol} - insufficient cash for strategy {strategy.strategy_id}")
                         continue
@@ -666,23 +936,57 @@ class MultiStrategyRunner:
                         self.cash_manager.release_cash(strategy.strategy_id, trade_value)
                         continue
 
+                    # Create order intent (idempotency)
+                    intent_id = self.db.create_order_intent(
+                        strategy.strategy_id,
+                        symbol,
+                        'BUY',
+                        adjusted_shares
+                    )
+                    
+                    # Check if already submitted
+                    existing_intent = self.db.get_order_intent_by_id(intent_id)
+                    if existing_intent and existing_intent['status'] in ['SUBMITTED', 'ACKED', 'FILLED']:
+                        logger.warning(f"Order intent {intent_id} already {existing_intent['status']} - skipping")
+                        self.cash_manager.release_cash(strategy.strategy_id, trade_value)
+                        continue
+                    
+                    # Log order intent to structured logger
+                    self.structured_logger.log_order_intent(
+                        intent_id, strategy.strategy_id, symbol, 'BUY', adjusted_shares
+                    )
+
                     order_data = MarketOrderRequest(
                         symbol=symbol,
-                        qty=shares,
+                        qty=adjusted_shares,
                         side=OrderSide.BUY,
                         time_in_force=TimeInForce.DAY
                     )
-                    order = self.trading_client.submit_order(order_data)
                     
-                    print(f"  ✅ BUY {shares} {symbol} @ ${price:.2f} (Order: {order.id})")
+                    # Wrap with DRY_RUN protection
+                    order = self.dry_run.execute_broker_operation(
+                        f"submit_order_{symbol}",
+                        self.trading_client.submit_order,
+                        order_data
+                    )
                     
-                    strategy.add_position(symbol, shares)
+                    # Update intent status
+                    self.db.update_order_intent_status(intent_id, 'SUBMITTED', str(order.id))
+                    
+                    # Log to structured logger
+                    self.structured_logger.log_order_submitted(
+                        intent_id, str(order.id), strategy.strategy_id, symbol
+                    )
+                    
+                    print(f"  ✅ BUY {adjusted_shares} {symbol} @ ${price:.2f} (Order: {order.id}, Intent: {intent_id})")
+                    
+                    strategy.add_position(symbol, adjusted_shares)
                     strategy.update_capital(-trade_value)
                     entry_date = signal.get('asof_date') or datetime.now()
                     strategy.entry_dates[symbol] = entry_date
                     total_exposure += trade_value
-                    self.performance_metrics.add_trade('BUY', symbol, shares, exec_price, trade_value)
-                    self._update_position_record(strategy.strategy_id, symbol, shares, exec_price)
+                    self.performance_metrics.add_trade('BUY', symbol, adjusted_shares, exec_price, trade_value)
+                    self._update_position_record(strategy.strategy_id, symbol, adjusted_shares, exec_price)
                     
                     # CRITICAL: Set stop loss for new position
                     atr = signal.get('atr', 0)
@@ -693,28 +997,42 @@ class MultiStrategyRunner:
                     else:
                         logger.warning(f"No ATR available for {symbol}, stop loss not set")
 
-                    # Log trade with full execution details
+                    # Calculate P&L for this trade
+                    total_costs = slippage_cost + commission_cost
+                    pnl, pnl_explanation = self.pnl_calculator.calculate_trade_pnl(
+                        strategy.strategy_id,
+                        symbol,
+                        'BUY',
+                        adjusted_shares,
+                        exec_price,
+                        total_costs
+                    )
+                    logger.info(f"P&L: {pnl_explanation}")
+                    
+                    # Log trade with full execution details and P&L
                     signal_id = signal.get('signal_id')
                     self.db.log_trade(
                         strategy.strategy_id,
                         signal_id,
                         symbol,
                         'BUY',
-                        shares,
+                        adjusted_shares,
                         price,
                         exec_price,
                         slippage_cost,
                         commission_cost,
-                        str(order.id)
+                        str(order.id),
+                        pnl
                     )
                     
                     # Track as executed (will verify fill status later)
                     trade_info = {
                         'symbol': signal['symbol'],
                         'action': signal['action'],
-                        'shares': shares,
+                        'shares': adjusted_shares,
                         'price': signal['price'],
-                        'order_id': order.id
+                        'order_id': order.id,
+                        'intent_id': intent_id
                     }
                     self.executed_trades.append(trade_info)
                     
@@ -750,7 +1068,19 @@ class MultiStrategyRunner:
                     self.cash_manager.release_cash(strategy.strategy_id, trade_value)
                     strategy.update_capital(trade_value)
                     
-                    # Log trade
+                    # Calculate P&L for this trade
+                    total_costs = slippage_cost + commission_cost
+                    pnl, pnl_explanation = self.pnl_calculator.calculate_trade_pnl(
+                        strategy.strategy_id,
+                        symbol,
+                        'SELL',
+                        shares,
+                        exec_price,
+                        total_costs
+                    )
+                    logger.info(f"P&L: {pnl_explanation}")
+                    
+                    # Log trade with P&L
                     self.db.log_trade(
                         strategy.strategy_id,
                         signal.get('signal_id'),
@@ -761,7 +1091,8 @@ class MultiStrategyRunner:
                         exec_price,
                         slippage_cost,
                         commission_cost,
-                        str(order.id)
+                        str(order.id),
+                        pnl
                     )
                     
                     # CRITICAL FIX: Update strategy positions

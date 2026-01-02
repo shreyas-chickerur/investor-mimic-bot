@@ -11,12 +11,54 @@ from pathlib import Path
 from datetime import datetime
 import sqlite3
 from collections import defaultdict
+import glob
 
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / 'src'))
 
+def get_drawdown_status(db_path='trading.db'):
+    """Get current drawdown stop status"""
+    try:
+        conn = sqlite3.connect(db_path)
+        result = conn.execute("SELECT value FROM system_state WHERE key='drawdown_stop_state'").fetchone()
+        conn.close()
+        
+        if result:
+            state_data = json.loads(result[0])
+            return state_data
+    except:
+        pass
+    return {'state': 'NORMAL', 'drawdown': 0.0}
+
+def get_latest_artifact(artifact_type):
+    """Get latest artifact of given type"""
+    patterns = {
+        'data_quality': 'artifacts/data_quality/data_quality_report_*.json',
+        'funnel': 'artifacts/funnel/signal_funnel_*.json',
+        'health': 'artifacts/health/strategy_health_summary_*.json',
+        'why_no_trade': 'artifacts/funnel/why_no_trade_summary_*.json'
+    }
+    
+    pattern = patterns.get(artifact_type)
+    if not pattern:
+        return None
+    
+    files = glob.glob(pattern)
+    if not files:
+        return None
+    
+    latest = max(files, key=lambda x: Path(x).stat().st_mtime)
+    try:
+        with open(latest) as f:
+            return json.load(f)
+    except:
+        return None
+
 def get_strategy_performance_today(db_path='trading.db'):
     """Get today's strategy performance from database"""
+    if db_path is None:
+        return []
+    
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     
@@ -40,6 +82,138 @@ def get_strategy_performance_today(db_path='trading.db'):
     conn.close()
     
     return [dict(row) for row in results]
+
+def generate_safety_features_html(db_path='trading.db'):
+    """Generate HTML section for safety features status"""
+    html = "<div style='background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;'>"
+    html += "<h3 style='color: #2c5282; margin: 0 0 15px 0; font-size: 18px;'>🛡️ Safety Systems Status</h3>"
+    
+    # Drawdown status
+    drawdown_state = get_drawdown_status(db_path)
+    state = drawdown_state.get('state', 'NORMAL')
+    drawdown_pct = drawdown_state.get('drawdown', 0.0) * 100
+    
+    if state == 'NORMAL':
+        status_color = '#28a745'
+        status_icon = '✅'
+        status_text = f'Normal Operation (Drawdown: {drawdown_pct:.1f}%)'
+    elif state == 'RAMPUP':
+        status_color = '#ff9800'
+        status_icon = '⚠️'
+        status_text = f'Rampup Mode - 50% Sizing (Drawdown: {drawdown_pct:.1f}%)'
+    elif state == 'HALT':
+        status_color = '#dc3545'
+        status_icon = '🛑'
+        status_text = f'HALT - Cooldown Active (Drawdown: {drawdown_pct:.1f}%)'
+    else:
+        status_color = '#dc3545'
+        status_icon = '🚨'
+        status_text = f'PANIC MODE (Drawdown: {drawdown_pct:.1f}%)'
+    
+    html += f"<div style='margin-bottom: 10px;'>"
+    html += f"<strong style='color: {status_color};'>{status_icon} Drawdown Stop:</strong> "
+    html += f"<span style='color: #333;'>{status_text}</span>"
+    html += "</div>"
+    
+    # Data quality
+    data_quality = get_latest_artifact('data_quality')
+    if data_quality:
+        blocked_count = len(data_quality.get('blocked_symbols', []))
+        total_symbols = data_quality.get('symbols_checked', 0)
+        if blocked_count > 0:
+            html += f"<div style='margin-bottom: 10px;'>"
+            html += f"<strong style='color: #ff9800;'>⚠️ Data Quality:</strong> "
+            html += f"<span style='color: #333;'>{blocked_count}/{total_symbols} symbols blocked</span>"
+            html += "</div>"
+        else:
+            html += f"<div style='margin-bottom: 10px;'>"
+            html += f"<strong style='color: #28a745;'>✅ Data Quality:</strong> "
+            html += f"<span style='color: #333;'>All {total_symbols} symbols passed</span>"
+            html += "</div>"
+    
+    # Signal funnel summary
+    funnel = get_latest_artifact('funnel')
+    if funnel:
+        funnel_data = funnel.get('funnel', {})
+        raw = funnel_data.get('raw_signals', 0)
+        executed = funnel_data.get('executed', 0)
+        conversion = (executed / raw * 100) if raw > 0 else 0
+        
+        html += f"<div style='margin-bottom: 10px;'>"
+        html += f"<strong style='color: #2c5282;'>📊 Signal Funnel:</strong> "
+        html += f"<span style='color: #333;'>{raw} raw → {executed} executed ({conversion:.1f}% conversion)</span>"
+        html += "</div>"
+    
+    # Why no trade
+    why_no_trade = get_latest_artifact('why_no_trade')
+    if why_no_trade:
+        html += f"<div style='margin-bottom: 10px; padding: 10px; background: #fff3cd; border-radius: 4px;'>"
+        html += f"<strong style='color: #856404;'>ℹ️ No Trades Today:</strong> "
+        top_reason = why_no_trade.get('top_blocker', {}).get('stage', 'Unknown')
+        html += f"<span style='color: #856404;'>Primary blocker: {top_reason}</span>"
+        html += "</div>"
+    
+    html += "</div>"
+    return html
+
+def generate_strategy_health_html():
+    """Generate HTML section for strategy health scores"""
+    health_data = get_latest_artifact('health')
+    if not health_data:
+        return ""
+    
+    html = "<div style='margin-bottom: 30px;'>"
+    html += "<h2 style='color: #2c5282; border-bottom: 2px solid #4A90E2; padding-bottom: 10px; font-size: 20px; font-weight: 600;'>"
+    html += "Strategy Health Scores"
+    html += "</h2>"
+    
+    strategies = health_data.get('strategies', [])
+    if strategies:
+        html += "<table style='width: 100%; border-collapse: collapse; margin-top: 10px;'>"
+        html += "<tr style='background: #f8f9fa; border-bottom: 2px solid #dee2e6;'>"
+        html += "<th style='padding: 10px; text-align: left;'>Strategy</th>"
+        html += "<th style='padding: 10px; text-align: center;'>Health Score</th>"
+        html += "<th style='padding: 10px; text-align: center;'>Status</th>"
+        html += "<th style='padding: 10px; text-align: left;'>Issues</th>"
+        html += "</tr>"
+        
+        for strat in strategies:
+            score = strat.get('health_score', 0)
+            status = strat.get('health_status', 'UNKNOWN')
+            issues = strat.get('issues', [])
+            
+            # Color coding
+            if status == 'HEALTHY':
+                status_color = '#28a745'
+                status_icon = '✅'
+            elif status == 'WARNING':
+                status_color = '#ff9800'
+                status_icon = '⚠️'
+            elif status == 'DEGRADED':
+                status_color = '#ff6b35'
+                status_icon = '⚠️'
+            else:
+                status_color = '#dc3545'
+                status_icon = '🚨'
+            
+            html += f"<tr style='border-bottom: 1px solid #dee2e6;'>"
+            html += f"<td style='padding: 10px;'>{strat.get('strategy_name', 'Unknown')}</td>"
+            html += f"<td style='padding: 10px; text-align: center; font-weight: bold;'>{score}/100</td>"
+            html += f"<td style='padding: 10px; text-align: center; color: {status_color}; font-weight: bold;'>{status_icon} {status}</td>"
+            html += f"<td style='padding: 10px; font-size: 12px; color: #666;'>{', '.join(issues[:2]) if issues else 'None'}</td>"
+            html += "</tr>"
+        
+        html += "</table>"
+        
+        # Add portfolio health score
+        portfolio_score = health_data.get('portfolio_health_score', 0)
+        html += f"<div style='margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px;'>"
+        html += f"<strong style='color: #2c5282;'>Portfolio Health Score:</strong> "
+        html += f"<span style='font-size: 24px; font-weight: bold; color: #2c5282;'>{portfolio_score}/100</span>"
+        html += "</div>"
+    
+    html += "</div>"
+    return html
 
 def generate_actionable_insights(trades, positions, strategy_perf, recon_status, regime):
     """Generate actionable insights section with what's working, what isn't, and recommendations"""
@@ -129,13 +303,17 @@ def generate_email_body(artifact_path: str, db_path='trading.db', include_visual
     """Generate HTML email body from artifact JSON
     
     Args:
-        artifact_path: Path to daily artifact JSON
+        artifact_path: Path to daily artifact JSON (or None if no artifact exists)
         db_path: Path to trading database
         include_visuals: If True, embed strategy performance charts (Mon/Wed/Fri)
     """
     
-    with open(artifact_path) as f:
-        data = json.load(f)
+    # Load artifact data if available, otherwise use empty structures
+    if artifact_path and Path(artifact_path).exists():
+        with open(artifact_path) as f:
+            data = json.load(f)
+    else:
+        data = {}
     
     # Extract data from artifact
     trades_data = data.get('trades', {})
@@ -241,6 +419,12 @@ def generate_email_body(artifact_path: str, db_path='trading.db', include_visual
         except Exception as e:
             print(f"Warning: Could not load strategy chart: {e}")
     
+    # Generate safety features section
+    safety_html = generate_safety_features_html(db_path)
+    
+    # Generate strategy health section
+    health_html = generate_strategy_health_html()
+    
     # Generate actionable insights
     insights_html = generate_actionable_insights(trades, open_positions, strategy_perf, recon_status, regime_class)
     
@@ -296,6 +480,9 @@ def generate_email_body(artifact_path: str, db_path='trading.db', include_visual
     </div>
     
     <div style="padding: 30px; background: white;">
+        <!-- Safety Features Status -->
+        {safety_html}
+        
         <!-- Actionable Insights -->
         <div style="margin-bottom: 30px;">
             <h2 style="color: #2c5282; font-size: 24px; margin-bottom: 15px; font-weight: 600;">📊 Daily Insights</h2>
@@ -352,6 +539,9 @@ def generate_email_body(artifact_path: str, db_path='trading.db', include_visual
             {strategy_html}
         </div>
         
+        <!-- Strategy Health Scores (Weekly) -->
+        {health_html}
+        
         <!-- Strategy Performance Charts (Mon/Wed/Fri only) -->
         {f'''
         <div style="margin-bottom: 30px;">
@@ -396,12 +586,14 @@ if __name__ == "__main__":
     artifact_path = Path(f'artifacts/json/{date}.json')
     
     if not artifact_path.exists():
-        print(f"❌ No artifact found for {date}")
-        sys.exit(1)
-    
-    # Generate email HTML
-    html = generate_email_body(str(artifact_path), db_path='trading.db', 
-                              include_visuals=args.include_visuals)
+        print(f"⚠️  No artifact found for {date}, generating email with database data only")
+        # Generate email without artifact (will use database data)
+        html = generate_email_body(None, db_path='trading.db', 
+                                  include_visuals=args.include_visuals)
+    else:
+        # Generate email with artifact
+        html = generate_email_body(str(artifact_path), db_path='trading.db', 
+                                  include_visuals=args.include_visuals)
     
     # Save to file for workflow to use
     output_path = '/tmp/daily_email.html'

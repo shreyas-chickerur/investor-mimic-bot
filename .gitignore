@@ -25,3 +25,10 @@ data/.encryption_key
 
 # Database files (contain sensitive data)
 data/*.db
+
+# Artifacts directories (generated per run)
+artifacts/
+artifacts/drawdown/
+artifacts/data_quality/
+artifacts/funnel/
+artifacts/health/

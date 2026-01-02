@@ -34,6 +34,64 @@ This is a **production-ready quantitative trading system** designed for automate
 - **Strategy Performance Tracking** - Per-strategy metrics, rankings, and visual analytics
 - **Web Dashboard UI** - Beautiful interactive dashboard with charts and performance tables
 
+### 🛡️ Safety & Validation (Live Trading Ready)
+
+**Designed for $1,000 live capital with minimal human oversight:**
+
+**Drawdown Protection:**
+- **8% Drawdown Stop** - Automatic halt of new entries, 10-day cooldown with automated health checks
+- **10% Panic Mode** - Flatten all positions (optional), 20-day cooldown, critical alert
+- **Automated Resume Protocol** - Health checks → 50% sizing rampup (5 days) → normal sizing
+- **Peak Tracking** - Continuous monitoring of portfolio high-water mark
+
+**Data Quality & Staleness:**
+- **72-Hour Staleness Detection** - Blocks symbols with old data
+- **5 Quality Checks** - Missing indicators, excessive NaN, insufficient history, price outliers
+- **Per-Run Artifacts** - `data_quality_report.json` with blocked symbols and reasons
+- **Never Trade on Suspect Data** - Explicit DATA_QUALITY rejection reasons
+
+**Idempotent Order Execution:**
+- **Deterministic Intent IDs** - Hash of (run_id, strategy, symbol, side, qty, hour_bucket)
+- **Duplicate Prevention** - GitHub Actions retries cannot create duplicate orders
+- **State Tracking** - CREATED → SUBMITTED → ACKED → FILLED with full audit trail
+- **Order Intent Artifacts** - Complete order lifecycle logging
+
+**Kill Switches:**
+- **Manual** - `TRADING_DISABLED=true` for immediate halt
+- **Automatic Triggers** - Reconciliation failure, duplicate intents, excessive rejections, consecutive failures
+- **Strategy-Level** - `STRATEGY_DISABLED_LIST` for selective disabling
+- **Email Alerts** - Critical notifications on all kill switch activations
+
+**Signal Funnel Tracking:**
+- **5-Stage Pipeline** - RAW → REGIME → CORRELATION → RISK → EXECUTED
+- **Rejection Logging** - Standardized reason codes with details
+- **"Why No Trade" Reports** - Automatic analysis when executed trades = 0
+- **JSON Artifacts** - `signal_funnel.json`, `signal_rejections.json`, `why_no_trade_summary.json`
+
+**Automated Health Scoring:**
+- **Per-Strategy Metrics** - Expectancy, drawdown, trade count, rejection rates
+- **Weekly Summaries** - `strategy_health_summary.json` with recommendations
+- **Health Status** - HEALTHY / WARNING / DEGRADED / CRITICAL (0-100 score)
+- **Actionable Insights** - Automated recommendations for strategy adjustments
+
+**DRY_RUN Mode:**
+- **Safe Testing** - Full system execution without broker writes
+- **All Logic Active** - Sizing, intents, reporting, artifacts generated normally
+- **Mock Results** - Realistic order/account responses for testing
+- **Zero Risk** - Perfect for validating changes before live deployment
+
+**Hard Reconciliation Gate:**
+- **Mandatory Pre-Trade Check** - Broker positions vs database verification
+- **1% Tolerance** - Blocks trading on any mismatch beyond threshold
+- **Critical Alerts** - Immediate notification on reconciliation failure
+- **Artifact Generation** - `reconciliation_diff.json` with discrepancies
+
+**Comprehensive Testing:**
+- **135+ Unit Tests** - Core functionality coverage
+- **Integration Tests** - Full execution flow validation
+- **Safety Feature Tests** - Drawdown stops, kill switches, idempotency, data quality
+- **Automated CI/CD** - Tests run on every commit
+
 ### Current Production Features
 1. **4 Trading Strategies** (RSI, Trend, Momentum, ML - Volatility Breakout disabled)
 - **Portfolio Risk Management** - 30% heat limit, -2% daily loss limit, correlation filtering (>0.7 rejection)
