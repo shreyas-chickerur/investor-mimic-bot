@@ -41,6 +41,90 @@ def get_strategy_performance_today(db_path='trading.db'):
     
     return [dict(row) for row in results]
 
+def generate_actionable_insights(trades, positions, strategy_perf, recon_status, regime):
+    """Generate actionable insights section with what's working, what isn't, and recommendations"""
+    insights = []
+    warnings = []
+    actions = []
+    
+    # Check if system is executing trades
+    if len(trades) == 0:
+        warnings.append("⚠️ <strong>No trades executed today</strong>")
+        actions.append("Check if strategies are generating signals (view GitHub Actions logs)")
+        actions.append("Verify market was open (check for holidays/weekends)")
+        actions.append("Review if risk filters are too strict (correlation, portfolio heat)")
+    else:
+        insights.append(f"✅ <strong>{len(trades)} trades executed</strong> - System is active")
+    
+    # Check reconciliation
+    if 'FAIL' in recon_status:
+        warnings.append("❌ <strong>Broker reconciliation failed</strong>")
+        actions.append("<strong>URGENT:</strong> Check Alpaca positions vs local database")
+        actions.append("Review discrepancies in GitHub Actions logs")
+    elif 'PASS' in recon_status:
+        insights.append("✅ <strong>Broker reconciliation passed</strong> - Positions in sync")
+    
+    # Check strategy performance
+    if strategy_perf:
+        profitable = [s for s in strategy_perf if s['total_pnl'] > 0]
+        losing = [s for s in strategy_perf if s['total_pnl'] < 0]
+        
+        if profitable:
+            top = profitable[0]
+            insights.append(f"✅ <strong>Top performer:</strong> {top['strategy']} (${top['total_pnl']:+.2f})")
+        
+        if losing:
+            worst = losing[-1]
+            warnings.append(f"⚠️ <strong>Underperformer:</strong> {worst['strategy']} (${worst['total_pnl']:+.2f})")
+            if worst['trades'] >= 5:  # Only suggest action if enough data
+                actions.append(f"Consider reviewing {worst['strategy']} parameters or allocation")
+    
+    # Check regime
+    if regime == 'CRISIS':
+        warnings.append("⚠️ <strong>Crisis regime detected</strong> - Portfolio heat reduced to 20%")
+        actions.append("Monitor positions closely for stop losses")
+        actions.append("Expect reduced trade frequency due to risk controls")
+    elif regime == 'HIGH_VOL':
+        insights.append("ℹ️ <strong>High volatility regime</strong> - Portfolio heat at 25%")
+    
+    # Check positions
+    if len(positions) == 0 and len(trades) > 0:
+        insights.append("ℹ️ All trades closed - No overnight exposure")
+    elif len(positions) > 0:
+        insights.append(f"ℹ️ <strong>{len(positions)} open positions</strong> - Monitor for stop losses")
+    
+    # Build HTML
+    html = "<div style='background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;'>"
+    
+    if insights:
+        html += "<div style='margin-bottom: 15px;'>"
+        html += "<h3 style='color: #28a745; margin: 0 0 10px 0; font-size: 16px;'>✅ What's Working</h3>"
+        for insight in insights:
+            html += f"<div style='margin: 5px 0; color: #333;'>{insight}</div>"
+        html += "</div>"
+    
+    if warnings:
+        html += "<div style='margin-bottom: 15px;'>"
+        html += "<h3 style='color: #ff9800; margin: 0 0 10px 0; font-size: 16px;'>⚠️ What Needs Attention</h3>"
+        for warning in warnings:
+            html += f"<div style='margin: 5px 0; color: #333;'>{warning}</div>"
+        html += "</div>"
+    
+    if actions:
+        html += "<div>"
+        html += "<h3 style='color: #2c5282; margin: 0 0 10px 0; font-size: 16px;'>🎯 Recommended Actions</h3>"
+        html += "<ol style='margin: 0; padding-left: 20px; color: #333;'>"
+        for action in actions:
+            html += f"<li style='margin: 5px 0;'>{action}</li>"
+        html += "</ol>"
+        html += "</div>"
+    
+    if not insights and not warnings and not actions:
+        html += "<p style='color: #666; font-style: italic;'>No specific insights available - system operating normally</p>"
+    
+    html += "</div>"
+    return html
+
 def generate_email_body(artifact_path: str, db_path='trading.db', include_visuals=False) -> str:
     """Generate HTML email body from artifact JSON
     
@@ -157,6 +241,9 @@ def generate_email_body(artifact_path: str, db_path='trading.db', include_visual
         except Exception as e:
             print(f"Warning: Could not load strategy chart: {e}")
     
+    # Generate actionable insights
+    insights_html = generate_actionable_insights(trades, open_positions, strategy_perf, recon_status, regime_class)
+    
     # Build strategy performance table
     strategy_html = ""
     if strategy_perf:
@@ -209,6 +296,12 @@ def generate_email_body(artifact_path: str, db_path='trading.db', include_visual
     </div>
     
     <div style="padding: 30px; background: white;">
+        <!-- Actionable Insights -->
+        <div style="margin-bottom: 30px;">
+            <h2 style="color: #2c5282; font-size: 24px; margin-bottom: 15px; font-weight: 600;">📊 Daily Insights</h2>
+            {insights_html}
+        </div>
+        
         <!-- Today's Summary Header -->
         <h2 style="color: #2c5282; font-size: 24px; margin-bottom: 25px; font-weight: 600;">Today's Summary</h2>
         

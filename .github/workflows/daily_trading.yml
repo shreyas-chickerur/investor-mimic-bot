@@ -201,7 +201,7 @@ jobs:
         python3 scripts/generate_email_chart.py
     
     - name: Generate daily email digest
-      if: success()
+      if: always()
       run: |
         # Check if today is Mon/Wed/Fri for visual reports
         DAY_OF_WEEK=$(date +%u)  # 1=Mon, 3=Wed, 5=Fri
@@ -214,7 +214,7 @@ jobs:
         fi
     
     - name: Send daily digest email
-      if: success()
+      if: always()
       uses: dawidd6/action-send-mail@v3
       with:
         server_address: smtp.gmail.com
