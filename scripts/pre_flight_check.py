@@ -58,22 +58,23 @@ def check_market_open():
 
 
 def check_data_freshness():
-    """Check if data is fresh enough or can be updated."""
-    data_path = project_root / 'data' / 'training_data.csv'
-    
-    if not data_path.exists():
-        print("❌ Data file not found")
-        return False
-    
+    """Check if market data is fresh enough."""
     try:
+        data_path = project_root / 'data' / 'training_data.csv'
+        if not data_path.exists():
+            print("❌ Data file not found")
+            return False
+        
         df = pd.read_csv(data_path)
         df['date'] = pd.to_datetime(df['date'])
         latest_date = df['date'].max()
-        age_hours = (datetime.now() - latest_date).total_seconds() / 3600
+        
+        now = datetime.now()
+        age_hours = (now - latest_date).total_seconds() / 3600
         age_days = age_hours / 24
         
-        # Allow up to 4 days (96 hours) for long weekends
-        max_age_hours = 96
+        # Get threshold from environment (default 240 hours = 10 days to handle holiday periods)
+        max_age_hours = int(os.getenv('DATA_VALIDATOR_MAX_AGE_HOURS', '240'))
         
         if age_hours <= max_age_hours:
             print(f"✅ Data fresh: {age_days:.1f} days old (latest: {latest_date.strftime('%Y-%m-%d')})")
