@@ -107,6 +107,32 @@ class CorrelationFilter:
         
         return long_corr, short_corr
     
+    def calculate_size_multiplier(self, correlation: float) -> tuple:
+        """
+        Calculate size multiplier based on correlation
+        
+        Args:
+            correlation: Correlation coefficient (0-1)
+            
+        Returns:
+            (size_multiplier, reason)
+            
+        Rules:
+            - corr <= 0.5: 100% size
+            - 0.5 < corr <= 0.8: linear scale to 25%
+            - corr > 0.8: reject (0% size)
+        """
+        abs_corr = abs(correlation)
+        
+        if abs_corr <= 0.5:
+            return 1.0, "low_correlation"
+        elif abs_corr <= 0.8:
+            # Linear interpolation: 1.0 at 0.5, 0.25 at 0.8
+            multiplier = 1.0 - ((abs_corr - 0.5) / 0.3) * 0.75
+            return max(multiplier, 0.25), f"attenuated_correlation_{abs_corr:.2f}"
+        else:
+            return 0.0, f"high_correlation_{abs_corr:.2f}"
+    
     def should_filter_signal(self, signal_symbol: str, existing_positions: Dict[str, float], 
                            regime: str = "NORMAL") -> tuple:
         """
@@ -150,6 +176,65 @@ class CorrelationFilter:
                 return True, reason, correlations
         
         return False, "Passed correlation filter", correlations
+    
+    def filter_signals_with_sizing(self, 
+                                   signals: List[Dict],
+                                   existing_positions: Dict[str, int],
+                                   market_data: pd.DataFrame) -> List[Dict]:
+        """
+        Filter signals and add size multipliers based on correlation
+        
+        Returns:
+            Signals with 'size_multiplier' and 'correlation_reason' fields
+        """
+        # Update price history
+        for symbol in market_data['symbol'].unique():
+            symbol_data = market_data[market_data['symbol'] == symbol]
+            self.update_price_history(symbol, symbol_data['close'])
+        
+        # Process signals
+        filtered_signals = []
+        existing_symbols = list(existing_positions.keys())
+        
+        for signal in signals:
+            if signal.get('action') != 'BUY':
+                # Don't filter sell signals
+                signal['size_multiplier'] = 1.0
+                signal['correlation_reason'] = 'sell_signal'
+                filtered_signals.append(signal)
+                continue
+            
+            symbol = signal.get('symbol')
+            
+            # Calculate max correlation with existing positions
+            max_corr = 0.0
+            max_corr_symbol = None
+            
+            for pos_symbol in existing_symbols:
+                if pos_symbol == symbol:
+                    continue
+                
+                corr = self.calculate_correlation(symbol, pos_symbol)
+                if abs(corr) > abs(max_corr):
+                    max_corr = corr
+                    max_corr_symbol = pos_symbol
+            
+            # Calculate size multiplier
+            size_mult, reason = self.calculate_size_multiplier(max_corr)
+            
+            if size_mult > 0:
+                signal['size_multiplier'] = size_mult
+                signal['correlation_reason'] = reason
+                signal['max_correlation'] = max_corr
+                signal['max_corr_symbol'] = max_corr_symbol
+                filtered_signals.append(signal)
+                
+                logger.info(f"Accepted {symbol}: size={size_mult*100:.0f}%, "
+                           f"corr={max_corr:.2f} with {max_corr_symbol or 'none'}")
+            else:
+                logger.info(f"Rejected {symbol}: corr={max_corr:.2f} with {max_corr_symbol}")
+        
+        return filtered_signals
     
     def filter_signals(self, 
                       signals: List[Dict],

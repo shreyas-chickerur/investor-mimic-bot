@@ -44,7 +44,9 @@ class EmailNotifier:
                           positions: List[Dict],
                           portfolio_value: float,
                           cash: float,
-                          errors: List[str] = None):
+                          errors: List[str] = None,
+                          funnel_summary: List[Dict] = None,
+                          why_no_trade_reports: List[str] = None):
         """Send daily trading summary email"""
         
         if not self.enabled:
@@ -54,7 +56,8 @@ class EmailNotifier:
         subject = f"📊 Daily Trading Summary - {datetime.now().strftime('%Y-%m-%d')}"
         
         # Build email body
-        body = self._build_summary_email(trades, positions, portfolio_value, cash, errors)
+        body = self._build_summary_email(trades, positions, portfolio_value, cash, errors, 
+                                         funnel_summary, why_no_trade_reports)
         
         self._send_email(subject, body)
     
@@ -91,7 +94,8 @@ class EmailNotifier:
         
         self._send_email(subject, body, is_html=True)
     
-    def _build_summary_email(self, trades, positions, portfolio_value, cash, errors):
+    def _build_summary_email(self, trades, positions, portfolio_value, cash, errors,
+                            funnel_summary=None, why_no_trade_reports=None):
         """Build HTML email body for daily summary"""
         
         # Count trades by action
@@ -151,6 +155,52 @@ class EmailNotifier:
             positions_html += "</table>"
         else:
             positions_html = "<p style='color: #666; font-style: italic;'>No open positions</p>"
+        
+        # Build funnel summary section
+        funnel_html = ""
+        if funnel_summary:
+            funnel_html = """
+            <div style="margin-bottom: 30px;">
+                <h2 style="color: #2c5282; border-bottom: 2px solid #4A90E2; padding-bottom: 10px; font-size: 20px; font-weight: 600;">
+                    📊 Signal Funnel Analysis
+                </h2>
+                <table style='width: 100%; border-collapse: collapse; margin-top: 10px;'>
+                    <tr style='background: #f8f9fa; border-bottom: 2px solid #dee2e6;'>
+                        <th style='padding: 10px; text-align: left;'>Strategy</th>
+                        <th style='padding: 10px; text-align: right;'>Raw</th>
+                        <th style='padding: 10px; text-align: right;'>Regime</th>
+                        <th style='padding: 10px; text-align: right;'>Correlation</th>
+                        <th style='padding: 10px; text-align: right;'>Risk</th>
+                        <th style='padding: 10px; text-align: right;'>Executed</th>
+                    </tr>
+            """
+            
+            for funnel in funnel_summary:
+                funnel_html += f"""
+                    <tr style='border-bottom: 1px solid #dee2e6;'>
+                        <td style='padding: 10px;'>{funnel.get('strategy_name', 'N/A')}</td>
+                        <td style='padding: 10px; text-align: right;'>{funnel.get('raw_signals_count', 0)}</td>
+                        <td style='padding: 10px; text-align: right;'>{funnel.get('after_regime_count', 0)}</td>
+                        <td style='padding: 10px; text-align: right;'>{funnel.get('after_correlation_count', 0)}</td>
+                        <td style='padding: 10px; text-align: right;'>{funnel.get('after_risk_count', 0)}</td>
+                        <td style='padding: 10px; text-align: right; font-weight: bold; color: #10b981;'>{funnel.get('executed_count', 0)}</td>
+                    </tr>
+                """
+            
+            funnel_html += "</table>"
+            
+            # Add "Why No Trade" reports
+            if why_no_trade_reports:
+                funnel_html += """
+                <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin-top: 15px;">
+                    <h3 style="color: #856404; margin-top: 0;">❓ Why No Trade?</h3>
+                    <ul style="margin: 0; padding-left: 20px;">
+                """
+                for report in why_no_trade_reports:
+                    funnel_html += f"<li style='color: #856404; margin: 5px 0;'>{report}</li>"
+                funnel_html += "</ul></div>"
+            
+            funnel_html += "</div>"
         
         # Build errors section
         errors_html = ""
@@ -218,6 +268,8 @@ class EmailNotifier:
             </div>
             {trades_html}
         </div>
+        
+        {funnel_html}
         
         <!-- Current Positions -->
         <div style="margin-bottom: 30px;">

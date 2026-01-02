@@ -2,8 +2,8 @@ name: Daily Trading Execution
 
 on:
   schedule:
-    # Runs at 6:30 AM PST (14:30 UTC) every day
-    - cron: '30 14 * * *'
+    # Runs at 1:15 PM PST (4:15 PM EST / 21:15 UTC) after market close, Monday-Friday
+    - cron: '15 21 * * 1-5'
   workflow_dispatch:  # Allow manual trigger
 
 env:
@@ -44,60 +44,22 @@ jobs:
     
     - name: Create required directories
       run: |
-        mkdir -p artifacts/json artifacts/markdown logs data
+        mkdir -p artifacts/json artifacts/markdown artifacts/funnel artifacts/data_quality artifacts/drawdown artifacts/health logs data
     
-    - name: Update market data
+    - name: Run trading with pre-flight checks
       env:
+        ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+        ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
         ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
-      run: |
-        python scripts/fetch_historical_data.py
-    
-    - name: Safety check - Verify paper trading mode
-      env:
-        ALPACA_PAPER: 'true'
-      run: |
-        echo "=== Safety Verification ==="
-        if [ "$ALPACA_PAPER" != "true" ]; then
-          echo "❌ FATAL: ALPACA_PAPER must be 'true' for automated runs"
-          exit 1
-        fi
-        echo "✅ Paper trading mode confirmed"
-        
-        # Verify PHASE5_SIGNAL_INJECTION is false
-        INJECTION="${PHASE5_SIGNAL_INJECTION:-false}"
-        if [ "$INJECTION" != "false" ]; then
-          echo "❌ FATAL: PHASE5_SIGNAL_INJECTION must be 'false' for production"
-          exit 1
-        fi
-        echo "✅ Signal injection disabled (production mode)"
-    
-    - name: Pre-execution broker state check
-      env:
-        ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
-        ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
-        ALPACA_PAPER: true
-      run: |
-        python3 scripts/check_broker_state.py
-    
-    - name: Run daily execution
-      env:
-        ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
-        ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
         ALPACA_PAPER: 'true'
         ALPACA_LIVE_ENABLED: 'false'
+        DRY_RUN: 'false'
         ENABLE_BROKER_RECONCILIATION: 'true'
-        PHASE5_SIGNAL_INJECTION: 'false'
-        DATA_MAX_AGE_HOURS: '72'
+        DATA_VALIDATOR_MAX_AGE_HOURS: '96'
+        TRADING_DISABLED: 'false'
       run: |
-        echo "=== Daily Trading Execution - $(date) ==="
-        echo "Environment:"
-        echo "  ALPACA_PAPER: $ALPACA_PAPER"
-        echo "  ALPACA_LIVE_ENABLED: $ALPACA_LIVE_ENABLED"
-        echo "  ENABLE_BROKER_RECONCILIATION: $ENABLE_BROKER_RECONCILIATION"
-        echo "  PHASE5_SIGNAL_INJECTION: $PHASE5_SIGNAL_INJECTION"
-        echo "  DATA_MAX_AGE_HOURS: $DATA_MAX_AGE_HOURS"
-        echo ""
-        python3 src/execution_engine.py
+        chmod +x scripts/run_trading.sh
+        ./scripts/run_trading.sh
     
     - name: Verify reconciliation passed
       run: |
