@@ -94,7 +94,7 @@ class DataValidator:
             expected_latest_date = self._expected_latest_date(market_now)
             age_hours = (now_utc - latest_date).total_seconds() / 3600
             
-            max_age_hours = int(os.getenv('DATA_VALIDATOR_MAX_AGE_HOURS', '240'))
+            max_age_hours = int(os.getenv('DATA_VALIDATOR_MAX_AGE_HOURS', '288'))
             if latest_date.date() < expected_latest_date and age_hours > max_age_hours:
                 expected_date = (datetime.now() - timedelta(hours=max_age_hours)).strftime('%Y-%m-%d')
                 errors.append(
