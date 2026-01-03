@@ -76,8 +76,8 @@ def check_data_freshness():
         age_hours = (now - latest_date).total_seconds() / 3600
         age_days = age_hours / 24
         
-        # Get threshold from environment (default 240 hours = 10 days to handle holiday periods)
-        max_age_hours = int(os.getenv('DATA_VALIDATOR_MAX_AGE_HOURS', '240'))
+        # Get threshold from environment (default 288 hours = 12 days to handle holiday periods)
+        max_age_hours = int(os.getenv('DATA_VALIDATOR_MAX_AGE_HOURS', '288'))
         
         if age_hours <= max_age_hours:
             print(f"✅ Data fresh: {age_days:.1f} days old (latest: {latest_date.strftime('%Y-%m-%d')})")
