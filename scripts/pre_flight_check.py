@@ -104,8 +104,8 @@ def check_data_freshness():
                     return True
                 else:
                     print("⚠️  Data update did not fetch newer data")
-                    # Still allow if within 7 days (full week)
-                    if age_hours <= 168:  # 7 days
+                    # Still allow if within configured threshold
+                    if age_hours <= max_age_hours:
                         print(f"   Proceeding with {age_days:.1f} day old data")
                         return True
                     else:
@@ -114,8 +114,8 @@ def check_data_freshness():
                         
             except Exception as e:
                 print(f"❌ Data update failed: {e}")
-                # Allow if within 7 days even if update fails
-                if age_hours <= 168:
+                # Allow if within configured threshold even if update fails
+                if age_hours <= max_age_hours:
                     print(f"   Proceeding with {age_days:.1f} day old data (update failed)")
                     return True
                 else:
