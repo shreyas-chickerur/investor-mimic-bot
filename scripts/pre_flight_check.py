@@ -27,7 +27,10 @@ from database import TradingDatabase
 
 def check_market_open():
     """Check if market is open today."""
-    now = datetime.now()
+    # Use US Eastern Time (market time) instead of UTC
+    import pytz
+    eastern = pytz.timezone('America/New_York')
+    now = datetime.now(eastern)
     weekday = now.weekday()
     
     # Weekend check
