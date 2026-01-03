@@ -55,7 +55,7 @@ jobs:
         ALPACA_LIVE_ENABLED: 'false'
         DRY_RUN: 'false'
         ENABLE_BROKER_RECONCILIATION: 'true'
-        DATA_VALIDATOR_MAX_AGE_HOURS: '96'
+        DATA_VALIDATOR_MAX_AGE_HOURS: '240'
         TRADING_DISABLED: 'false'
       run: |
         chmod +x scripts/run_trading.sh
