@@ -14,6 +14,11 @@ This is a **production-ready quantitative trading system** designed for automate
 
 ### 🎯 Key Features
 
+### **Trading Universe:**
+- **180+ Symbols** - 146 large-cap stocks + 38 ETFs
+- **Stocks** - Technology, Healthcare, Financial, Consumer, Energy, Industrial, Utilities
+- **ETFs** - Broad market (SPY, QQQ, IWM), Sector (XLF, XLE, XLK), International (VEA, EEM), Bonds (AGG, TLT), Commodities (GLD, SLV), Thematic (ARKK, SMH)
+
 ### **4 Active Trading Strategies:**
 - **RSI Mean Reversion** - Conditional reversion with RSI slope (threshold: 35), VWAP proximity
 - **MA Crossover (Trend Following)** - 20/50 MA crossover with ADX confirmation (threshold: 20)
