@@ -18,13 +18,24 @@ from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 
-SYMBOLS = [
-    'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'TSLA', 'NVDA', 'AMD',
-    'NFLX', 'DIS', 'PYPL', 'INTC', 'CSCO', 'ADBE', 'CRM', 'ORCL',
-    'QCOM', 'TXN', 'AVGO', 'COST', 'SBUX', 'MCD', 'NKE', 'WMT',
-    'HD', 'LOW', 'TGT', 'CVS', 'UNH', 'JNJ', 'PFE', 'ABBV',
-    'MRK', 'TMO', 'DHR', 'MDT'
-]
+# Load symbols from universe.csv (includes stocks and ETFs)
+def load_universe():
+    """Load trading universe from config file"""
+    universe_path = Path(__file__).parent.parent / 'config' / 'universe.csv'
+    if universe_path.exists():
+        df = pd.read_csv(universe_path)
+        return df['symbol'].tolist()
+    else:
+        # Fallback to default list if universe.csv doesn't exist
+        return [
+            'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'TSLA', 'NVDA', 'AMD',
+            'NFLX', 'DIS', 'PYPL', 'INTC', 'CSCO', 'ADBE', 'CRM', 'ORCL',
+            'QCOM', 'TXN', 'AVGO', 'COST', 'SBUX', 'MCD', 'NKE', 'WMT',
+            'HD', 'LOW', 'TGT', 'CVS', 'UNH', 'JNJ', 'PFE', 'ABBV',
+            'MRK', 'TMO', 'DHR', 'MDT'
+        ]
+
+SYMBOLS = load_universe()
 
 def calculate_rsi(prices, period=14):
     """Calculate RSI"""
