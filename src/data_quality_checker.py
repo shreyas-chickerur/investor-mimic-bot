@@ -194,27 +194,20 @@ class DataQualityChecker:
         return False, ""
     
     def _check_nan_values(self, symbol_data: pd.DataFrame) -> Tuple[bool, str]:
-        """Check for excessive NaN values in recent data only."""
+        """Check for excessive NaN values."""
         total_rows = len(symbol_data)
         if total_rows == 0:
             return True, "No data rows"
         
-        # Only check the most recent 100 days (what execution engine uses)
-        # Early historical data naturally has NaN for indicators that need warmup
-        recent_data = symbol_data.tail(100)
-        total_recent = len(recent_data)
-        
-        if total_recent == 0:
-            return True, "No recent data rows"
-        
-        # Check each required indicator in recent data only
+        # Check each required indicator
+        # Note: Execution engine filters to last 100 days before calling this
         for indicator in self.required_indicators:
-            if indicator in recent_data.columns:
-                nan_count = recent_data[indicator].isna().sum()
-                nan_pct = nan_count / total_recent
+            if indicator in symbol_data.columns:
+                nan_count = symbol_data[indicator].isna().sum()
+                nan_pct = nan_count / total_rows
                 
                 if nan_pct > self.max_nan_pct:
-                    return True, f"{indicator} has {nan_pct:.1%} NaN in recent data (threshold: {self.max_nan_pct:.1%})"
+                    return True, f"{indicator} has {nan_pct:.1%} NaN (threshold: {self.max_nan_pct:.1%})"
         
         return False, ""
     
