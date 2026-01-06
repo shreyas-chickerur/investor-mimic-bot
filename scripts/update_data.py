@@ -14,9 +14,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import pandas as pd
-from alpaca.data.historical import StockHistoricalDataClient
-from alpaca.data.requests import StockBarsRequest
-from alpaca.data.timeframe import TimeFrame
 
 # Load symbols from universe.csv (includes stocks and ETFs)
 def load_universe():
@@ -53,66 +50,34 @@ def calculate_volatility(prices, period=20):
     return volatility
 
 def main():
-    """Update data with latest prices"""
+    """Update data with latest prices using Alpha Vantage"""
     print("=" * 80)
-    print("UPDATING TRAINING DATA")
+    print("UPDATING TRAINING DATA (Alpha Vantage)")
     print("=" * 80)
     
-    # Get Alpaca credentials
-    api_key = os.getenv('ALPACA_API_KEY')
-    secret_key = os.getenv('ALPACA_SECRET_KEY')
+    # Import Alpha Vantage fetcher
+    from alpha_vantage_fetcher import AlphaVantageFetcher
     
-    if not api_key or not secret_key:
-        print("ERROR: Missing Alpaca credentials")
-        sys.exit(1)
+    # Check if we should do incremental update or full fetch
+    data_path = Path(__file__).parent.parent / 'data' / 'training_data.csv'
     
-    # Initialize client
-    client = StockHistoricalDataClient(api_key, secret_key)
+    fetcher = AlphaVantageFetcher(premium=True)
     
-    # CRITICAL FIX: Get 300 days of data for MA strategies (need 200-day MA)
-    # LOOKAHEAD FIX: Use previous trading day only (not today)
-    end_date = datetime.now()
-    
-    # If running after market close, use today; otherwise use previous day
-    if end_date.hour >= 16:  # After 4 PM
-        end_date = end_date
+    if data_path.exists():
+        print("\n📊 Existing data found - performing incremental update")
+        try:
+            combined = fetcher.update_existing_data(str(data_path), SYMBOLS)
+        except Exception as e:
+            print(f"⚠️  Incremental update failed: {e}")
+            print("Falling back to full fetch...")
+            combined = fetcher.fetch_multiple_symbols(SYMBOLS, outputsize='full')
     else:
-        end_date = end_date - timedelta(days=1)
+        print("\n📊 No existing data - performing full fetch")
+        combined = fetcher.fetch_multiple_symbols(SYMBOLS, outputsize='full')
     
-    start_date = end_date - timedelta(days=300)
-    
-    print(f"\nFetching data from {start_date.date()} to {end_date.date()}")
-    print(f"Symbols: {len(SYMBOLS)}")
-    
-    # Fetch data
-    request = StockBarsRequest(
-        symbol_or_symbols=SYMBOLS,
-        timeframe=TimeFrame.Day,
-        start=start_date,
-        end=end_date
-    )
-    
-    print("\nFetching from Alpaca...")
-    bars = client.get_stock_bars(request)
-    
-    # Combine all symbols
-    all_data = []
-    for symbol in SYMBOLS:
-        if symbol in bars:
-            df = bars[symbol].df.reset_index()
-            df['symbol'] = symbol
-            all_data.append(df)
-            print(f"  ✓ {symbol}: {len(df)} bars")
-        else:
-            print(f"  ✗ {symbol}: No data")
-    
-    if not all_data:
-        print("\nERROR: No data fetched")
-        sys.exit(1)
-    
-    # Combine
-    combined = pd.concat(all_data, ignore_index=True)
-    combined = combined.rename(columns={'timestamp': 'date'})
+    # Ensure date column is properly named
+    if 'timestamp' in combined.columns:
+        combined = combined.rename(columns={'timestamp': 'date'})
     
     # Calculate technical indicators by symbol
     print("\nCalculating indicators...")
