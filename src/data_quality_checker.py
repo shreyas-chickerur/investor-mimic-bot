@@ -41,7 +41,8 @@ class DataQualityChecker:
         
         # Quality thresholds
         self.max_nan_pct = float(os.getenv('MAX_NAN_PCT', '0.10'))  # 10% max NaN
-        self.min_history_days = int(os.getenv('MIN_HISTORY_DAYS', '250'))  # For 200-day MA
+        # Note: Execution engine filters to 100 days before calling this, so require at least 60 days
+        self.min_history_days = int(os.getenv('MIN_HISTORY_DAYS', '60'))
         
         # Required indicators
         self.required_indicators = [
