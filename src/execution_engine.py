@@ -387,13 +387,14 @@ class MultiStrategyRunner:
         df = pd.read_csv(data_file, index_col=0)
         df.index = pd.to_datetime(df.index)
         
-        # Get last 100 days
+        # CRITICAL: Filter to last 100 days BEFORE quality checks
+        # Early historical data has NaN for indicators that need warmup
         from datetime import timedelta
         latest_date = df.index.max()
         cutoff_date = latest_date - timedelta(days=100)
         df = df[df.index >= cutoff_date].copy()
         
-        logger.info(f"Loaded {len(df)} rows for {df['symbol'].nunique()} symbols")
+        logger.info(f"Loaded {len(df)} rows for {df['symbol'].nunique()} symbols (last 100 days)")
         return df
     
     def check_stop_losses(self, market_data):
