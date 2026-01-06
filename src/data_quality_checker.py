@@ -46,7 +46,7 @@ class DataQualityChecker:
         # Required indicators
         self.required_indicators = [
             'close', 'rsi', 'sma_20', 'sma_50', 'sma_100', 
-            'atr', 'volatility_20d'
+            'atr_20', 'volatility_20d'
         ]
         
         # Create artifacts directory
