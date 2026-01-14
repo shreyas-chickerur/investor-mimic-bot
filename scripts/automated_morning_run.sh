@@ -102,14 +102,8 @@ else:
 
 VERIFY_STATUS=$?
 
-# Step 4: Commit results if successful
+# Final status
 if [ $VERIFY_STATUS -eq 0 ]; then
-    echo "" | tee -a "$LOG_FILE"
-    echo "Step 4: Committing results..." | tee -a "$LOG_FILE"
-    git add -A
-    git commit -m "Phase 5 Day 1 Complete (Automated)" 2>&1 | tee -a "$LOG_FILE"
-    git push origin main 2>&1 | tee -a "$LOG_FILE"
-    
     echo "" | tee -a "$LOG_FILE"
     echo "✅ Automated morning run completed successfully!" | tee -a "$LOG_FILE"
 else
