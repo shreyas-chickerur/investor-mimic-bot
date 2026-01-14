@@ -335,7 +335,7 @@ RESUME PROTOCOL:
 No manual intervention required unless health checks fail.
 """
         
-        self.email_notifier.send_critical_alert(subject, message)
+        self.email_notifier.send_alert(subject, message)
     
     def _send_panic_alert(self, drawdown: float, current_value: float, peak_value: float):
         """Send panic alert email."""
@@ -365,7 +365,7 @@ RESUME PROTOCOL:
 IMMEDIATE MANUAL REVIEW RECOMMENDED.
 """
         
-        self.email_notifier.send_critical_alert(subject, message)
+        self.email_notifier.send_alert(subject, message)
     
     def should_flatten_positions(self) -> bool:
         """
