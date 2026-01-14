@@ -57,7 +57,7 @@ fi
 echo "" | tee -a "$LOG_FILE"
 echo "Step 2: Running Day 1 execution..." | tee -a "$LOG_FILE"
 export ENABLE_BROKER_RECONCILIATION=true
-python3 src/multi_strategy_main.py 2>&1 | tee -a "$LOG_FILE"
+python3 src/execution_engine.py 2>&1 | tee -a "$LOG_FILE"
 
 RUN_STATUS=$?
 
