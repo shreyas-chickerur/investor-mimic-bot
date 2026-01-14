@@ -560,10 +560,16 @@ if intent_id:
 python scripts/check_broker_state.py
 
 # Sync database with broker (overwrites DB)
-python scripts/sync_database.py --force
+python scripts/sync_broker_state.py
 
-# Verify reconciliation
-python scripts/verify_execution.py
+# This will:
+# - Fetch current broker positions and cash
+# - Clear local database positions
+# - Update database to match broker state
+# - Verify sync was successful
+
+# Alternative: Use Makefile
+make sync-db
 ```
 
 **View Reconciliation History:**
@@ -707,10 +713,29 @@ sqlite3 trading.db "SELECT * FROM broker_state WHERE reconciliation_status='FAIL
 
 ```bash
 # Sync database to broker state (overwrites DB)
-python scripts/sync_database.py --force
+python scripts/sync_broker_state.py
 
-# Verify sync worked
-python scripts/verify_execution.py
+# Or use Makefile
+make sync-db
+
+# Verify sync worked - reconciliation should now pass
+python3 -c "
+import sys
+sys.path.insert(0, 'src')
+from broker_reconciler import BrokerReconciler
+import sqlite3
+
+reconciler = BrokerReconciler()
+broker_state = reconciler.get_broker_state()
+conn = sqlite3.connect('trading.db')
+cursor = conn.cursor()
+cursor.execute('SELECT symbol, shares, avg_price FROM positions')
+local_positions = {row[0]: {'qty': int(row[1]), 'avg_price': float(row[2])} for row in cursor.fetchall()}
+conn.close()
+
+success, _ = reconciler.reconcile_daily(local_positions, broker_state['cash'])
+print(f'Reconciliation: {\"✅ PASS\" if success else \"❌ FAIL\"}')
+"
 ```
 
 ### GitHub Actions Failures

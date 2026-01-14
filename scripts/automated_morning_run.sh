@@ -40,33 +40,16 @@ if [ -z "$ALPACA_API_KEY" ] || [ -z "$ALPACA_SECRET_KEY" ]; then
 fi
 echo "✅ Alpaca credentials verified" | tee -a "$LOG_FILE"
 
-# Step 1: Verify positions cleared
+# Step 1: Sync database with broker state
 echo "" | tee -a "$LOG_FILE"
-echo "Step 1: Verifying broker positions cleared..." | tee -a "$LOG_FILE"
-python3 -c "
-import sys
-sys.path.insert(0, 'src')
-from broker_reconciler import BrokerReconciler
+echo "Step 1: Syncing database with broker state..." | tee -a "$LOG_FILE"
+python3 scripts/sync_broker_state.py 2>&1 | tee -a "$LOG_FILE"
 
-r = BrokerReconciler()
-s = r.get_broker_state()
-print(f'Positions: {len(s[\"positions\"])}')
-print(f'Cash: \${s[\"cash\"]:,.2f}')
+SYNC_STATUS=$?
 
-if len(s['positions']) == 0:
-    print('\n✅ READY FOR DAY 1')
-    sys.exit(0)
-else:
-    print(f'\n⚠️ {len(s[\"positions\"])} positions remain - aborting')
-    sys.exit(1)
-" 2>&1 | tee -a "$LOG_FILE"
-
-POSITIONS_CHECK=$?
-
-if [ $POSITIONS_CHECK -ne 0 ]; then
+if [ $SYNC_STATUS -ne 0 ]; then
     echo "" | tee -a "$LOG_FILE"
-    echo "❌ Positions not cleared. Aborting automated run." | tee -a "$LOG_FILE"
-    echo "Please check manually and run when ready." | tee -a "$LOG_FILE"
+    echo "❌ Database sync failed. Aborting automated run." | tee -a "$LOG_FILE"
     exit 1
 fi
 
@@ -94,17 +77,23 @@ if json_path.exists():
     with open(json_path) as f:
         data = json.load(f)
     
-    recon = data.get('reconciliation_status', 'UNKNOWN')
-    discrep = len(data.get('reconciliation_discrepancies', []))
+    system_health = data.get('system_health', {})
+    recon = system_health.get('reconciliation_status', 'UNKNOWN')
+    discrep = system_health.get('reconciliation_discrepancies', [])
+    discrep_count = len(discrep) if isinstance(discrep, list) else 0
     
     print(f'Reconciliation: {recon}')
-    print(f'Discrepancies: {discrep}')
+    print(f'Discrepancies: {discrep_count}')
     
-    if 'PASS' in recon and discrep == 0:
-        print('\n✅ DAY 1 COMPLETE - Phase 5 started!')
+    if 'PASS' in recon and discrep_count == 0:
+        print('\n✅ Execution complete - Reconciliation passed!')
         sys.exit(0)
     else:
         print('\n❌ Reconciliation failed')
+        if discrep_count > 0:
+            print('Discrepancies:')
+            for d in discrep:
+                print(f'  - {d}')
         sys.exit(1)
 else:
     print(f'❌ No artifact found for {date}')

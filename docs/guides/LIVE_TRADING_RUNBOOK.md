@@ -318,23 +318,54 @@ MIN_HISTORY_DAYS=250              # For 200-day MA
 ```bash
 # View latest reconciliation
 sqlite3 trading.db "SELECT * FROM broker_state WHERE snapshot_type='RECONCILIATION' ORDER BY created_at DESC LIMIT 1;"
+
+# Or check broker vs local state
+python scripts/check_broker_state.py
 ```
 
-**Step 2: Sync Database to Broker (Overwrites DB)**
+**Step 2: Sync Database to Broker**
 ```bash
-python scripts/sync_database.py --force
+# Recommended: Use the sync tool
+python scripts/sync_broker_state.py
+
+# This will:
+# - Fetch current broker positions
+# - Clear local database positions
+# - Update database to match broker
+# - Verify sync was successful
 ```
 
 **⚠️ WARNING:** This overwrites database with broker state. Any pending signals/intents will be lost.
 
 **Step 3: Verify Sync**
 ```bash
-python scripts/verify_execution.py
+# Check reconciliation status
+python3 -c "
+import sys
+sys.path.insert(0, 'src')
+from broker_reconciler import BrokerReconciler
+import sqlite3
+
+reconciler = BrokerReconciler()
+broker_state = reconciler.get_broker_state()
+
+conn = sqlite3.connect('trading.db')
+cursor = conn.cursor()
+cursor.execute('SELECT symbol, shares, avg_price FROM positions')
+local_positions = {row[0]: {'qty': int(row[1]), 'avg_price': float(row[2])} for row in cursor.fetchall()}
+conn.close()
+
+success, discrepancies = reconciler.reconcile_daily(local_positions, broker_state['cash'])
+print(f'Reconciliation: {\"✅ PASS\" if success else \"❌ FAIL\"}')
+if discrepancies:
+    for d in discrepancies:
+        print(f'  - {d}')
+"
 ```
 
 **Step 4: Resume Trading**
 
-Reconciliation will automatically pass on next run if sync was successful.
+Reconciliation will automatically pass on next run if sync was successful. The automated morning run now includes database sync as Step 1.
 
 ### Configuration
 

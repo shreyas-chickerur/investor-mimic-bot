@@ -116,7 +116,7 @@ positions:
 # Database operations
 sync-db:
 	@echo "🔄 Syncing database with Alpaca..."
-	python3 scripts/sync_database.py
+	python3 scripts/sync_broker_state.py
 
 update-data:
 	@echo "📥 Updating market data..."
