@@ -89,7 +89,8 @@ This is a **production-ready quantitative trading system** designed for automate
 - **Mandatory Pre-Trade Check** - Broker positions vs database verification
 - **1% Tolerance** - Blocks trading on any mismatch beyond threshold
 - **Critical Alerts** - Immediate notification on reconciliation failure
-- **Artifact Generation** - `reconciliation_diff.json` with discrepancies
+- **Automatic Sync** - Morning runs sync database with broker before trading
+- **Manual Sync Tool** - `sync_broker_state.py` for resolving discrepancies
 
 **Comprehensive Testing:**
 - **135+ Unit Tests** - Core functionality coverage
