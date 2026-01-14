@@ -202,13 +202,19 @@ class DataQualityChecker:
         
         # Check each required indicator
         # Note: Execution engine filters to last 100 days before calling this
+        # For 100-day filtered data, sma_100 will have ~12 NaN at start (17%)
+        # Use relaxed threshold for long-period indicators
         for indicator in self.required_indicators:
             if indicator in symbol_data.columns:
                 nan_count = symbol_data[indicator].isna().sum()
                 nan_pct = nan_count / total_rows
                 
-                if nan_pct > self.max_nan_pct:
-                    return True, f"{indicator} has {nan_pct:.1%} NaN (threshold: {self.max_nan_pct:.1%})"
+                # Relaxed threshold for long-period indicators (sma_100, sma_200)
+                # These need 100/200 days warmup, so will have NaN at start of 100-day window
+                threshold = 0.20 if indicator in ['sma_100', 'sma_200', 'price_to_sma100', 'price_to_sma200'] else self.max_nan_pct
+                
+                if nan_pct > threshold:
+                    return True, f"{indicator} has {nan_pct:.1%} NaN (threshold: {threshold:.1%})"
         
         return False, ""
     
