@@ -12,11 +12,11 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-from portfolio_backtester import PortfolioBacktester
-from regime_detector import RegimeDetector
-from correlation_filter import CorrelationFilter
-from portfolio_risk_manager import PortfolioRiskManager
-from execution_costs import ExecutionCostModel
+from src.integration.portfolio_backtester import PortfolioBacktester
+from src.regime.regime_detector import RegimeDetector
+from src.risk.correlation_filter import CorrelationFilter
+from src.risk.portfolio_risk_manager import PortfolioRiskManager
+from src.utils.execution_costs import ExecutionCostModel
 
 from strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
 

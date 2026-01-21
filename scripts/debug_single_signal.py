@@ -13,8 +13,8 @@ import logging
 logging.basicConfig(level=logging.DEBUG, format='%(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
 
-from portfolio_risk_manager import PortfolioRiskManager
-from execution_costs import ExecutionCostModel
+from src.risk.portfolio_risk_manager import PortfolioRiskManager
+from src.utils.execution_costs import ExecutionCostModel
 
 def test_signal_execution():
     """Manually trace a single signal through execution"""

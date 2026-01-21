@@ -7,7 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 import unittest
-from email_notifier import EmailNotifier
+from src.utils.email_notifier import EmailNotifier
 
 
 class TestEmailAlert(unittest.TestCase):

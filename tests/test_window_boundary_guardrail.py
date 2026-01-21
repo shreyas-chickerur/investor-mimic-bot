@@ -6,7 +6,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
 
-import window_boundary_guardrail
+from src.utils import window_boundary_guardrail
 
 
 def test_guardrail_passes_with_no_activity():

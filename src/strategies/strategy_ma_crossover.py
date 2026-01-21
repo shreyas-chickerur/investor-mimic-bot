@@ -7,7 +7,8 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from strategy_base import TradingStrategy
+from src.core.strategy_base import TradingStrategy
+from src.utils.config_loader import get_config
 from typing import List, Dict
 import pandas as pd
 
@@ -21,9 +22,11 @@ class MACrossoverStrategy(TradingStrategy):
             name="MA Crossover",
             capital=capital
         )
-        # IMPROVED: Faster MAs (20/100 instead of 50/200)
-        self.short_window = 20
-        self.long_window = 100
+        # Load parameters from config
+        config = get_config()
+        self.short_window = config.get('strategies.ma_crossover.fast_ma', 20)
+        self.long_window = config.get('strategies.ma_crossover.slow_ma', 50)
+        self.volume_confirmation = config.get('strategies.ma_crossover.volume_confirmation', True)
         self.adx_threshold = 20  # Minimum trend strength
     
     def generate_signals(self, market_data: pd.DataFrame) -> List[Dict]:

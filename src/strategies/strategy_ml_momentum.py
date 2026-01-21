@@ -8,14 +8,14 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from strategy_base import TradingStrategy
+from src.core.strategy_base import TradingStrategy
+from src.utils.config_loader import get_config
 from typing import List, Dict
 import pandas as pd
 import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import StandardScaler
 
 
 class MLMomentumStrategy(TradingStrategy):
@@ -27,6 +27,12 @@ class MLMomentumStrategy(TradingStrategy):
             name="ML Momentum",
             capital=capital
         )
+        # Load parameters from config
+        config = get_config()
+        self.lookback_days = config.get('strategies.ml_momentum.lookback_days', 60)
+        self.min_confidence = config.get('strategies.ml_momentum.min_confidence', 0.60)
+        self.feature_count = config.get('strategies.ml_momentum.feature_count', 10)
+        
         self.hold_days = 5
         self.entry_dates = {}
         # IMPROVED: Use Logistic Regression classifier
@@ -34,7 +40,7 @@ class MLMomentumStrategy(TradingStrategy):
         self.scaler = StandardScaler()
         self.is_trained = False
         self.model_trained = False
-        self.min_probability = 0.6  # Minimum probability for buy signal
+        self.min_probability = self.min_confidence
         
     def _prepare_features(self, symbol_data: pd.DataFrame) -> np.array:
         """Extract features for ML model"""

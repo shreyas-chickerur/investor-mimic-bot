@@ -21,8 +21,8 @@ import pandas as pd
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / 'src'))
 
-from data_validator import DataValidator
-from database import TradingDatabase
+from src.data.data_validator import DataValidator
+from src.core.database import TradingDatabase
 
 
 def check_market_open():

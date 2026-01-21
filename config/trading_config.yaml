@@ -1,0 +1,152 @@
+# Trading System Configuration
+# All hardcoded parameters centralized here
+
+# Risk Management
+risk:
+  # Portfolio-level risk limits
+  max_portfolio_heat: 0.30  # Maximum 30% of portfolio at risk
+  max_daily_loss_pct: 0.02  # Maximum 2% daily loss before halt
+  max_position_size_pct: 0.10  # Maximum 10% per position
+  
+  # Drawdown stops
+  drawdown_halt_threshold: 0.08  # 8% drawdown triggers halt
+  drawdown_panic_threshold: 0.10  # 10% drawdown triggers panic
+  halt_cooldown_days: 10
+  panic_cooldown_days: 20
+  rampup_days: 5
+  rampup_sizing_pct: 0.50  # 50% sizing during rampup
+  flatten_on_panic: true
+  
+  # Stop losses
+  stop_loss_atr_multiplier: 2.5  # 2.5x ATR for stop loss
+  trailing_stop_atr_multiplier: 3.0  # 3x ATR for trailing stop
+  
+  # Correlation filter
+  correlation_window: 60  # 60-day rolling correlation
+  correlation_short_window: 20  # 20-day short window for regime shifts
+  max_correlation: 0.70  # Reject if correlation > 0.7
+
+# Position Sizing
+position_sizing:
+  base_risk_per_trade: 0.01  # 1% portfolio risk per trade
+  atr_period: 14  # 14-day ATR for volatility
+  min_position_value: 100  # Minimum $100 position
+  max_position_value: 50000  # Maximum $50k position
+
+# Execution
+execution:
+  execution_time: "16:15"  # 4:15 PM ET (15 min before close)
+  timezone: "America/New_York"
+  
+  # Execution costs
+  commission_per_share: 0.0  # $0 commission (Alpaca)
+  slippage_bps: 5  # 5 basis points slippage
+  market_impact_threshold: 0.01  # 1% of daily volume
+  
+  # Order management
+  order_timeout_seconds: 300  # 5 minute timeout
+  max_retries: 3
+
+# Regime Detection
+regime:
+  # VIX thresholds
+  vix_low_threshold: 15  # Low volatility regime
+  vix_high_threshold: 25  # High volatility regime
+  vix_crisis_threshold: 35  # Crisis regime
+  
+  # Trend detection
+  trend_lookback_days: 60  # 60-day trend
+  trend_ma_short: 20  # 20-day MA
+  trend_ma_long: 50  # 50-day MA
+  
+  # Regime-based adjustments
+  high_vol_heat_reduction: 0.20  # Reduce heat by 20% in high vol
+  crisis_heat_reduction: 0.50  # Reduce heat by 50% in crisis
+
+# Strategy Allocation
+strategies:
+  # Dynamic allocation
+  enable_dynamic_allocation: true
+  rebalance_frequency_days: 30  # Rebalance every 30 days
+  min_allocation_pct: 0.10  # Minimum 10% per strategy
+  max_allocation_pct: 0.35  # Maximum 35% per strategy
+  
+  # Strategy-specific parameters
+  rsi_mean_reversion:
+    rsi_period: 14
+    rsi_oversold: 30
+    rsi_overbought: 70
+    rsi_slope_threshold: 5
+    vwap_proximity_pct: 0.02
+    
+  ma_crossover:
+    fast_ma: 20
+    slow_ma: 50
+    volume_confirmation: true
+    
+  ml_momentum:
+    lookback_days: 60
+    min_confidence: 0.60
+    feature_count: 10
+    
+  volatility_breakout:
+    atr_period: 14
+    breakout_multiplier: 2.0
+    volume_surge_threshold: 1.5
+
+# Data Management
+data:
+  # Data sources
+  primary_source: "alpaca"  # alpaca or alpha_vantage
+  backup_source: "alpha_vantage"
+  
+  # Data quality
+  min_data_points: 100  # Minimum data points required
+  max_missing_pct: 0.05  # Maximum 5% missing data
+  outlier_std_threshold: 5  # 5 standard deviations
+  
+  # Universe
+  universe_size: 36  # Number of stocks in universe
+  rebalance_universe_days: 90  # Rebalance universe every 90 days
+
+# Monitoring
+monitoring:
+  # Performance tracking
+  track_sharpe: true
+  track_sortino: true
+  track_calmar: true
+  rolling_window_days: 252  # 1 year rolling metrics
+  
+  # Alerts
+  enable_email_alerts: true
+  alert_on_drawdown: true
+  alert_on_daily_loss: true
+  alert_on_reconciliation_fail: true
+  
+  # Artifact generation
+  save_daily_artifacts: true
+  artifact_retention_days: 365
+
+# Backtesting
+backtesting:
+  # Walk-forward parameters
+  training_period_years: 2
+  test_period_months: 6
+  step_size_months: 6
+  
+  # Validation
+  min_sharpe: 0.5  # Minimum acceptable Sharpe
+  max_drawdown: 0.25  # Maximum acceptable drawdown
+  min_trades: 30  # Minimum trades for valid backtest
+
+# Paper Trading
+paper_trading:
+  min_duration_days: 14  # Minimum 2 weeks
+  log_all_signals: true
+  log_rejected_signals: true
+  
+# Database
+database:
+  path: "trading.db"
+  backup_frequency_days: 7
+  vacuum_frequency_days: 30

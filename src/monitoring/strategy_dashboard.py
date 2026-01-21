@@ -4,7 +4,7 @@ Strategy Dashboard
 Admin interface to compare and monitor all strategies
 """
 from flask import Flask, render_template_string, jsonify
-from strategy_database import StrategyDatabase
+from src.integration.strategy_database import StrategyDatabase
 from datetime import datetime
 
 app = Flask(__name__)

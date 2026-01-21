@@ -10,7 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 import sqlite3
-from strategy_database import StrategyDatabase
+from src.integration.strategy_database import StrategyDatabase
 
 
 def init_database(db_path='trading.db'):

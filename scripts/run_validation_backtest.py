@@ -30,14 +30,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-from signal_injection_engine import SignalInjectionEngine
-from signal_tracer import SignalFlowTracer
-from portfolio_backtester import PortfolioBacktester
-from regime_detector import RegimeDetector
-from correlation_filter import CorrelationFilter
-from portfolio_risk_manager import PortfolioRiskManager
-from execution_costs import ExecutionCostModel
-from window_boundary_guardrail import test_window_boundary_guardrail, explain_window_behavior
+from src.utils.signal_injection_engine import SignalInjectionEngine
+from src.utils.signal_tracer import SignalFlowTracer
+from src.integration.portfolio_backtester import PortfolioBacktester
+from src.regime.regime_detector import RegimeDetector
+from src.risk.correlation_filter import CorrelationFilter
+from src.risk.portfolio_risk_manager import PortfolioRiskManager
+from src.utils.execution_costs import ExecutionCostModel
+from src.utils.window_boundary_guardrail import test_window_boundary_guardrail, explain_window_behavior
 
 from strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
 

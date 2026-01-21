@@ -57,7 +57,7 @@ def main():
     print("=" * 80)
     
     # Import Alpha Vantage fetcher
-    from alpha_vantage_fetcher import AlphaVantageFetcher
+    from src.data.alpha_vantage_fetcher import AlphaVantageFetcher
     
     # Check if we should do incremental update or full fetch
     data_path = Path(__file__).parent.parent / 'data' / 'training_data.csv'

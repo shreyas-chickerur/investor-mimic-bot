@@ -153,7 +153,7 @@ class TestErrorHandling(unittest.TestCase):
     
     def test_empty_dataframe_handling(self):
         """Test handling of empty data"""
-        from trading_system import TradingSystem
+        from src.core.trading_system import TradingSystem
         
         system = TradingSystem(capital=10000)
         
@@ -171,7 +171,7 @@ class TestErrorHandling(unittest.TestCase):
     
     def test_invalid_data_handling(self):
         """Test handling of invalid data"""
-        from trading_system import TradingSystem
+        from src.core.trading_system import TradingSystem
         
         system = TradingSystem(capital=10000)
         
@@ -206,7 +206,7 @@ class TestFutureFeatures(unittest.TestCase):
     
     def test_position_sizing_flexibility(self):
         """Test different position sizing methods"""
-        from trading_system import TradingSystem
+        from src.core.trading_system import TradingSystem
         
         # Test different position sizes
         for size in [0.05, 0.10, 0.15, 0.20]:
@@ -217,7 +217,7 @@ class TestFutureFeatures(unittest.TestCase):
     
     def test_max_positions_configurable(self):
         """Test max positions is configurable"""
-        from trading_system import TradingSystem
+        from src.core.trading_system import TradingSystem
         
         # Test different max positions
         for max_pos in [5, 10, 15, 20]:

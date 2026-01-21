@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 import unittest
 from unittest.mock import Mock, patch, MagicMock
-from broker_reconciler import BrokerReconciler, ReconciliationMismatch
+from src.risk.broker_reconciler import BrokerReconciler, ReconciliationMismatch
 
 
 class TestBrokerReconciler(unittest.TestCase):

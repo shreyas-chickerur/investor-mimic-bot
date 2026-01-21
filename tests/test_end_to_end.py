@@ -92,10 +92,10 @@ def test_risk_management():
     print("TEST 4: RISK MANAGEMENT")
     print("="*80)
     
-    from regime_detector import RegimeDetector
-    from correlation_filter import CorrelationFilter
-    from portfolio_risk_manager import PortfolioRiskManager
-    from execution_costs import ExecutionCostModel
+    from src.regime.regime_detector import RegimeDetector
+    from src.risk.correlation_filter import CorrelationFilter
+    from src.risk.portfolio_risk_manager import PortfolioRiskManager
+    from src.utils.execution_costs import ExecutionCostModel
     
     # Initialize components
     regime = RegimeDetector()
@@ -129,12 +129,12 @@ def test_backtester_integration():
     print("TEST 5: BACKTESTER INTEGRATION")
     print("="*80)
     
-    from portfolio_backtester import PortfolioBacktester
+    from src.integration.portfolio_backtester import PortfolioBacktester
     from strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
-    from regime_detector import RegimeDetector
-    from correlation_filter import CorrelationFilter
-    from portfolio_risk_manager import PortfolioRiskManager
-    from execution_costs import ExecutionCostModel
+    from src.regime.regime_detector import RegimeDetector
+    from src.risk.correlation_filter import CorrelationFilter
+    from src.risk.portfolio_risk_manager import PortfolioRiskManager
+    from src.utils.execution_costs import ExecutionCostModel
     
     # Load data
     df = pd.read_csv('data/training_data.csv', index_col=0)
@@ -175,8 +175,8 @@ def test_signal_injection():
     print("TEST 6: SIGNAL INJECTION (VALIDATION)")
     print("="*80)
     
-    from signal_injection_engine import SignalInjectionEngine
-    from signal_tracer import SignalFlowTracer
+    from src.utils.signal_injection_engine import SignalInjectionEngine
+    from src.utils.signal_tracer import SignalFlowTracer
     
     # Initialize
     injection_engine = SignalInjectionEngine()
@@ -202,9 +202,9 @@ def test_execution_pipeline():
     print("TEST 7: EXECUTION PIPELINE")
     print("="*80)
     
-    from portfolio_backtester import PortfolioBacktester
-    from execution_costs import ExecutionCostModel
-    from portfolio_risk_manager import PortfolioRiskManager
+    from src.integration.portfolio_backtester import PortfolioBacktester
+    from src.utils.execution_costs import ExecutionCostModel
+    from src.risk.portfolio_risk_manager import PortfolioRiskManager
     
     # Create backtester
     backtester = PortfolioBacktester(100000)
@@ -247,7 +247,7 @@ def test_performance_metrics():
     print("TEST 8: PERFORMANCE METRICS")
     print("="*80)
     
-    from performance_metrics import PerformanceMetrics
+    from src.monitoring.performance_metrics import PerformanceMetrics
     
     metrics = PerformanceMetrics()
     

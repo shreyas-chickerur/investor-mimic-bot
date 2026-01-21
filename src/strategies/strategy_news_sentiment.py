@@ -7,8 +7,8 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from strategy_base import TradingStrategy
-from news_sentiment import NewsSentimentProvider
+from src.core.strategy_base import TradingStrategy
+from src.utils.news_sentiment import NewsSentimentProvider
 from typing import List, Dict
 import pandas as pd
 

@@ -105,7 +105,7 @@ This is a **production-ready quantitative trading system** designed for automate
 - **Broker Reconciliation** - Automated position/cash verification before every execution
 - **Execution Cost Modeling** - Realistic slippage (0.05%) and commission ($1/trade) simulation
 - **Strategy Performance Tracking** - Per-strategy metrics, rankings, and visual analytics
-- **Web Dashboard UI** - Beautiful interactive dashboard with charts and performance tables
+- **Streamlit Dashboard** - Real-time monitoring with interactive charts and performance metrics
 - **Automated Execution** - GitHub Actions workflow runs daily at 6:30 AM PST
 - **Email Notifications** - Daily digest with trade summaries, weekly visual reports (Mon/Wed/Fri)
 
@@ -329,6 +329,39 @@ regime_type, regime_vix, status
 ```
 
 **Schema Documentation:** See [`docs/reference/TRADING_DB_SCHEMA.md`](docs/reference/TRADING_DB_SCHEMA.md)
+
+---
+
+## 📊 Dashboard
+
+### Real-Time Monitoring Dashboard
+
+The system includes a **Streamlit-based dashboard** for real-time monitoring of trading performance, positions, and risk metrics.
+
+**Features:**
+- 📈 Portfolio performance charts (equity curve, P&L)
+- 💼 Current positions with unrealized P&L
+- 📝 Recent trade history
+- 🎯 Per-strategy performance metrics (win rate, total P&L)
+- ⚠️ Risk metrics (portfolio heat, max drawdown, daily loss)
+- 🔄 Auto-refresh capability
+
+**Launch Dashboard:**
+```bash
+# Option 1: Using the run script
+cd dashboard
+./run.sh
+
+# Option 2: Direct streamlit command
+streamlit run dashboard/app.py --server.port 8501
+
+# Option 3: From project root
+python -m streamlit run dashboard/app.py
+```
+
+**Access:** Open browser to `http://localhost:8501`
+
+**Requirements:** Dashboard requires `trading.db` with populated data. Run the system at least once before viewing.
 
 ---
 
