@@ -17,7 +17,7 @@ sys.path.insert(0, str(project_root / 'src'))
 from dotenv import load_dotenv
 load_dotenv()
 
-from database import TradingDatabase
+from src.core.database import TradingDatabase
 from strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
 from strategies.strategy_ml_momentum import MLMomentumStrategy
 from strategies.strategy_news_sentiment import NewsSentimentStrategy
@@ -29,27 +29,28 @@ from alpaca.trading.enums import OrderSide, TimeInForce
 import pandas as pd
 
 # Import new modules for professional-grade system
-from email_notifier import EmailNotifier
-from data_validator import DataValidator
-from cash_manager import CashManager
-from portfolio_risk_manager import PortfolioRiskManager
-from correlation_filter import CorrelationFilter
-from regime_detector import RegimeDetector
-from dynamic_allocator import DynamicAllocator
-from execution_costs import ExecutionCostModel
-from performance_metrics import PerformanceMetrics
-from broker_reconciler import BrokerReconciler
-from artifact_writer import DailyArtifactWriter, create_artifact_data
-from kill_switch_service import KillSwitchService
-from signal_funnel_tracker import SignalFunnelTracker
-from universe_provider import UniverseProvider
-from pending_signals_manager import PendingSignalsManager
-from structured_logger import StructuredLogger
-from drawdown_stop_manager import DrawdownStopManager
-from data_quality_checker import DataQualityChecker
-from dry_run_wrapper import DryRunWrapper, get_dry_run_wrapper
-from strategy_health_scorer import StrategyHealthScorer
-from pnl_calculator import PnLCalculator
+from src.utils.email_notifier import EmailNotifier
+from src.data.data_validator import DataValidator
+from src.integration.cash_manager import CashManager
+from src.risk.portfolio_risk_manager import PortfolioRiskManager
+from src.risk.correlation_filter import CorrelationFilter
+from src.regime.regime_detector import RegimeDetector
+from src.regime.dynamic_allocator import DynamicAllocator
+from src.utils.execution_costs import ExecutionCostModel
+from src.monitoring.performance_metrics import PerformanceMetrics
+from src.risk.broker_reconciler import BrokerReconciler
+from src.monitoring.artifact_writer import DailyArtifactWriter, create_artifact_data
+from src.utils.kill_switch_service import KillSwitchService
+from src.monitoring.signal_funnel_tracker import SignalFunnelTracker
+from src.data.universe_provider import UniverseProvider
+from src.integration.pending_signals_manager import PendingSignalsManager
+from src.utils.structured_logger import StructuredLogger
+from src.risk.drawdown_stop_manager import DrawdownStopManager
+from src.data.data_quality_checker import DataQualityChecker
+from src.integration.dry_run_wrapper import DryRunWrapper, get_dry_run_wrapper
+from src.monitoring.strategy_health_scorer import StrategyHealthScorer
+from src.monitoring.pnl_calculator import PnLCalculator
+from src.utils.config_loader import get_config
 
 # Setup logging - CRITICAL FIX: Ensure logs directory exists
 Path('logs').mkdir(exist_ok=True)
@@ -67,6 +68,10 @@ class MultiStrategyRunner:
     """Runs all 5 strategies with independent tracking"""
     
     def __init__(self):
+        # Load configuration
+        self.config = get_config()
+        logger.info("Configuration loaded from YAML")
+        
         self.db = TradingDatabase('trading.db')
         self.run_id = self.db.run_id
         self.asof_date = datetime.now().strftime('%Y-%m-%d')
@@ -112,33 +117,66 @@ class MultiStrategyRunner:
         
         logger.info(f"Portfolio: ${self.portfolio_value:.2f}, Cash: ${self.cash_available:.2f}")
         
-        # Initialize professional-grade modules
+        # Initialize professional-grade modules with config
         self.email_notifier = EmailNotifier()
         self.data_validator = DataValidator()
         self.cash_manager = CashManager(self.portfolio_value)
-        self.portfolio_risk = PortfolioRiskManager()
-        self.correlation_filter = CorrelationFilter()
+        
+        # Portfolio risk manager - load from config
+        max_heat = self.config.get('risk.max_portfolio_heat', 0.30)
+        max_daily_loss = self.config.get('risk.max_daily_loss_pct', 0.02)
+        self.portfolio_risk = PortfolioRiskManager(
+            max_portfolio_heat=max_heat,
+            max_daily_loss_pct=max_daily_loss,
+            daily_start_value=self.portfolio_value
+        )
+        logger.info(f"Portfolio Risk Manager: max_heat={max_heat:.1%}, max_daily_loss={max_daily_loss:.1%}")
+        
+        # Correlation filter - load from config
+        corr_window = self.config.get('risk.correlation_window', 60)
+        corr_short_window = self.config.get('risk.correlation_short_window', 20)
+        max_corr = self.config.get('risk.max_correlation', 0.70)
+        self.correlation_filter = CorrelationFilter(
+            correlation_window=corr_window,
+            short_window=corr_short_window,
+            max_correlation=max_corr
+        )
+        logger.info(f"Correlation Filter: window={corr_window}, short={corr_short_window}, max={max_corr}")
+        
         self.regime_detector = RegimeDetector()
         self.dynamic_allocator = DynamicAllocator(self.portfolio_value)
         self.cost_model = ExecutionCostModel()
         self.performance_metrics = PerformanceMetrics()
         self.broker_reconciler = BrokerReconciler(email_notifier=self.email_notifier)
         
-        # Initialize stop loss manager (3x ATR catastrophe stops)
-        from stop_loss_manager import StopLossManager
-        self.stop_loss_manager = StopLossManager(atr_multiplier=3.0)
-        logger.info("Stop Loss Manager initialized: 3x ATR catastrophe stops enabled")
+        # Initialize stop loss manager - load from config
+        stop_loss_multiplier = self.config.get('risk.stop_loss_atr_multiplier', 2.5)
+        from src.risk.stop_loss_manager import StopLossManager
+        self.stop_loss_manager = StopLossManager(atr_multiplier=stop_loss_multiplier)
+        logger.info(f"Stop Loss Manager initialized: {stop_loss_multiplier}x ATR catastrophe stops enabled")
         
         # Initialize production-readiness modules
         self.kill_switch = KillSwitchService(self.db, self.email_notifier)
         self.funnel_tracker = SignalFunnelTracker(self.db)
         self.universe_provider = UniverseProvider()
-        self.pending_signals = PendingSignalsManager(self.db, decay_days=3)
+        
+        # Pending signals - load decay from config
+        decay_days = self.config.get('monitoring.signal_decay_days', 3)
+        self.pending_signals = PendingSignalsManager(self.db, decay_days=decay_days)
         self.structured_logger = StructuredLogger(self.run_id)
         logger.info("Production-readiness modules initialized: kill switches, funnel tracking, universe provider, pending signals, structured logging")
         
-        # Initialize live trading safety modules
-        self.drawdown_manager = DrawdownStopManager(self.db, self.email_notifier)
+        # Initialize live trading safety modules - load from config
+        halt_threshold = self.config.get('risk.drawdown_halt_threshold', 0.08)
+        panic_threshold = self.config.get('risk.drawdown_panic_threshold', 0.10)
+        self.drawdown_manager = DrawdownStopManager(
+            self.db, 
+            self.email_notifier,
+            halt_threshold=halt_threshold,
+            panic_threshold=panic_threshold
+        )
+        logger.info(f"Drawdown Manager: halt={halt_threshold:.1%}, panic={panic_threshold:.1%}")
+        
         self.data_quality_checker = DataQualityChecker()
         self.dry_run = get_dry_run_wrapper()
         self.health_scorer = StrategyHealthScorer(self.db)

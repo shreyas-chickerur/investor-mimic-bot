@@ -28,7 +28,7 @@ from datetime import datetime, timedelta
 import tempfile
 import shutil
 
-from trading_system import TradingSystem
+from src.core.trading_system import TradingSystem
 
 class TestTradingSystem(unittest.TestCase):
     """Comprehensive test suite for trading system"""

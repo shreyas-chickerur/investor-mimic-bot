@@ -28,7 +28,11 @@ class DrawdownStopManager:
     - 50% sizing for 5 days after resume
     """
     
-    def __init__(self, db, email_notifier, artifacts_dir='artifacts/drawdown'):
+    def __init__(self, db, email_notifier, artifacts_dir='artifacts/drawdown',
+                 halt_threshold: float = 0.08, panic_threshold: float = 0.10,
+                 halt_cooldown_days: int = 10, panic_cooldown_days: int = 20,
+                 rampup_sizing_pct: float = 0.50, rampup_days: int = 5,
+                 flatten_on_panic: bool = True):
         """
         Initialize drawdown stop manager.
         
@@ -36,25 +40,32 @@ class DrawdownStopManager:
             db: Database instance
             email_notifier: Email notifier for critical alerts
             artifacts_dir: Directory for drawdown artifacts
+            halt_threshold: Drawdown threshold to halt trading (default 8%)
+            panic_threshold: Drawdown threshold for panic mode (default 10%)
+            halt_cooldown_days: Cooldown days after halt (default 10)
+            panic_cooldown_days: Cooldown days after panic (default 20)
+            rampup_sizing_pct: Position sizing during rampup (default 50%)
+            rampup_days: Days in rampup mode (default 5)
+            flatten_on_panic: Whether to flatten positions in panic (default True)
         """
         self.db = db
         self.email_notifier = email_notifier
         self.artifacts_dir = artifacts_dir
         
-        # Thresholds
-        self.halt_threshold = float(os.getenv('DRAWDOWN_HALT_THRESHOLD', '0.08'))  # 8%
-        self.panic_threshold = float(os.getenv('DRAWDOWN_PANIC_THRESHOLD', '0.10'))  # 10%
+        # Thresholds - use parameters, fallback to env vars for backward compatibility
+        self.halt_threshold = halt_threshold or float(os.getenv('DRAWDOWN_HALT_THRESHOLD', '0.08'))
+        self.panic_threshold = panic_threshold or float(os.getenv('DRAWDOWN_PANIC_THRESHOLD', '0.10'))
         
         # Cooldown periods (trading days)
-        self.halt_cooldown_days = int(os.getenv('HALT_COOLDOWN_DAYS', '10'))
-        self.panic_cooldown_days = int(os.getenv('PANIC_COOLDOWN_DAYS', '20'))
+        self.halt_cooldown_days = halt_cooldown_days or int(os.getenv('HALT_COOLDOWN_DAYS', '10'))
+        self.panic_cooldown_days = panic_cooldown_days or int(os.getenv('PANIC_COOLDOWN_DAYS', '20'))
         
         # Resume protocol
-        self.rampup_sizing_pct = float(os.getenv('RAMPUP_SIZING_PCT', '0.50'))  # 50%
-        self.rampup_days = int(os.getenv('RAMPUP_DAYS', '5'))
+        self.rampup_sizing_pct = rampup_sizing_pct or float(os.getenv('RAMPUP_SIZING_PCT', '0.50'))
+        self.rampup_days = rampup_days or int(os.getenv('RAMPUP_DAYS', '5'))
         
         # Flatten on panic
-        self.flatten_on_panic = os.getenv('FLATTEN_ON_PANIC', 'true').lower() == 'true'
+        self.flatten_on_panic = flatten_on_panic if flatten_on_panic is not None else (os.getenv('FLATTEN_ON_PANIC', 'true').lower() == 'true')
         
         # Create artifacts directory
         os.makedirs(self.artifacts_dir, exist_ok=True)

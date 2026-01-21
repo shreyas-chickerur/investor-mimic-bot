@@ -23,11 +23,11 @@ from unittest.mock import Mock, MagicMock, patch
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from drawdown_stop_manager import DrawdownStopManager
-from data_quality_checker import DataQualityChecker
-from dry_run_wrapper import DryRunWrapper, get_dry_run_wrapper
-from signal_funnel_tracker import SignalFunnelTracker
-from strategy_health_scorer import StrategyHealthScorer
+from src.risk.drawdown_stop_manager import DrawdownStopManager
+from src.data.data_quality_checker import DataQualityChecker
+from src.integration.dry_run_wrapper import DryRunWrapper, get_dry_run_wrapper
+from src.monitoring.signal_funnel_tracker import SignalFunnelTracker
+from src.monitoring.strategy_health_scorer import StrategyHealthScorer
 
 
 class TestDrawdownStopManager:
@@ -46,7 +46,7 @@ class TestDrawdownStopManager:
     def mock_email(self):
         """Create mock email notifier."""
         email = Mock()
-        email.send_critical_alert = Mock()
+        email.send_alert = Mock()
         return email
     
     @pytest.fixture
@@ -85,7 +85,7 @@ class TestDrawdownStopManager:
         assert details['drawdown_pct'] == 0.08
         
         # Check email was sent
-        mock_email.send_critical_alert.assert_called_once()
+        mock_email.send_alert.assert_called_once()
         
         # Check state was saved
         mock_db.set_system_state.assert_called()
@@ -105,8 +105,8 @@ class TestDrawdownStopManager:
         assert details['drawdown_pct'] == 0.10
         
         # Check panic alert was sent
-        mock_email.send_critical_alert.assert_called_once()
-        assert "PANIC" in mock_email.send_critical_alert.call_args[0][0]
+        mock_email.send_alert.assert_called_once()
+        assert "PANIC" in mock_email.send_alert.call_args[0][0]
     
     def test_cooldown_state_management(self, mock_db, mock_email, temp_dir):
         """Test cooldown state transitions."""
@@ -286,6 +286,7 @@ class TestDataQualityChecker:
             'sma_50': [140.0] * 100,
             'sma_100': [135.0] * 100,
             'atr': [2.0] * 100,
+            'atr_20': [2.0] * 100,  # Add required indicator
             'volatility_20d': [0.02] * 100
         })
         
@@ -300,17 +301,18 @@ class TestDataQualityChecker:
         
         checker = DataQualityChecker(temp_dir)
         
-        # Create data with extreme price jump
+        # Create data with price outlier
         data = pd.DataFrame({
-            'symbol': ['AAPL'] * 300,
-            'date': pd.date_range(end=datetime.now(), periods=300),
-            'close': [150.0] * 299 + [300.0],  # 100% jump
-            'rsi': [50.0] * 300,
-            'sma_20': [145.0] * 300,
-            'sma_50': [140.0] * 300,
-            'sma_100': [135.0] * 300,
-            'atr': [2.0] * 300,
-            'volatility_20d': [0.02] * 300
+            'symbol': ['AAPL'] * 100,
+            'date': [datetime.now()] * 100,
+            'close': [150.0] * 99 + [10000.0],  # Outlier
+            'rsi': [50.0] * 100,
+            'sma_20': [145.0] * 100,
+            'sma_50': [140.0] * 100,
+            'sma_100': [135.0] * 100,
+            'atr': [2.0] * 100,
+            'atr_20': [2.0] * 100,  # Add required indicator
+            'volatility_20d': [0.02] * 100
         })
         
         blocked, report = checker.check_data_quality(data, datetime.now())

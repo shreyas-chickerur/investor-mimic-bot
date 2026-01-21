@@ -121,6 +121,17 @@ class PortfolioRiskManager:
         Returns:
             True if position can be added, False otherwise
         """
+        # Input validation
+        if portfolio_value <= 0:
+            logger.error(f"Invalid portfolio_value: {portfolio_value} (must be > 0)")
+            return False
+        if current_exposure < 0:
+            logger.error(f"Invalid current_exposure: {current_exposure} (must be >= 0)")
+            return False
+        if position_value < 0:
+            logger.error(f"Invalid position_value: {position_value} (must be >= 0)")
+            return False
+        
         # Check if trading is halted
         if self.trading_halted:
             logger.warning("Trading halted due to daily loss limit")

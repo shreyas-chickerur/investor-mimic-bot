@@ -12,42 +12,42 @@ def test_all_modules_import():
     print("Testing module imports...")
     
     try:
-        from regime_detector import RegimeDetector
+        from src.regime.regime_detector import RegimeDetector
         print("✅ RegimeDetector imports")
     except Exception as e:
         print(f"❌ RegimeDetector: {e}")
         raise AssertionError(f"RegimeDetector import failed: {e}") from e
     
     try:
-        from dynamic_allocator import DynamicAllocator
+        from src.regime.dynamic_allocator import DynamicAllocator
         print("✅ DynamicAllocator imports")
     except Exception as e:
         print(f"❌ DynamicAllocator: {e}")
         raise AssertionError(f"DynamicAllocator import failed: {e}") from e
     
     try:
-        from correlation_filter import CorrelationFilter
+        from src.risk.correlation_filter import CorrelationFilter
         print("✅ CorrelationFilter imports")
     except Exception as e:
         print(f"❌ CorrelationFilter: {e}")
         raise AssertionError(f"CorrelationFilter import failed: {e}") from e
     
     try:
-        from portfolio_risk_manager import PortfolioRiskManager
+        from src.risk.portfolio_risk_manager import PortfolioRiskManager
         print("✅ PortfolioRiskManager imports")
     except Exception as e:
         print(f"❌ PortfolioRiskManager: {e}")
         raise AssertionError(f"PortfolioRiskManager import failed: {e}") from e
     
     try:
-        from execution_costs import ExecutionCostModel
+        from src.utils.execution_costs import ExecutionCostModel
         print("✅ ExecutionCostModel imports")
     except Exception as e:
         print(f"❌ ExecutionCostModel: {e}")
         raise AssertionError(f"ExecutionCostModel import failed: {e}") from e
     
     try:
-        from performance_metrics import PerformanceMetrics
+        from src.monitoring.performance_metrics import PerformanceMetrics
         print("✅ PerformanceMetrics imports")
     except Exception as e:
         print(f"❌ PerformanceMetrics: {e}")
@@ -58,7 +58,7 @@ def test_regime_detection():
     """Test regime detection functionality"""
     print("\nTesting regime detection...")
     
-    from regime_detector import RegimeDetector
+    from src.regime.regime_detector import RegimeDetector
     
     rd = RegimeDetector()
     
@@ -83,7 +83,7 @@ def test_dynamic_allocation():
     """Test dynamic capital allocation"""
     print("\nTesting dynamic allocation...")
     
-    from dynamic_allocator import DynamicAllocator
+    from src.regime.dynamic_allocator import DynamicAllocator
     import numpy as np
     
     da = DynamicAllocator(100000)
@@ -120,7 +120,7 @@ def test_correlation_filter():
     """Test correlation filtering with dual windows"""
     print("\nTesting correlation filter...")
     
-    from correlation_filter import CorrelationFilter
+    from src.risk.correlation_filter import CorrelationFilter
     import pandas as pd
     import numpy as np
     
@@ -148,7 +148,7 @@ def test_portfolio_risk():
     """Test portfolio risk management"""
     print("\nTesting portfolio risk management...")
     
-    from portfolio_risk_manager import PortfolioRiskManager
+    from src.risk.portfolio_risk_manager import PortfolioRiskManager
     
     prm = PortfolioRiskManager()
     prm.set_daily_start_value(100000)
@@ -175,7 +175,7 @@ def test_execution_costs():
     """Test execution cost modeling"""
     print("\nTesting execution costs...")
     
-    from execution_costs import ExecutionCostModel
+    from src.utils.execution_costs import ExecutionCostModel
     
     ecm = ExecutionCostModel()
     
@@ -206,7 +206,7 @@ def test_performance_metrics():
     """Test performance metrics calculation"""
     print("\nTesting performance metrics...")
     
-    from performance_metrics import PerformanceMetrics
+    from src.monitoring.performance_metrics import PerformanceMetrics
     from datetime import datetime, timedelta
     
     pm = PerformanceMetrics()

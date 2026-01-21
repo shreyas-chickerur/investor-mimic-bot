@@ -7,14 +7,14 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from strategy_database import StrategyDatabase
+from src.integration.strategy_database import StrategyDatabase
 from strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
 from strategies.strategy_ml_momentum import MLMomentumStrategy
 from strategies.strategy_news_sentiment import NewsSentimentStrategy
 from strategies.strategy_ma_crossover import MACrossoverStrategy
 from strategies.strategy_volatility_breakout import VolatilityBreakoutStrategy
-from alpaca_data_fetcher import AlpacaDataFetcher
-from trade_executor import TradeExecutor
+from src.data.alpaca_data_fetcher import AlpacaDataFetcher
+from src.integration.trade_executor import TradeExecutor
 import pandas as pd
 from datetime import datetime
 

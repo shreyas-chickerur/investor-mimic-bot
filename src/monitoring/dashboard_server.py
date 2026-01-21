@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from flask import Flask, render_template_string, jsonify
-from strategy_database import StrategyDatabase
+from src.integration.strategy_database import StrategyDatabase
 from datetime import datetime
 import sqlite3
 

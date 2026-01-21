@@ -7,7 +7,8 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from strategy_base import TradingStrategy
+from src.core.strategy_base import TradingStrategy
+from src.utils.config_loader import get_config
 from typing import List, Dict
 import pandas as pd
 import numpy as np
@@ -22,6 +23,12 @@ class VolatilityBreakoutStrategy(TradingStrategy):
             name="Volatility Breakout",
             capital=capital
         )
+        # Load parameters from config
+        config = get_config()
+        self.atr_period = config.get('strategies.volatility_breakout.atr_period', 14)
+        self.breakout_multiplier = config.get('strategies.volatility_breakout.breakout_multiplier', 2.0)
+        self.volume_surge_threshold = config.get('strategies.volatility_breakout.volume_surge_threshold', 1.5)
+        
         self.bb_period = 20
         self.bb_std = 2
         self.hold_days = 7

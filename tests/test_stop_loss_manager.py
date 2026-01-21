@@ -11,7 +11,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / 'src'))
 
-from stop_loss_manager import StopLossManager
+from src.risk.stop_loss_manager import StopLossManager
 
 
 class TestStopLossManager:

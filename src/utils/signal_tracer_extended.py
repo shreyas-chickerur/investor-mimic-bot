@@ -2,7 +2,7 @@
 """
 Signal Flow Tracer - Terminal State Extensions
 
-Phase 5: Adds terminal state enforcement to existing SignalFlowTracer.
+Adds terminal state enforcement to existing SignalFlowTracer.
 Every signal must reach exactly one terminal state.
 
 Terminal States:
@@ -14,7 +14,8 @@ Terminal States:
 - REJECTED_BY_BROKER
 """
 import logging
-from typing import Dict, List, Set
+from typing import Dict, List, Set, Tuple
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -259,7 +260,7 @@ def print_terminal_state_summary(tracer):
 
 if __name__ == "__main__":
     # Test terminal state enforcement
-    from signal_flow_tracer import SignalFlowTracer
+    from src.utils.signal_tracer import SignalFlowTracer
     
     logging.basicConfig(level=logging.INFO)
     

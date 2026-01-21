@@ -7,7 +7,8 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from strategy_base import TradingStrategy
+from src.core.strategy_base import TradingStrategy
+from src.utils.config_loader import get_config
 from typing import List, Dict
 import pandas as pd
 
@@ -21,12 +22,25 @@ class RSIMeanReversionStrategy(TradingStrategy):
             name="RSI Mean Reversion",
             capital=capital
         )
-        self.rsi_threshold = 30
+        # Load parameters from config
+        config = get_config()
+        self.rsi_period = config.get('strategies.rsi_mean_reversion.rsi_period', 14)
+        self.rsi_oversold = config.get('strategies.rsi_mean_reversion.rsi_oversold', 30)
+        self.rsi_overbought = config.get('strategies.rsi_mean_reversion.rsi_overbought', 70)
+        self.rsi_slope_threshold = config.get('strategies.rsi_mean_reversion.rsi_slope_threshold', 5)
+        self.vwap_proximity_pct = config.get('strategies.rsi_mean_reversion.vwap_proximity_pct', 0.02)
+        
+        # Legacy attributes for backward compatibility
+        self.rsi_threshold = self.rsi_oversold
         self.hold_days = 20
     
     def generate_signals(self, market_data: pd.DataFrame) -> List[Dict]:
         """Generate buy signals for oversold stocks with improved filters"""
         signals = []
+        
+        # Handle empty DataFrame
+        if market_data.empty or 'symbol' not in market_data.columns:
+            return signals
         
         for symbol in market_data['symbol'].unique():
             symbol_data = market_data[market_data['symbol'] == symbol]

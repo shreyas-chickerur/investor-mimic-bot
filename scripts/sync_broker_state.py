@@ -13,7 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
-from broker_reconciler import BrokerReconciler
+from src.risk.broker_reconciler import BrokerReconciler
 import logging
 
 logging.basicConfig(level=logging.INFO, format='%(message)s')

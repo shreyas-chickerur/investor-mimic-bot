@@ -44,7 +44,7 @@ class CriticalAlertSystem:
         self.db_path = db_path
         
         # Initialize email notifier
-        from email_notifier import EmailNotifier
+        from src.utils.email_notifier import EmailNotifier
         self.email_notifier = EmailNotifier()
         
         # Initialize Twilio (optional)

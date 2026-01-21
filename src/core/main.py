@@ -35,7 +35,7 @@ sys.path.insert(0, str(project_root / 'src'))
 # Set up environment
 os.chdir(project_root)
 
-from trading_system import TradingSystem
+from src.core.trading_system import TradingSystem
 from dotenv import load_dotenv
 import pandas as pd
 
