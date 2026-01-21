@@ -112,10 +112,10 @@ class MLMomentumStrategy(TradingStrategy):
                 features = self._prepare_features(symbol_data)
                 features_scaled = self.scaler.transform(features)
                 prediction = self.model.predict(features_scaled)[0]
-                confidence = self.model.predict_proba(features_scaled)[0][1]
+                prob_positive = self.model.predict_proba(features_scaled)[0][1]
                 
-                # Buy signal: Model predicts positive return with high confidence
-                if prediction == 1 and prob_positive > 0.6 and symbol not in self.positions:
+                # Buy signal: Model predicts positive return with confidence > min_probability
+                if prediction == 1 and prob_positive > self.min_probability and symbol not in self.positions:
                     shares = self.calculate_position_size(price, max_position_pct=0.10)
                     
                     signals.append({
@@ -140,7 +140,7 @@ class MLMomentumStrategy(TradingStrategy):
                             'shares': shares,
                             'price': price,
                             'value': shares * price,
-                            'confidence': 1.0 if days_held >= self.hold_days else confidence,
+                            'confidence': 1.0 if days_held >= self.hold_days else prob_positive,
                             'reasoning': f'Held {days_held} days' if days_held >= self.hold_days else 'ML predicts reversal'
                         })
             except:
