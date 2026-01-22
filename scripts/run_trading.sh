@@ -37,7 +37,7 @@ if [ $? -eq 0 ]; then
     echo ""
     
     # Run the trading system
-    python3 src/execution_engine.py
+    python3 src/core/execution_engine.py
     
     EXIT_CODE=$?
     
