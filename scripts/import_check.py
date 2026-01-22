@@ -13,11 +13,11 @@ sys.path.insert(0, str(ROOT / "src"))
 
 
 MODULES = [
-    "execution_engine",
-    "data_validator",
-    "broker_reconciler",
-    "database",
-    "artifact_writer",
+    "src.core.execution_engine",
+    "src.data.data_validator",
+    "src.risk.broker_reconciler",
+    "src.core.database",
+    "src.monitoring.artifact_writer",
     "scripts.generate_email_chart",
     "scripts.check_broker_state",
     "scripts.generate_daily_email",
