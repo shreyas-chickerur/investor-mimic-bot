@@ -24,42 +24,58 @@ echo "  ALPACA_PAPER: $ALPACA_PAPER"
 echo "  DATA_VALIDATOR_MAX_AGE_HOURS: $DATA_VALIDATOR_MAX_AGE_HOURS"
 echo ""
 
-# Run pre-flight checks
+# Run pre-flight checks and capture output
 echo "Running pre-flight checks..."
-python3 scripts/pre_flight_check.py
+PREFLIGHT_OUTPUT=$(python3 scripts/pre_flight_check.py 2>&1)
+PREFLIGHT_EXIT=$?
 
-# Check exit code
-if [ $? -eq 0 ]; then
+echo "$PREFLIGHT_OUTPUT"
+
+# Check if market was closed (expected skip)
+if echo "$PREFLIGHT_OUTPUT" | grep -q "MARKET CLOSED.*expected"; then
+    echo "MARKET_CLOSED" > /tmp/run_status.txt
     echo ""
     echo "================================================================================"
-    echo "EXECUTING TRADING SYSTEM"
-    echo "================================================================================"
-    echo ""
-    
-    # Run the trading system
-    python3 src/core/execution_engine.py
-    
-    EXIT_CODE=$?
-    
-    echo ""
-    echo "================================================================================"
-    if [ $EXIT_CODE -eq 0 ]; then
-        echo "✅ TRADING RUN COMPLETED SUCCESSFULLY"
-    else
-        echo "❌ TRADING RUN FAILED (exit code: $EXIT_CODE)"
-    fi
+    echo "⏸️  RUN SKIPPED - Market closed (expected)"
     echo "================================================================================"
     echo "Finished: $(date)"
-    
-    exit $EXIT_CODE
-else
-    echo ""
-    echo "================================================================================"
-    echo "⏸️  TRADING RUN SKIPPED (pre-flight checks failed)"
-    echo "================================================================================"
-    echo "Finished: $(date)"
-    
-    # Exit 0 so GitHub Actions doesn't mark as failed
-    # (skipping on weekends/holidays is expected behavior)
     exit 0
 fi
+
+# Check exit code for other failures
+if [ $PREFLIGHT_EXIT -ne 0 ]; then
+    echo "PREFLIGHT_FAILED" > /tmp/run_status.txt
+    echo ""
+    echo "================================================================================"
+    echo "❌ PRE-FLIGHT CHECKS FAILED"
+    echo "================================================================================"
+    echo "Finished: $(date)"
+    exit 1
+fi
+
+# Pre-flight passed, execute trading
+echo "EXECUTING" > /tmp/run_status.txt
+echo ""
+echo "================================================================================"
+echo "EXECUTING TRADING SYSTEM"
+echo "================================================================================"
+echo ""
+
+# Run the trading system
+python3 src/core/execution_engine.py
+
+EXIT_CODE=$?
+
+echo ""
+echo "================================================================================"
+if [ $EXIT_CODE -eq 0 ]; then
+    echo "✅ TRADING RUN COMPLETED SUCCESSFULLY"
+    echo "SUCCESS" > /tmp/run_status.txt
+else
+    echo "❌ TRADING RUN FAILED (exit code: $EXIT_CODE)"
+    echo "EXECUTION_FAILED" > /tmp/run_status.txt
+fi
+echo "================================================================================"
+echo "Finished: $(date)"
+
+exit $EXIT_CODE

@@ -223,23 +223,63 @@ jobs:
         - Daily artifacts: \`daily-artifacts-${{ github.run_number }}\`
         EOF
     
-    - name: Send failure notification
-      if: failure()
+    - name: Check run status
+      id: check_status
+      if: always()
+      run: |
+        if [ -f /tmp/run_status.txt ]; then
+          STATUS=$(cat /tmp/run_status.txt)
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+        else
+          echo "status=UNKNOWN" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Send market closed notification
+      if: always() && steps.check_status.outputs.status == 'MARKET_CLOSED'
       uses: dawidd6/action-send-mail@v3
       with:
         server_address: smtp.gmail.com
         server_port: 587
         username: ${{ secrets.EMAIL_USERNAME }}
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: "⚠️ Daily Trading Workflow Failed - ${{ github.run_number }}"
+        subject: "⏸️ Trading Skipped - Market Closed (Expected) - ${{ github.run_number }}"
         to: ${{ secrets.EMAIL_TO }}
         from: Trading System
         body: |
-          Daily Trading Execution Failed
+          Trading Run Skipped - Market Closed (Expected)
+          
+          Run: ${{ github.run_number }}
+          Date: $(date +%Y-%m-%d)
+          Status: Market closed (weekend or holiday)
+          
+          This is expected behavior. The trading system automatically skips execution when:
+          - Market is closed (weekends)
+          - Market holidays
+          
+          No action required. The system will resume automatically on the next trading day.
+          
+          Next scheduled run: Monday-Friday at 4:15 PM ET
+    
+    - name: Send failure notification
+      if: failure() && steps.check_status.outputs.status != 'MARKET_CLOSED'
+      uses: dawidd6/action-send-mail@v3
+      with:
+        server_address: smtp.gmail.com
+        server_port: 587
+        username: ${{ secrets.EMAIL_USERNAME }}
+        password: ${{ secrets.EMAIL_PASSWORD }}
+        subject: "❌ Daily Trading Workflow Failed (UNEXPECTED) - ${{ github.run_number }}"
+        to: ${{ secrets.EMAIL_TO }}
+        from: Trading System
+        body: |
+          ⚠️ UNEXPECTED FAILURE - Daily Trading Execution Failed
           
           Run: ${{ github.run_number }}
           Date: ${{ github.event.repository.updated_at }}
           Workflow: ${{ github.workflow }}
+          Status: ${{ steps.check_status.outputs.status }}
+          
+          This is an UNEXPECTED failure that requires attention.
           
           Failed Step: Check the logs at:
           https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}

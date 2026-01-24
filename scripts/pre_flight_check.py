@@ -181,8 +181,11 @@ def main():
     print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S %Z')}")
     print()
     
+    # Check market first to distinguish expected vs unexpected failures
+    market_open = check_market_open()
+    
     checks = {
-        'Market Open': check_market_open(),
+        'Market Open': market_open,
         'Data Fresh': check_data_freshness(),
         'Database': check_database(),
         'Safety Systems': check_safety_systems(),
@@ -204,8 +207,13 @@ def main():
         print("✅ ALL CHECKS PASSED - Safe to proceed with trading run")
         print("=" * 80)
         return 0
+    elif not market_open and all(v for k, v in checks.items() if k != 'Market Open'):
+        # Market closed but all other checks passed - this is EXPECTED
+        print("⏸️  MARKET CLOSED - Skipping trading run (expected)")
+        print("=" * 80)
+        return 0  # Exit with success - this is expected behavior
     else:
-        print("❌ CHECKS FAILED - Skipping trading run")
+        print("❌ CHECKS FAILED - Skipping trading run (unexpected failure)")
         print("=" * 80)
         return 1
 
