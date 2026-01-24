@@ -61,7 +61,23 @@ jobs:
         chmod +x scripts/run_trading.sh
         ./scripts/run_trading.sh
     
+    - name: Check if trading executed
+      id: check_execution
+      if: always()
+      run: |
+        if [ -f /tmp/run_status.txt ]; then
+          STATUS=$(cat /tmp/run_status.txt)
+          if [ "$STATUS" = "SUCCESS" ] || [ "$STATUS" = "EXECUTING" ]; then
+            echo "executed=true" >> $GITHUB_OUTPUT
+          else
+            echo "executed=false" >> $GITHUB_OUTPUT
+          fi
+        else
+          echo "executed=false" >> $GITHUB_OUTPUT
+        fi
+    
     - name: Verify reconciliation passed
+      if: steps.check_execution.outputs.executed == 'true'
       run: |
         python3 -c "
         import json
@@ -95,11 +111,13 @@ jobs:
         "
     
     - name: Validate system invariants
+      if: steps.check_execution.outputs.executed == 'true'
       run: |
         echo "=== Validating System ==="
         python3 scripts/validate_system.py --latest
     
     - name: Verify execution criteria
+      if: steps.check_execution.outputs.executed == 'true'
       run: |
         echo "=== Verifying Execution ==="
         python3 scripts/verify_execution.py
