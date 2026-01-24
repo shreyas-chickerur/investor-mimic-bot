@@ -5,7 +5,7 @@ Shows individual performance for each of the 5 strategies
 """
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.integration.strategy_database import StrategyDatabase
 from datetime import datetime

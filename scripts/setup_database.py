@@ -6,11 +6,8 @@ Creates all required tables and initial state for the trading system.
 Safe to run multiple times (idempotent).
 """
 import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
-
 import sqlite3
-from src.integration.strategy_database import StrategyDatabase
+from pathlib import Path
 
 
 def init_database(db_path='trading.db'):
@@ -22,13 +19,75 @@ def init_database(db_path='trading.db'):
     """
     print(f'Initializing database: {db_path}')
     
-    # Initialize via StrategyDatabase (creates strategies table)
-    db = StrategyDatabase(db_path)
-    print('✅ Strategies table created')
-    
-    # Create additional tables
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
+    
+    # Strategies table (from StrategyDatabase)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS strategies (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            description TEXT,
+            capital_allocation REAL NOT NULL,
+            initial_capital REAL NOT NULL,
+            status TEXT DEFAULT 'active',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    print('✅ Strategies table created')
+    
+    # Daily performance snapshots
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS strategy_performance (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            strategy_id INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            portfolio_value REAL NOT NULL,
+            cash REAL NOT NULL,
+            positions_value REAL NOT NULL,
+            total_return_pct REAL NOT NULL,
+            daily_return_pct REAL,
+            num_positions INTEGER,
+            num_trades_today INTEGER,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (strategy_id) REFERENCES strategies(id)
+        )
+    ''')
+    
+    # Individual trades (from StrategyDatabase)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS strategy_trades (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            strategy_id INTEGER NOT NULL,
+            symbol TEXT NOT NULL,
+            action TEXT NOT NULL,
+            shares REAL NOT NULL,
+            price REAL NOT NULL,
+            value REAL NOT NULL,
+            order_id TEXT,
+            executed_at TEXT NOT NULL,
+            exit_price REAL,
+            exit_at TEXT,
+            profit_loss REAL,
+            return_pct REAL,
+            hold_days INTEGER,
+            FOREIGN KEY (strategy_id) REFERENCES strategies(id)
+        )
+    ''')
+    
+    # Trading signals
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS strategy_signals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            strategy_id INTEGER NOT NULL,
+            symbol TEXT NOT NULL,
+            signal TEXT NOT NULL,
+            confidence REAL,
+            reasoning TEXT,
+            generated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (strategy_id) REFERENCES strategies(id)
+        )
+    ''')
     
     # Trades table
     cursor.execute('''
