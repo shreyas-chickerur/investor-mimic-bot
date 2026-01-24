@@ -17,9 +17,9 @@ from pathlib import Path
 from datetime import datetime, timedelta
 import pandas as pd
 
-# Add src to path
+# Add project root to path
 project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root / 'src'))
+sys.path.insert(0, str(project_root))
 
 from src.data.data_validator import DataValidator
 from src.core.database import TradingDatabase
