@@ -40,7 +40,9 @@ class PnLCalculator:
     def _load_open_positions(self):
         """Load current open positions from database as lots."""
         try:
-            conn = self.db._get_connection()
+            import sqlite3
+            conn = sqlite3.connect(self.db.db_path)
+            conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
             # Get all open positions
@@ -206,7 +208,8 @@ class PnLCalculator:
         """
         # Get realized P&L from database
         try:
-            conn = self.db._get_connection()
+            import sqlite3
+            conn = sqlite3.connect(self.db.db_path)
             cursor = conn.cursor()
             
             cursor.execute('''
