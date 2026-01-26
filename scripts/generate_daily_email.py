@@ -14,7 +14,7 @@ from collections import defaultdict
 import glob
 
 project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root / 'src'))
+sys.path.insert(0, str(project_root))
 
 def get_drawdown_status(db_path='trading.db'):
     """Get current drawdown stop status"""

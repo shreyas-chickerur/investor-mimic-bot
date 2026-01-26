@@ -31,7 +31,7 @@ def calculate_volatility(prices, period=20):
     return returns.rolling(window=period).std()
 
 stock_data = recent[['symbol', 'close']].copy()
-stock_data['date'] = recent.index
+stock_data = stock_data.reset_index()  # Move index to column to avoid ambiguity
 
 volatility_data = []
 for symbol, group in stock_data.groupby('symbol'):
