@@ -43,20 +43,13 @@ class MLMomentumStrategy(TradingStrategy):
         self.min_probability = self.min_confidence
         
     def _prepare_features(self, symbol_data: pd.DataFrame) -> np.array:
-        """Extract features for ML model"""
+        """Extract features for ML model - MUST match training features"""
         features = []
         
-        # Technical indicators
+        # Match training features exactly (3 features)
         features.append(symbol_data['rsi'].iloc[-1] if 'rsi' in symbol_data else 50)
-        features.append(symbol_data['close'].iloc[-1] / symbol_data['close'].iloc[-5] - 1 if len(symbol_data) >= 5 else 0)  # 5-day return
         features.append(symbol_data['close'].iloc[-1] / symbol_data['close'].iloc[-20] - 1 if len(symbol_data) >= 20 else 0)  # 20-day return
         features.append(symbol_data['volume'].iloc[-1] / symbol_data['volume'].iloc[-20:].mean() if len(symbol_data) >= 20 else 1)  # Volume ratio
-        
-        # Price momentum
-        if len(symbol_data) >= 10:
-            features.append((symbol_data['close'].iloc[-1] - symbol_data['close'].iloc[-10]) / symbol_data['close'].iloc[-10])
-        else:
-            features.append(0)
         
         return np.array(features).reshape(1, -1)
     
