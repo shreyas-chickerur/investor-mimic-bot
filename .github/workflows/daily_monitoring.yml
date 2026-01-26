@@ -186,32 +186,6 @@ jobs:
         
         EOF
     
-    - name: Send success email
-      if: steps.checks.outputs.total_failures == '0'
-      uses: dawidd6/action-send-mail@v3
-      with:
-        server_address: smtp.gmail.com
-        server_port: 587
-        username: ${{ secrets.EMAIL_USERNAME }}
-        password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: "✅ Daily Trading Monitoring - All Checks Passed - ${{ github.run_number }}"
-        to: ${{ secrets.ALERT_EMAIL }}
-        from: Trading System Monitor
-        body: |
-          Daily Trading Monitoring Report
-          Date: ${{ steps.checks.outputs.date }}
-          
-          ✅ ALL CHECKS PASSED
-          
-          Summary:
-          - Signals Generated: ${{ steps.checks.outputs.signals }}
-          - Trades Executed: ${{ steps.checks.outputs.trades }}
-          - Open Positions: ${{ steps.checks.outputs.positions }}/15
-          
-          System Status: HEALTHY
-          
-          View full run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-    
     - name: Send failure alert email
       if: steps.checks.outputs.total_failures != '0'
       uses: dawidd6/action-send-mail@v3
