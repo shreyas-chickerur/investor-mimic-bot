@@ -69,8 +69,8 @@ class RSIMeanReversionStrategy(TradingStrategy):
             vwap = latest.get('vwap', price)
             atr = latest.get('atr_20', None)
             
-            # Buy signal: RSI < 35 (relaxed from 30) AND RSI slope > 0 (turning up)
-            if rsi < 35 and rsi_slope > 0 and symbol not in self.positions:
+            # Buy signal: RSI < 40 (research-backed threshold) AND RSI slope > 0 (turning up)
+            if rsi < 40 and rsi_slope > 0 and symbol not in self.positions:
                 # Volatility-adjusted position sizing
                 shares = self.calculate_position_size(price, atr=atr, max_position_pct=0.10)
                     
@@ -85,15 +85,15 @@ class RSIMeanReversionStrategy(TradingStrategy):
                     'asof_date': latest_date
                 })
             
-            # IMPROVED Sell signal: RSI > 50 OR price >= VWAP OR held for 20 days
+            # IMPROVED Sell signal: RSI > 60 OR price >= VWAP OR held for 20 days
             if symbol in self.positions:
                 days_held = self.get_days_held(symbol, latest_date)
                 shares = self.positions[symbol]
                 
                 # Exit conditions (any one triggers exit)
                 exit_reason = None
-                if rsi > 50:
-                    exit_reason = f'RSI {rsi:.1f} > 50 (mean reversion complete)'
+                if rsi > 60:
+                    exit_reason = f'RSI {rsi:.1f} > 60 (mean reversion complete)'
                 elif price >= vwap:
                     exit_reason = f'Price ${price:.2f} >= VWAP ${vwap:.2f} (profitable exit)'
                 elif days_held >= self.hold_days:
