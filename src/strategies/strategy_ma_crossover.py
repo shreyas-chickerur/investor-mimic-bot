@@ -5,7 +5,7 @@ Buy on golden cross (50-day MA > 200-day MA), sell on death cross
 """
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.core.strategy_base import TradingStrategy
 from src.utils.config_loader import get_config

@@ -10,19 +10,18 @@ from datetime import datetime
 import logging
 import time
 
-project_root = Path(__file__).parent.parent
+project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
-sys.path.insert(0, str(project_root / 'src'))
 
 from dotenv import load_dotenv
 load_dotenv()
 
 from src.core.database import TradingDatabase
-from strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
-from strategies.strategy_ml_momentum import MLMomentumStrategy
-from strategies.strategy_news_sentiment import NewsSentimentStrategy
-from strategies.strategy_ma_crossover import MACrossoverStrategy
-from strategies.strategy_volatility_breakout import VolatilityBreakoutStrategy
+from src.strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
+from src.strategies.strategy_ml_momentum import MLMomentumStrategy
+from src.strategies.strategy_news_sentiment import NewsSentimentStrategy
+from src.strategies.strategy_ma_crossover import MACrossoverStrategy
+from src.strategies.strategy_volatility_breakout import VolatilityBreakoutStrategy
 from alpaca.trading.client import TradingClient
 from alpaca.trading.requests import MarketOrderRequest
 from alpaca.trading.enums import OrderSide, TimeInForce
