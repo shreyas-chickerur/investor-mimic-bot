@@ -126,9 +126,9 @@ class MultiStrategyRunner:
         max_daily_loss = self.config.get('risk.max_daily_loss_pct', 0.02)
         self.portfolio_risk = PortfolioRiskManager(
             max_portfolio_heat=max_heat,
-            max_daily_loss_pct=max_daily_loss,
-            daily_start_value=self.portfolio_value
+            max_daily_loss_pct=max_daily_loss
         )
+        self.portfolio_risk.daily_start_value = self.portfolio_value
         logger.info(f"Portfolio Risk Manager: max_heat={max_heat:.1%}, max_daily_loss={max_daily_loss:.1%}")
         
         # Correlation filter - load from config
