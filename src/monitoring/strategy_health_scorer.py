@@ -106,7 +106,9 @@ class StrategyHealthScorer:
         """Get recent trades for strategy."""
         cutoff = (datetime.now() - timedelta(days=days)).isoformat()
         
-        conn = self.db._get_connection()
+        import sqlite3
+        conn = sqlite3.connect(self.db.db_path)
+        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -124,7 +126,9 @@ class StrategyHealthScorer:
         """Get recent signals for strategy."""
         cutoff = (datetime.now() - timedelta(days=days)).isoformat()
         
-        conn = self.db._get_connection()
+        import sqlite3
+        conn = sqlite3.connect(self.db.db_path)
+        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -142,7 +146,9 @@ class StrategyHealthScorer:
         """Get recent rejections for strategy."""
         cutoff = (datetime.now() - timedelta(days=days)).isoformat()
         
-        conn = self.db._get_connection()
+        import sqlite3
+        conn = sqlite3.connect(self.db.db_path)
+        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
         cursor.execute('''
