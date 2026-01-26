@@ -1,258 +1,281 @@
-.PHONY: help install run dashboard test clean sync-db view-performance analyze-signals import-check \
-	perf-report perf-chart perf-dashboard email-daily email-weekly email-sample \
-	validate verify-system check-broker debug-signal backtest fetch-backtest-data run-backtest
+.PHONY: help install setup init fetch-data update-data sync-broker clean-data \
+	run run-dry dashboard logs shell \
+	test test-unit test-integration test-component test-functional test-coverage test-watch \
+	report analyze backtest metrics \
+	validate verify check-broker check-health debug-signal import-check \
+	clean clean-all clean-cache format lint type-check \
+	dev-setup dev-test dev-run
 
 # Default target
+.DEFAULT_GOAL := help
+
+# Colors for output
+BLUE := \033[0;34m
+GREEN := \033[0;32m
+YELLOW := \033[0;33m
+RED := \033[0;31m
+NC := \033[0m
+
 help:
-	@echo "📊 Multi-Strategy Trading System - Available Commands"
+	@echo "$(BLUE)╔════════════════════════════════════════════════════════════════╗$(NC)"
+	@echo "$(BLUE)║        Quantitative Trading System - Makefile Commands        ║$(NC)"
+	@echo "$(BLUE)╚════════════════════════════════════════════════════════════════╝$(NC)"
 	@echo ""
-	@echo "🚀 MAIN COMMANDS:"
-	@echo "  make run              - Run all 5 trading strategies"
-	@echo "  make dashboard        - Open web dashboard (http://localhost:5000)"
-	@echo "  make analyze          - Analyze all strategies for signals"
+	@echo "$(GREEN)📦 SETUP & INSTALLATION$(NC)"
+	@echo "  make install          Install Python dependencies"
+	@echo "  make init             Initialize database schema"
+	@echo "  make setup            Full setup (install + init + fetch-data)"
+	@echo "  make check-health     Verify system health"
 	@echo ""
-	@echo "📈 STRATEGY PERFORMANCE:"
-	@echo "  make perf-report      - Generate 30-day performance report"
-	@echo "  make perf-chart       - Generate performance charts (7 days)"
-	@echo "  make perf-dashboard   - Start performance dashboard UI"
+	@echo "$(GREEN)🚀 DEVELOPMENT$(NC)"
+	@echo "  make run              Execute trading system"
+	@echo "  make run-dry          Dry run (no actual trades)"
+	@echo "  make dashboard        Launch Streamlit dashboard"
+	@echo "  make logs             View recent logs"
+	@echo "  make shell            Open Python shell with imports"
 	@echo ""
-	@echo "📧 EMAIL & NOTIFICATIONS:"
-	@echo "  make email-daily      - Generate daily email digest"
-	@echo "  make email-weekly     - Generate weekly email with visuals"
-	@echo "  make email-sample     - Generate sample email (mock data)"
-	@echo "  make email-chart      - Generate performance chart for email"
+	@echo "$(GREEN)🧪 TESTING$(NC)"
+	@echo "  make test             Run all tests"
+	@echo "  make test-unit        Run unit tests only"
+	@echo "  make test-integration Run integration tests"
+	@echo "  make test-component   Run component tests"
+	@echo "  make test-functional  Run functional tests"
+	@echo "  make test-coverage    Run tests with coverage report"
+	@echo "  make test-watch       Run tests in watch mode"
 	@echo ""
-	@echo "✅ SYSTEM VALIDATION:"
-	@echo "  make validate         - Validate system invariants"
-	@echo "  make verify-system    - Verify execution criteria"
-	@echo "  make check-broker     - Check broker state"
-	@echo "  make import-check     - Verify all modules load"
+	@echo "$(GREEN)📊 DATA MANAGEMENT$(NC)"
+	@echo "  make fetch-data       Fetch historical market data"
+	@echo "  make update-data      Update market data"
+	@echo "  make sync-broker      Sync database with broker"
+	@echo "  make clean-data       Clean cached data"
 	@echo ""
-	@echo "🐛 ANALYSIS & DEBUGGING:"
-	@echo "  make debug-signal     - Debug single signal flow"
-	@echo "  make backtest         - Run validation backtest"
+	@echo "$(GREEN)📈 ANALYSIS & REPORTING$(NC)"
+	@echo "  make report           Generate performance report"
+	@echo "  make analyze          Analyze signals (no trading)"
+	@echo "  make backtest         Run backtest validation"
+	@echo "  make metrics          Show portfolio metrics"
 	@echo ""
-	@echo "📊 BACKTESTING:"
-	@echo "  make fetch-backtest-data  - Fetch 15 years historical data"
-	@echo "  make run-backtest         - Run walk-forward backtest"
-	@echo "  make backtest-full        - Fetch data + run backtest"
+	@echo "$(GREEN)✅ VALIDATION & DEBUGGING$(NC)"
+	@echo "  make validate         Validate system invariants"
+	@echo "  make verify           Verify execution criteria"
+	@echo "  make check-broker     Check broker state"
+	@echo "  make debug-signal     Debug signal flow"
+	@echo "  make import-check     Verify imports"
 	@echo ""
-	@echo "📊 MONITORING:"
-	@echo "  make view             - View strategy performance (CLI)"
-	@echo "  make logs             - View recent trading logs"
-	@echo "  make positions        - Check current Alpaca positions"
+	@echo "$(GREEN)🧹 MAINTENANCE$(NC)"
+	@echo "  make clean            Clean temporary files"
+	@echo "  make clean-all        Deep clean (including DB)"
+	@echo "  make format           Format code with black"
+	@echo "  make lint             Lint code with flake8"
+	@echo "  make type-check       Type check with mypy"
 	@echo ""
-	@echo "🔧 DATABASE & DATA:"
-	@echo "  make init             - Initialize database schema"
-	@echo "  make sync-db          - Sync database with broker"
-	@echo "  make update-data      - Update market data"
-	@echo "  make fetch-data       - Fetch historical data"
-	@echo ""
-	@echo "🧪 TESTING:"
-	@echo "  make test             - Run all tests"
-	@echo "  make test-single      - Test single strategy"
-	@echo "  make test-multi       - Test multi-strategy integration"
-	@echo ""
-	@echo "🧹 MAINTENANCE:"
-	@echo "  make clean            - Clean logs and temporary files"
-	@echo "  make clean-all        - Deep clean (including databases)"
+
+# ============================================================================
+# SETUP & INSTALLATION
+# ============================================================================
+
+install:
+	@echo "$(BLUE)📦 Installing Python dependencies...$(NC)"
+	@python3 -m pip install --upgrade pip
+	@python3 -m pip install -r requirements.txt
+	@echo "$(GREEN)✅ Dependencies installed$(NC)"
 
 init:
-	@echo "Initializing database..."
-	python3 scripts/setup_database.py --db trading.db
-	@echo "✅ Database initialized"
+	@echo "$(BLUE)🗄️  Initializing database...$(NC)"
+	@python3 scripts/setup_database.py --db trading.db
+	@echo "$(GREEN)✅ Database initialized$(NC)"
 
 fetch-data:
-	@echo "Fetching market data (premium API, ~18 seconds)..."
+	@echo "$(BLUE)📥 Fetching historical market data (15 years)...$(NC)"
 	@set -a && source .env && set +a && python3 scripts/fetch_historical_data.py
-	@echo "✅ Market data fetched"
+	@echo "$(GREEN)✅ Market data fetched$(NC)"
 
-verify-positions:
-	@echo "Verifying broker positions..."
-	@set -a && source .env && set +a && python3 -c "\
-	import sys; \
-	sys.path.insert(0, 'src'); \
-	from broker_reconciler import BrokerReconciler; \
-	r = BrokerReconciler(); \
-	s = r.get_broker_state(); \
-	print(f'Positions: {len(s[\"positions\"])}'); \
-	print(f'Cash: \$${s[\"cash\"]:,.2f}'); \
-	exit(0 if len(s['positions']) == 0 else 1)"
+setup: install init fetch-data
+	@echo "$(GREEN)✅ Setup complete! Run 'make run' to start trading.$(NC)"
+
+check-health:
+	@echo "$(BLUE)🏥 Checking system health...$(NC)"
+	@python3 scripts/import_check.py
+	@echo "$(GREEN)✅ System health check passed$(NC)"
+
+# ============================================================================
+# DEVELOPMENT
+# ============================================================================
 
 run:
-	@echo "Running trading execution..."
-	@set -a && source .env && set +a && export ENABLE_BROKER_RECONCILIATION=true && python3 src/execution_engine.py
-	@echo "✅ Execution complete"
+	@echo "$(BLUE)🚀 Running trading system...$(NC)"
+	@set -a && source .env && set +a && export ENABLE_BROKER_RECONCILIATION=true && python3 src/core/execution_engine.py
+	@echo "$(GREEN)✅ Execution complete$(NC)"
 
-# Single strategy (RSI only)
-run-single:
-	@echo "🚀 Running single RSI strategy..."
-	python3 src/main.py
+run-dry:
+	@echo "$(BLUE)🧪 Running in DRY RUN mode (no actual trades)...$(NC)"
+	@set -a && source .env && set +a && export DRY_RUN=true && python3 src/core/execution_engine.py
+	@echo "$(GREEN)✅ Dry run complete$(NC)"
 
-# Web dashboard
 dashboard:
-	@echo "📊 Starting web dashboard..."
-	@echo "🌐 Open http://localhost:5000 in your browser"
-	python3 src/dashboard_server.py
-
-# Analysis
-analyze:
-	@echo "🔍 Analyzing all strategies for signals..."
-	python3 scripts/analyze_signals.py
-
-# Monitoring
-view:
-	@echo "📊 Strategy Performance Dashboard"
-	python3 scripts/view_performance.py
+	@echo "$(BLUE)📊 Starting Streamlit dashboard...$(NC)"
+	@echo "$(YELLOW)🌐 Open http://localhost:8501 in your browser$(NC)"
+	@cd dashboard && streamlit run app.py --server.port 8501
 
 logs:
-	@echo "📋 Recent trading logs:"
-	@tail -50 logs/multi_strategy.log 2>/dev/null || echo "No logs yet"
+	@echo "$(BLUE)📋 Recent trading logs:$(NC)"
+	@tail -50 logs/multi_strategy.log 2>/dev/null || echo "$(YELLOW)No logs yet$(NC)"
 
-positions:
-	@echo "💼 Current Alpaca positions:"
-	@python3 -c "import os; from dotenv import load_dotenv; load_dotenv(); from alpaca.trading.client import TradingClient; client = TradingClient(os.getenv('ALPACA_API_KEY'), os.getenv('ALPACA_SECRET_KEY'), paper=True); positions = client.get_all_positions(); [print(f'{p.symbol}: {p.qty} shares @ \$${p.avg_entry_price}') for p in positions] if positions else print('No positions')"
+shell:
+	@echo "$(BLUE)🐍 Opening Python shell with imports...$(NC)"
+	@python3 -c "import sys; sys.path.insert(0, 'src'); from IPython import embed; embed()"
 
-# Database operations
-sync-db:
-	@echo "🔄 Syncing database with Alpaca..."
-	python3 scripts/sync_broker_state.py
+# ============================================================================
+# TESTING
+# ============================================================================
+
+test:
+	@echo "$(BLUE)🧪 Running all tests...$(NC)"
+	@python3 -m pytest tests/ -v --tb=short
+	@echo "$(GREEN)✅ All tests passed$(NC)"
+
+test-unit:
+	@echo "$(BLUE)🧪 Running unit tests...$(NC)"
+	@python3 -m pytest tests/unit/ -v --tb=short
+	@echo "$(GREEN)✅ Unit tests passed$(NC)"
+
+test-integration:
+	@echo "$(BLUE)🧪 Running integration tests...$(NC)"
+	@python3 -m pytest tests/integration/ -v --tb=short
+	@echo "$(GREEN)✅ Integration tests passed$(NC)"
+
+test-component:
+	@echo "$(BLUE)🧪 Running component tests...$(NC)"
+	@python3 -m pytest tests/component/ -v --tb=short
+	@echo "$(GREEN)✅ Component tests passed$(NC)"
+
+test-functional:
+	@echo "$(BLUE)🧪 Running functional tests...$(NC)"
+	@python3 -m pytest tests/functional/ -v --tb=short
+	@echo "$(GREEN)✅ Functional tests passed$(NC)"
+
+test-coverage:
+	@echo "$(BLUE)📊 Running tests with coverage...$(NC)"
+	@python3 -m pytest tests/ --cov=src --cov-report=html --cov-report=term
+	@echo "$(GREEN)✅ Coverage report generated: htmlcov/index.html$(NC)"
+
+test-watch:
+	@echo "$(BLUE)👀 Running tests in watch mode...$(NC)"
+	@python3 -m pytest tests/ -v --tb=short -f
+
+# ============================================================================
+# DATA MANAGEMENT
+# ============================================================================
 
 update-data:
-	@echo "📥 Updating market data..."
-	python3 scripts/update_data.py
+	@echo "$(BLUE)📥 Updating market data...$(NC)"
+	@python3 scripts/update_data.py
+	@echo "$(GREEN)✅ Market data updated$(NC)"
 
-# Testing
-test:
-	@echo "🧪 Running all tests..."
-	python3 -m pytest tests/ -v
+sync-broker:
+	@echo "$(BLUE)🔄 Syncing database with broker...$(NC)"
+	@python3 scripts/sync_broker_state.py
+	@echo "$(GREEN)✅ Database synced$(NC)"
 
-import-check:
-	@echo "🔎 Running import check..."
-	python3 scripts/import_check.py
+clean-data:
+	@echo "$(BLUE)🧹 Cleaning cached data...$(NC)"
+	@rm -rf data/*.csv data/*.pkl
+	@echo "$(GREEN)✅ Data cache cleaned$(NC)"
 
-test-single:
-	@echo "🧪 Testing single strategy..."
-	python3 tests/test_trading_system.py
+# ============================================================================
+# ANALYSIS & REPORTING
+# ============================================================================
 
-test-multi:
-	@echo "🧪 Testing multi-strategy system..."
-	python3 tests/test_integration.py
+report:
+	@echo "$(BLUE)📊 Generating performance report...$(NC)"
+	@python3 scripts/generate_strategy_performance.py --days 30
+	@echo "$(GREEN)✅ Report generated$(NC)"
 
-# Cleanup
-clean:
-	@echo "🧹 Cleaning logs and temporary files..."
-	rm -f logs/*.log
-	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
-	find . -type f -name "*.pyc" -delete
-	@echo "✅ Cleanup complete"
-
-clean-all: clean
-	@echo "🧹 Deep cleaning (including databases)..."
-	rm -f data/*.db
-	@echo "⚠️  Databases removed - will be recreated on next run"
-
-# Strategy Performance
-perf-report:
-	@echo "📊 Generating 30-day strategy performance report..."
-	python3 scripts/generate_strategy_performance.py --days 30
-
-perf-chart:
-	@echo "📈 Generating strategy performance charts..."
-	python3 scripts/generate_strategy_chart.py --days 7
-
-perf-dashboard:
-	@echo "🌐 Starting strategy performance dashboard..."
-	@echo "📊 Open http://localhost:8080/dashboard/strategy_performance.html"
-	python3 scripts/serve_dashboard.py
-
-# Email & Notifications
-email-daily:
-	@echo "📧 Generating daily email digest..."
-	python3 scripts/generate_daily_email.py
-	@echo "✅ Email generated: /tmp/daily_email.html"
-
-email-weekly:
-	@echo "📊 Generating weekly email with visuals..."
-	python3 scripts/generate_daily_email.py --include-visuals
-	@echo "✅ Email with charts generated: /tmp/daily_email.html"
-
-email-sample:
-	@echo "📧 Generating sample email with mock data..."
-	python3 examples/send_sample_email.py
-	@echo "✅ Sample email generated: /tmp/sample_email.html"
-
-email-sample-visual:
-	@echo "📊 Generating sample email with visuals..."
-	python3 examples/send_sample_email.py --include-visuals
-	@echo "✅ Sample email with charts generated: /tmp/sample_email.html"
-
-email-chart:
-	@echo "📈 Generating performance chart for email..."
-	python3 scripts/generate_email_chart.py
-
-# System Validation & Management
-validate:
-	@echo "✅ Validating system invariants..."
-	python3 scripts/validate_system.py --latest
-
-verify-system:
-	@echo "🔍 Verifying execution criteria..."
-	python3 scripts/verify_execution.py
-
-check-broker:
-	@echo "💼 Checking broker state..."
-	python3 scripts/check_broker_state.py
-
-# Analysis & Debugging
-debug-signal:
-	@echo "🐛 Debugging single signal flow..."
-	python3 scripts/debug_single_signal.py
+analyze:
+	@echo "$(BLUE)🔍 Analyzing signals (no trading)...$(NC)"
+	@python3 scripts/analyze_signals.py
+	@echo "$(GREEN)✅ Analysis complete$(NC)"
 
 backtest:
-	@echo "📊 Running validation backtest..."
-	python3 scripts/run_validation_backtest.py
+	@echo "$(BLUE)📊 Running backtest validation...$(NC)"
+	@python3 scripts/run_validation_backtest.py
+	@echo "$(GREEN)✅ Backtest complete$(NC)"
 
-# Data Cleaning & Backtesting
-clean-data:
-	@echo "🧹 Cleaning historical data..."
-	@echo "   - Forward-fill missing values"
-	@echo "   - Impute technical indicators"
-	@echo ""
-	python3 scripts/clean_data.py
-	@echo ""
-	@echo "✅ Clean data saved to data/training_data_clean.csv"
+metrics:
+	@echo "$(BLUE)📈 Portfolio metrics:$(NC)"
+	@python3 scripts/view_performance.py
 
-backtest-multi-strategy:
-	@echo "📊 Running multi-strategy backtest..."
-	@echo "   - RSI Mean Reversion"
-	@echo "   - MA Crossover"
-	@echo "   - Volatility Breakout"
-	@echo "   - Momentum"
-	@echo "   - ML Momentum"
-	@echo ""
-	python3 scripts/run_multi_strategy_backtest.py
-	@echo ""
-	@echo "✅ Results saved to artifacts/backtest/"
-	@echo "   - Report: artifacts/backtest/multi_strategy_comparison.md"
-	@echo "   - Plot: artifacts/backtest/strategy_comparison.png"
+# ============================================================================
+# VALIDATION & DEBUGGING
+# ============================================================================
 
-# Development helpers
-dev-dashboard:
-	@echo "🔧 Starting dashboard in development mode..."
-	FLASK_ENV=development python3 src/dashboard_server.py
+validate:
+	@echo "$(BLUE)✅ Validating system invariants...$(NC)"
+	@python3 scripts/validate_system.py --latest
 
-check-secrets:
-	@echo "🔐 Checking GitHub secrets..."
-	@python3 -c "import os; from dotenv import load_dotenv; load_dotenv(); print('✅ ALPACA_API_KEY:', 'Set' if os.getenv('ALPACA_API_KEY') else '❌ Missing'); print('✅ ALPACA_SECRET_KEY:', 'Set' if os.getenv('ALPACA_SECRET_KEY') else '❌ Missing')"
+verify:
+	@echo "$(BLUE)🔍 Verifying execution criteria...$(NC)"
+	@python3 scripts/verify_execution.py
 
-# Quick start guide
-quickstart:
-	@echo "🚀 QUICK START GUIDE"
-	@echo ""
-	@echo "1. Install dependencies:    make install"
-	@echo "2. Sync database:           make sync-db"
-	@echo "3. Run strategies:          make run"
-	@echo "4. View dashboard:          make dashboard"
-	@echo ""
-	@echo "For help:                   make help"
+check-broker:
+	@echo "$(BLUE)💼 Checking broker state...$(NC)"
+	@python3 scripts/check_broker_state.py
+
+debug-signal:
+	@echo "$(BLUE)🐛 Debugging signal flow...$(NC)"
+	@python3 scripts/debug_single_signal.py
+
+import-check:
+	@echo "$(BLUE)🔎 Verifying imports...$(NC)"
+	@python3 scripts/import_check.py
+
+# ============================================================================
+# MAINTENANCE
+# ============================================================================
+
+clean:
+	@echo "$(BLUE)🧹 Cleaning temporary files...$(NC)"
+	@rm -f logs/*.log
+	@find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+	@find . -type f -name "*.pyc" -delete
+	@rm -rf .pytest_cache .coverage htmlcov/
+	@echo "$(GREEN)✅ Cleanup complete$(NC)"
+
+clean-all: clean
+	@echo "$(BLUE)🧹 Deep cleaning (including databases)...$(NC)"
+	@rm -f trading.db data/*.db
+	@echo "$(YELLOW)⚠️  Databases removed - run 'make init' to recreate$(NC)"
+
+clean-cache:
+	@echo "$(BLUE)🧹 Cleaning Python cache...$(NC)"
+	@find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+	@find . -type f -name "*.pyc" -delete
+	@echo "$(GREEN)✅ Cache cleaned$(NC)"
+
+format:
+	@echo "$(BLUE)🎨 Formatting code with black...$(NC)"
+	@python3 -m black src/ tests/ scripts/ --line-length 100
+	@echo "$(GREEN)✅ Code formatted$(NC)"
+
+lint:
+	@echo "$(BLUE)🔍 Linting code with flake8...$(NC)"
+	@python3 -m flake8 src/ tests/ scripts/ --max-line-length 100 --ignore=E203,W503
+	@echo "$(GREEN)✅ Linting complete$(NC)"
+
+type-check:
+	@echo "$(BLUE)🔍 Type checking with mypy...$(NC)"
+	@python3 -m mypy src/ --ignore-missing-imports
+	@echo "$(GREEN)✅ Type check complete$(NC)"
+
+# ============================================================================
+# DEVELOPMENT HELPERS
+# ============================================================================
+
+dev-setup: install init
+	@echo "$(GREEN)✅ Development environment ready$(NC)"
+
+dev-test: clean-cache test-unit
+	@echo "$(GREEN)✅ Quick test complete$(NC)"
+
+dev-run: clean-cache run-dry
+	@echo "$(GREEN)✅ Development run complete$(NC)"

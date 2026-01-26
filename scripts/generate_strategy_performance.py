@@ -16,7 +16,7 @@ from collections import defaultdict
 import json
 
 project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root / 'src'))
+sys.path.insert(0, str(project_root))
 
 def calculate_sharpe_ratio(returns, risk_free_rate=0.0):
     """Calculate Sharpe ratio from returns list"""
