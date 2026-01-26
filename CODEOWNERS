@@ -1,0 +1,28 @@
+# CODEOWNERS - Defines required reviewers for code changes
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for everything
+* @shreyas-chickerur
+
+# Core trading engine - requires careful review
+/src/core/ @shreyas-chickerur
+/src/strategies/ @shreyas-chickerur
+
+# Risk management - critical for capital protection
+/src/risk/ @shreyas-chickerur
+
+# Data quality and validation
+/src/data/ @shreyas-chickerur
+
+# GitHub Actions workflows - affects automation
+/.github/workflows/ @shreyas-chickerur
+
+# Configuration files - affects system behavior
+/config/ @shreyas-chickerur
+pyproject.toml @shreyas-chickerur
+requirements.txt @shreyas-chickerur
+.env.example @shreyas-chickerur
+
+# Documentation
+/README.md @shreyas-chickerur
+/CONTRIBUTING.md @shreyas-chickerur
