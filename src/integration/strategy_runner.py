@@ -5,14 +5,14 @@ Executes all strategies daily and tracks performance
 """
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.integration.strategy_database import StrategyDatabase
-from strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
-from strategies.strategy_ml_momentum import MLMomentumStrategy
-from strategies.strategy_news_sentiment import NewsSentimentStrategy
-from strategies.strategy_ma_crossover import MACrossoverStrategy
-from strategies.strategy_volatility_breakout import VolatilityBreakoutStrategy
+from src.strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
+from src.strategies.strategy_ml_momentum import MLMomentumStrategy
+from src.strategies.strategy_news_sentiment import NewsSentimentStrategy
+from src.strategies.strategy_ma_crossover import MACrossoverStrategy
+from src.strategies.strategy_volatility_breakout import VolatilityBreakoutStrategy
 from src.data.alpaca_data_fetcher import AlpacaDataFetcher
 from src.integration.trade_executor import TradeExecutor
 import pandas as pd

@@ -5,7 +5,7 @@ Real-time monitoring of all 5 strategies in browser
 """
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from flask import Flask, render_template_string, jsonify
 from src.integration.strategy_database import StrategyDatabase
