@@ -3,8 +3,9 @@ Pydantic schemas for data validation and type safety.
 
 Ensures data integrity across the trading system with formal validation.
 """
+from __future__ import annotations
 from datetime import datetime
-from typing import Optional, Literal
+from typing import Optional, Literal, List, Tuple
 from pydantic import BaseModel, Field, validator, ConfigDict
 import pandas as pd
 
@@ -125,7 +126,7 @@ class PortfolioStateSchema(BaseModel):
 
 # Validation helper functions
 
-def validate_market_data(df: pd.DataFrame) -> tuple[bool, list[str]]:
+def validate_market_data(df: pd.DataFrame) -> Tuple[bool, List[str]]:
     """
     Validate market data DataFrame against schema.
     
@@ -171,7 +172,7 @@ def validate_market_data(df: pd.DataFrame) -> tuple[bool, list[str]]:
     return len(errors) == 0, errors
 
 
-def validate_signal(signal: dict) -> tuple[bool, Optional[str]]:
+def validate_signal(signal: dict) -> Tuple[bool, Optional[str]]:
     """
     Validate a trading signal.
     
@@ -188,7 +189,7 @@ def validate_signal(signal: dict) -> tuple[bool, Optional[str]]:
         return False, str(e)
 
 
-def validate_trade(trade: dict) -> tuple[bool, Optional[str]]:
+def validate_trade(trade: dict) -> Tuple[bool, Optional[str]]:
     """
     Validate an executed trade.
     
@@ -205,7 +206,7 @@ def validate_trade(trade: dict) -> tuple[bool, Optional[str]]:
         return False, str(e)
 
 
-def validate_portfolio_state(state: dict) -> tuple[bool, Optional[str]]:
+def validate_portfolio_state(state: dict) -> Tuple[bool, Optional[str]]:
     """
     Validate portfolio state.
     
