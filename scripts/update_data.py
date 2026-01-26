@@ -153,6 +153,21 @@ def main():
     
     final = pd.concat(processed, ignore_index=True)
     
+    # Filter to 2010-present and exclude major market outliers
+    print("\n🔍 Filtering data: 2010-present, excluding major outliers...")
+    final['date'] = pd.to_datetime(final['date'])
+    
+    # Keep only 2010 onwards (16 years of data)
+    final = final[final['date'] >= '2010-01-01'].copy()
+    print(f"   After 2010 filter: {len(final)} rows")
+    
+    # Exclude COVID crash period (Feb-Apr 2020) - extreme volatility outlier
+    covid_crash_start = pd.Timestamp('2020-02-19')  # Market peak before crash
+    covid_crash_end = pd.Timestamp('2020-04-30')    # Recovery beginning
+    final = final[~((final['date'] >= covid_crash_start) & (final['date'] <= covid_crash_end))].copy()
+    print(f"   After COVID crash exclusion: {len(final)} rows")
+    print(f"   Excluded period: {covid_crash_start.date()} to {covid_crash_end.date()}")
+    
     # Set date as index (CRITICAL FIX)
     final = final.set_index('date')
     
