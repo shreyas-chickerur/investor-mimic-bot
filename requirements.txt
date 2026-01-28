@@ -32,3 +32,4 @@ PyYAML==6.0.1
 streamlit==1.29.0
 plotly==5.18.0
 pytz==2024.1
+python-dateutil==2.8.2
