@@ -31,3 +31,4 @@ matplotlib==3.7.5
 PyYAML==6.0.1
 streamlit==1.29.0
 plotly==5.18.0
+pytz==2024.1
