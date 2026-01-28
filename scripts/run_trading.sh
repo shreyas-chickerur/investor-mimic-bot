@@ -26,9 +26,18 @@ echo ""
 
 # Run pre-flight checks and capture output
 echo "Running pre-flight checks..."
+echo "DEBUG: About to execute pre_flight_check.py"
+echo "DEBUG: Python version: $(python3 --version)"
+echo "DEBUG: Current directory: $(pwd)"
+echo "DEBUG: Script exists: $(ls -la scripts/pre_flight_check.py 2>&1 || echo 'NOT FOUND')"
+echo ""
+
 PREFLIGHT_OUTPUT=$(python3 scripts/pre_flight_check.py 2>&1)
 PREFLIGHT_EXIT=$?
 
+echo "DEBUG: Pre-flight exit code: $PREFLIGHT_EXIT"
+echo "DEBUG: Output length: ${#PREFLIGHT_OUTPUT}"
+echo ""
 echo "$PREFLIGHT_OUTPUT"
 
 # Check if market was closed (expected skip)
