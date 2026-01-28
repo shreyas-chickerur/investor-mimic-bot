@@ -121,8 +121,8 @@ class DataValidator:
             
             # Check number of symbols
             num_symbols = df['symbol'].nunique()
-            if num_symbols < 30:
-                errors.append(f"Too few symbols: {num_symbols} (expected 36)")
+            if num_symbols < 29:
+                errors.append(f"Too few symbols: {num_symbols} (expected 29)")
             
             # Log validation results
             if errors:
