@@ -10,11 +10,14 @@ Checks:
 
 Returns exit code 0 if safe to proceed, 1 if should skip.
 """
+from __future__ import annotations
 
 import os
 import sys
+import traceback
 from pathlib import Path
 from datetime import datetime, timedelta
+from typing import Dict, Tuple
 import pandas as pd
 
 # Add project root to path
@@ -25,43 +28,56 @@ from src.data.data_validator import DataValidator
 from src.core.database import TradingDatabase
 
 
-def check_market_open():
-    """Check if market is open today."""
-    # Use US Eastern Time (market time) instead of UTC
-    import pytz
-    eastern = pytz.timezone('America/New_York')
-    now = datetime.now(eastern)
-    weekday = now.weekday()
+def check_market_open() -> bool:
+    """Check if market is open today.
     
-    # Weekend check
-    if weekday >= 5:  # Saturday=5, Sunday=6
-        print(f"⏸️  Market closed: Weekend ({now.strftime('%A')})")
+    Returns:
+        bool: True if market is open, False otherwise
+    """
+    try:
+        # Use US Eastern Time (market time) instead of UTC
+        import pytz
+        eastern = pytz.timezone('America/New_York')
+        now = datetime.now(eastern)
+        weekday = now.weekday()
+        
+        # Weekend check
+        if weekday >= 5:  # Saturday=5, Sunday=6
+            print(f"⏸️  Market closed: Weekend ({now.strftime('%A')})")
+            return False
+        
+        # Basic holiday check (major US holidays)
+        holidays_2026 = [
+            '2026-01-01',  # New Year's Day
+            '2026-01-19',  # MLK Day
+            '2026-02-16',  # Presidents Day
+            '2026-04-03',  # Good Friday
+            '2026-05-25',  # Memorial Day
+            '2026-07-03',  # Independence Day (observed)
+            '2026-09-07',  # Labor Day
+            '2026-11-26',  # Thanksgiving
+            '2026-12-25',  # Christmas
+        ]
+        
+        today = now.strftime('%Y-%m-%d')
+        if today in holidays_2026:
+            print(f"⏸️  Market closed: Holiday ({today})")
+            return False
+        
+        print(f"✅ Market open: {now.strftime('%A, %B %d, %Y')}")
+        return True
+    except Exception as e:
+        print(f"❌ Error checking market status: {e}")
+        traceback.print_exc()
         return False
-    
-    # Basic holiday check (major US holidays)
-    holidays_2026 = [
-        '2026-01-01',  # New Year's Day
-        '2026-01-19',  # MLK Day
-        '2026-02-16',  # Presidents Day
-        '2026-04-03',  # Good Friday
-        '2026-05-25',  # Memorial Day
-        '2026-07-03',  # Independence Day (observed)
-        '2026-09-07',  # Labor Day
-        '2026-11-26',  # Thanksgiving
-        '2026-12-25',  # Christmas
-    ]
-    
-    today = now.strftime('%Y-%m-%d')
-    if today in holidays_2026:
-        print(f"⏸️  Market closed: Holiday ({today})")
-        return False
-    
-    print(f"✅ Market open: {now.strftime('%A, %B %d, %Y')}")
-    return True
 
 
-def check_data_freshness():
-    """Check if market data is fresh enough."""
+def check_data_freshness() -> bool:
+    """Check if market data is fresh enough.
+    
+    Returns:
+        bool: True if data is fresh or successfully updated, False otherwise
+    """
     try:
         data_path = project_root / 'data' / 'training_data.csv'
         if not data_path.exists():
@@ -123,11 +139,16 @@ def check_data_freshness():
                     
     except Exception as e:
         print(f"❌ Error checking data: {e}")
+        traceback.print_exc()
         return False
 
 
-def check_database():
-    """Check database is accessible."""
+def check_database() -> bool:
+    """Check database is accessible.
+    
+    Returns:
+        bool: True if database is accessible, False otherwise
+    """
     try:
         db = TradingDatabase()
         # Try a simple query
@@ -136,11 +157,16 @@ def check_database():
         return True
     except Exception as e:
         print(f"❌ Database error: {e}")
+        traceback.print_exc()
         return False
 
 
-def check_safety_systems():
-    """Check safety systems are configured."""
+def check_safety_systems() -> bool:
+    """Check safety systems are configured.
+    
+    Returns:
+        bool: True if all safety systems pass, False otherwise
+    """
     checks = []
     
     # Check DRY_RUN mode
@@ -173,50 +199,87 @@ def check_safety_systems():
     return all(checks)
 
 
-def main():
-    """Run all pre-flight checks."""
-    print("=" * 80)
-    print("PRE-FLIGHT CHECK - Automated Trading Run")
-    print("=" * 80)
-    print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S %Z')}")
-    print()
+def main() -> int:
+    """Run all pre-flight checks.
     
-    # Check market first to distinguish expected vs unexpected failures
-    market_open = check_market_open()
-    
-    checks = {
-        'Market Open': market_open,
-        'Data Fresh': check_data_freshness(),
-        'Database': check_database(),
-        'Safety Systems': check_safety_systems(),
-    }
-    
-    print()
-    print("=" * 80)
-    print("SUMMARY")
-    print("=" * 80)
-    
-    for name, passed in checks.items():
-        status = "✅ PASS" if passed else "❌ FAIL"
-        print(f"{name:20s} {status}")
-    
-    all_passed = all(checks.values())
-    
-    print()
-    if all_passed:
-        print("✅ ALL CHECKS PASSED - Safe to proceed with trading run")
+    Returns:
+        int: Exit code (0 for success, 1 for failure)
+    """
+    try:
         print("=" * 80)
-        return 0
-    elif not market_open and all(v for k, v in checks.items() if k != 'Market Open'):
-        # Market closed but all other checks passed - this is EXPECTED
-        print("⏸️  MARKET CLOSED - Skipping trading run (expected)")
+        print("PRE-FLIGHT CHECK - Automated Trading Run")
         print("=" * 80)
-        return 0  # Exit with success - this is expected behavior
-    else:
-        print("❌ CHECKS FAILED - Skipping trading run (unexpected failure)")
+        print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S %Z')}")
+        print()
+        
+        # Check market first to distinguish expected vs unexpected failures
+        print("[1/4] Checking market status...")
+        market_open = check_market_open()
+        print()
+        
+        print("[2/4] Checking data freshness...")
+        data_fresh = check_data_freshness()
+        print()
+        
+        print("[3/4] Checking database...")
+        database_ok = check_database()
+        print()
+        
+        print("[4/4] Checking safety systems...")
+        safety_ok = check_safety_systems()
+        print()
+        
+        checks = {
+            'Market Open': market_open,
+            'Data Fresh': data_fresh,
+            'Database': database_ok,
+            'Safety Systems': safety_ok,
+        }
+        
+        print()
+        print("=" * 80)
+        print("SUMMARY")
+        print("=" * 80)
+        
+        for name, passed in checks.items():
+            status = "✅ PASS" if passed else "❌ FAIL"
+            print(f"{name:20s} {status}")
+        
+        all_passed = all(checks.values())
+        
+        print()
+        if all_passed:
+            print("✅ ALL CHECKS PASSED - Safe to proceed with trading run")
+            print("=" * 80)
+            return 0
+        elif not market_open and all(v for k, v in checks.items() if k != 'Market Open'):
+            # Market closed but all other checks passed - this is EXPECTED
+            print("⏸️  MARKET CLOSED - Skipping trading run (expected)")
+            print("=" * 80)
+            return 0  # Exit with success - this is expected behavior
+        else:
+            print("❌ CHECKS FAILED - Skipping trading run (unexpected failure)")
+            print("=" * 80)
+            return 1
+            
+    except Exception as e:
+        print()
+        print("=" * 80)
+        print("❌ CRITICAL ERROR IN PRE-FLIGHT CHECK")
+        print("=" * 80)
+        print(f"Error: {e}")
+        print()
+        print("Full traceback:")
+        traceback.print_exc()
         print("=" * 80)
         return 1
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    try:
+        exit_code = main()
+        sys.exit(exit_code)
+    except Exception as e:
+        print(f"\n❌ FATAL ERROR: {e}")
+        traceback.print_exc()
+        sys.exit(1)
