@@ -16,11 +16,10 @@ class UniverseProvider:
     """Provides trading universe from multiple sources"""
     
     DEFAULT_UNIVERSE = [
-        'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'TSLA', 'NVDA', 'AMD',
-        'NFLX', 'DIS', 'PYPL', 'INTC', 'CSCO', 'ADBE', 'CRM', 'ORCL',
-        'QCOM', 'TXN', 'AVGO', 'COST', 'SBUX', 'MCD', 'NKE', 'WMT',
-        'HD', 'LOW', 'TGT', 'CVS', 'UNH', 'JNJ', 'PFE', 'ABBV',
-        'MRK', 'TMO', 'DHR', 'MDT'
+        'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'TSLA', 'NVDA',
+        'NFLX', 'DIS', 'ADBE', 'AVGO', 'COST', 'MCD', 'NKE', 'WMT',
+        'HD', 'JNJ', 'ABBV', 'MRK', 'TMO', 'DHR', 'BRK.B', 'ACN',
+        'ABT', 'KO', 'MA', 'PEP', 'PG', 'VZ'
     ]
     
     def __init__(self, mode: str = None):
