@@ -24,21 +24,10 @@ echo "  ALPACA_PAPER: $ALPACA_PAPER"
 echo "  DATA_VALIDATOR_MAX_AGE_HOURS: $DATA_VALIDATOR_MAX_AGE_HOURS"
 echo ""
 
-# Run pre-flight checks and capture output
+# Run pre-flight checks without capturing to see errors
 echo "Running pre-flight checks..."
-echo "DEBUG: About to execute pre_flight_check.py"
-echo "DEBUG: Python version: $(python3 --version)"
-echo "DEBUG: Current directory: $(pwd)"
-echo "DEBUG: Script exists: $(ls -la scripts/pre_flight_check.py 2>&1 || echo 'NOT FOUND')"
-echo ""
-
-PREFLIGHT_OUTPUT=$(python3 scripts/pre_flight_check.py 2>&1)
+python3 scripts/pre_flight_check.py
 PREFLIGHT_EXIT=$?
-
-echo "DEBUG: Pre-flight exit code: $PREFLIGHT_EXIT"
-echo "DEBUG: Output length: ${#PREFLIGHT_OUTPUT}"
-echo ""
-echo "$PREFLIGHT_OUTPUT"
 
 # Check if market was closed (expected skip)
 if echo "$PREFLIGHT_OUTPUT" | grep -q "MARKET CLOSED.*expected"; then
