@@ -263,25 +263,27 @@ class BrokerReconciler:
         # Send email alert
         if self.email_notifier:
             try:
-                subject = "🚨 TRADING SYSTEM PAUSED - Reconciliation Failure"
+                subject = "⚠️ Broker Reconciliation Warning - Discrepancies Detected"
                 disc_list = '\n'.join([f'- {disc}' for disc in discrepancies])
                 timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                body = f"""CRITICAL ALERT: Trading system has been PAUSED due to reconciliation failure.
+                body = f"""Trading execution completed, but reconciliation found discrepancies.
 
 Time: {timestamp}
-Status: PAUSED - All trading blocked
+Status: Execution successful, reconciliation has {len(discrepancies)} discrepancies
 
-Discrepancies Found ({len(discrepancies)}):
+Discrepancies Found:
 {disc_list}
 
-Action Required:
-1. Review discrepancies above
-2. Manually reconcile local state with broker
-3. Fix any data corruption
-4. Run reconciliation again
-5. System will resume only after successful reconciliation
+This is common in paper trading and usually not a concern. The system found differences between:
+- System's internal state (what it thinks it owns)
+- Broker's actual state (what Alpaca reports)
 
-DO NOT TRADE MANUALLY until this is resolved."""
+Review Recommended:
+1. Check if discrepancies are expected (e.g., manual trades, old positions)
+2. Review the daily artifacts for details
+3. If needed, manually reconcile local state with broker
+
+The trading system will continue to operate normally."""
                 self.email_notifier.send_alert(subject, body)
                 logger.info("✅ Email alert sent")
             except Exception as e:
