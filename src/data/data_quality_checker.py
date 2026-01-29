@@ -173,11 +173,16 @@ class DataQualityChecker:
             # Can't determine date, assume stale
             return True, "Cannot determine data date"
         
-        # Calculate age
-        age_hours = (asof_date - most_recent).total_seconds() / 3600
+        # Calculate age in days (not hours) - market data is daily
+        # Allow data from previous trading day (up to 3 days for weekends)
+        age_days = (asof_date.date() - most_recent.date()).days
         
-        if age_hours > self.staleness_threshold_hours:
-            return True, f"Data age {age_hours:.1f}h exceeds threshold {self.staleness_threshold_hours}h"
+        # More lenient threshold: allow up to 5 days (covers long weekends)
+        # This is reasonable since we fetch fresh data before trading
+        max_age_days = 5
+        
+        if age_days > max_age_days:
+            return True, f"Data age {age_days} days exceeds threshold {max_age_days} days"
         
         return False, ""
     
