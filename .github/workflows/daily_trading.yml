@@ -46,6 +46,11 @@ jobs:
       run: |
         mkdir -p artifacts/json artifacts/markdown artifacts/funnel artifacts/data_quality artifacts/drawdown artifacts/health logs data
     
+    - name: Check signal generation health
+      run: |
+        echo "=== Signal Generation Health Check ==="
+        python3 scripts/monitor_signal_health.py || echo "Health check completed with warnings"
+    
     - name: Run trading with pre-flight checks
       env:
         ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}

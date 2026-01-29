@@ -432,6 +432,14 @@ class MultiStrategyRunner:
         cutoff_date = latest_date - timedelta(days=150)
         df = df[df.index >= cutoff_date].copy()
         
+        # Check data freshness and warn if stale
+        data_age_days = (pd.Timestamp.now() - latest_date).days
+        if data_age_days > 3:
+            logger.warning(f"⚠️  DATA IS STALE: {data_age_days} days old (latest: {latest_date.date()})")
+            logger.warning(f"⚠️  Consider running: python3 scripts/update_daily_data.py")
+        else:
+            logger.info(f"Data freshness: {data_age_days} days old (latest: {latest_date.date()})")
+        
         logger.info(f"Loaded {len(df)} rows for {df['symbol'].nunique()} symbols (last 150 days)")
         return df
     
@@ -760,10 +768,16 @@ class MultiStrategyRunner:
                         self.funnel_tracker.record_after_regime(strategy.strategy_id, 0)
                         continue
 
+                    # Generate signals with detailed logging
+                    logger.info(f"  Calling {strategy.name}.generate_signals() with {len(market_data)} rows, {market_data['symbol'].nunique()} symbols")
                     signals = strategy.generate_signals(market_data)
                     
                     # FUNNEL STAGE 1: Raw signals
                     raw_count = len(signals) if signals else 0
+                    logger.info(f"  {strategy.name} generated {raw_count} raw signals")
+                    if raw_count > 0:
+                        for sig in signals[:3]:  # Log first 3 signals
+                            logger.info(f"    - {sig.get('action')} {sig.get('symbol')}: {sig.get('reasoning', 'No reason')}")
                     self.funnel_tracker.record_raw_signals(strategy.strategy_id, raw_count)
                     
                     # VALIDATION MODE: Route injected signals to RSI Mean Reversion
