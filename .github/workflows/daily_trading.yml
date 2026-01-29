@@ -46,6 +46,13 @@ jobs:
       run: |
         mkdir -p artifacts/json artifacts/markdown artifacts/funnel artifacts/data_quality artifacts/drawdown artifacts/health logs data
     
+    - name: Update market data
+      env:
+        ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+      run: |
+        echo "=== Fetching Latest Market Data ==="
+        python3 scripts/update_daily_data.py || echo "Data update completed with warnings"
+    
     - name: Check signal generation health
       run: |
         echo "=== Signal Generation Health Check ==="
