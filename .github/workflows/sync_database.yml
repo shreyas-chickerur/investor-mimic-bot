@@ -1,0 +1,71 @@
+name: Sync Database with Broker
+
+on:
+  workflow_dispatch:  # Manual trigger only
+
+env:
+  PYTHON_VERSION: "3.8"
+
+jobs:
+  sync-database:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Download previous database
+      uses: actions/download-artifact@v4
+      with:
+        name: trading-database
+        path: .
+      continue-on-error: true
+    
+    - name: Initialize database if needed
+      run: |
+        python scripts/setup_database.py --db trading.db
+    
+    - name: Sync broker state to database
+      env:
+        ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+        ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+        ALPACA_PAPER: true
+      run: |
+        echo "🔄 Syncing database with broker state..."
+        python scripts/sync_broker_state.py
+        echo "✅ Database synced successfully"
+    
+    - name: Verify sync
+      env:
+        ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+        ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+        ALPACA_PAPER: true
+      run: |
+        echo "🔍 Verifying reconciliation..."
+        python scripts/verify_reconciliation.py
+    
+    - name: Upload synced database
+      uses: actions/upload-artifact@v4
+      with:
+        name: trading-database
+        path: trading.db
+        retention-days: 90
+        overwrite: true
+    
+    - name: Summary
+      run: |
+        echo "## Database Sync Complete" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Database has been synced with broker state" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "The next daily trading run should pass reconciliation." >> $GITHUB_STEP_SUMMARY

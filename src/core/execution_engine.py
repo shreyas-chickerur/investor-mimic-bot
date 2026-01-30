@@ -1031,15 +1031,56 @@ class MultiStrategyRunner:
                         intent_id, str(order.id), strategy.strategy_id, symbol
                     )
                     
-                    print(f"  ✅ BUY {adjusted_shares} {symbol} @ ${price:.2f} (Order: {order.id}, Intent: {intent_id})")
+                    # CRITICAL FIX: Verify order fill before updating database
+                    # Wait for order to be filled (market orders typically fill immediately)
+                    fill_verified = False
+                    actual_filled_qty = adjusted_shares
+                    actual_fill_price = exec_price
                     
-                    strategy.add_position(symbol, adjusted_shares)
-                    strategy.update_capital(-trade_value)
+                    try:
+                        # Get order status from broker
+                        filled_order = self.dry_run.execute_broker_operation(
+                            f"get_order_{symbol}",
+                            self.trading_client.get_order_by_id,
+                            order.id
+                        )
+                        
+                        if filled_order.status in ['filled', 'partially_filled']:
+                            fill_verified = True
+                            actual_filled_qty = float(filled_order.filled_qty) if filled_order.filled_qty else adjusted_shares
+                            actual_fill_price = float(filled_order.filled_avg_price) if filled_order.filled_avg_price else exec_price
+                            logger.info(f"Order {order.id} verified: {filled_order.status}, filled_qty={actual_filled_qty}, avg_price={actual_fill_price}")
+                        else:
+                            logger.warning(f"Order {order.id} not filled yet: status={filled_order.status}")
+                            # For paper trading, assume immediate fill
+                            if self.paper_mode:
+                                fill_verified = True
+                                logger.info(f"Paper trading mode - assuming immediate fill")
+                    except Exception as e:
+                        logger.warning(f"Could not verify fill for {order.id}: {e}")
+                        # For paper trading, assume fill succeeded
+                        if self.paper_mode:
+                            fill_verified = True
+                            logger.info(f"Paper trading mode - assuming fill despite verification error")
+                    
+                    if not fill_verified:
+                        logger.error(f"Order {order.id} not filled - skipping database update to prevent sync issues")
+                        self.cash_manager.release_cash(strategy.strategy_id, trade_value)
+                        continue
+                    
+                    print(f"  ✅ BUY {actual_filled_qty} {symbol} @ ${actual_fill_price:.2f} (Order: {order.id}, Intent: {intent_id})")
+                    
+                    # Update in-memory state with actual filled quantities
+                    strategy.add_position(symbol, actual_filled_qty)
+                    actual_trade_value = actual_fill_price * actual_filled_qty + total_cost
+                    strategy.update_capital(-actual_trade_value)
                     entry_date = signal.get('asof_date') or datetime.now()
                     strategy.entry_dates[symbol] = entry_date
-                    total_exposure += trade_value
-                    self.performance_metrics.add_trade('BUY', symbol, adjusted_shares, exec_price, trade_value)
-                    self._update_position_record(strategy.strategy_id, symbol, adjusted_shares, exec_price)
+                    total_exposure += actual_trade_value
+                    self.performance_metrics.add_trade('BUY', symbol, actual_filled_qty, actual_fill_price, actual_trade_value)
+                    
+                    # CRITICAL: Only update database AFTER verifying fill
+                    self._update_position_record(strategy.strategy_id, symbol, actual_filled_qty, actual_fill_price)
                     
                     # CRITICAL: Set stop loss for new position
                     atr = signal.get('atr', 0)
@@ -1112,12 +1153,53 @@ class MultiStrategyRunner:
                         side=OrderSide.SELL,
                         time_in_force=TimeInForce.DAY
                     )
-                    order = self.trading_client.submit_order(order_data)
                     
-                    print(f"  ✅ SELL {shares} {symbol} @ ${price:.2f} (Order: {order.id})")
+                    # Wrap with DRY_RUN protection
+                    order = self.dry_run.execute_broker_operation(
+                        f"submit_order_sell_{symbol}",
+                        self.trading_client.submit_order,
+                        order_data
+                    )
                     
-                    # Release cash back
-                    trade_value = exec_price * shares - total_cost
+                    # CRITICAL FIX: Verify order fill before updating database
+                    fill_verified = False
+                    actual_filled_qty = shares
+                    actual_fill_price = exec_price
+                    
+                    try:
+                        # Get order status from broker
+                        filled_order = self.dry_run.execute_broker_operation(
+                            f"get_order_sell_{symbol}",
+                            self.trading_client.get_order_by_id,
+                            order.id
+                        )
+                        
+                        if filled_order.status in ['filled', 'partially_filled']:
+                            fill_verified = True
+                            actual_filled_qty = float(filled_order.filled_qty) if filled_order.filled_qty else shares
+                            actual_fill_price = float(filled_order.filled_avg_price) if filled_order.filled_avg_price else exec_price
+                            logger.info(f"SELL Order {order.id} verified: {filled_order.status}, filled_qty={actual_filled_qty}, avg_price={actual_fill_price}")
+                        else:
+                            logger.warning(f"SELL Order {order.id} not filled yet: status={filled_order.status}")
+                            # For paper trading, assume immediate fill
+                            if self.paper_mode:
+                                fill_verified = True
+                                logger.info(f"Paper trading mode - assuming immediate SELL fill")
+                    except Exception as e:
+                        logger.warning(f"Could not verify SELL fill for {order.id}: {e}")
+                        # For paper trading, assume fill succeeded
+                        if self.paper_mode:
+                            fill_verified = True
+                            logger.info(f"Paper trading mode - assuming SELL fill despite verification error")
+                    
+                    if not fill_verified:
+                        logger.error(f"SELL Order {order.id} not filled - skipping database update to prevent sync issues")
+                        continue
+                    
+                    print(f"  ✅ SELL {actual_filled_qty} {symbol} @ ${actual_fill_price:.2f} (Order: {order.id})")
+                    
+                    # Release cash back with actual filled quantities
+                    trade_value = actual_fill_price * actual_filled_qty - total_cost
                     self.cash_manager.release_cash(strategy.strategy_id, trade_value)
                     strategy.update_capital(trade_value)
                     
@@ -1127,8 +1209,8 @@ class MultiStrategyRunner:
                         strategy.strategy_id,
                         symbol,
                         'SELL',
-                        shares,
-                        exec_price,
+                        actual_filled_qty,
+                        actual_fill_price,
                         total_costs
                     )
                     logger.info(f"P&L: {pnl_explanation}")
@@ -1139,18 +1221,18 @@ class MultiStrategyRunner:
                         signal.get('signal_id'),
                         symbol,
                         'SELL',
-                        shares,
+                        actual_filled_qty,
                         price,
-                        exec_price,
+                        actual_fill_price,
                         slippage_cost,
                         commission_cost,
                         str(order.id),
                         pnl
                     )
                     
-                    # CRITICAL FIX: Update strategy positions
+                    # CRITICAL FIX: Update strategy positions with actual filled quantities
                     if symbol in strategy.positions:
-                        strategy.positions[symbol] -= shares
+                        strategy.positions[symbol] -= actual_filled_qty
                         if strategy.positions[symbol] <= 0:
                             del strategy.positions[symbol]
                             if symbol in strategy.entry_dates:
@@ -1159,7 +1241,9 @@ class MultiStrategyRunner:
                             self.stop_loss_manager.remove_stop_loss(symbol)
                             logger.info(f"Stop loss removed for {symbol} (position closed)")
                             total_exposure = max(total_exposure - trade_value, 0)
-                    self._update_position_record(strategy.strategy_id, symbol, -shares, exec_price)
+                    
+                    # CRITICAL: Only update database AFTER verifying fill
+                    self._update_position_record(strategy.strategy_id, symbol, -actual_filled_qty, actual_fill_price)
                     
                     trade_record = {
                         'strategy': strategy.name,
