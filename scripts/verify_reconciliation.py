@@ -7,7 +7,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.core.database import TradingDatabase
-from src.integration.broker_reconciler import BrokerReconciler
+from src.core.broker_reconciler import BrokerReconciler
 from alpaca.trading.client import TradingClient
 
 
