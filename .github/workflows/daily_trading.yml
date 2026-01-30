@@ -137,6 +137,28 @@ jobs:
         "
         EOF
     
+    - name: Auto-sync database on reconciliation failure
+      id: auto_sync
+      if: always() && steps.check_reconciliation.outputs.status == 'FAIL' && steps.check_reconciliation.outputs.discrepancies != '0'
+      env:
+        ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+        ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+        ALPACA_PAPER: true
+      run: |
+        echo "🔄 Reconciliation failed - Auto-syncing database with broker..."
+        python scripts/sync_broker_state.py
+        echo "✅ Database auto-synced successfully"
+        echo "synced=true" >> $GITHUB_OUTPUT
+    
+    - name: Re-upload synced database
+      if: steps.auto_sync.outputs.synced == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: trading-database
+        path: trading.db
+        retention-days: 90
+        overwrite: true
+    
     - name: Validate system invariants
       if: steps.check_execution.outputs.executed == 'true'
       run: |
