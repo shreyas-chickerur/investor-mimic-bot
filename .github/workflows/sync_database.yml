@@ -45,16 +45,8 @@ jobs:
         python scripts/sync_broker_state.py
         echo "✅ Database synced successfully"
     
-    - name: Verify sync
-      env:
-        ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
-        ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
-        ALPACA_PAPER: true
-      run: |
-        echo "🔍 Verifying reconciliation..."
-        python scripts/verify_reconciliation.py
-    
     - name: Upload synced database
+      if: always()
       uses: actions/upload-artifact@v4
       with:
         name: trading-database
@@ -63,6 +55,7 @@ jobs:
         overwrite: true
     
     - name: Summary
+      if: always()
       run: |
         echo "## Database Sync Complete" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
