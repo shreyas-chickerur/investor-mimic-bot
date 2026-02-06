@@ -26,7 +26,7 @@ def _get_local_positions(cursor):
     cursor.execute("""
         SELECT p.strategy_id, s.name as strategy_name, p.symbol, p.shares, p.avg_price
         FROM positions p
-        JOIN strategies s ON p.strategy_id = s.strategy_id
+        JOIN strategies s ON p.strategy_id = s.id
         WHERE p.shares > 0
         ORDER BY p.symbol, s.name
     """)
@@ -45,7 +45,7 @@ def _get_local_positions(cursor):
 
 def _get_or_create_broker_sync_strategy(cursor, portfolio_value):
     """Get or create the BROKER_SYNC strategy for untracked positions."""
-    cursor.execute("SELECT strategy_id FROM strategies WHERE name = 'BROKER_SYNC' LIMIT 1")
+    cursor.execute("SELECT id FROM strategies WHERE name = 'BROKER_SYNC' LIMIT 1")
     result = cursor.fetchone()
     if result:
         return result[0]
