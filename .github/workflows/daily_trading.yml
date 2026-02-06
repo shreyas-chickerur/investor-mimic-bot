@@ -112,6 +112,9 @@ jobs:
           echo "discrepancies=0" >> $GITHUB_OUTPUT
           echo "✅ Reconciliation status: $RECON_STATUS"
         fi
+        
+        # Ensure outputs are set even on edge cases
+        echo "recon_done=true" >> $GITHUB_OUTPUT
     
     - name: Auto-sync database on reconciliation failure
       id: auto_sync
@@ -127,7 +130,7 @@ jobs:
         echo "synced=true" >> $GITHUB_OUTPUT
     
     - name: Re-upload synced database
-      if: steps.auto_sync.outputs.synced == 'true'
+      if: always() && steps.auto_sync.outputs.synced == 'true'
       uses: actions/upload-artifact@v4
       with:
         name: trading-database
