@@ -305,15 +305,17 @@ class TestReconciliationIntegration:
         
         mock_client.get_all_positions.return_value = [mock_broker_position]
         
-        reconciler = BrokerReconciler()
-        
-        # Mismatch in positions
-        local_positions = {}
-        
-        success, discrepancies = reconciler.reconcile_daily(
-            local_positions=local_positions,
-            local_cash=100000
-        )
+        with patch.dict(os.environ, {'ALPACA_API_KEY': 'test', 'ALPACA_SECRET_KEY': 'test'}):
+            reconciler = BrokerReconciler()
+            reconciler.client = mock_client
+            
+            # Mismatch in positions
+            local_positions = {}
+            
+            success, discrepancies = reconciler.reconcile_daily(
+                local_positions=local_positions,
+                local_cash=100000
+            )
         
         # Should fail
         assert success == False
