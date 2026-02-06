@@ -24,6 +24,7 @@ logs/
 data/.encryption_key
 
 # Database files (contain sensitive data)
+trading.db
 data/*.db
 
 # Artifacts directories (generated per run)
