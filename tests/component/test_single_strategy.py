@@ -21,7 +21,12 @@ logger = logging.getLogger(__name__)
 @pytest.fixture(scope="module")
 def market_data():
     """Load market data for testing"""
+    # Try tests/data first, then project root data/
     data_file = Path(__file__).parent.parent / 'data' / 'training_data.csv'
+    if not data_file.exists():
+        data_file = Path(__file__).parent.parent.parent / 'data' / 'training_data.csv'
+    if not data_file.exists():
+        pytest.skip("training_data.csv not found")
     df = pd.read_csv(data_file, index_col=0)
     df.index = pd.to_datetime(df.index)
     df = df.sort_index()

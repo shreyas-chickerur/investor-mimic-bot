@@ -8,6 +8,7 @@ This is the comprehensive test that verifies everything works together.
 
 import sys
 import os
+import pytest
 sys.path.insert(0, 'src')
 
 import pandas as pd
@@ -169,6 +170,10 @@ def test_backtester_integration():
     
 
 
+@pytest.mark.skipif(
+    not os.path.exists('src/config/validation_config.yaml'),
+    reason="validation_config.yaml not present"
+)
 def test_signal_injection():
     """Test signal injection for validation"""
     print("\n" + "="*80)

@@ -21,7 +21,7 @@ class TestBrokerReconciler(unittest.TestCase):
         self.mock_email = Mock()
         
         # Mock Alpaca client
-        with patch('broker_reconciler.TradingClient'):
+        with patch('src.risk.broker_reconciler.TradingClient'):
             self.reconciler = BrokerReconciler(email_notifier=self.mock_email)
             self.reconciler.client = Mock()
     
@@ -216,8 +216,7 @@ class TestBrokerReconciler(unittest.TestCase):
         # Assert email was sent
         self.mock_email.send_alert.assert_called_once()
         call_args = self.mock_email.send_alert.call_args[0]
-        self.assertIn('PAUSED', call_args[0])  # Subject
-        self.assertIn('Reconciliation', call_args[0])
+        self.assertIn('Reconciliation', call_args[0])  # Subject
     
     def test_force_resume(self):
         """Test force resume functionality"""

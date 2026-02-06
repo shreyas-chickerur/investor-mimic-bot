@@ -231,7 +231,7 @@ class TestDataQualityChecker:
         checker = DataQualityChecker(temp_dir)
         
         # Create data with old dates
-        old_date = datetime.now() - timedelta(days=5)
+        old_date = datetime.now() - timedelta(days=10)
         data = pd.DataFrame({
             'symbol': ['AAPL', 'MSFT'],
             'date': [old_date, old_date],
@@ -239,8 +239,8 @@ class TestDataQualityChecker:
             'rsi': [50.0, 60.0],
             'sma_20': [145.0, 295.0],
             'sma_50': [140.0, 290.0],
-            'sma_100': [135.0, 285.0],
-            'atr': [2.0, 3.0],
+            'sma_200': [135.0, 285.0],
+            'atr_20': [2.0, 3.0],
             'volatility_20d': [0.02, 0.03]
         })
         
@@ -284,9 +284,8 @@ class TestDataQualityChecker:
             'rsi': [np.nan] * 50 + [50.0] * 50,  # 50% NaN
             'sma_20': [145.0] * 100,
             'sma_50': [140.0] * 100,
-            'sma_100': [135.0] * 100,
-            'atr': [2.0] * 100,
-            'atr_20': [2.0] * 100,  # Add required indicator
+            'sma_200': [135.0] * 100,
+            'atr_20': [2.0] * 100,
             'volatility_20d': [0.02] * 100
         })
         
@@ -309,9 +308,8 @@ class TestDataQualityChecker:
             'rsi': [50.0] * 100,
             'sma_20': [145.0] * 100,
             'sma_50': [140.0] * 100,
-            'sma_100': [135.0] * 100,
-            'atr': [2.0] * 100,
-            'atr_20': [2.0] * 100,  # Add required indicator
+            'sma_200': [135.0] * 100,
+            'atr_20': [2.0] * 100,
             'volatility_20d': [0.02] * 100
         })
         
@@ -333,8 +331,8 @@ class TestDataQualityChecker:
             'rsi': [50.0],
             'sma_20': [145.0],
             'sma_50': [140.0],
-            'sma_100': [135.0],
-            'atr': [2.0],
+            'sma_200': [135.0],
+            'atr_20': [2.0],
             'volatility_20d': [0.02]
         })
         
@@ -550,19 +548,37 @@ class TestStrategyHealthScoring:
     
     @pytest.fixture
     def mock_db(self):
-        """Create mock database with connection."""
+        """Create mock database with real temp SQLite file."""
+        import sqlite3
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.db')
+        tmp.close()
+        conn = sqlite3.connect(tmp.name)
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS trades (
+            id INTEGER PRIMARY KEY, strategy_id INTEGER, symbol TEXT,
+            action TEXT, shares REAL, exec_price REAL, executed_at TEXT,
+            run_id TEXT, signal_id INTEGER, requested_price REAL,
+            slippage_cost REAL, commission_cost REAL, order_id TEXT)''')
+        cursor.execute('''CREATE TABLE IF NOT EXISTS positions (
+            id INTEGER PRIMARY KEY, strategy_id INTEGER, symbol TEXT,
+            shares REAL, avg_price REAL, current_price REAL,
+            market_value REAL, unrealized_pnl REAL, entry_date TEXT)''')
+        cursor.execute('''CREATE TABLE IF NOT EXISTS signals (
+            id INTEGER PRIMARY KEY, strategy_id INTEGER, symbol TEXT,
+            signal_type TEXT, confidence REAL, reasoning TEXT,
+            terminal_state TEXT, terminal_reason TEXT,
+            generated_at TEXT, run_id TEXT, asof_date TEXT)''')
+        cursor.execute('''CREATE TABLE IF NOT EXISTS signal_rejections (
+            id INTEGER PRIMARY KEY, strategy_id INTEGER, symbol TEXT,
+            stage TEXT, reason_code TEXT, details TEXT,
+            created_at TEXT, run_id TEXT)''')
+        conn.commit()
+        conn.close()
+
         db = Mock()
-        
-        # Mock connection
-        mock_conn = Mock()
-        mock_cursor = Mock()
-        mock_cursor.fetchall = Mock(return_value=[])
-        mock_conn.cursor = Mock(return_value=mock_cursor)
-        mock_conn.close = Mock()
-        
-        db._get_connection = Mock(return_value=mock_conn)
-        
-        return db
+        db.db_path = tmp.name
+        yield db
+        os.unlink(tmp.name)
     
     @pytest.fixture
     def temp_dir(self):
