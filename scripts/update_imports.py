@@ -71,11 +71,6 @@ IMPORT_MAPPINGS = {
 
 def update_file_imports(filepath):
     """Update imports in a single file"""
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-
     try:
         with open(filepath, 'r') as f:
             content = f.read()
