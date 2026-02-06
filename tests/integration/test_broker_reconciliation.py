@@ -14,7 +14,7 @@ from src.risk.broker_reconciler import BrokerReconciler, ReconciliationMismatch
 class TestBrokerReconciliation:
     """Test broker reconciliation logic"""
     
-    @patch('broker_reconciler.TradingClient')
+    @patch('src.risk.broker_reconciler.TradingClient')
     def test_reconciliation_catches_missing_position(self, mock_trading_client):
         """Test that missing positions in broker are detected"""
         # Setup mock broker
@@ -46,7 +46,7 @@ class TestBrokerReconciliation:
         assert len(discrepancies) > 0
         assert any('MSFT' in str(d) for d in discrepancies)
     
-    @patch('broker_reconciler.TradingClient')
+    @patch('src.risk.broker_reconciler.TradingClient')
     def test_reconciliation_catches_share_mismatch(self, mock_trading_client):
         """Test that share count mismatches are detected"""
         mock_client = Mock()
@@ -81,7 +81,7 @@ class TestBrokerReconciliation:
         assert len(discrepancies) > 0
         assert any('AAPL' in str(d) and 'quantity' in str(d).lower() for d in discrepancies)
     
-    @patch('broker_reconciler.TradingClient')
+    @patch('src.risk.broker_reconciler.TradingClient')
     def test_reconciliation_catches_orphaned_position(self, mock_trading_client):
         """Test that positions in broker but not in DB are detected"""
         mock_client = Mock()
@@ -115,7 +115,7 @@ class TestBrokerReconciliation:
         assert len(discrepancies) > 0
         assert any('AAPL' in str(d) for d in discrepancies)
     
-    @patch('broker_reconciler.TradingClient')
+    @patch('src.risk.broker_reconciler.TradingClient')
     def test_reconciliation_passes_when_matching(self, mock_trading_client):
         """Test that reconciliation passes when positions match"""
         mock_client = Mock()
@@ -155,7 +155,7 @@ class TestBrokerReconciliation:
         assert success == True
         assert len(discrepancies) == 0
     
-    @patch('broker_reconciler.TradingClient')
+    @patch('src.risk.broker_reconciler.TradingClient')
     def test_reconciliation_handles_empty_positions(self, mock_trading_client):
         """Test reconciliation with no positions"""
         mock_client = Mock()
@@ -178,7 +178,7 @@ class TestBrokerReconciliation:
         assert success == True
         assert len(discrepancies) == 0
     
-    @patch('broker_reconciler.TradingClient')
+    @patch('src.risk.broker_reconciler.TradingClient')
     def test_reconciliation_handles_api_failure(self, mock_trading_client):
         """Test reconciliation handles API failures gracefully"""
         mock_client = Mock()
@@ -218,7 +218,7 @@ class TestBrokerReconciliation:
         assert success == True
         assert len(discrepancies) == 0
     
-    @patch('broker_reconciler.TradingClient')
+    @patch('src.risk.broker_reconciler.TradingClient')
     def test_reconciliation_sets_paused_state_on_failure(self, mock_trading_client):
         """Test that reconciliation sets paused state on mismatch"""
         mock_client = Mock()
@@ -248,7 +248,7 @@ class TestBrokerReconciliation:
         # Reconciler should track mismatch
         assert len(reconciler.mismatch_details) > 0 or len(discrepancies) > 0
     
-    @patch('broker_reconciler.TradingClient')
+    @patch('src.risk.broker_reconciler.TradingClient')
     def test_reconciliation_cash_mismatch(self, mock_trading_client):
         """Test that cash mismatches are detected"""
         mock_client = Mock()
@@ -277,7 +277,7 @@ class TestBrokerReconciliation:
 class TestReconciliationIntegration:
     """Test reconciliation integration with execution engine"""
     
-    @patch('broker_reconciler.TradingClient')
+    @patch('src.risk.broker_reconciler.TradingClient')
     def test_reconciliation_blocks_trading_on_failure(self, mock_trading_client):
         """Test that failed reconciliation should block trading"""
         mock_client = Mock()
@@ -309,7 +309,7 @@ class TestReconciliationIntegration:
     
     def test_reconciliation_allows_trading_on_success(self):
         """Test that successful reconciliation allows trading"""
-        with patch('broker_reconciler.TradingClient') as mock_client_class:
+        with patch('src.risk.broker_reconciler.TradingClient') as mock_client_class:
             mock_client = Mock()
             mock_client_class.return_value = mock_client
             
@@ -338,7 +338,7 @@ class TestReconciliationIntegration:
                 assert success == True
                 assert reconciler.is_paused == False
     
-    @patch('broker_reconciler.TradingClient')
+    @patch('src.risk.broker_reconciler.TradingClient')
     def test_reconcile_with_orders(self, mock_trading_client):
         """Test reconciliation with open orders (lines 94-95)"""
         mock_client = Mock()
@@ -366,7 +366,7 @@ class TestReconciliationIntegration:
             )
             assert mock_client.get_orders.called
     
-    @patch('broker_reconciler.TradingClient')
+    @patch('src.risk.broker_reconciler.TradingClient')
     def test_reconcile_exception_handling(self, mock_trading_client):
         """Test exception handling in reconciliation (lines 116-121)"""
         mock_client = Mock()
@@ -388,7 +388,7 @@ class TestReconciliationIntegration:
             assert any('error' in str(d).lower() for d in discrepancies)
             assert reconciler.is_paused == True
     
-    @patch('broker_reconciler.TradingClient')
+    @patch('src.risk.broker_reconciler.TradingClient')
     def test_reconcile_orders_stuck_orders(self, mock_trading_client):
         """Test stuck orders detection (lines 196-223)"""
         mock_client = Mock()
@@ -415,7 +415,7 @@ class TestReconciliationIntegration:
             
             assert any('Stuck orders' in str(d) for d in discrepancies)
     
-    @patch('broker_reconciler.TradingClient')
+    @patch('src.risk.broker_reconciler.TradingClient')
     def test_reconcile_orders_phantom_orders(self, mock_trading_client):
         """Test phantom orders detection (lines 196-223)"""
         mock_client = Mock()
@@ -444,7 +444,7 @@ class TestReconciliationIntegration:
             
             assert any('Phantom orders' in str(d) for d in discrepancies)
     
-    @patch('broker_reconciler.TradingClient')
+    @patch('src.risk.broker_reconciler.TradingClient')
     def test_email_alert_failure(self, mock_trading_client):
         """Test email alert failure handling (lines 287-288)"""
         mock_client = Mock()
@@ -472,7 +472,7 @@ class TestReconciliationIntegration:
             
             assert success == False
     
-    @patch('broker_reconciler.TradingClient')
+    @patch('src.risk.broker_reconciler.TradingClient')
     def test_get_broker_state(self, mock_trading_client):
         """Test get_broker_state method (lines 317-341)"""
         mock_client = Mock()
@@ -507,7 +507,7 @@ class TestReconciliationIntegration:
             assert state['buying_power'] == 50000.0
             assert state['portfolio_value'] == 65000.0
     
-    @patch('broker_reconciler.TradingClient')
+    @patch('src.risk.broker_reconciler.TradingClient')
     def test_get_broker_state_error_handling(self, mock_trading_client):
         """Test get_broker_state error handling (lines 340-341)"""
         mock_client = Mock()
@@ -525,7 +525,7 @@ class TestReconciliationIntegration:
     
     def test_check_if_paused(self):
         """Test check_if_paused method"""
-        with patch('broker_reconciler.TradingClient'):
+        with patch('src.risk.broker_reconciler.TradingClient'):
             with patch.dict(os.environ, {'ALPACA_API_KEY': 'test', 'ALPACA_SECRET_KEY': 'test'}):
                 reconciler = BrokerReconciler()
                 
@@ -544,7 +544,7 @@ class TestReconciliationIntegration:
     
     def test_force_resume(self):
         """Test force_resume method"""
-        with patch('broker_reconciler.TradingClient'):
+        with patch('src.risk.broker_reconciler.TradingClient'):
             with patch.dict(os.environ, {'ALPACA_API_KEY': 'test', 'ALPACA_SECRET_KEY': 'test'}):
                 reconciler = BrokerReconciler()
                 

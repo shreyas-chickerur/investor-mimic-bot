@@ -120,7 +120,7 @@ class TestWorkflowExecution(unittest.TestCase):
     
     def test_run_script_exists(self):
         """Test that main.py exists"""
-        script_path = 'src/main.py'
+        script_path = 'src/core/main.py'
         self.assertTrue(os.path.exists(script_path), 
                        f"Run script not found: {script_path}")
         print("✓ Run script exists")

@@ -1,0 +1,151 @@
+name: CI Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  PYTHON_VERSION: "3.8"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov
+    
+    - name: Run unit tests
+      run: |
+        python -m pytest tests/unit/ -v --tb=short --junitxml=test-results/unit.xml
+    
+    - name: Run component tests
+      run: |
+        python -m pytest tests/component/ -v --tb=short --junitxml=test-results/component.xml
+    
+    - name: Run integration tests
+      run: |
+        python -m pytest tests/integration/ -v --tb=short --junitxml=test-results/integration.xml
+    
+    - name: Run functional tests
+      run: |
+        python -m pytest tests/functional/ -v --tb=short --junitxml=test-results/functional.xml
+    
+    - name: Run full suite with coverage
+      run: |
+        python -m pytest tests/ -v --tb=short --cov=src --cov-report=term-missing --cov-report=html:coverage-report --junitxml=test-results/all.xml
+    
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results-${{ github.run_number }}
+        path: |
+          test-results/
+          coverage-report/
+        retention-days: 30
+    
+    - name: Create test summary
+      if: always()
+      run: |
+        echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        python -m pytest tests/ --tb=no -q 2>&1 | tail -5 >> $GITHUB_STEP_SUMMARY
+
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Import check
+      run: |
+        python scripts/import_check.py
+
+  workflow-validation:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Validate workflow files exist
+      run: |
+        echo "=== Validating workflow files ==="
+        for f in .github/workflows/daily_trading.yml .github/workflows/sync_database.yml .github/workflows/ci_tests.yml; do
+          if [ -f "$f" ]; then
+            echo "✅ $f exists"
+          else
+            echo "❌ $f missing"
+            exit 1
+          fi
+        done
+    
+    - name: Validate required scripts exist
+      run: |
+        echo "=== Validating required scripts ==="
+        SCRIPTS=(
+          "scripts/sync_broker_state.py"
+          "scripts/setup_database.py"
+          "scripts/import_check.py"
+          "scripts/run_trading.sh"
+          "scripts/update_daily_data.py"
+        )
+        for s in "${SCRIPTS[@]}"; do
+          if [ -f "$s" ]; then
+            echo "✅ $s exists"
+          else
+            echo "❌ $s missing"
+            exit 1
+          fi
+        done
+    
+    - name: Validate Python syntax in scripts
+      run: |
+        echo "=== Checking Python syntax ==="
+        find scripts/ -name "*.py" -exec python -m py_compile {} \;
+        echo "✅ All scripts compile successfully"
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.8"
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Validate sync_broker_state.py imports
+      run: |
+        python -c "from scripts.sync_broker_state import sync_broker_to_database; print('✅ sync_broker_state imports OK')"
+    
+    - name: Validate core module imports
+      run: |
+        python -c "from src.core.database import TradingDatabase; from src.risk.broker_reconciler import BrokerReconciler; print('✅ Core module imports OK')"

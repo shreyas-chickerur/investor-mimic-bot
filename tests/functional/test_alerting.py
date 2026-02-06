@@ -33,7 +33,7 @@ class TestCriticalAlertSystem:
         os.environ['RECIPIENT_EMAIL'] = 'recipient@example.com'
         
         # Create alert system with mocked email
-        with patch('email_notifier.EmailNotifier'):
+        with patch('src.utils.email_notifier.EmailNotifier'):
             self.alert_system = CriticalAlertSystem(self.db_path)
             self.alert_system.email_notifier = Mock()
             self.alert_system.email_notifier.send_email = Mock(return_value=True)
@@ -335,7 +335,7 @@ class TestAlertSystemIntegration:
             if var in os.environ:
                 del os.environ[var]
         
-        with patch('email_notifier.EmailNotifier'):
+        with patch('src.utils.email_notifier.EmailNotifier'):
             alert_system = CriticalAlertSystem(":memory:")
             
             # Should initialize without Twilio
@@ -349,7 +349,7 @@ class TestAlertSystemIntegration:
             if var in os.environ:
                 del os.environ[var]
         
-        with patch('email_notifier.EmailNotifier') as mock_email:
+        with patch('src.utils.email_notifier.EmailNotifier') as mock_email:
             mock_email.return_value.enabled = False
             alert_system = CriticalAlertSystem(":memory:")
             
@@ -361,7 +361,7 @@ class TestAlertSystemIntegration:
         os.environ['ALERT_DRAWDOWN_THRESHOLD'] = '0.20'  # 20%
         os.environ['ALERT_NO_TRADE_DAYS'] = '14'  # 14 days
         
-        with patch('email_notifier.EmailNotifier'):
+        with patch('src.utils.email_notifier.EmailNotifier'):
             alert_system = CriticalAlertSystem(":memory:")
             
             assert alert_system.drawdown_threshold == 0.20
@@ -373,7 +373,7 @@ class TestAlertSystemEdgeCases:
     
     def test_zero_peak_portfolio_value(self):
         """Test handling of zero peak portfolio value"""
-        with patch('email_notifier.EmailNotifier'):
+        with patch('src.utils.email_notifier.EmailNotifier'):
             alert_system = CriticalAlertSystem(":memory:")
             alert_system.email_notifier = Mock()
             
@@ -384,7 +384,7 @@ class TestAlertSystemEdgeCases:
     
     def test_no_trades_in_database(self):
         """Test handling when no trades exist"""
-        with patch('email_notifier.EmailNotifier'):
+        with patch('src.utils.email_notifier.EmailNotifier'):
             alert_system = CriticalAlertSystem(":memory:")
             alert_system.email_notifier = Mock()
             
@@ -402,7 +402,7 @@ class TestAlertSystemEdgeCases:
     
     def test_database_error_handling(self):
         """Test handling of database errors"""
-        with patch('email_notifier.EmailNotifier'):
+        with patch('src.utils.email_notifier.EmailNotifier'):
             alert_system = CriticalAlertSystem(":memory:")
             alert_system.email_notifier = Mock()
             alert_system.email_notifier.send_email = Mock(return_value=True)
