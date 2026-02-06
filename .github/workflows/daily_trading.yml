@@ -90,52 +90,28 @@ jobs:
     
     - name: Check reconciliation status
       id: check_reconciliation
-      if: steps.check_execution.outputs.executed == 'true'
+      if: always()
       continue-on-error: true
       run: |
-        echo "=== Checking Reconciliation ==="
-        date=$(date +%Y-%m-%d)
-        json_path="artifacts/json/${date}.json"
+        echo "=== Checking Reconciliation from Database ==="
         
-        python3 << 'EOF'
-        import json
-        import sys
-        import os
-        from pathlib import Path
+        # Query database directly for reconciliation status
+        RUN_ID=$(sqlite3 trading.db "SELECT run_id FROM broker_state ORDER BY created_at DESC LIMIT 1;" || echo "UNKNOWN")
+        RECON_STATUS=$(sqlite3 trading.db "SELECT reconciliation_status FROM broker_state WHERE run_id='$RUN_ID' AND snapshot_type='RECONCILIATION';" || echo "UNKNOWN")
         
-        date = "$(date +%Y-%m-%d)"
-        json_path = Path(f"artifacts/json/{date}.json")
+        echo "Run ID: $RUN_ID"
+        echo "Reconciliation Status: $RECON_STATUS"
         
-        if json_path.exists():
-            with open(json_path) as f:
-                data = json.load(f)
-            
-            system_health = data.get('system_health', {})
-            recon = system_health.get('reconciliation_status', 'UNKNOWN')
-            discrep = system_health.get('reconciliation_discrepancies', [])
-            
-            print(f'Reconciliation: {recon}')
-            print(f'Discrepancies: {len(discrep)}')
-            
-            # Set output for downstream steps
-            with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-                f.write(f'status={recon}\n')
-                f.write(f'discrepancies={len(discrep)}\n')
-            
-            if 'PASS' in recon and len(discrep) == 0:
-                print('✅ Execution complete - Reconciliation passed')
-                sys.exit(0)
-            else:
-                print('⚠️  Reconciliation has discrepancies (non-blocking)')
-                sys.exit(0)  # Exit with success - reconciliation is non-blocking
-        else:
-            print(f'⚠️  No artifact found for {date}')
-            with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-                f.write(f'status=UNKNOWN\n')
-                f.write(f'discrepancies=0\n')
-            sys.exit(0)
-        "
-        EOF
+        # Set outputs for downstream steps
+        echo "status=$RECON_STATUS" >> $GITHUB_OUTPUT
+        
+        if [ "$RECON_STATUS" = "FAIL" ]; then
+          echo "discrepancies=1" >> $GITHUB_OUTPUT
+          echo "⚠️  Reconciliation FAILED - will trigger auto-sync"
+        else
+          echo "discrepancies=0" >> $GITHUB_OUTPUT
+          echo "✅ Reconciliation status: $RECON_STATUS"
+        fi
     
     - name: Auto-sync database on reconciliation failure
       id: auto_sync
