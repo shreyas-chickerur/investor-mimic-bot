@@ -32,11 +32,25 @@ jobs:
         python3 scripts/import_check.py
     
     - name: Download previous database (if exists)
-      uses: actions/download-artifact@v4
-      with:
-        name: trading-database
-        path: .
       continue-on-error: true
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        echo "=== Downloading latest trading-database artifact ==="
+        # List recent artifacts named trading-database, get the most recent one
+        ARTIFACT_ID=$(gh api repos/${{ github.repository }}/actions/artifacts \
+          --jq '.artifacts | map(select(.name == "trading-database" and .expired == false)) | sort_by(.created_at) | reverse | .[0].id // empty')
+        
+        if [ -n "$ARTIFACT_ID" ]; then
+          echo "Found artifact ID: $ARTIFACT_ID"
+          gh api repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip > trading-db.zip
+          unzip -o trading-db.zip
+          rm -f trading-db.zip
+          echo "✅ Downloaded trading.db from artifact $ARTIFACT_ID"
+          ls -la trading.db
+        else
+          echo "⚠️ No trading-database artifact found — will initialize fresh"
+        fi
     
     - name: Initialize database
       run: |
