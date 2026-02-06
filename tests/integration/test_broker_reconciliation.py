@@ -29,18 +29,20 @@ class TestBrokerReconciliation:
         
         mock_client.get_all_positions.return_value = [mock_broker_position]
         
-        reconciler = BrokerReconciler()
-        
-        # Local positions include MSFT
-        local_positions = {
-            'AAPL': {'qty': 100, 'avg_price': 150.00},
-            'MSFT': {'qty': 50, 'avg_price': 300.00}
-        }
-        
-        success, discrepancies = reconciler.reconcile_daily(
-            local_positions=local_positions,
-            local_cash=50000
-        )
+        with patch.dict(os.environ, {'ALPACA_API_KEY': 'test', 'ALPACA_SECRET_KEY': 'test'}):
+            reconciler = BrokerReconciler()
+            reconciler.client = mock_client
+            
+            # Local positions include MSFT
+            local_positions = {
+                'AAPL': {'qty': 100, 'avg_price': 150.00},
+                'MSFT': {'qty': 50, 'avg_price': 300.00}
+            }
+            
+            success, discrepancies = reconciler.reconcile_daily(
+                local_positions=local_positions,
+                local_cash=50000
+            )
         
         assert success == False
         assert len(discrepancies) > 0
@@ -66,16 +68,18 @@ class TestBrokerReconciliation:
         mock_account.buying_power = '50000.0'
         mock_client.get_account.return_value = mock_account
         
-        reconciler = BrokerReconciler()
-        
-        local_positions = {
-            'AAPL': {'qty': 100, 'avg_price': 150.00}
-        }
-        
-        success, discrepancies = reconciler.reconcile_daily(
-            local_positions=local_positions,
-            local_cash=50000
-        )
+        with patch.dict(os.environ, {'ALPACA_API_KEY': 'test', 'ALPACA_SECRET_KEY': 'test'}):
+            reconciler = BrokerReconciler()
+            reconciler.client = mock_client
+            
+            local_positions = {
+                'AAPL': {'qty': 100, 'avg_price': 150.00}
+            }
+            
+            success, discrepancies = reconciler.reconcile_daily(
+                local_positions=local_positions,
+                local_cash=50000
+            )
         
         assert success == False
         assert len(discrepancies) > 0
@@ -101,15 +105,17 @@ class TestBrokerReconciliation:
         mock_account.buying_power = '100000.0'
         mock_client.get_account.return_value = mock_account
         
-        reconciler = BrokerReconciler()
-        
-        # Local has no positions
-        local_positions = {}
-        
-        success, discrepancies = reconciler.reconcile_daily(
-            local_positions=local_positions,
-            local_cash=100000
-        )
+        with patch.dict(os.environ, {'ALPACA_API_KEY': 'test', 'ALPACA_SECRET_KEY': 'test'}):
+            reconciler = BrokerReconciler()
+            reconciler.client = mock_client
+            
+            # Local has no positions
+            local_positions = {}
+            
+            success, discrepancies = reconciler.reconcile_daily(
+                local_positions=local_positions,
+                local_cash=100000
+            )
         
         assert success == False
         assert len(discrepancies) > 0
@@ -140,17 +146,19 @@ class TestBrokerReconciliation:
         mock_account.buying_power = '50000.0'
         mock_client.get_account.return_value = mock_account
         
-        reconciler = BrokerReconciler()
-        
-        local_positions = {
-            'AAPL': {'qty': 100, 'avg_price': 150.00},
-            'MSFT': {'qty': 50, 'avg_price': 300.00}
-        }
-        
-        success, discrepancies = reconciler.reconcile_daily(
-            local_positions=local_positions,
-            local_cash=50000
-        )
+        with patch.dict(os.environ, {'ALPACA_API_KEY': 'test', 'ALPACA_SECRET_KEY': 'test'}):
+            reconciler = BrokerReconciler()
+            reconciler.client = mock_client
+            
+            local_positions = {
+                'AAPL': {'qty': 100, 'avg_price': 150.00},
+                'MSFT': {'qty': 50, 'avg_price': 300.00}
+            }
+            
+            success, discrepancies = reconciler.reconcile_daily(
+                local_positions=local_positions,
+                local_cash=50000
+            )
         
         assert success == True
         assert len(discrepancies) == 0
@@ -168,12 +176,14 @@ class TestBrokerReconciliation:
         mock_account.buying_power = '100000.0'
         mock_client.get_account.return_value = mock_account
         
-        reconciler = BrokerReconciler()
-        
-        success, discrepancies = reconciler.reconcile_daily(
-            local_positions={},
-            local_cash=100000
-        )
+        with patch.dict(os.environ, {'ALPACA_API_KEY': 'test', 'ALPACA_SECRET_KEY': 'test'}):
+            reconciler = BrokerReconciler()
+            reconciler.client = mock_client
+            
+            success, discrepancies = reconciler.reconcile_daily(
+                local_positions={},
+                local_cash=100000
+            )
         
         assert success == True
         assert len(discrepancies) == 0
@@ -187,12 +197,14 @@ class TestBrokerReconciliation:
         # Simulate API failure
         mock_client.get_all_positions.side_effect = Exception("API Error")
         
-        reconciler = BrokerReconciler()
-        
-        success, discrepancies = reconciler.reconcile_daily(
-            local_positions={},
-            local_cash=100000
-        )
+        with patch.dict(os.environ, {'ALPACA_API_KEY': 'test', 'ALPACA_SECRET_KEY': 'test'}):
+            reconciler = BrokerReconciler()
+            reconciler.client = mock_client
+            
+            success, discrepancies = reconciler.reconcile_daily(
+                local_positions={},
+                local_cash=100000
+            )
         
         # Should fail gracefully
         assert success == False
@@ -232,17 +244,19 @@ class TestBrokerReconciliation:
         
         mock_client.get_all_positions.return_value = [mock_broker_position]
         
-        reconciler = BrokerReconciler()
-        
-        # Local has different position
-        local_positions = {
-            'AAPL': {'qty': 90, 'avg_price': 150.00}
-        }
-        
-        success, discrepancies = reconciler.reconcile_daily(
-            local_positions=local_positions,
-            local_cash=50000
-        )
+        with patch.dict(os.environ, {'ALPACA_API_KEY': 'test', 'ALPACA_SECRET_KEY': 'test'}):
+            reconciler = BrokerReconciler()
+            reconciler.client = mock_client
+            
+            # Local has different position
+            local_positions = {
+                'AAPL': {'qty': 90, 'avg_price': 150.00}
+            }
+            
+            success, discrepancies = reconciler.reconcile_daily(
+                local_positions=local_positions,
+                local_cash=50000
+            )
         
         assert success == False
         # Reconciler should track mismatch
