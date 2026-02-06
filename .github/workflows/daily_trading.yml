@@ -176,7 +176,7 @@ jobs:
         fi
     
     - name: Upload trading database
-      if: always()
+      if: always() && steps.auto_sync.outputs.synced != 'true'
       uses: actions/upload-artifact@v4
       with:
         name: trading-database
