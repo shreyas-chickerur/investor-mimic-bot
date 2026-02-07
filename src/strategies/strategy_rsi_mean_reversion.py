@@ -80,8 +80,9 @@ class RSIMeanReversionStrategy(TradingStrategy):
                     'shares': shares,
                     'price': price,
                     'value': shares * price,
-                    'confidence': (30 - rsi) / 30,  # Higher confidence for lower RSI
+                    'confidence': max(0.1, min(1.0, (40 - rsi) / 40)),  # Higher confidence for lower RSI
                     'reasoning': f'RSI {rsi:.1f} < {self.rsi_threshold}, slope {rsi_slope:.2f} > 0 (turning up)',
+                    'atr': atr if atr and atr > 0 else None,
                     'asof_date': latest_date
                 })
             

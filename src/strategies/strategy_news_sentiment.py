@@ -66,6 +66,7 @@ class NewsSentimentStrategy(TradingStrategy):
                     'value': shares * price,
                     'confidence': sentiment_score * 0.8,  # Slightly lower confidence
                     'reasoning': f'Momentum {returns_5d*100:.1f}% + sentiment filter ({sentiment_score:.2f})',
+                    'atr': atr if atr and atr > 0 else None,
                     'asof_date': latest_date
                 })
             

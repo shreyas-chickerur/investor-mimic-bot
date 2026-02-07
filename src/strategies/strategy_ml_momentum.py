@@ -99,6 +99,8 @@ class MLMomentumStrategy(TradingStrategy):
                 continue
             
             price = symbol_data['close'].iloc[-1]
+            latest = symbol_data.iloc[-1]
+            atr = latest.get('atr_20', None)
             
             # Get features and predict
             try:
@@ -109,7 +111,7 @@ class MLMomentumStrategy(TradingStrategy):
                 
                 # Buy signal: Model predicts positive return with confidence > min_probability
                 if prediction == 1 and prob_positive > self.min_probability and symbol not in self.positions:
-                    shares = self.calculate_position_size(price, max_position_pct=0.10)
+                    shares = self.calculate_position_size(price, atr=atr, max_position_pct=0.10)
                     
                     signals.append({
                         'symbol': symbol,
@@ -118,7 +120,8 @@ class MLMomentumStrategy(TradingStrategy):
                         'price': price,
                         'value': shares * price,
                         'confidence': prob_positive,
-                        'reasoning': f'ML probability of positive return: {prob_positive*100:.1f}%'
+                        'reasoning': f'ML probability of positive return: {prob_positive*100:.1f}%',
+                        'atr': atr if atr and atr > 0 else None,
                     })
                 
                 # Sell signal: Held for target days or model predicts negative
@@ -136,7 +139,9 @@ class MLMomentumStrategy(TradingStrategy):
                             'confidence': 1.0 if days_held >= self.hold_days else prob_positive,
                             'reasoning': f'Held {days_held} days' if days_held >= self.hold_days else 'ML predicts reversal'
                         })
-            except:
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"ML prediction failed for {symbol}: {e}")
                 continue
         
         return signals

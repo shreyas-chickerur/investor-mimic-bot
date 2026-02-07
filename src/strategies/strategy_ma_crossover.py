@@ -73,6 +73,7 @@ class MACrossoverStrategy(TradingStrategy):
                     'value': shares * price,
                     'confidence': min(adx / 40, 1.0),  # Higher confidence for stronger trends
                     'reasoning': f'Golden cross: {self.short_window}MA crossed above {self.long_window}MA, ADX={adx:.1f}',
+                    'atr': atr if atr and atr > 0 else None,
                     'asof_date': latest_date
                 })
             
