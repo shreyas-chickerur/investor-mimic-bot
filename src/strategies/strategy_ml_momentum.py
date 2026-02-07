@@ -126,7 +126,8 @@ class MLMomentumStrategy(TradingStrategy):
                 
                 # Sell signal: Held for target days or model predicts negative
                 elif symbol in self.positions:
-                    days_held = self.entry_dates.get(symbol, 0)
+                    latest_date = symbol_data.index[-1]
+                    days_held = self.get_days_held(symbol, latest_date)
                     if days_held >= self.hold_days or (prediction == 0 and prob_positive < 0.4):
                         shares = self.positions[symbol]
                         

@@ -140,33 +140,28 @@ def test_backtester_integration():
     # Load data
     df = pd.read_csv('data/training_data.csv', index_col=0)
     df.index = pd.to_datetime(df.index)
-    test_data = df.tail(500)  # Small test
+    # Use a small slice: need at least train_days + test_days trading days
+    test_data = df.tail(700)  # ~2.8 years
     
-    # Initialize components
-    backtester = PortfolioBacktester(100000)
-    strategies = [RSIMeanReversionStrategy(1, 20000)]
-    regime = RegimeDetector()
-    corr_filter = CorrelationFilter()
-    risk_mgr = PortfolioRiskManager()
-    cost_model = ExecutionCostModel()
+    # Initialize backtester with walk-forward API
+    backtester = PortfolioBacktester(initial_capital=100000)
     
-    # Run backtest
-    results = backtester.run_backtest(
-        test_data,
-        strategies,
-        regime,
-        corr_filter,
-        risk_mgr,
-        cost_model
+    # Run walk-forward backtest with short windows for speed
+    results = backtester.run_walk_forward(
+        market_data=test_data,
+        strategy_classes=[RSIMeanReversionStrategy],
+        train_days=252,   # 1yr train
+        test_days=126,    # 6mo test
+        step_days=126,    # 6mo step
     )
     
     assert 'final_value' in results, "Missing final_value in results"
-    assert 'total_return' in results, "Missing total_return in results"
+    assert 'total_return_pct' in results, "Missing total_return_pct in results"
     
     print(f"✅ Backtest completed")
     print(f"   Final value: ${results['final_value']:,.2f}")
-    print(f"   Total return: {results['total_return']:.2%}")
-    print(f"   Trades: {len(backtester.trades)}")
+    print(f"   Total return: {results['total_return_pct']:.2f}%")
+    print(f"   Trades: {results['total_trades']}")
     
 
 
@@ -202,47 +197,32 @@ def test_signal_injection():
 
 
 def test_execution_pipeline():
-    """Test complete execution pipeline"""
+    """Test complete execution pipeline via backtester cost helpers"""
     print("\n" + "="*80)
     print("TEST 7: EXECUTION PIPELINE")
     print("="*80)
     
     from src.integration.portfolio_backtester import PortfolioBacktester
     from src.utils.execution_costs import ExecutionCostModel
-    from src.risk.portfolio_risk_manager import PortfolioRiskManager
     
-    # Create backtester
-    backtester = PortfolioBacktester(100000)
-    cost_model = ExecutionCostModel()
-    risk_mgr = PortfolioRiskManager()
+    # Create backtester and test cost calculations
+    backtester = PortfolioBacktester(initial_capital=100000, slippage_bps=5.0, commission_per_share=0.0)
+    cost_model = ExecutionCostModel(slippage_bps=5.0, commission_per_share=0.0)
     
-    # Create test signal
-    signal = {
-        'symbol': 'AAPL',
-        'action': 'BUY',
-        'price': 150.0,
-        'shares': 10,
-        'strategy_id': 1
-    }
+    # Test buy cost calculation
+    buy_cost = backtester._buy_cost(150.0, 10)
+    assert buy_cost > 150.0 * 10, "Buy cost should include slippage"
+    print(f"✅ Buy cost for 10 shares @ $150: ${buy_cost:.2f} (includes slippage)")
     
-    # Test execution
-    date = datetime.now()
-    initial_cash = backtester.cash
+    # Test sell proceeds calculation
+    sell_proceeds = backtester._sell_price(155.0, 10)
+    assert sell_proceeds < 155.0 * 10, "Sell proceeds should deduct slippage"
+    print(f"✅ Sell proceeds for 10 shares @ $155: ${sell_proceeds:.2f} (after slippage)")
     
-    new_cash = backtester._execute_buy(
-        signal,
-        backtester.cash,
-        backtester.cash,
-        risk_mgr,
-        cost_model,
-        date
-    )
-    
-    if new_cash < initial_cash:
-        print(f"✅ Trade executed: ${initial_cash - new_cash:.2f} spent")
-        print(f"   Position: {backtester.positions.get('AAPL', {}).get('shares', 0)} shares")
-    else:
-        print("⚠️ Trade rejected (may be expected based on conditions)")
+    # Test cost model consistency
+    exec_price, slippage, commission, total_cost = cost_model.calculate_execution_price(150.0, 'BUY', 10)
+    assert exec_price > 150.0, "Execution price should be higher for BUY"
+    print(f"✅ Cost model: exec_price=${exec_price:.4f}, slippage=${slippage:.4f}, total_cost=${total_cost:.4f}")
     
 
 
