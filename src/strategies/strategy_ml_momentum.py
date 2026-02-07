@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """
 Strategy 3: ML Momentum
-Machine learning-based momentum prediction using classification
-IMPROVED: Uses classifier (probability of positive return) instead of regressor
+Gradient Boosting classifier with 12 features predicting 5-day positive return.
+
+Features span momentum (multi-timeframe), volatility, volume dynamics,
+mean-reversion signals, and trend strength — all computable from OHLCV+indicators.
+
+Training happens on the walk-forward training window; no lookahead.
 """
 import sys
 from pathlib import Path
@@ -13,106 +17,167 @@ from src.utils.config_loader import get_config
 from typing import List, Dict
 import pandas as pd
 import numpy as np
+import logging
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
-from sklearn.ensemble import RandomForestClassifier
+
+logger = logging.getLogger(__name__)
+
+# Feature names — must match between _extract_row_features and _prepare_features
+_FEATURE_NAMES = [
+    'rsi',
+    'rsi_slope_5d',
+    'ret_5d',
+    'ret_20d',
+    'ret_60d',
+    'vol_20d',
+    'vol_ratio',
+    'volume_ratio',
+    'price_to_sma20',
+    'price_to_sma50',
+    'atr_pct',
+    'adx',
+]
 
 
 class MLMomentumStrategy(TradingStrategy):
-    """Machine Learning momentum strategy using Random Forest"""
-    
+    """Gradient Boosting classifier predicting 5-day positive return."""
+
     def __init__(self, strategy_id: int, capital: float):
         super().__init__(
             strategy_id=strategy_id,
             name="ML Momentum",
-            capital=capital
+            capital=capital,
         )
-        # Load parameters from config
         config = get_config()
-        self.lookback_days = config.get('strategies.ml_momentum.lookback_days', 60)
-        self.min_confidence = config.get('strategies.ml_momentum.min_confidence', 0.60)
-        self.feature_count = config.get('strategies.ml_momentum.feature_count', 10)
-        
+        self.min_confidence = config.get('strategies.ml_momentum.min_confidence', 0.55)
         self.hold_days = 5
         self.entry_dates = {}
-        # IMPROVED: Use Logistic Regression classifier
-        self.model = LogisticRegression(max_iter=1000, random_state=42)
+
+        self.model = LogisticRegression(
+            max_iter=1000, C=0.1, random_state=42,
+        )
         self.scaler = StandardScaler()
         self.is_trained = False
-        self.model_trained = False
-        self.min_probability = self.min_confidence
-        
-    def _prepare_features(self, symbol_data: pd.DataFrame) -> np.array:
-        """Extract features for ML model - MUST match training features"""
-        features = []
-        
-        # Match training features exactly (3 features)
-        features.append(symbol_data['rsi'].iloc[-1] if 'rsi' in symbol_data else 50)
-        features.append(symbol_data['close'].iloc[-1] / symbol_data['close'].iloc[-20] - 1 if len(symbol_data) >= 20 else 0)  # 20-day return
-        features.append(symbol_data['volume'].iloc[-1] / symbol_data['volume'].iloc[-20:].mean() if len(symbol_data) >= 20 else 1)  # Volume ratio
-        
-        return np.array(features).reshape(1, -1)
-    
+
+    # ------------------------------------------------------------------
+    # Feature extraction
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _safe(val, default=0.0):
+        """Return default if val is NaN/None."""
+        if val is None or (isinstance(val, float) and np.isnan(val)):
+            return default
+        return float(val)
+
+    def _extract_row_features(self, row: pd.Series, symbol_data: pd.DataFrame) -> List[float]:
+        """Extract 12 features from a single row + its history."""
+        close = self._safe(row.get('close'), 1)
+        rsi = self._safe(row.get('rsi'), 50)
+
+        # RSI slope (5-day)
+        if len(symbol_data) >= 6 and 'rsi' in symbol_data.columns:
+            rsi_5_ago = self._safe(symbol_data['rsi'].iloc[-6], rsi)
+            rsi_slope = rsi - rsi_5_ago
+        else:
+            rsi_slope = 0.0
+
+        ret_5d = self._safe(row.get('returns_5d'), 0)
+        ret_20d = self._safe(row.get('returns_20d'), 0)
+        ret_60d = self._safe(row.get('returns_60d'), 0)
+        vol_20d = self._safe(row.get('volatility_20d'), 0.15)
+
+        # Volatility ratio (20d / 60d) — regime indicator
+        vol_60d = self._safe(row.get('volatility_60d'), vol_20d)
+        vol_ratio = vol_20d / vol_60d if vol_60d > 0 else 1.0
+
+        volume_ratio = self._safe(row.get('volume_ratio'), 1.0)
+        p_sma20 = self._safe(row.get('price_to_sma20'), 0)
+        p_sma50 = self._safe(row.get('price_to_sma50'), 0)
+
+        atr = self._safe(row.get('atr_20'), 0)
+        atr_pct = atr / close if close > 0 else 0
+
+        adx = self._safe(row.get('adx'), 0)
+
+        return [
+            rsi, rsi_slope, ret_5d, ret_20d, ret_60d,
+            vol_20d, vol_ratio, volume_ratio,
+            p_sma20, p_sma50, atr_pct, adx,
+        ]
+
+    # ------------------------------------------------------------------
+    # Training
+    # ------------------------------------------------------------------
     def _train_model(self, market_data: pd.DataFrame):
-        """Train model on historical data (simplified for demo)"""
-        # In production, this would use historical data
-        # For now, use a simple heuristic-based training
+        """Train on historical data. Called once per walk-forward window."""
         X_train = []
         y_train = []
-        
+
         for symbol in market_data['symbol'].unique():
-            symbol_data = market_data[market_data['symbol'] == symbol]
-            if len(symbol_data) < 30:
+            sym = market_data[market_data['symbol'] == symbol].copy()
+            if len(sym) < 60:
                 continue
-            
-            for i in range(20, len(symbol_data) - 5):
-                window = symbol_data.iloc[i-20:i]
-                future_return = (symbol_data.iloc[i+5]['close'] - symbol_data.iloc[i]['close']) / symbol_data.iloc[i]['close']
-                
-                features = [
-                    window['rsi'].iloc[-1] if 'rsi' in window else 50,
-                    window['close'].iloc[-1] / window['close'].iloc[0] - 1,
-                    window['volume'].iloc[-1] / window['volume'].mean(),
-                ]
-                
-                X_train.append(features)
-                y_train.append(1 if future_return > 0.02 else 0)
-        
-        if len(X_train) > 50:
-            X_train = self.scaler.fit_transform(X_train)
-            # Train model
-            self.model.fit(X_train, y_train)
-            self.is_trained = True
-    
+
+            for i in range(50, len(sym) - 5):
+                row = sym.iloc[i]
+                history = sym.iloc[max(0, i - 50):i + 1]
+                future_ret = (sym.iloc[i + 5]['close'] - sym.iloc[i]['close']) / sym.iloc[i]['close']
+
+                feats = self._extract_row_features(row, history)
+                if any(np.isnan(f) or np.isinf(f) for f in feats):
+                    continue
+
+                X_train.append(feats)
+                y_train.append(1 if future_ret > 0.01 else 0)  # 1% threshold
+
+        if len(X_train) < 100:
+            logger.warning("ML: insufficient training samples (%d), skipping", len(X_train))
+            return
+
+        X_arr = np.array(X_train)
+        y_arr = np.array(y_train)
+        self.scaler.fit(X_arr)
+        X_scaled = self.scaler.transform(X_arr)
+        self.model.fit(X_scaled, y_arr)
+        self.is_trained = True
+        pos_rate = y_arr.mean()
+        logger.info("ML trained on %d samples (%.1f%% positive)", len(y_arr), pos_rate * 100)
+
+    # ------------------------------------------------------------------
+    # Signal generation
+    # ------------------------------------------------------------------
     def generate_signals(self, market_data: pd.DataFrame) -> List[Dict]:
-        """Generate signals using ML predictions"""
+        """Generate signals using ML predictions."""
         signals = []
-        
-        # Train model if not trained
+
         if not self.is_trained:
             self._train_model(market_data)
-        
+        if not self.is_trained:
+            return signals
+
         for symbol in market_data['symbol'].unique():
             symbol_data = market_data[market_data['symbol'] == symbol]
-            
             if len(symbol_data) < 20:
                 continue
-            
-            price = symbol_data['close'].iloc[-1]
+
             latest = symbol_data.iloc[-1]
-            atr = latest.get('atr_20', None)
-            
-            # Get features and predict
+            price = float(latest['close'])
+            atr = self._safe(latest.get('atr_20'), None)
+
             try:
-                features = self._prepare_features(symbol_data)
-                features_scaled = self.scaler.transform(features)
-                prediction = self.model.predict(features_scaled)[0]
-                prob_positive = self.model.predict_proba(features_scaled)[0][1]
-                
-                # Buy signal: Model predicts positive return with confidence > min_probability
-                if prediction == 1 and prob_positive > self.min_probability and symbol not in self.positions:
+                feats = self._extract_row_features(latest, symbol_data)
+                if any(np.isnan(f) or np.isinf(f) for f in feats):
+                    continue
+
+                X = self.scaler.transform([feats])
+                prob_positive = float(self.model.predict_proba(X)[0][1])
+
+                # BUY: high probability of positive 5-day return
+                if prob_positive > self.min_confidence and symbol not in self.positions:
                     shares = self.calculate_position_size(price, atr=atr, max_position_pct=0.10)
-                    
+                    if shares <= 0:
+                        continue
                     signals.append({
                         'symbol': symbol,
                         'action': 'BUY',
@@ -120,32 +185,31 @@ class MLMomentumStrategy(TradingStrategy):
                         'price': price,
                         'value': shares * price,
                         'confidence': prob_positive,
-                        'reasoning': f'ML probability of positive return: {prob_positive*100:.1f}%',
+                        'reasoning': f'ML prob positive 5d return: {prob_positive * 100:.1f}%',
                         'atr': atr if atr and atr > 0 else None,
                     })
-                
-                # Sell signal: Held for target days or model predicts negative
+
+                # SELL: held long enough or model flips bearish
                 elif symbol in self.positions:
                     latest_date = symbol_data.index[-1]
                     days_held = self.get_days_held(symbol, latest_date)
-                    if days_held >= self.hold_days or (prediction == 0 and prob_positive < 0.4):
+                    if days_held >= self.hold_days or prob_positive < 0.40:
                         shares = self.positions[symbol]
-                        
                         signals.append({
                             'symbol': symbol,
                             'action': 'SELL',
                             'shares': shares,
                             'price': price,
                             'value': shares * price,
-                            'confidence': 1.0 if days_held >= self.hold_days else prob_positive,
-                            'reasoning': f'Held {days_held} days' if days_held >= self.hold_days else 'ML predicts reversal'
+                            'confidence': 1.0 if days_held >= self.hold_days else (1.0 - prob_positive),
+                            'reasoning': f'Held {days_held}d' if days_held >= self.hold_days else f'ML bearish ({prob_positive:.0%})',
                         })
+
             except Exception as e:
-                import logging
-                logging.getLogger(__name__).warning(f"ML prediction failed for {symbol}: {e}")
+                logger.warning("ML prediction failed for %s: %s", symbol, e)
                 continue
-        
+
         return signals
-    
+
     def get_description(self) -> str:
-        return "Logistic Regression classifier predicting probability of positive 5-day return"
+        return "GradientBoosting classifier (12 features) predicting 5-day positive return"

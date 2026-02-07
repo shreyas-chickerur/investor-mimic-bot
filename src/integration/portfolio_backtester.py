@@ -29,9 +29,10 @@ class PortfolioBacktester:
         commission_per_share: float = 0.0,
         max_portfolio_heat: float = 0.50,
         max_daily_loss_pct: float = 0.05,
-        stop_loss_atr_mult: float = 2.5,
+        stop_loss_atr_mult: float = 5.0,
         max_positions_per_strategy: int = 3,
         max_correlation: float = 0.80,
+        min_hold_days: int = 2,
     ):
         self.initial_capital = initial_capital
         self.slippage_bps = slippage_bps
@@ -41,6 +42,7 @@ class PortfolioBacktester:
         self.stop_loss_atr_mult = stop_loss_atr_mult
         self.max_positions_per_strategy = max_positions_per_strategy
         self.max_correlation = max_correlation
+        self.min_hold_days = min_hold_days
 
     # ------------------------------------------------------------------
     # Walk-forward driver
@@ -54,7 +56,10 @@ class PortfolioBacktester:
         step_days: int = 126,
     ) -> Dict:
         """
-        Run walk-forward backtest across multiple windows.
+        Run walk-forward backtest as a continuous simulation.
+
+        Positions carry across windows. Only ML models retrain at
+        window boundaries. No forced closes.
 
         Args:
             market_data: Full historical data (DatetimeIndex, 'symbol' column)
@@ -65,68 +70,286 @@ class PortfolioBacktester:
             Dict with overall metrics, per-window metrics, equity curve
         """
         dates = sorted(market_data.index.unique())
-        window_results = []
-        all_equity = []
-        all_trades = []
-        capital = self.initial_capital
-        window_id = 0
 
+        # Build window schedule
+        windows = []
+        wid = 0
         while True:
-            train_start_idx = window_id * step_days
+            train_start_idx = wid * step_days
             train_end_idx = train_start_idx + train_days
             test_end_idx = train_end_idx + test_days
-
             if test_end_idx > len(dates):
                 break
+            windows.append({
+                'train_start': dates[train_start_idx],
+                'train_end': dates[train_end_idx - 1],
+                'test_start': dates[train_end_idx],
+                'test_end': dates[min(test_end_idx - 1, len(dates) - 1)],
+            })
+            wid += 1
 
-            train_start = dates[train_start_idx]
-            train_end = dates[train_end_idx - 1]
-            test_start = dates[train_end_idx]
-            test_end = dates[min(test_end_idx - 1, len(dates) - 1)]
+        if not windows:
+            return {'error': 'Not enough data for even one window'}
 
-            logger.info(
-                f"Window {window_id + 1}: train {train_start.date()}-{train_end.date()}, "
-                f"test {test_start.date()}-{test_end.date()}, capital ${capital:,.0f}"
+        # Continuous simulation state
+        cash = self.initial_capital
+        positions = {}   # carried across windows
+        stop_levels = {}
+        cooldowns = {}   # {symbol: last_sell_date} — prevent re-entry churn
+        equity_curve = []
+        all_trades = []
+        window_results = []
+
+        # Create strategy instances — each gets 1/N of capital for sizing
+        strategies = []
+        for i, cls in enumerate(strategy_classes):
+            strat = cls(
+                strategy_id=i + 1,
+                capital=self.initial_capital / len(strategy_classes),
             )
+            strategies.append(strat)
 
-            train_data = market_data[
-                (market_data.index >= train_start) & (market_data.index <= train_end)
+        # Initial training on first window's train data
+        first_train = market_data[
+            (market_data.index >= windows[0]['train_start'])
+            & (market_data.index <= windows[0]['train_end'])
+        ]
+        for strat in strategies:
+            if hasattr(strat, '_train_model'):
+                try:
+                    strat._train_model(first_train)
+                except Exception as e:
+                    logger.warning(f"Training failed for {strat.name}: {e}")
+
+        # Determine full test date range
+        sim_start = windows[0]['test_start']
+        sim_end = windows[-1]['test_end']
+        sim_dates = [d for d in dates if sim_start <= d <= sim_end]
+
+        # Track which window we're in for retraining
+        current_window_idx = 0
+        window_start_value = self.initial_capital
+        day_start_value = self.initial_capital
+
+        for day_idx, date in enumerate(sim_dates):
+            # -- Retrain at window boundaries --
+            if (current_window_idx + 1 < len(windows)
+                    and date >= windows[current_window_idx + 1]['test_start']):
+                # Record window result
+                pos_val = self._mark_to_market(positions, market_data[market_data.index == date])
+                pv = cash + pos_val
+                window_results.append({
+                    'window_id': current_window_idx + 1,
+                    'train_period': (
+                        f"{windows[current_window_idx]['train_start'].date()} to "
+                        f"{windows[current_window_idx]['train_end'].date()}"
+                    ),
+                    'test_period': (
+                        f"{windows[current_window_idx]['test_start'].date()} to "
+                        f"{windows[current_window_idx]['test_end'].date()}"
+                    ),
+                    'final_value': pv,
+                    'trades': [],  # trades tracked globally
+                })
+
+                current_window_idx += 1
+                window_start_value = pv
+
+                # Retrain ML strategies on new training data
+                train_data = market_data[
+                    (market_data.index >= windows[current_window_idx]['train_start'])
+                    & (market_data.index <= windows[current_window_idx]['train_end'])
+                ]
+                for strat in strategies:
+                    if hasattr(strat, '_train_model'):
+                        try:
+                            strat.is_trained = False
+                            strat._train_model(train_data)
+                        except Exception as e:
+                            logger.warning(f"Retrain failed for {strat.name}: {e}")
+
+                logger.info(
+                    f"Window {current_window_idx + 1}: retrained, "
+                    f"capital ${pv:,.0f}, {len(positions)} open positions"
+                )
+
+            day_data = market_data[market_data.index == date]
+            if day_data.empty:
+                continue
+
+            # -- Mark-to-market --
+            pos_value = self._mark_to_market(positions, day_data)
+            portfolio_value = cash + pos_value
+
+            # -- Daily loss circuit breaker --
+            if day_idx == 0 or date != sim_dates[max(0, day_idx - 1)]:
+                day_start_value = portfolio_value
+            daily_pnl_pct = (portfolio_value - day_start_value) / day_start_value if day_start_value > 0 else 0
+            if daily_pnl_pct < -self.max_daily_loss_pct:
+                equity_curve.append(self._snap(date, portfolio_value, cash, pos_value, len(positions)))
+                continue
+
+            # -- Check stop losses (respect min hold period) --
+            for sym in list(positions.keys()):
+                sym_row = day_data[day_data['symbol'] == sym]
+                if sym_row.empty:
+                    continue
+                price = float(sym_row.iloc[0]['close'])
+                days_held = (date - positions[sym]['entry_date']).days
+                if (sym in stop_levels and price <= stop_levels[sym]
+                        and days_held >= self.min_hold_days):
+                    pos = positions.pop(sym)
+                    stop_levels.pop(sym, None)
+                    proceeds = self._sell_price(price, pos['shares'])
+                    pnl = proceeds - pos['entry_price'] * pos['shares']
+                    cash += proceeds
+                    all_trades.append({
+                        'date': date, 'symbol': sym, 'action': 'SELL',
+                        'shares': pos['shares'], 'price': price,
+                        'pnl': pnl, 'reason': 'STOP_LOSS',
+                        'hold_days': days_held,
+                    })
+                    strat = pos.get('strategy_obj')
+                    if strat:
+                        strat.positions.pop(sym, None)
+                        strat.entry_dates.pop(sym, None)
+                    cooldowns[sym] = date
+
+            # -- Generate signals --
+            lookback_start = date - timedelta(days=210)
+            historical = market_data[
+                (market_data.index >= lookback_start) & (market_data.index <= date)
             ]
-            test_data = market_data[
-                (market_data.index >= test_start) & (market_data.index <= test_end)
-            ]
 
-            # Fresh strategy instances per window (train on train_data)
-            strategies = []
-            for i, cls in enumerate(strategy_classes):
-                strat = cls(strategy_id=i + 1, capital=capital / len(strategy_classes))
-                # Let ML strategies train on training data
-                if hasattr(strat, '_train_model'):
-                    try:
-                        strat._train_model(train_data)
-                    except Exception as e:
-                        logger.warning(f"Training failed for {strat.name}: {e}")
-                strategies.append(strat)
+            all_signals = []
+            for strat in strategies:
+                try:
+                    sigs = strat.generate_signals(historical)
+                    if sigs:
+                        for s in sigs:
+                            s['_strategy'] = strat
+                        all_signals.extend(sigs)
+                except Exception:
+                    continue
 
-            # Run single-window simulation
-            result = self._simulate_window(
-                test_data, strategies, capital
+            # -- Process SELL signals (respect min hold period) --
+            for sig in all_signals:
+                if sig.get('action') != 'SELL':
+                    continue
+                sym = sig['symbol']
+                if sym not in positions:
+                    continue
+                days_held = (date - positions[sym]['entry_date']).days
+                if days_held < self.min_hold_days:
+                    continue
+                pos = positions.pop(sym)
+                stop_levels.pop(sym, None)
+                price = float(sig['price'])
+                proceeds = self._sell_price(price, pos['shares'])
+                pnl = proceeds - pos['entry_price'] * pos['shares']
+                cash += proceeds
+                all_trades.append({
+                    'date': date, 'symbol': sym, 'action': 'SELL',
+                    'shares': pos['shares'], 'price': price,
+                    'pnl': pnl, 'reason': sig.get('reasoning', ''),
+                    'hold_days': days_held,
+                })
+                # Sync strategy state so it can generate new BUY signals
+                strat = pos.get('strategy_obj')
+                if strat:
+                    strat.positions.pop(sym, None)
+                    strat.entry_dates.pop(sym, None)
+                cooldowns[sym] = date  # prevent immediate re-entry
+
+            # -- Process BUY signals (high confidence only, cooldown, max 2/day) --
+            cooldown_days = 10
+            min_buy_confidence = 0.65
+            max_daily_buys = 2
+            buy_sigs = sorted(
+                [s for s in all_signals
+                 if s.get('action') == 'BUY'
+                 and s.get('confidence', 0) >= min_buy_confidence
+                 and s['symbol'] not in positions
+                 and (s['symbol'] not in cooldowns
+                      or (date - cooldowns[s['symbol']]).days >= cooldown_days)],
+                key=lambda s: s.get('confidence', 0),
+                reverse=True,
+            )[:max_daily_buys]
+
+            pos_value = self._mark_to_market(positions, day_data)
+            portfolio_value = cash + pos_value
+            current_exposure = sum(p['shares'] * p['entry_price'] for p in positions.values())
+
+            for sig in buy_sigs:
+                sym = sig['symbol']
+                shares = sig.get('shares', 0)
+                price = float(sig['price'])
+                if shares <= 0 or price <= 0:
+                    continue
+
+                cost = self._buy_cost(price, shares)
+                if cost > cash:
+                    continue
+
+                new_exposure = current_exposure + cost
+                if portfolio_value > 0 and new_exposure / portfolio_value > self.max_portfolio_heat:
+                    continue
+
+                exec_price = price * (1 + self.slippage_bps / 10000)
+                cash -= cost
+                current_exposure += cost
+                atr = sig.get('atr', 0) or 0
+
+                positions[sym] = {
+                    'shares': shares,
+                    'entry_price': exec_price,
+                    'entry_date': date,
+                    'atr': atr,
+                    'strategy_obj': sig.get('_strategy'),
+                }
+
+                if atr > 0:
+                    stop_levels[sym] = exec_price - self.stop_loss_atr_mult * atr
+
+                all_trades.append({
+                    'date': date, 'symbol': sym, 'action': 'BUY',
+                    'shares': shares, 'price': exec_price,
+                    'pnl': 0, 'reason': sig.get('reasoning', ''),
+                    'hold_days': 0,
+                })
+
+                strat = sig.get('_strategy')
+                if strat:
+                    strat.positions[sym] = shares
+                    strat.entry_dates[sym] = date
+
+            # -- End-of-day snapshot --
+            pos_value = self._mark_to_market(positions, day_data)
+            portfolio_value = cash + pos_value
+            equity_curve.append(self._snap(date, portfolio_value, cash, pos_value, len(positions)))
+
+        # Record final window
+        if current_window_idx < len(windows):
+            final_pv = cash + self._mark_to_market(
+                positions,
+                market_data[market_data.index == sim_dates[-1]] if sim_dates else pd.DataFrame(),
             )
-
-            result['window_id'] = window_id + 1
-            result['train_period'] = f"{train_start.date()} to {train_end.date()}"
-            result['test_period'] = f"{test_start.date()} to {test_end.date()}"
-            window_results.append(result)
-
-            all_equity.extend(result['equity_curve'])
-            all_trades.extend(result['trades'])
-
-            # Carry forward capital
-            capital = result['final_value']
-            window_id += 1
+            window_results.append({
+                'window_id': current_window_idx + 1,
+                'train_period': (
+                    f"{windows[current_window_idx]['train_start'].date()} to "
+                    f"{windows[current_window_idx]['train_end'].date()}"
+                ),
+                'test_period': (
+                    f"{windows[current_window_idx]['test_start'].date()} to "
+                    f"{windows[current_window_idx]['test_end'].date()}"
+                ),
+                'final_value': final_pv,
+                'trades': [],
+            })
 
         # Aggregate
-        overall = self._aggregate_results(all_equity, all_trades, window_results)
+        overall = self._aggregate_results(equity_curve, all_trades, window_results)
         overall['windows'] = window_results
         return overall
 

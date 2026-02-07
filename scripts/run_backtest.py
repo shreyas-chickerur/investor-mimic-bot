@@ -23,6 +23,8 @@ from src.strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
 from src.strategies.strategy_ma_crossover import MACrossoverStrategy
 from src.strategies.strategy_ml_momentum import MLMomentumStrategy
 from src.strategies.strategy_news_sentiment import NewsSentimentStrategy
+from src.strategies.strategy_earnings_drift import EarningsDriftStrategy
+from src.strategies.strategy_factor_momentum import FactorMomentumStrategy
 
 logging.basicConfig(
     level=logging.WARNING,
@@ -67,11 +69,13 @@ def main():
         print(f"  Trimmed to {args.years}+2yr window: {df.index.min().date()} to {df.index.max().date()}")
 
     # Strategy classes to test
+    # New mix: drop NewsSentiment (no API key) and MACrossover (weakest signal)
+    # Add EarningsDrift (PEAD anomaly) and FactorMomentum (cross-sectional ranking)
     strategy_classes = [
         RSIMeanReversionStrategy,
-        MACrossoverStrategy,
         MLMomentumStrategy,
-        NewsSentimentStrategy,
+        EarningsDriftStrategy,
+        FactorMomentumStrategy,
     ]
 
     print(f"\nStrategies: {[c.__name__ for c in strategy_classes]}")
@@ -86,7 +90,7 @@ def main():
         commission_per_share=0.0,
         max_portfolio_heat=0.50,
         max_daily_loss_pct=0.05,
-        stop_loss_atr_mult=2.5,
+        stop_loss_atr_mult=5.0,
         max_positions_per_strategy=3,
     )
 

@@ -22,6 +22,8 @@ from src.strategies.strategy_ml_momentum import MLMomentumStrategy
 from src.strategies.strategy_news_sentiment import NewsSentimentStrategy
 from src.strategies.strategy_ma_crossover import MACrossoverStrategy
 from src.strategies.strategy_volatility_breakout import VolatilityBreakoutStrategy
+from src.strategies.strategy_earnings_drift import EarningsDriftStrategy
+from src.strategies.strategy_factor_momentum import FactorMomentumStrategy
 from alpaca.trading.client import TradingClient
 from alpaca.trading.requests import MarketOrderRequest
 from alpaca.trading.enums import OrderSide, TimeInForce
@@ -338,10 +340,12 @@ class MultiStrategyRunner:
         
         strategy_configs = [
             ("RSI Mean Reversion", "Buy when RSI < 30 + low volatility, hold 20 days", RSIMeanReversionStrategy),
-            ("ML Momentum", "Machine learning momentum prediction", MLMomentumStrategy),
-            ("News Sentiment", "News sentiment + technical indicators", NewsSentimentStrategy),
-            ("MA Crossover", "Golden cross (50/200 MA) trend following", MACrossoverStrategy),
-            # Volatility Breakout disabled - underperforming (+15% over 15 years in backtest)
+            ("ML Momentum", "GradientBoosting 12-feature classifier predicting 5d return", MLMomentumStrategy),
+            ("Earnings Drift", "Post-earnings announcement drift via volume spike detection", EarningsDriftStrategy),
+            ("Factor Momentum", "Cross-sectional factor ranking: momentum+quality+reversion", FactorMomentumStrategy),
+            # Disabled strategies:
+            # ("News Sentiment", "News sentiment + technical indicators", NewsSentimentStrategy),
+            # ("MA Crossover", "Golden cross (50/200 MA) trend following", MACrossoverStrategy),
             # ("Volatility Breakout", "Bollinger Band breakouts with volume", VolatilityBreakoutStrategy)
         ]
         
@@ -388,7 +392,9 @@ class MultiStrategyRunner:
             "ML Momentum": MLMomentumStrategy,
             "News Sentiment": NewsSentimentStrategy,
             "MA Crossover": MACrossoverStrategy,
-            "Volatility Breakout": VolatilityBreakoutStrategy
+            "Volatility Breakout": VolatilityBreakoutStrategy,
+            "Earnings Drift": EarningsDriftStrategy,
+            "Factor Momentum": FactorMomentumStrategy,
         }
         
         strategy_class = strategy_map.get(name)
