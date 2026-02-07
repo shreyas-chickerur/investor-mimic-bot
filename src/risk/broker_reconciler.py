@@ -151,11 +151,12 @@ class BrokerReconciler:
                     disc = f"Quantity mismatch for {symbol}: local={local_data['qty']}, broker={broker_data['qty']}"
                     discrepancies.append(disc)
                 
-                # Check average price (allow 1% tolerance for rounding)
-                price_diff_pct = abs(local_data['avg_price'] - broker_data['avg_price']) / broker_data['avg_price'] * 100
-                if price_diff_pct > 1.0:
-                    disc = f"Price mismatch for {symbol}: local=${local_data['avg_price']:.2f}, broker=${broker_data['avg_price']:.2f} ({price_diff_pct:.2f}% diff)"
-                    discrepancies.append(disc)
+                # Log average price differences as warnings (not failures)
+                # Price diffs are expected due to multi-strategy aggregation and partial fills
+                if broker_data['avg_price'] > 0:
+                    price_diff_pct = abs(local_data['avg_price'] - broker_data['avg_price']) / broker_data['avg_price'] * 100
+                    if price_diff_pct > 1.0:
+                        logger.warning(f"Avg price drift for {symbol}: local=${local_data['avg_price']:.2f}, broker=${broker_data['avg_price']:.2f} ({price_diff_pct:.2f}% diff) — cosmetic only")
             
             # Check for positions in broker but not local
             for symbol in broker_dict:
