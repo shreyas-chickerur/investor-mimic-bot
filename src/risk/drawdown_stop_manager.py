@@ -286,9 +286,8 @@ class DrawdownStopManager:
         # Save health check artifact
         self._save_health_check_artifact(checks)
         
-        # All checks must pass
-        all_passed = all(checks.values() if k != 'timestamp' else True 
-                        for k in checks.keys())
+        # All checks must pass (skip 'timestamp' key)
+        all_passed = all(v for k, v in checks.items() if k != 'timestamp')
         
         if all_passed:
             logger.info("✅ All health checks passed, ready to resume trading")

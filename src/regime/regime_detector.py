@@ -180,7 +180,7 @@ class RegimeDetector:
             return enabled
         
         # Trend following strategies
-        if 'ma' in strategy_lower or 'crossover' in strategy_lower:
+        if 'ma crossover' in strategy_lower or 'crossover' in strategy_lower or 'trend' in strategy_lower:
             enabled = regime_adjustments['enable_trend_following']
             if not enabled:
                 logger.info(f"Disabling {strategy_name} due to regime")

@@ -144,7 +144,10 @@ class MultiStrategyRunner:
         
         self.regime_detector = RegimeDetector()
         self.dynamic_allocator = DynamicAllocator(self.portfolio_value)
-        self.cost_model = ExecutionCostModel()
+        slippage_bps = self.config.get('execution.slippage_bps', 5)
+        commission = self.config.get('execution.commission_per_share', 0.0)
+        self.cost_model = ExecutionCostModel(slippage_bps=slippage_bps, commission_per_share=commission)
+        logger.info(f"Execution costs: {slippage_bps}bps slippage, ${commission}/share commission")
         self.performance_metrics = PerformanceMetrics()
         self.broker_reconciler = BrokerReconciler(email_notifier=self.email_notifier)
         
@@ -1085,9 +1088,9 @@ class MultiStrategyRunner:
                     # CRITICAL: Set stop loss for new position
                     atr = signal.get('atr', 0)
                     if atr and atr > 0:
-                        self.stop_loss_manager.set_stop_loss(symbol, exec_price, atr)
+                        self.stop_loss_manager.set_stop_loss(symbol, actual_fill_price, atr)
                         stop_price = self.stop_loss_manager.get_stop_price(symbol)
-                        logger.info(f"Stop loss set for {symbol}: ${stop_price:.2f} (3x ATR from ${exec_price:.2f})")
+                        logger.info(f"Stop loss set for {symbol}: ${stop_price:.2f} (3x ATR from ${actual_fill_price:.2f})")
                     else:
                         logger.warning(f"No ATR available for {symbol}, stop loss not set")
 

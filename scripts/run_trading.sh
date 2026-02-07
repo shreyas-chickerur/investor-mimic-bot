@@ -2,7 +2,7 @@
 # Automated trading run with pre-flight checks
 # Safe for GitHub Actions and cron jobs
 
-set -e  # Exit on error
+# Note: Do NOT use set -e here - we handle exit codes manually
 
 echo "================================================================================"
 echo "AUTOMATED TRADING RUN"
@@ -24,13 +24,14 @@ echo "  ALPACA_PAPER: $ALPACA_PAPER"
 echo "  DATA_VALIDATOR_MAX_AGE_HOURS: $DATA_VALIDATOR_MAX_AGE_HOURS"
 echo ""
 
-# Run pre-flight checks without capturing to see errors
+# Run pre-flight checks and capture output
 echo "Running pre-flight checks..."
-python3 scripts/pre_flight_check.py
+PREFLIGHT_OUTPUT=$(python3 scripts/pre_flight_check.py 2>&1)
 PREFLIGHT_EXIT=$?
+echo "$PREFLIGHT_OUTPUT"
 
 # Check if market was closed (expected skip)
-if echo "$PREFLIGHT_OUTPUT" | grep -q "MARKET CLOSED.*expected"; then
+if echo "$PREFLIGHT_OUTPUT" | grep -q "MARKET CLOSED\|Market closed"; then
     echo "MARKET_CLOSED" > /tmp/run_status.txt
     echo ""
     echo "================================================================================"
