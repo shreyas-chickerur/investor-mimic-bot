@@ -1511,7 +1511,9 @@ def main():
                 data_freshness=data_freshness,
                 errors=runner.errors,
                 warnings=warnings,
-                reconciliation_status=runner.reconciliation_status
+                reconciliation_status=runner.reconciliation_status,
+                portfolio_value=runner.portfolio_value,
+                cash=runner.cash_available,
             )
             artifact['system_health']['reconciliation_discrepancies'] = runner.reconciliation_discrepancies
             writer.write_daily_artifact(datetime.now().strftime('%Y-%m-%d'), artifact)

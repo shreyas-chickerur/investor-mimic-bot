@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Walk-Forward Backtesting & New Alpha Sources
+
+#### Walk-Forward Portfolio Backtester
+- Continuous simulation mode: positions carry across windows, no forced closes
+- ML models retrain only at window boundaries (proper walk-forward validation)
+- Per-symbol cooldown (10 days) prevents re-entry churn
+- Minimum hold period (2 days) prevents same-day round-trips
+- Portfolio-level confidence filter (0.60 min) and max 3 buys/day
+- 5x ATR catastrophe-only stop losses (reduced from 2.5x)
+
+#### New Strategies
+- **Earnings Drift (PEAD)**: Detects earnings events via volume spike + abnormal
+  return proxy, buys positive surprises, holds for 40-day drift period.
+  79.2% win rate in walk-forward backtest.
+- **Factor Momentum**: Cross-sectional ranking by composite score (momentum,
+  quality proxy, mean-reversion, volume confirmation), buys top 5 stocks,
+  holds 20 days. 62.7% win rate in walk-forward backtest.
+
+#### ML Pipeline Rewrite
+- 12 features: multi-timeframe momentum (5/10/20/60d), volatility regime,
+  volume dynamics, mean-reversion signals (RSI slope), trend strength (ADX)
+- LogisticRegression with C=0.1 regularization (replaced overfitting GradientBoosting)
+- Proper train/test split via walk-forward windows (no lookahead bias)
+
+#### Tests
+- 22 new tests for EarningsDrift and FactorMomentum strategies
+- Unit tests, edge cases, integration tests with real market data
+
+### Changed
+
+#### Strategy Mix
+- Replaced MA Crossover and News Sentiment with Earnings Drift and Factor Momentum
+- Registered new strategies in execution engine for live trading
+- Updated `_create_strategy_instance` map for DB-backed strategy loading
+
+#### Backtester Improvements
+- Fixed critical bug: backtester now syncs `strat.positions` on all sell paths
+  (signal sells + stop losses), preventing strategies from going dormant
+- Increased max positions per strategy from 3 to 5
+- Walk-forward backtest result (5yr, 2020-2025): +3.96% return vs -6.7%
+  buy-and-hold, 0.24 Sharpe, 1.29 profit factor, 54.1% win rate
+
 ### Added - Industrial Grade Improvements
 
 #### Dependency Management

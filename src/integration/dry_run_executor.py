@@ -241,7 +241,9 @@ class DryRunExecutor:
             data_freshness="DRY_RUN",
             errors=risk_data.get('errors', []),
             warnings=["DRY RUN MODE - No broker orders placed"],
-            reconciliation_status="DRY_RUN_READ_ONLY"
+            reconciliation_status="DRY_RUN_READ_ONLY",
+            portfolio_value=state.get('portfolio_value', 0),
+            cash=state.get('cash', 0),
         )
         
         json_path, md_path = self.artifact_writer.write_daily_artifact(date, artifact_data)

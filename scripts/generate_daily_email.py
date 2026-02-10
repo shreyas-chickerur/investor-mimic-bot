@@ -327,14 +327,44 @@ def generate_email_body(artifact_path: str, db_path='trading.db', include_visual
     filled_trades = trades_data.get('filled', []) if isinstance(trades_data, dict) else []
     trades = filled_trades or placed_trades
     
+    # Normalize trade keys: artifact uses side/qty, email expects action/shares/strategy
+    for trade in trades:
+        if 'action' not in trade and 'side' in trade:
+            trade['action'] = trade['side']
+        if 'shares' not in trade and 'qty' in trade:
+            trade['shares'] = trade['qty']
+        if 'strategy' not in trade:
+            trade['strategy'] = trade.get('strategy_name', 'N/A')
+    
     # Get positions list
     open_positions = positions_data.get('open', []) if isinstance(positions_data, dict) else positions_data
     
-    # Extract metrics
-    portfolio_value = risk_data.get('portfolio_value', 100000)
-    cash = risk_data.get('cash', 0)
+    # Normalize position keys: artifact uses qty/avg_price, email expects shares/entry_price/current_price
+    for pos in open_positions:
+        if 'shares' not in pos and 'qty' in pos:
+            pos['shares'] = pos['qty']
+        if 'entry_price' not in pos and 'avg_price' in pos:
+            pos['entry_price'] = pos['avg_price']
+        if 'current_price' not in pos:
+            # Derive from market_value / qty if available, else fall back to entry
+            if pos.get('market_value', 0) > 0 and pos.get('shares', 0) > 0:
+                pos['current_price'] = pos['market_value'] / pos['shares']
+            else:
+                pos['current_price'] = pos.get('entry_price', 0)
+    
+    # Extract metrics — portfolio_value and cash come from risk or top-level data
+    portfolio_value = risk_data.get('portfolio_value', 0) or data.get('portfolio_value', 0)
+    cash = risk_data.get('cash', 0) or data.get('cash', 0)
     daily_pnl = risk_data.get('daily_pnl', 0)
     portfolio_heat = risk_data.get('portfolio_heat', 0)
+    
+    # If portfolio_value is still 0, estimate from positions + cash
+    if portfolio_value == 0:
+        pos_value = sum(p.get('market_value', 0) or (p.get('shares', 0) * p.get('current_price', 0)) for p in open_positions)
+        if pos_value > 0 or cash > 0:
+            portfolio_value = pos_value + cash
+        else:
+            portfolio_value = 100000  # fallback default
     
     # Reconciliation status
     recon_status = system_health.get('reconciliation_status', 'UNKNOWN')

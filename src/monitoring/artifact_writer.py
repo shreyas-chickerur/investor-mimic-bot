@@ -279,7 +279,9 @@ def create_artifact_data(
     data_freshness: str,
     errors: List[str] = None,
     warnings: List[str] = None,
-    reconciliation_status: str = "UNKNOWN"
+    reconciliation_status: str = "UNKNOWN",
+    portfolio_value: float = 0.0,
+    cash: float = 0.0,
 ) -> Dict:
     """
     Helper to create properly structured artifact data
@@ -304,6 +306,8 @@ def create_artifact_data(
             'rejected': rejected_orders or []
         },
         'risk': {
+            'portfolio_value': portfolio_value,
+            'cash': cash,
             'portfolio_heat': portfolio_heat,
             'daily_pnl': daily_pnl,
             'cumulative_pnl': cumulative_pnl,
