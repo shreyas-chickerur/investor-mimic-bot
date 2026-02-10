@@ -91,7 +91,7 @@ def main():
         max_portfolio_heat=0.50,
         max_daily_loss_pct=0.05,
         stop_loss_atr_mult=5.0,
-        max_positions_per_strategy=3,
+        max_positions_per_strategy=5,
     )
 
     results = bt.run_walk_forward(

@@ -30,7 +30,7 @@ class PortfolioBacktester:
         max_portfolio_heat: float = 0.50,
         max_daily_loss_pct: float = 0.05,
         stop_loss_atr_mult: float = 5.0,
-        max_positions_per_strategy: int = 3,
+        max_positions_per_strategy: int = 5,
         max_correlation: float = 0.80,
         min_hold_days: int = 2,
     ):
@@ -100,12 +100,13 @@ class PortfolioBacktester:
         all_trades = []
         window_results = []
 
-        # Create strategy instances — each gets 1/N of capital for sizing
+        # Create strategy instances — each gets half of capital for sizing;
+        # the portfolio heat limit (50%) prevents actual over-allocation.
         strategies = []
         for i, cls in enumerate(strategy_classes):
             strat = cls(
                 strategy_id=i + 1,
-                capital=self.initial_capital / len(strategy_classes),
+                capital=self.initial_capital / 2,
             )
             strategies.append(strat)
 
@@ -263,8 +264,8 @@ class PortfolioBacktester:
 
             # -- Process BUY signals (high confidence only, cooldown, max 2/day) --
             cooldown_days = 10
-            min_buy_confidence = 0.65
-            max_daily_buys = 2
+            min_buy_confidence = 0.60
+            max_daily_buys = 3
             buy_sigs = sorted(
                 [s for s in all_signals
                  if s.get('action') == 'BUY'
