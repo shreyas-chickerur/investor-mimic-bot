@@ -197,8 +197,8 @@ analyze:
 	@echo "$(GREEN)✅ Analysis complete$(NC)"
 
 backtest:
-	@echo "$(BLUE)📊 Running backtest validation...$(NC)"
-	@python3 scripts/run_validation_backtest.py
+	@echo "$(BLUE)📊 Running walk-forward backtest...$(NC)"
+	@python3 scripts/run_backtest.py
 	@echo "$(GREEN)✅ Backtest complete$(NC)"
 
 metrics:

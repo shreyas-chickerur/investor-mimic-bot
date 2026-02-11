@@ -17,6 +17,11 @@ htmlcov/
 logs/
 *.log
 
+# IDE / tool caches
+.cascade/
+.hypothesis/
+.benchmarks/
+
 # Generated HTML files (test outputs)
 *.html
 
@@ -27,9 +32,11 @@ data/.encryption_key
 trading.db
 data/*.db
 
+# ML model artifacts (regenerated on train)
+data/*.pkl
+
 # Artifacts directories (generated per run)
 artifacts/
-artifacts/drawdown/
-artifacts/data_quality/
-artifacts/funnel/
-artifacts/health/
+
+# Backtest output (regenerated per run)
+backtest_results/
