@@ -360,17 +360,13 @@ class TestStrategyDatabaseMaximize:
 
 class TestConfigModulesMaximize:
     """Maximize coverage of config modules"""
-    
-    def test_config_import(self):
-        import config
+
+    def test_config_loader_import(self):
+        from src.utils.config_loader import ConfigLoader
+        loader = ConfigLoader()
+        assert loader is not None
+
+    def test_typed_config_import(self):
+        from src.utils.config_typed import TradingSystemConfig
+        config = TradingSystemConfig()
         assert config is not None
-    
-    def test_logger_import(self):
-        import logging
-        assert logging is not None
-    
-    def test_security_import(self):
-        """Test that security-related env checks work"""
-        import os
-        # Verify we can check for security-related env vars
-        assert os.environ is not None
