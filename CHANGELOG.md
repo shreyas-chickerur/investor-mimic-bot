@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - Production Bug Fixes (GitHub Actions log analysis)
+
+- **`initialize_strategies`**: Enforces canonical 4-strategy set (RSI Mean Reversion, ML
+  Momentum, Earnings Drift, Factor Momentum). Old DB entries for disabled strategies
+  (News Sentiment, MA Crossover, Volatility Breakout) are now ignored; missing canonical
+  strategies are created on the fly. Fixes EarningsDrift + FactorMomentum never running.
+- **Wash trade prevention**: Added `symbols_bought_this_run` / `symbols_sold_this_run`
+  per-run sets in `MultiStrategyRunner`. BUY is skipped if the symbol was sold in the
+  same run, and SELL is skipped if the symbol was bought in the same run. Fixes Alpaca
+  "potential wash trade detected" rejections for cross-strategy conflicts.
+- **Duplicate stop-loss log**: Removed the redundant `logger.info("Stop loss set…")`
+  in `_execute_strategy_trades`; `StopLossManager.set_stop_loss` already logs it.
+  Also corrects the wrong "3x ATR" label (actual multiplier is 2.5x).
+- **VIX hardcoded 18.0**: `RegimeDetector.get_vix_level` now computes 20-day annualized
+  realized volatility of the market proxy as a VIX proxy (100 × σ_ann). Falls back to
+  18.0 only when market data is unavailable or insufficient. `get_status` and
+  `get_regime_adjustments` both forward `market_data` to the new signature.
+- **`setup_database.py` schema mismatch**: Positions table now includes
+  `current_price`, `market_value`, `unrealized_pnl`, `stop_loss_price`, `entry_date`
+  columns and changes `shares` from INTEGER to REAL — matching `database.py`.
+- **Signal reasoning chains in daily email**: `generate_daily_email.py` now queries
+  today's signals (with `reasoning` and `terminal_state`) grouped by strategy and
+  renders a "Signal Reasoning Chains" section for all 4 active strategies.
+- **Duplicate log lines**: Added `force=True` to `logging.basicConfig` in
+  `execution_engine.py` so imported modules that also call `basicConfig` cannot stack
+  extra handlers on the root logger.
+
+### Added - Daily Email Signal Reasoning Flowcharts
+
+- Daily execution email now includes a **Signal Reasoning Flowcharts** section for
+  news-linked signals (event chain format: `event -> event -> ... -> signal`).
+- News Sentiment strategy signals now attach top news headlines (`news_events`) so
+  downstream reporting can explain article-to-signal causality.
+- News sentiment provider now exposes structured sentiment context
+  (`score + top headlines`) while preserving the existing score API.
+- Added component tests for flowchart rendering and HTML escaping in email output.
+
 ### Added - Walk-Forward Backtesting & New Alpha Sources
 
 #### Walk-Forward Portfolio Backtester

@@ -35,14 +35,25 @@ class RegimeDetector:
         
         logger.info(f"Regime Detector: VIX low={vix_low_threshold}, high={vix_high_threshold}")
     
-    def get_vix_level(self) -> float:
+    def get_vix_level(self, market_data=None) -> float:
         """
-        Get current VIX level
-        
-        Returns default for backtesting (VIX fetching disabled to avoid rate limits)
+        Get VIX level estimate.
+
+        Uses 20-day annualized realized volatility of the market proxy as a
+        VIX proxy (scale: 100 * annualized_vol).  Falls back to 18.0 when
+        insufficient data is available.
         """
-        # For backtesting, use default moderate volatility
-        # In production, this would fetch real VIX data
+        if market_data is not None and not market_data.empty:
+            try:
+                proxy = self._get_market_proxy(market_data)
+                if len(proxy) >= 21:
+                    returns = proxy.pct_change().dropna().tail(20)
+                    realized_vol = returns.std() * (252 ** 0.5) * 100
+                    if 5.0 <= realized_vol <= 80.0:  # sanity bounds
+                        logger.info(f"VIX proxy (realized vol): {realized_vol:.1f}")
+                        return round(realized_vol, 1)
+            except Exception as exc:
+                logger.warning(f"Could not calculate VIX proxy: {exc}")
         return 18.0
 
     def _get_market_proxy(self, market_data: pd.DataFrame) -> pd.Series:
@@ -189,12 +200,12 @@ class RegimeDetector:
         # Other strategies always enabled
         return True
     
-    def get_status(self) -> Dict:
-        """Get current regime status"""
-        vix = self.get_vix_level()
-        vol_regime = self.detect_volatility_regime(vix)
-        adjustments = self.get_regime_adjustments(vix)
-        
+    def get_status(self, market_data=None) -> Dict:
+        """Get current regime status, optionally using market_data for VIX proxy."""
+        vix = self.get_vix_level(market_data)
+        vol_regime = self.detect_volatility_regime(vix, market_data)
+        adjustments = self.get_regime_adjustments(vix, market_data)
+
         return {
             'vix': vix,
             'volatility_regime': vol_regime,

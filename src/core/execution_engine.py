@@ -61,7 +61,8 @@ logging.basicConfig(
     handlers=[
         logging.FileHandler('logs/multi_strategy.log'),
         logging.StreamHandler()
-    ]
+    ],
+    force=True,
 )
 logger = logging.getLogger(__name__)
 
@@ -315,49 +316,36 @@ class MultiStrategyRunner:
         )
         
     def initialize_strategies(self):
-        """Initialize all 5 strategies with equal capital allocation"""
-        # CRITICAL FIX: Use portfolio value for allocation, not just cash
-        capital_per_strategy = self.portfolio_value / 5
-        
-        # Check if strategies already exist
-        existing = self.db.get_all_strategies()
-        
-        if existing:
-            logger.info(f"Found {len(existing)} existing strategies")
-            strategies = []
-            for strat in existing:
-                strategy = self._create_strategy_instance(strat['id'], strat['name'], capital_per_strategy)
-                if strategy is not None:
-                    # CRITICAL FIX: Load positions from Alpaca for each strategy
-                    self._load_strategy_positions(strategy)
-                    strategies.append(strategy)
-                else:
-                    logger.warning(f"Failed to create strategy instance for: {strat.get('name', 'Unknown')}")
-            return strategies
-        
-        # Create new strategies
-        logger.info("Initializing 5 new strategies...")
-        
-        strategy_configs = [
+        """Initialize the 4 canonical active strategies, creating DB entries for any that are missing."""
+        CANONICAL_STRATEGIES = [
             ("RSI Mean Reversion", "Buy when RSI < 30 + low volatility, hold 20 days", RSIMeanReversionStrategy),
             ("ML Momentum", "GradientBoosting 12-feature classifier predicting 5d return", MLMomentumStrategy),
             ("Earnings Drift", "Post-earnings announcement drift via volume spike detection", EarningsDriftStrategy),
             ("Factor Momentum", "Cross-sectional factor ranking: momentum+quality+reversion", FactorMomentumStrategy),
-            # Disabled strategies:
-            # ("News Sentiment", "News sentiment + technical indicators", NewsSentimentStrategy),
-            # ("MA Crossover", "Golden cross (50/200 MA) trend following", MACrossoverStrategy),
-            # ("Volatility Breakout", "Bollinger Band breakouts with volume", VolatilityBreakoutStrategy)
         ]
-        
+
+        capital_per_strategy = self.portfolio_value / len(CANONICAL_STRATEGIES)
+
+        # Build a name→id lookup from whatever is already in the DB
+        existing_by_name = {s['name']: s for s in self.db.get_all_strategies()}
+        logger.info(
+            f"DB has {len(existing_by_name)} strategies: {list(existing_by_name.keys())}. "
+            f"Enforcing canonical set: {[n for n, _, _ in CANONICAL_STRATEGIES]}"
+        )
+
         strategies = []
-        for name, desc, strategy_class in strategy_configs:
-            strategy_id = self.db.create_strategy(name, desc, capital_per_strategy)
+        for name, desc, strategy_class in CANONICAL_STRATEGIES:
+            if name in existing_by_name:
+                strategy_id = existing_by_name[name]['id']
+                logger.info(f"  Loaded existing: {name} (ID: {strategy_id})")
+            else:
+                strategy_id = self.db.create_strategy(name, desc, capital_per_strategy)
+                logger.info(f"  Created new: {name} (ID: {strategy_id}, Capital: ${capital_per_strategy:.2f})")
+
             strategy = strategy_class(strategy_id, capital_per_strategy)
-            # CRITICAL FIX: Load positions for new strategies too
             self._load_strategy_positions(strategy)
             strategies.append(strategy)
-            logger.info(f"  Created: {name} (ID: {strategy_id}, Capital: ${capital_per_strategy:.2f})")
-        
+
         return strategies
     
     def _load_strategy_positions(self, strategy):
@@ -630,6 +618,8 @@ class MultiStrategyRunner:
             logger.info("No stop losses triggered")
         logger.info("=" * 80)
         self.executed_signals = []
+        self.symbols_bought_this_run: set = set()
+        self.symbols_sold_this_run: set = set()
         self.reconciliation_status = "SKIPPED"
         self.reconciliation_discrepancies = []
         current_prices = market_data.groupby('symbol')['close'].last().to_dict()
@@ -970,6 +960,11 @@ class MultiStrategyRunner:
             
             if action == 'BUY' and shares > 0:
                 try:
+                    # Wash trade prevention: skip if already sold this symbol this run
+                    if symbol in self.symbols_sold_this_run:
+                        logger.warning(f"Skipping BUY {symbol} - already sold this run (wash trade prevention)")
+                        continue
+
                     # Apply size multiplier from correlation attenuation
                     size_mult = signal.get('size_multiplier', 1.0)
                     # Apply drawdown sizing multiplier (rampup mode)
@@ -1078,7 +1073,8 @@ class MultiStrategyRunner:
                         continue
                     
                     print(f"  ✅ BUY {actual_filled_qty} {symbol} @ ${actual_fill_price:.2f} (Order: {order.id}, Intent: {intent_id})")
-                    
+                    self.symbols_bought_this_run.add(symbol)
+
                     # Update in-memory state with actual filled quantities
                     strategy.add_position(symbol, actual_filled_qty)
                     actual_trade_value = actual_fill_price * actual_filled_qty + total_cost
@@ -1095,8 +1091,6 @@ class MultiStrategyRunner:
                     atr = signal.get('atr', 0)
                     if atr and atr > 0:
                         self.stop_loss_manager.set_stop_loss(symbol, actual_fill_price, atr)
-                        stop_price = self.stop_loss_manager.get_stop_price(symbol)
-                        logger.info(f"Stop loss set for {symbol}: ${stop_price:.2f} (3x ATR from ${actual_fill_price:.2f})")
                     else:
                         logger.warning(f"No ATR available for {symbol}, stop loss not set")
 
@@ -1153,6 +1147,11 @@ class MultiStrategyRunner:
                     
             elif action == 'SELL' and shares > 0:
                 try:
+                    # Wash trade prevention: skip if already bought this symbol this run
+                    if symbol in self.symbols_bought_this_run:
+                        logger.warning(f"Skipping SELL {symbol} - already bought this run (wash trade prevention)")
+                        continue
+
                     exec_price, slippage_cost, commission_cost, total_cost = self.cost_model.calculate_execution_price(
                         price, 'SELL', shares
                     )
@@ -1206,7 +1205,8 @@ class MultiStrategyRunner:
                         continue
                     
                     print(f"  ✅ SELL {actual_filled_qty} {symbol} @ ${actual_fill_price:.2f} (Order: {order.id})")
-                    
+                    self.symbols_sold_this_run.add(symbol)
+
                     # Release cash back with actual filled quantities
                     trade_value = actual_fill_price * actual_filled_qty - total_cost
                     self.cash_manager.release_cash(strategy.strategy_id, trade_value)
@@ -1364,6 +1364,70 @@ class MultiStrategyRunner:
             allocation = allocations.get(strategy.strategy_id, strategy.capital)
             strategy.capital = max(allocation - exposures.get(strategy.strategy_id, 0), 0)
         self.cash_manager.set_allocations(allocations, exposures)
+
+    def _format_signal_flowchart(self, strategy_name, signal):
+        """Build a flowchart-style reasoning chain for a signal."""
+        action = str(signal.get('action', 'BUY')).upper()
+        reasoning = str(signal.get('reasoning', '')).strip()
+        symbol = signal.get('symbol', 'N/A')
+
+        news_events = []
+        explicit_news_events = signal.get('news_events')
+        if isinstance(explicit_news_events, list):
+            news_events.extend([str(item).strip() for item in explicit_news_events if str(item).strip()])
+
+        for key in ['news_headline', 'headline', 'article_title', 'news_summary']:
+            value = signal.get(key)
+            if value:
+                news_events.append(str(value).strip())
+
+        has_news_context = bool(news_events) or 'news' in strategy_name.lower()
+        if not has_news_context:
+            return None
+
+        chain_parts = [f"Symbol {symbol}"]
+        for event in news_events[:3]:
+            chain_parts.append(f"News: {event}")
+
+        if reasoning:
+            chain_parts.append(reasoning)
+
+        if action == 'BUY':
+            chain_parts.append("Price expected to rise")
+        else:
+            chain_parts.append("Price expected to weaken")
+
+        chain_parts.append(f"Signal generated ({action})")
+        return " -> ".join(chain_parts)
+
+    def build_signal_reasoning_chains(self):
+        """Build reasoning chains for email reporting from generated signals."""
+        if not getattr(self, 'raw_signals_by_strategy', None):
+            return []
+
+        executed_keys = {
+            (str(trade.get('symbol')), str(trade.get('action', '')).upper())
+            for trade in self.executed_trades
+        }
+
+        chains = []
+        for strategy_name, signals in self.raw_signals_by_strategy.items():
+            for signal in signals or []:
+                flowchart = self._format_signal_flowchart(strategy_name, signal)
+                if not flowchart:
+                    continue
+
+                symbol = str(signal.get('symbol', 'N/A'))
+                action = str(signal.get('action', 'BUY')).upper()
+                chains.append({
+                    'strategy': strategy_name,
+                    'symbol': symbol,
+                    'action': action,
+                    'flowchart': flowchart,
+                    'executed': (symbol, action) in executed_keys,
+                })
+
+        return chains
     
     def generate_performance_report(self):
         """Generate performance report for all strategies"""
@@ -1445,7 +1509,8 @@ def main():
                 positions=positions_data,
                 portfolio_value=runner.portfolio_value,
                 cash=runner.cash_available,
-                errors=runner.errors if runner.errors else None
+                errors=runner.errors if runner.errors else None,
+                signal_reasoning_chains=runner.build_signal_reasoning_chains(),
             )
             logger.info("Email summary sent successfully")
         except Exception as e:
@@ -1456,7 +1521,7 @@ def main():
             latest_date = market_data.index.max()
             data_freshness_hours = (datetime.now() - latest_date).total_seconds() / 3600
             data_freshness = f"{data_freshness_hours:.1f}h old"
-            regime = runner.regime_detector.get_status()
+            regime = runner.regime_detector.get_status(market_data)
             warnings = []
             if runner.pending_orders:
                 warnings.append(
