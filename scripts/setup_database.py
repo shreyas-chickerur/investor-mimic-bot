@@ -116,14 +116,20 @@ def init_database(db_path='trading.db'):
     print('✅ System state table created')
     
     # Positions table (for tracking current positions)
+    # Schema must match database.py TradingDatabase.update_position()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS positions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             strategy_id INTEGER NOT NULL,
             symbol TEXT NOT NULL,
-            shares INTEGER NOT NULL,
-            avg_price REAL NOT NULL,
-            last_updated TEXT NOT NULL,
+            shares REAL NOT NULL,
+            avg_price REAL,
+            current_price REAL,
+            market_value REAL,
+            unrealized_pnl REAL,
+            stop_loss_price REAL,
+            entry_date TEXT,
+            last_updated TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (strategy_id) REFERENCES strategies(id),
             UNIQUE(strategy_id, symbol)
         )

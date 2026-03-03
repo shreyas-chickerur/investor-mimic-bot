@@ -215,6 +215,91 @@ def generate_strategy_health_html():
     html += "</div>"
     return html
 
+def generate_signal_reasoning_html(db_path='trading.db') -> str:
+    """Generate HTML section showing signal reasoning chains for all strategies today."""
+    if db_path is None:
+        return ""
+
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+
+        # Get today's signals with strategy name, grouped by strategy
+        rows = conn.execute('''
+            SELECT s.name AS strategy, sig.symbol, sig.signal_type AS action,
+                   sig.confidence, sig.reasoning, sig.terminal_state
+            FROM signals sig
+            JOIN strategies s ON sig.strategy_id = s.id
+            WHERE DATE(sig.created_at) = DATE('now')
+            ORDER BY s.name, sig.confidence DESC
+        ''').fetchall()
+        conn.close()
+    except Exception:
+        return ""
+
+    if not rows:
+        return ""
+
+    # Group by strategy
+    by_strategy = defaultdict(list)
+    for row in rows:
+        by_strategy[row['strategy']].append(dict(row))
+
+    STRATEGY_ICONS = {
+        'RSI Mean Reversion': '📉',
+        'ML Momentum':        '🤖',
+        'Earnings Drift':     '📣',
+        'Factor Momentum':    '📊',
+    }
+
+    html = "<div style='margin-bottom: 30px;'>"
+    html += ("<h2 style='color: #2c5282; border-bottom: 2px solid #4A90E2; "
+             "padding-bottom: 10px; font-size: 20px; font-weight: 600;'>"
+             "Signal Reasoning Chains</h2>")
+
+    for strategy_name, signals in by_strategy.items():
+        icon = STRATEGY_ICONS.get(strategy_name, '📈')
+        executed   = [s for s in signals if s.get('terminal_state') == 'EXECUTED']
+        filtered   = [s for s in signals if s.get('terminal_state') != 'EXECUTED']
+
+        html += (f"<div style='background:#f8f9fa; border-radius:8px; "
+                 f"padding:15px; margin-bottom:15px; "
+                 f"border-left:4px solid #4A90E2;'>")
+        html += (f"<h3 style='margin:0 0 10px 0; font-size:16px; color:#2c5282;'>"
+                 f"{icon} {strategy_name} &nbsp;"
+                 f"<span style='font-weight:normal; font-size:13px; color:#6b7280;'>"
+                 f"{len(executed)} executed · {len(filtered)} filtered</span></h3>")
+
+        if executed:
+            html += "<div style='margin-bottom:8px;'>"
+            for sig in executed[:3]:
+                action_color = '#28a745' if sig['action'] == 'BUY' else '#dc3545'
+                conf_pct = f"{sig['confidence']*100:.0f}%" if sig['confidence'] else 'N/A'
+                reasoning = sig.get('reasoning') or 'No reasoning recorded'
+                # Truncate long reasoning
+                if len(reasoning) > 200:
+                    reasoning = reasoning[:197] + '...'
+                html += (f"<div style='margin:6px 0; padding:8px 10px; "
+                         f"background:white; border-radius:4px; "
+                         f"border-left:3px solid {action_color};'>")
+                html += (f"<span style='color:{action_color}; font-weight:bold; "
+                         f"font-size:13px;'>{sig['action']}</span> "
+                         f"<strong>{sig['symbol']}</strong> "
+                         f"<span style='color:#6b7280; font-size:12px;'>"
+                         f"(conf: {conf_pct})</span><br>"
+                         f"<span style='color:#555; font-size:12px;'>{reasoning}</span>")
+                html += "</div>"
+            html += "</div>"
+        else:
+            html += ("<p style='color:#6b7280; font-size:13px; "
+                     "font-style:italic; margin:4px 0;'>No signals executed today</p>")
+
+        html += "</div>"
+
+    html += "</div>"
+    return html
+
+
 def generate_actionable_insights(trades, positions, strategy_perf, recon_status, regime):
     """Generate actionable insights section with what's working, what isn't, and recommendations"""
     insights = []
@@ -454,7 +539,10 @@ def generate_email_body(artifact_path: str, db_path='trading.db', include_visual
     
     # Generate strategy health section
     health_html = generate_strategy_health_html()
-    
+
+    # Generate signal reasoning chains for all active strategies
+    signal_reasoning_html = generate_signal_reasoning_html(db_path)
+
     # Generate actionable insights
     insights_html = generate_actionable_insights(trades, open_positions, strategy_perf, recon_status, regime_class)
     
@@ -583,6 +671,13 @@ def generate_email_body(artifact_path: str, db_path='trading.db', include_visual
         </div>
         ''' if include_visuals and strategy_chart_html else ''}
         
+        <!-- Signal Reasoning Chains -->
+        {f'''
+        <div style="margin-bottom: 30px;">
+            {signal_reasoning_html}
+        </div>
+        ''' if signal_reasoning_html else ''}
+
         <!-- Current Positions -->
         <div style="margin-bottom: 30px;">
             <h2 style="color: #2c5282; border-bottom: 2px solid #4A90E2; padding-bottom: 10px; font-size: 20px; font-weight: 600;">
