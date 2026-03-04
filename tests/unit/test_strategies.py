@@ -22,7 +22,7 @@ class TestRSIMeanReversionStrategy:
         assert strategy.strategy_id == 1
         assert strategy.name == "RSI Mean Reversion"
         assert strategy.capital == 20000
-        assert strategy.rsi_threshold == 30
+        assert strategy.rsi_threshold == 40  # entry threshold raised from 30 → 40
         assert strategy.hold_days == 20
     
     def test_rsi_buy_signal_generation(self, mock_market_data):
