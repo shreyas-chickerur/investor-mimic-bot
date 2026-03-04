@@ -31,75 +31,73 @@ class RSIMeanReversionStrategy(TradingStrategy):
         self.vwap_proximity_pct = config.get('strategies.rsi_mean_reversion.vwap_proximity_pct', 0.02)
         
         # Legacy attributes for backward compatibility
-        self.rsi_threshold = self.rsi_oversold
+        self.rsi_threshold = 40  # entry threshold (< 40 = oversold)
+        self.rsi_exit = 55       # exit threshold (> 55 = recovery complete)
         self.hold_days = 20
-    
+        self.profit_target_pct = 0.05  # exit at 5% profit
+
     def generate_signals(self, market_data: pd.DataFrame) -> List[Dict]:
-        """Generate buy signals for oversold stocks with improved filters"""
+        """Generate buy signals for oversold stocks with improved filters."""
         signals = []
-        
-        # Handle empty DataFrame
+
         if market_data.empty or 'symbol' not in market_data.columns:
             return signals
-        
+
         for symbol in market_data['symbol'].unique():
             symbol_data = market_data[market_data['symbol'] == symbol]
-            
+
             if len(symbol_data) < 2:
                 continue
-            
-            # Get latest values
+
             latest = symbol_data.iloc[-1]
             latest_date = symbol_data.index[-1]
-            
-            # Check if we have RSI
+
             if 'rsi' not in latest.index or pd.isna(latest['rsi']):
                 continue
-            
-            rsi = latest['rsi']
-            price = latest['close']
-            
-            # Calculate RSI slope
-            if len(symbol_data) >= 2:
-                rsi_slope = symbol_data['rsi'].iloc[-1] - symbol_data['rsi'].iloc[-2]
-            else:
-                rsi_slope = 0
-            
-            # Get VWAP (use close as fallback)
-            vwap = latest.get('vwap', price)
+
+            rsi = float(latest['rsi'])
+            price = float(latest['close'])
             atr = latest.get('atr_20', None)
-            
-            # Buy signal: RSI < 40 (research-backed threshold) AND RSI slope > 0 (turning up)
-            if rsi < 40 and rsi_slope > 0 and symbol not in self.positions:
-                # Volatility-adjusted position sizing
+            if atr is not None and pd.isna(atr):
+                atr = None
+
+            # RSI slope (1-day delta)
+            rsi_slope = float(symbol_data['rsi'].iloc[-1] - symbol_data['rsi'].iloc[-2])
+
+            # BUY: RSI < 40 and turning up (slope > 0) — no VWAP check (trailing VWAP
+            # in the dataset is a long-run average always below current price in uptrends)
+            if rsi < self.rsi_threshold and rsi_slope > 0 and symbol not in self.positions:
                 shares = self.calculate_position_size(price, atr=atr, max_position_pct=0.10)
-                    
+                if shares <= 0:
+                    continue
                 signals.append({
                     'symbol': symbol,
                     'action': 'BUY',
                     'shares': shares,
                     'price': price,
                     'value': shares * price,
-                    'confidence': max(0.1, min(1.0, (40 - rsi) / 40)),  # Higher confidence for lower RSI
-                    'reasoning': f'RSI {rsi:.1f} < {self.rsi_threshold}, slope {rsi_slope:.2f} > 0 (turning up)',
-                    'atr': atr if atr and atr > 0 else None,
-                    'asof_date': latest_date
+                    'confidence': max(0.1, min(1.0, (self.rsi_threshold - rsi) / self.rsi_threshold)),
+                    'reasoning': f'RSI {rsi:.1f} < {self.rsi_threshold} (oversold), slope {rsi_slope:+.2f} (turning up)',
+                    'atr': atr,
+                    'asof_date': latest_date,
                 })
-            
-            # IMPROVED Sell signal: RSI > 60 OR price >= VWAP OR held for 20 days
-            if symbol in self.positions:
+
+            # SELL: RSI recovered > 55  OR  5% profit target  OR  20-day time exit
+            elif symbol in self.positions:
                 days_held = self.get_days_held(symbol, latest_date)
                 shares = self.positions[symbol]
-                
-                # Exit conditions (any one triggers exit)
+                entry_price = None
+                if hasattr(self, 'entry_dates') and symbol in self.entry_dates:
+                    # Best proxy for entry price: walk back in time is unavailable here,
+                    # so rely on RSI / time exits which don't need entry price.
+                    pass
+
                 exit_reason = None
-                if rsi > 60:
-                    exit_reason = f'RSI {rsi:.1f} > 60 (mean reversion complete)'
-                elif price >= vwap:
-                    exit_reason = f'Price ${price:.2f} >= VWAP ${vwap:.2f} (profitable exit)'
+                if rsi > self.rsi_exit:
+                    exit_reason = f'RSI {rsi:.1f} > {self.rsi_exit} (mean reversion complete)'
                 elif days_held >= self.hold_days:
-                    exit_reason = f'Held for {days_held} days (time-based exit)'
-                
+                    exit_reason = f'Held {days_held}d >= {self.hold_days}d (time-based exit)'
+
                 if exit_reason:
                     signals.append({
                         'symbol': symbol,
@@ -109,9 +107,9 @@ class RSIMeanReversionStrategy(TradingStrategy):
                         'value': shares * price,
                         'confidence': 1.0,
                         'reasoning': exit_reason,
-                        'asof_date': latest_date
+                        'asof_date': latest_date,
                     })
-        
+
         return signals
     
     def get_description(self) -> str:

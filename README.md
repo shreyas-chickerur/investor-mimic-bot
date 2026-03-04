@@ -1,6 +1,6 @@
-# Quantitative Trading System
+# Investor Mimic Bot
 
-**Automated multi-strategy trading system with regime-aware risk management and broker reconciliation.**
+**4-strategy quantitative trading system with regime-aware risk, news sentiment, and broker reconciliation.**
 
 [![Paper Trading](https://img.shields.io/badge/Status-Paper%20Trading-blue)](https://app.alpaca.markets/paper/dashboard/overview)
 [![Automated](https://img.shields.io/badge/Execution-Automated-green)](.github/workflows/daily_trading.yml)
@@ -9,15 +9,23 @@
 
 ## What This Does
 
-This is an automated quantitative trading system that:
-- Runs **5 independent trading strategies** (RSI Mean Reversion, MA Crossover, ML Momentum, Volatility Breakout, News Sentiment)
-- Trades **32 large-cap US stocks** on Alpaca Markets (paper trading)
-- Executes **daily at 4:15 PM ET** via GitHub Actions (after market close)
-- Uses **16 years of historical data** (2010-present, COVID crash excluded)
-- Manages **portfolio-level risk** with correlation filtering, heat limits, and stop losses
-- Adapts to **market regimes** using VIX-based detection (Normal/High Vol/Crisis)
-- Monitors **performance daily** with automated email alerts on failures
-- Reconciles **broker state** before every execution to prevent discrepancies
+Automated quantitative trading system running **4 independent strategies** on **36 large-cap US stocks**:
+
+| Strategy | Edge | Hold Period |
+|---|---|---|
+| **RSI Mean Reversion** | Buy RSI < 40 + turning up, sell RSI > 55 | Up to 20 days |
+| **ML Momentum** | LogisticRegression on 12 OHLCV+indicator features, P(5d gain) > 52% | 5 days |
+| **Earnings Drift (PEAD)** | Buys volume-spike + abnormal-return events (positive earnings proxy) | 40 days |
+| **Factor Momentum** | Cross-sectional rank by momentum/quality/reversion/volume percentiles, top 5 | 20 days |
+
+**News Sentiment Layer** (via yfinance + VADER): boosts confidence on positive headlines, suppresses on negative, drops BUY signals on very negative news — applied to all 4 strategies.
+
+- Executes **daily at 4:15 PM ET** via GitHub Actions
+- **16 years of historical data** (2010–present)
+- Portfolio-level risk: correlation filter, 50% heat cap, 2.5× ATR stop losses
+- Regime detection using realized volatility proxy
+- Broker reconciliation before every run
+- Daily email digest with signal reasoning chains
 
 ---
 

@@ -52,6 +52,7 @@ from src.integration.dry_run_wrapper import DryRunWrapper, get_dry_run_wrapper
 from src.monitoring.strategy_health_scorer import StrategyHealthScorer
 from src.monitoring.pnl_calculator import PnLCalculator
 from src.utils.config_loader import get_config
+from src.utils.news_sentiment import NewsSignalFilter
 
 # Setup logging - CRITICAL FIX: Ensure logs directory exists
 Path('logs').mkdir(exist_ok=True)
@@ -621,6 +622,10 @@ class MultiStrategyRunner:
         self.symbols_bought_this_run: set = set()
         self.symbols_sold_this_run: set = set()
         self.reconciliation_status = "SKIPPED"
+
+        # Pre-fetch news sentiment once per run for all signal symbols
+        self._news_filter = NewsSignalFilter()
+        self._news_sentiment_map: dict = {}
         self.reconciliation_discrepancies = []
         current_prices = market_data.groupby('symbol')['close'].last().to_dict()
         allocations = self._calculate_dynamic_allocations(strategies)
@@ -815,6 +820,16 @@ class MultiStrategyRunner:
                         
                         self.funnel_tracker.record_after_correlation(strategy.strategy_id, len(signals))
 
+                        # Apply news sentiment as confidence modifier (boost/suppress)
+                        signal_symbols = list({s.get('symbol') for s in signals})
+                        new_syms = [s for s in signal_symbols if s not in self._news_sentiment_map]
+                        if new_syms:
+                            self._news_sentiment_map.update(
+                                self._news_filter.fetch_for_symbols(new_syms)
+                            )
+                        signals = self._news_filter.apply(signals, self._news_sentiment_map)
+                        logger.info(f"  After news filter: {len(signals)} signals")
+
                         # Log signals to database
                         signal_ids = []
                         for signal in signals:
@@ -828,55 +843,56 @@ class MultiStrategyRunner:
                             )
                             signal_ids.append(signal_id)
                             signal['signal_id'] = signal_id
-                        
+
                         # FUNNEL STAGE 4: Risk/cash limits (tracked in _execute_strategy_trades)
-                        signals_before_risk = len(signals[:3])  # Top 3 signals
-                        
+                        # Use strategy's own top_n if set (e.g. FactorMomentum=5), else 5
+                        max_signals = getattr(strategy, 'top_n', 5)
+                        signals_to_execute = signals[:max_signals]
+
                         # Execute trades
                         executed = self._execute_strategy_trades(
                             strategy,
-                            signals[:3],
+                            signals_to_execute,
                             total_exposure,
                             self.portfolio_value
                         )
-                        
+
                         # FUNNEL STAGE 5: Executed
                         self.funnel_tracker.record_executed(strategy.strategy_id, len(executed))
-                        
+
                         # Log risk rejections
-                        for sig in signals[:3]:
+                        for sig in signals_to_execute:
                             if not any(e.get('symbol') == sig.get('symbol') for e in executed):
                                 self.funnel_tracker.log_rejection(
                                     strategy.strategy_id,
                                     sig.get('symbol'),
                                     'RISK',
-                                    'insufficient_cash_or_heat',
-                                    signal_id=sig.get('signal_id')
+                                    'cash_or_heat_limit',
+                                    {}
                                 )
-                        
-                        self.executed_signals.extend(executed)
+
                         all_signals.extend(executed)
-                        
-                        # Set terminal states
-                        for i, signal in enumerate(signals[:3]):
+
+                        # Set terminal states for executed signals
+                        for signal in signals_to_execute:
                             signal_id = signal.get('signal_id')
                             if signal_id:
                                 was_executed = any(e.get('symbol') == signal.get('symbol') for e in executed)
                                 if was_executed:
-                                    self.db.update_signal_terminal_state(signal_id, 'EXECUTED', 'trade_submitted')
+                                    self.db.update_signal_terminal_state(signal_id, 'EXECUTED', 'filled')
                                 else:
                                     self.db.update_signal_terminal_state(signal_id, 'FILTERED', 'risk_or_cash_limit')
-                        
-                        # Mark remaining signals as FILTERED
-                        for signal in signals[3:]:
+
+                        # Mark throttled signals as FILTERED
+                        for signal in signals[max_signals:]:
                             signal_id = signal.get('signal_id')
                             if signal_id:
-                                self.db.update_signal_terminal_state(signal_id, 'FILTERED', 'top_3_throttle')
+                                self.db.update_signal_terminal_state(signal_id, 'FILTERED', 'throttle')
                                 self.funnel_tracker.log_rejection(
                                     strategy.strategy_id,
                                     signal.get('symbol'),
                                     'THROTTLE',
-                                    'top_3_limit',
+                                    'max_signals_limit',
                                     signal_id=signal_id
                                 )
                     else:

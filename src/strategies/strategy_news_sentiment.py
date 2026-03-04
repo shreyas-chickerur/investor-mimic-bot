@@ -43,7 +43,14 @@ class NewsSentimentStrategy(TradingStrategy):
             atr = symbol_data.get('atr_20', None)
             returns_5d = symbol_data.get('returns_5d', 0)
 
-            sentiment_score = self._get_sentiment_score(symbol)
+            sentiment_context = self.sentiment_provider.get_sentiment_context(symbol)
+            if sentiment_context is not None:
+                sentiment_score = sentiment_context.get('score')
+                news_headlines = sentiment_context.get('headlines', [])
+            else:
+                sentiment_score = self._get_sentiment_score(symbol)
+                news_headlines = []
+
             if sentiment_score is None:
                 sentiment_score = max(0.0, min(1.0, 0.5 + returns_5d))
             
@@ -66,6 +73,7 @@ class NewsSentimentStrategy(TradingStrategy):
                     'value': shares * price,
                     'confidence': sentiment_score * 0.8,  # Slightly lower confidence
                     'reasoning': f'Momentum {returns_5d*100:.1f}% + sentiment filter ({sentiment_score:.2f})',
+                    'news_events': news_headlines,
                     'atr': atr if atr and atr > 0 else None,
                     'asof_date': latest_date
                 })
@@ -84,6 +92,7 @@ class NewsSentimentStrategy(TradingStrategy):
                         'value': shares * price,
                         'confidence': 1.0 - sentiment_score if sentiment_score < 0.4 else 1.0,
                         'reasoning': f'Negative sentiment' if sentiment_score < 0.4 else f'Held {days_held} days',
+                        'news_events': news_headlines,
                         'asof_date': latest_date
                     })
         

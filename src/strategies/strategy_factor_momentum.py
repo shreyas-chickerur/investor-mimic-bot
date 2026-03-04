@@ -45,12 +45,14 @@ class FactorMomentumStrategy(TradingStrategy):
 
     def _compute_factor_scores(self, market_data: pd.DataFrame) -> Dict[str, float]:
         """
-        Compute composite factor score for each symbol.
+        Compute composite factor score for each symbol using cross-sectional
+        percentile ranking so that scores reflect relative standing, not absolute
+        values that cluster around 0.5 when sigmoid-normalised independently.
 
         Returns:
-            Dict of {symbol: composite_score}
+            Dict of {symbol: composite_score} where scores are meaningful ranks.
         """
-        scores = {}
+        raw: Dict[str, Dict[str, float]] = {}
 
         for symbol in market_data['symbol'].unique():
             sym = market_data[market_data['symbol'] == symbol]
@@ -61,46 +63,53 @@ class FactorMomentumStrategy(TradingStrategy):
 
             # Factor 1: Momentum (60d return, skip last 5d for short-term reversal)
             if len(sym) >= 65:
-                price_now = sym['close'].iloc[-6]   # 5 days ago
-                price_60d = sym['close'].iloc[-65]  # 65 days ago
-                momentum = (price_now / price_60d - 1) if price_60d > 0 else 0
+                price_now = sym['close'].iloc[-6]
+                price_60d = sym['close'].iloc[-65]
+                momentum = (price_now / price_60d - 1) if price_60d > 0 else 0.0
             else:
                 ret_60d = latest.get('returns_60d', 0)
-                momentum = float(ret_60d) if not pd.isna(ret_60d) else 0
+                momentum = float(ret_60d) if not pd.isna(ret_60d) else 0.0
 
-            # Factor 2: Quality proxy (low vol + positive momentum)
+            # Factor 2: Quality proxy (low vol relative to peers + positive momentum)
             vol_20d = float(latest.get('volatility_20d', 0.2)) if not pd.isna(latest.get('volatility_20d', np.nan)) else 0.2
-            quality = -vol_20d + max(momentum, 0) * 0.5  # Reward low vol + positive momentum
+            quality = -vol_20d + max(momentum, 0) * 0.5
 
-            # Factor 3: Mean-reversion (RSI oversold bounce potential)
-            rsi = float(latest.get('rsi', 50)) if not pd.isna(latest.get('rsi', np.nan)) else 50
-            # Score higher for moderate oversold (30-45 range), not extreme
-            if 25 <= rsi <= 45:
-                reversion_score = (45 - rsi) / 20  # 0 to 1
-            else:
-                reversion_score = 0
+            # Factor 3: Mean-reversion (moderate oversold: 25–45 RSI range)
+            rsi = float(latest.get('rsi', 50)) if not pd.isna(latest.get('rsi', np.nan)) else 50.0
+            reversion_score = max(0.0, (45 - rsi) / 20) if 25 <= rsi <= 45 else 0.0
 
-            # Factor 4: Volume confirmation (rising volume on up-moves)
+            # Factor 4: Volume confirmation (rising volume on up-moves only)
             vol_ratio = float(latest.get('volume_ratio', 1.0)) if not pd.isna(latest.get('volume_ratio', np.nan)) else 1.0
-            ret_5d = float(latest.get('returns_5d', 0)) if not pd.isna(latest.get('returns_5d', np.nan)) else 0
-            volume_confirm = vol_ratio * max(ret_5d, 0)  # Only counts if recent return positive
+            ret_5d = float(latest.get('returns_5d', 0)) if not pd.isna(latest.get('returns_5d', np.nan)) else 0.0
+            volume_confirm = vol_ratio * max(ret_5d, 0)
 
-            # Composite score (weighted)
+            raw[symbol] = {
+                'momentum': momentum,
+                'quality': quality,
+                'reversion': reversion_score,
+                'volume': volume_confirm,
+            }
+
+        if len(raw) < 3:
+            return {}
+
+        # Cross-sectional percentile ranking — compare each stock vs the universe
+        df = pd.DataFrame(raw).T
+        for col in ['momentum', 'quality', 'reversion', 'volume']:
+            df[f'{col}_pct'] = df[col].rank(pct=True)
+
+        scores: Dict[str, float] = {}
+        for symbol in df.index:
+            r = df.loc[symbol]
             composite = (
-                0.40 * self._rank_normalize(momentum) +
-                0.25 * self._rank_normalize(quality) +
-                0.20 * reversion_score +
-                0.15 * self._rank_normalize(volume_confirm)
+                0.40 * r['momentum_pct'] +
+                0.25 * r['quality_pct'] +
+                0.20 * r['reversion_pct'] +
+                0.15 * r['volume_pct']
             )
-
-            scores[symbol] = composite
+            scores[symbol] = float(composite)
 
         return scores
-
-    @staticmethod
-    def _rank_normalize(value: float) -> float:
-        """Normalize a single value to [0, 1] range using sigmoid."""
-        return 1 / (1 + np.exp(-5 * value))
 
     def generate_signals(self, market_data: pd.DataFrame) -> List[Dict]:
         """Generate signals by ranking stocks and buying top quintile."""

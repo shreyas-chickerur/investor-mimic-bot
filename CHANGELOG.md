@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - Critical Strategy Logic (Paper Trading Performance)
+
+- **RSI VWAP exit bug**: The `vwap` column in training data is a trailing 20-day VWAP
+  (always ~70% of current close), so `price >= vwap` fired on *every* position, causing
+  immediate same-day exits and zero holding periods. Removed VWAP exit entirely;
+  exits are now RSI > 55 (mean reversion complete) or 20-day time exit.
+- **Factor Momentum ranking collapse**: `_rank_normalize(sigmoid(value))` applied
+  independently to each symbol compressed all composite scores into 0.50–0.65,
+  making "top 5" selection nearly random. Replaced with proper cross-sectional
+  percentile ranking (`DataFrame.rank(pct=True)` across the universe), giving
+  a score spread of 0.0–1.0 that actually reflects relative standing.
+- **ML Momentum signal blackout**: `min_confidence=0.55` blocked all signals because
+  logistic regression on noisy financial data rarely produces probabilities > 0.55.
+  Lowered to 0.52. Added `class_weight='balanced'` to handle class imbalance. Daily
+  retraining (controlled by `_train_date`) to keep model current. Future return
+  threshold lowered from 1% to 0.5% to provide more balanced training labels.
+  Uses pre-computed `future_return_5d` column from training data when available.
+- **Signal throttle killing Factor Momentum**: Hardcoded `signals[:3]` cut every
+  strategy to 3 signals. Changed to `signals[:max_signals]` where `max_signals =
+  getattr(strategy, 'top_n', 5)`, allowing Factor Momentum to execute its full 5.
+- **ML config sync**: `config/trading_config.yaml` `min_confidence` updated to 0.52.
+
+### Added - News Sentiment Integration
+
+- **`src/utils/news_sentiment.py`** fully rewritten:
+  - `fetch_symbol_news(symbol)`: fetches headlines from yfinance, scores each title
+    with VADER sentiment analyzer (falls back to keyword matching if VADER unavailable)
+  - `NewsSentimentProvider`: batch-fetches N symbols in parallel (ThreadPoolExecutor),
+    caches results for the calendar day to avoid redundant API calls
+  - `NewsSignalFilter.apply(signals, sentiment_map)`: applies as confidence modifier —
+    score > 0.62 → ×1.15, score < 0.38 → ×0.80, score < 0.25 + BUY → signal dropped
+    SELL signals are never dropped regardless of sentiment
+- **Execution engine integration**: `_news_filter` pre-fetches sentiment for all signal
+  symbols after the correlation filter; applied before execution for all 4 strategies
+- Added `yfinance==0.2.36` and `vaderSentiment==3.3.2` to `requirements.txt`
+- New Makefile targets: `news-test`, `install-news`
+
+### Added - Test Suite for Strategy Logic
+
+- `tests/unit/test_strategy_logic.py`: 23 targeted tests covering all critical fixes:
+  - RSI: VWAP exit regression test, buy/no-buy conditions, RSI exit, time exit
+  - Factor Momentum: score spread assertion, ranking direction, top_n enforcement
+  - ML Momentum: confidence threshold, class_weight, daily retraining, training classes
+  - Earnings Drift: event detection, positive/negative surprise routing
+  - News filter: boost/suppress/drop logic, SELL signal preservation
+
 ### Fixed - Production Bug Fixes (GitHub Actions log analysis)
 
 - **`initialize_strategies`**: Enforces canonical 4-strategy set (RSI Mean Reversion, ML
