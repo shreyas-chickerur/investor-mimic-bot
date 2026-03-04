@@ -1,7 +1,7 @@
-.PHONY: help install setup init fetch-data update-data sync-broker clean-data \
+.PHONY: help install install-news setup init fetch-data update-data sync-broker clean-data \
 	run run-dry dashboard logs shell \
 	test test-unit test-integration test-component test-functional test-coverage test-watch \
-	report analyze backtest metrics \
+	report analyze backtest metrics email-test signals-check news-test \
 	validate verify check-broker check-health debug-signal import-check \
 	clean clean-all clean-cache format lint type-check \
 	dev-setup dev-test dev-run
@@ -18,56 +18,57 @@ NC := \033[0m
 
 help:
 	@echo "$(BLUE)╔════════════════════════════════════════════════════════════════╗$(NC)"
-	@echo "$(BLUE)║        Quantitative Trading System - Makefile Commands        ║$(NC)"
+	@echo "$(BLUE)║     Investor Mimic Bot — 4-Strategy Quant Trading System      ║$(NC)"
 	@echo "$(BLUE)╚════════════════════════════════════════════════════════════════╝$(NC)"
 	@echo ""
 	@echo "$(GREEN)📦 SETUP & INSTALLATION$(NC)"
-	@echo "  make install          Install Python dependencies"
+	@echo "  make install          Install all Python dependencies"
+	@echo "  make install-news     Install news/sentiment extras (yfinance + VADER)"
 	@echo "  make init             Initialize database schema"
 	@echo "  make setup            Full setup (install + init + fetch-data)"
-	@echo "  make check-health     Verify system health"
+	@echo "  make check-health     Verify imports and system health"
 	@echo ""
-	@echo "$(GREEN)🚀 DEVELOPMENT$(NC)"
-	@echo "  make run              Execute trading system"
-	@echo "  make run-dry          Dry run (no actual trades)"
+	@echo "$(GREEN)🚀 TRADING$(NC)"
+	@echo "  make run              Execute trading (live paper)"
+	@echo "  make run-dry          Dry run — no orders submitted"
+	@echo "  make signals-check    Preview today's signals without trading"
 	@echo "  make dashboard        Launch Streamlit dashboard"
-	@echo "  make logs             View recent logs"
-	@echo "  make shell            Open Python shell with imports"
+	@echo "  make logs             View last 50 log lines"
+	@echo ""
+	@echo "$(GREEN)📰 NEWS & SENTIMENT$(NC)"
+	@echo "  make news-test        Test news fetch + sentiment for sample symbols"
 	@echo ""
 	@echo "$(GREEN)🧪 TESTING$(NC)"
 	@echo "  make test             Run all tests"
-	@echo "  make test-unit        Run unit tests only"
+	@echo "  make test-unit        Run unit tests only (fast)"
 	@echo "  make test-integration Run integration tests"
-	@echo "  make test-component   Run component tests"
-	@echo "  make test-functional  Run functional tests"
-	@echo "  make test-coverage    Run tests with coverage report"
-	@echo "  make test-watch       Run tests in watch mode"
+	@echo "  make test-coverage    Run tests with HTML coverage report"
 	@echo ""
 	@echo "$(GREEN)📊 DATA MANAGEMENT$(NC)"
-	@echo "  make fetch-data       Fetch historical market data"
-	@echo "  make update-data      Update market data"
-	@echo "  make sync-broker      Sync database with broker"
-	@echo "  make clean-data       Clean cached data"
+	@echo "  make fetch-data       Fetch full historical data (15 years)"
+	@echo "  make update-data      Incremental daily data update"
+	@echo "  make sync-broker      Sync local DB with Alpaca positions"
+	@echo "  make clean-data       Remove cached data files"
 	@echo ""
 	@echo "$(GREEN)📈 ANALYSIS & REPORTING$(NC)"
-	@echo "  make report           Generate performance report"
-	@echo "  make analyze          Analyze signals (no trading)"
-	@echo "  make backtest         Run backtest validation"
-	@echo "  make metrics          Show portfolio metrics"
+	@echo "  make report           30-day strategy performance report"
+	@echo "  make email-test       Preview daily email HTML locally"
+	@echo "  make analyze          Analyze signal flow (no trading)"
+	@echo "  make backtest         Walk-forward backtest"
+	@echo "  make metrics          Live portfolio metrics"
 	@echo ""
-	@echo "$(GREEN)✅ VALIDATION & DEBUGGING$(NC)"
+	@echo "$(GREEN)✅ DEBUGGING$(NC)"
 	@echo "  make validate         Validate system invariants"
-	@echo "  make verify           Verify execution criteria"
-	@echo "  make check-broker     Check broker state"
-	@echo "  make debug-signal     Debug signal flow"
-	@echo "  make import-check     Verify imports"
+	@echo "  make check-broker     Check Alpaca broker state"
+	@echo "  make debug-signal     Debug single signal flow"
+	@echo "  make import-check     Verify all imports resolve"
 	@echo ""
 	@echo "$(GREEN)🧹 MAINTENANCE$(NC)"
-	@echo "  make clean            Clean temporary files"
-	@echo "  make clean-all        Deep clean (including DB)"
+	@echo "  make clean            Remove logs, caches, temp files"
+	@echo "  make clean-all        Deep clean (removes DB — run 'make init' after)"
 	@echo "  make format           Format code with black"
-	@echo "  make lint             Lint code with flake8"
-	@echo "  make type-check       Type check with mypy"
+	@echo "  make lint             Lint with flake8"
+	@echo "  make type-check       mypy type check"
 	@echo ""
 
 # ============================================================================
@@ -79,6 +80,11 @@ install:
 	@python3 -m pip install --upgrade pip
 	@python3 -m pip install -r requirements.txt
 	@echo "$(GREEN)✅ Dependencies installed$(NC)"
+
+install-news:
+	@echo "$(BLUE)📰 Installing news/sentiment extras...$(NC)"
+	@python3 -m pip install yfinance vaderSentiment
+	@echo "$(GREEN)✅ News dependencies installed$(NC)"
 
 init:
 	@echo "$(BLUE)🗄️  Initializing database...$(NC)"
@@ -204,6 +210,45 @@ backtest:
 metrics:
 	@echo "$(BLUE)📈 Portfolio metrics:$(NC)"
 	@python3 scripts/view_performance.py
+
+email-test:
+	@echo "$(BLUE)📧 Generating email preview...$(NC)"
+	@python3 scripts/generate_daily_email.py
+	@open /tmp/daily_email.html 2>/dev/null || xdg-open /tmp/daily_email.html 2>/dev/null || echo "Email HTML at /tmp/daily_email.html"
+	@echo "$(GREEN)✅ Email preview ready$(NC)"
+
+news-test:
+	@echo "$(BLUE)📰 Testing news fetch + sentiment...$(NC)"
+	@python3 -c "
+import sys; sys.path.insert(0, '.')
+from src.utils.news_sentiment import NewsSignalFilter
+nf = NewsSignalFilter()
+results = nf.fetch_for_symbols(['AAPL','MSFT','NVDA','GOOGL'])
+for sym, ctx in results.items():
+    print(f'{sym}: score={ctx[\"score\"]:.3f}, articles={ctx[\"article_count\"]}')
+    for h in ctx.get('headlines', [])[:2]:
+        print(f'  - {h[:80]}')
+"
+	@echo "$(GREEN)✅ News test complete$(NC)"
+
+signals-check:
+	@echo "$(BLUE)🔍 Checking today's signals (DRY_RUN=true, no orders)...$(NC)"
+	@set -a && source .env && set +a && export DRY_RUN=true && export SIGNAL_INJECTION=false && \
+		python3 -c "
+import sys; sys.path.insert(0,'.')
+from src.core.execution_engine import MultiStrategyRunner
+runner = MultiStrategyRunner()
+market_data = runner.load_market_data()
+strategies = runner.initialize_strategies()
+for s in strategies:
+    signals = s.generate_signals(market_data)
+    buys  = [x for x in signals if x.get('action')=='BUY']
+    sells = [x for x in signals if x.get('action')=='SELL']
+    print(f'{s.name}: {len(buys)} buys, {len(sells)} sells')
+    for sig in buys[:3]:
+        print(f'  BUY {sig[\"symbol\"]} conf={sig.get(\"confidence\",0):.2f}: {sig.get(\"reasoning\",\"\")[:60]}')
+"
+	@echo "$(GREEN)✅ Signal check complete$(NC)"
 
 # ============================================================================
 # VALIDATION & DEBUGGING

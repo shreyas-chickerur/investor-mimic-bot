@@ -55,10 +55,12 @@ class MLMomentumStrategy(TradingStrategy):
         self.entry_dates = {}
 
         self.model = LogisticRegression(
-            max_iter=1000, C=0.1, random_state=42,
+            max_iter=2000, C=0.1, random_state=42,
+            class_weight='balanced',  # handle slight class imbalance
         )
         self.scaler = StandardScaler()
         self.is_trained = False
+        self._train_date: str = ""  # track when model was last trained
 
     # ------------------------------------------------------------------
     # Feature extraction
@@ -110,9 +112,10 @@ class MLMomentumStrategy(TradingStrategy):
     # Training
     # ------------------------------------------------------------------
     def _train_model(self, market_data: pd.DataFrame):
-        """Train on historical data. Called once per walk-forward window."""
+        """Train on historical data using pre-computed future_return_5d when available."""
         X_train = []
         y_train = []
+        use_precomputed = 'future_return_5d' in market_data.columns
 
         for symbol in market_data['symbol'].unique():
             sym = market_data[market_data['symbol'] == symbol].copy()
@@ -122,14 +125,21 @@ class MLMomentumStrategy(TradingStrategy):
             for i in range(50, len(sym) - 5):
                 row = sym.iloc[i]
                 history = sym.iloc[max(0, i - 50):i + 1]
-                future_ret = (sym.iloc[i + 5]['close'] - sym.iloc[i]['close']) / sym.iloc[i]['close']
+
+                if use_precomputed:
+                    future_ret = row.get('future_return_5d', np.nan)
+                    if pd.isna(future_ret):
+                        continue
+                    future_ret = float(future_ret)
+                else:
+                    future_ret = (sym.iloc[i + 5]['close'] - sym.iloc[i]['close']) / sym.iloc[i]['close']
 
                 feats = self._extract_row_features(row, history)
                 if any(np.isnan(f) or np.isinf(f) for f in feats):
                     continue
 
                 X_train.append(feats)
-                y_train.append(1 if future_ret > 0.01 else 0)  # 1% threshold
+                y_train.append(1 if future_ret > 0.005 else 0)  # 0.5% threshold (lower = more positives)
 
         if len(X_train) < 100:
             logger.warning("ML: insufficient training samples (%d), skipping", len(X_train))
@@ -142,7 +152,8 @@ class MLMomentumStrategy(TradingStrategy):
         self.model.fit(X_scaled, y_arr)
         self.is_trained = True
         pos_rate = y_arr.mean()
-        logger.info("ML trained on %d samples (%.1f%% positive)", len(y_arr), pos_rate * 100)
+        logger.info("ML trained on %d samples (%.1f%% positive, precomputed=%s)",
+                    len(y_arr), pos_rate * 100, use_precomputed)
 
     # ------------------------------------------------------------------
     # Signal generation
@@ -151,8 +162,11 @@ class MLMomentumStrategy(TradingStrategy):
         """Generate signals using ML predictions."""
         signals = []
 
-        if not self.is_trained:
+        # Retrain daily (model is cheap and data changes each day)
+        today = str(market_data.index.max().date()) if len(market_data) > 0 else ""
+        if not self.is_trained or today != self._train_date:
             self._train_model(market_data)
+            self._train_date = today
         if not self.is_trained:
             return signals
 
@@ -173,7 +187,9 @@ class MLMomentumStrategy(TradingStrategy):
                 X = self.scaler.transform([feats])
                 prob_positive = float(self.model.predict_proba(X)[0][1])
 
-                # BUY: high probability of positive 5-day return
+                # BUY: probability above threshold.  min_confidence=0.52 is intentionally
+                # low — logistic regression on financial data rarely exceeds 0.60, so
+                # a 0.55 threshold would kill nearly all signals.
                 if prob_positive > self.min_confidence and symbol not in self.positions:
                     shares = self.calculate_position_size(price, atr=atr, max_position_pct=0.10)
                     if shares <= 0:

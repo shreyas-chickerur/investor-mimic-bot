@@ -5,6 +5,7 @@ Sends daily trading summaries and error alerts
 """
 import os
 import smtplib
+import html as html_lib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
@@ -39,14 +40,15 @@ class EmailNotifier:
         alert_subject = f"🚨 ALERT: {subject}"
         self._send_email(alert_subject, message)
     
-    def send_daily_summary(self, 
+    def send_daily_summary(self,
                           trades: List[Dict],
                           positions: List[Dict],
                           portfolio_value: float,
                           cash: float,
                           errors: List[str] = None,
                           funnel_summary: List[Dict] = None,
-                          why_no_trade_reports: List[str] = None):
+                          why_no_trade_reports: List[str] = None,
+                          signal_reasoning_chains: Optional[List[Dict]] = None):
         """Send daily trading summary email"""
         
         if not self.enabled:
@@ -56,8 +58,16 @@ class EmailNotifier:
         subject = f"📊 Daily Trading Summary - {datetime.now().strftime('%Y-%m-%d')}"
         
         # Build email body
-        body = self._build_summary_email(trades, positions, portfolio_value, cash, errors, 
-                                         funnel_summary, why_no_trade_reports)
+        body = self._build_summary_email(
+            trades,
+            positions,
+            portfolio_value,
+            cash,
+            errors,
+            funnel_summary,
+            why_no_trade_reports,
+            signal_reasoning_chains,
+        )
         
         self._send_email(subject, body)
     
@@ -95,7 +105,8 @@ class EmailNotifier:
         self._send_email(subject, body, is_html=True)
     
     def _build_summary_email(self, trades, positions, portfolio_value, cash, errors,
-                            funnel_summary=None, why_no_trade_reports=None):
+                            funnel_summary=None, why_no_trade_reports=None,
+                            signal_reasoning_chains=None):
         """Build HTML email body for daily summary"""
         
         # Count trades by action
@@ -174,7 +185,48 @@ class EmailNotifier:
                         <th style='padding: 10px; text-align: right;'>Executed</th>
                     </tr>
             """
-            
+
+        # Build signal reasoning flowchart section
+        reasoning_html = ""
+        if signal_reasoning_chains:
+            cards_html = ""
+            for chain in signal_reasoning_chains[:12]:
+                action = chain.get('action', 'N/A')
+                action_color = '#10b981' if action == 'BUY' else '#ef4444'
+                strategy = html_lib.escape(str(chain.get('strategy', 'Unknown Strategy')))
+                symbol = html_lib.escape(str(chain.get('symbol', 'N/A')))
+                flowchart = html_lib.escape(str(chain.get('flowchart', 'No flowchart available')))
+                status = 'Executed' if chain.get('executed') else 'Not Executed'
+                status_color = '#10b981' if chain.get('executed') else '#6b7280'
+
+                cards_html += f"""
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid {action_color};
+                            border-radius: 8px; padding: 14px; margin-bottom: 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <div style="font-weight: 600; color: #1e3a5f;">{strategy} • {symbol} • {action}</div>
+                        <div style="font-size: 12px; color: {status_color}; font-weight: 600;">{status}</div>
+                    </div>
+                    <div style="font-family: 'SFMono-Regular', Menlo, Monaco, Consolas, monospace; color: #334155;
+                                font-size: 12px; line-height: 1.5; white-space: normal;">
+                        {flowchart}
+                    </div>
+                </div>
+                """
+
+            reasoning_html = f"""
+            <div style="margin-bottom: 30px;">
+                <h2 style="color: #2c5282; border-bottom: 2px solid #4A90E2; padding-bottom: 10px;
+                           font-size: 20px; font-weight: 600;">
+                    🧠 Signal Reasoning Flowcharts
+                </h2>
+                <p style="color: #64748b; margin: 10px 0 16px 0; font-size: 13px;">
+                    News-to-signal event chains (format: event → event → event → signal generated).
+                </p>
+                {cards_html}
+            </div>
+            """
+
+        if funnel_summary:
             for funnel in funnel_summary:
                 funnel_html += f"""
                     <tr style='border-bottom: 1px solid #dee2e6;'>
@@ -215,7 +267,7 @@ class EmailNotifier:
             """
         
         # Complete email with blue and orange color scheme
-        html = f"""
+        email_html = f"""
 <html>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; max-width: 900px; margin: 0 auto; background: #f5f5f5;">
     <!-- Header with blue gradient -->
@@ -268,6 +320,8 @@ class EmailNotifier:
             </div>
             {trades_html}
         </div>
+
+        {reasoning_html}
         
         {funnel_html}
         
@@ -291,7 +345,7 @@ class EmailNotifier:
 </html>
 """
         
-        return html
+        return email_html
     
     def _send_email(self, subject: str, body: str, is_html: bool = True):
         """Send email via SMTP"""

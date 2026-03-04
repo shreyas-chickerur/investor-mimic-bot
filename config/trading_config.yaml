@@ -86,8 +86,8 @@ strategies:
     
   ml_momentum:
     lookback_days: 60
-    min_confidence: 0.55  # Lowered from 0.60 to generate more signals
-    feature_count: 10
+    min_confidence: 0.52  # Logistic regression on financial data rarely exceeds 0.55
+    feature_count: 12
     
   volatility_breakout:
     atr_period: 14
