@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """
-Quick Data Update Script
-Updates training_data.csv with latest market data from Alpaca
+DEPRECATED — use scripts/update_daily_data.py instead.
+
+This script is an older one-off fetcher that is no longer called by GitHub
+Actions or the Makefile.  It is kept for reference only.
+
+The canonical daily data update path is:
+  make update-data          → scripts/update_daily_data.py
+  GitHub Actions step       → scripts/update_daily_data.py
 """
 import os
 import sys

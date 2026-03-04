@@ -19,9 +19,6 @@ load_dotenv()
 from src.core.database import TradingDatabase
 from src.strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
 from src.strategies.strategy_ml_momentum import MLMomentumStrategy
-from src.strategies.strategy_news_sentiment import NewsSentimentStrategy
-from src.strategies.strategy_ma_crossover import MACrossoverStrategy
-from src.strategies.strategy_volatility_breakout import VolatilityBreakoutStrategy
 from src.strategies.strategy_earnings_drift import EarningsDriftStrategy
 from src.strategies.strategy_factor_momentum import FactorMomentumStrategy
 from alpaca.trading.client import TradingClient
@@ -375,13 +372,11 @@ class MultiStrategyRunner:
             strategy.entry_dates = {}
     
     def _create_strategy_instance(self, strategy_id, name, capital):
-        """Create strategy instance based on name"""
+        """Create strategy instance for one of the 4 canonical strategies.
+        Returns None for any other name so callers can skip gracefully."""
         strategy_map = {
             "RSI Mean Reversion": RSIMeanReversionStrategy,
             "ML Momentum": MLMomentumStrategy,
-            "News Sentiment": NewsSentimentStrategy,
-            "MA Crossover": MACrossoverStrategy,
-            "Volatility Breakout": VolatilityBreakoutStrategy,
             "Earnings Drift": EarningsDriftStrategy,
             "Factor Momentum": FactorMomentumStrategy,
         }
