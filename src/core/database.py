@@ -323,6 +323,35 @@ class TradingDatabase:
         conn.commit()
         conn.close()
     
+    def refresh_position_prices(self, price_map: dict) -> int:
+        """Bulk-update current_price and unrealized_pnl for all open positions.
+
+        Args:
+            price_map: {symbol: latest_close_price}
+
+        Returns:
+            Number of positions updated.
+        """
+        if not price_map:
+            return 0
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        updated = 0
+        for symbol, price in price_map.items():
+            cursor.execute(
+                """UPDATE positions
+                   SET current_price  = ?,
+                       market_value   = shares * ?,
+                       unrealized_pnl = (? - avg_price) * shares,
+                       last_updated   = ?
+                   WHERE symbol = ? AND shares > 0""",
+                (price, price, price, datetime.now().isoformat(), symbol),
+            )
+            updated += cursor.rowcount
+        conn.commit()
+        conn.close()
+        return updated
+
     def delete_position(self, strategy_id: int, symbol: str):
         """Delete a position (when fully closed)"""
         conn = sqlite3.connect(self.db_path)
