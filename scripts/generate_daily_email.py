@@ -615,8 +615,30 @@ def generate_email_body(artifact_path=None, db_path='trading.db', include_visual
     summary     = build_summary(pv, cash, pnl_30d, rows_30d)
     health_data = get_health()
 
+    # Build optional inline chart block (Mon/Wed/Fri via --include-visuals)
+    chart_section = ""
+    if include_visuals:
+        try:
+            import sys as _sys
+            from pathlib import Path as _Path
+            _sys.path.insert(0, str(_Path(__file__).parent))
+            from generate_email_chart import generate_performance_chart
+            b64 = generate_performance_chart(db_path=db_path, days=30)
+            if b64:
+                chart_section = (
+                    "<div style='margin:16px 0;'>"
+                    "<div style='font-size:10px;font-weight:700;letter-spacing:0.8px;"
+                    "text-transform:uppercase;color:" + MUTED + ";margin-bottom:6px;'>"
+                    "30-Day P&amp;L Curve</div>"
+                    "<img src='data:image/png;base64," + b64 + "' "
+                    "style='width:100%;max-width:860px;border:1px solid " + BORDER + ";'>"
+                    "</div>\n"
+                )
+        except Exception:
+            pass  # chart unavailable — email still sends without it
+
     body_sections = (
-        "    <div style='margin-bottom:20px;'>" + summary + "</div>\n"
+        "    <div style='margin-bottom:20px;'>" + summary + chart_section + "</div>\n"
         + section("Open Positions",
                   build_positions(positions),
                   str(len(positions)) + " active")
