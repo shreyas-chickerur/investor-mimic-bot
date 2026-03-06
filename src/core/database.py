@@ -3,6 +3,8 @@
 Trading Database Adapter
 Single source of truth for paper trading operational validation
 """
+from __future__ import annotations
+
 import sqlite3
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timedelta

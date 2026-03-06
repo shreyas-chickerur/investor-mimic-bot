@@ -1,12 +1,26 @@
 #!/usr/bin/env python3
 """
-Trading System Configuration
-Manages auto vs manual trading modes
+LEGACY — use src.utils.config_loader.get_config() instead.
+
+This module predates the YAML-based ConfigLoader and only reads from
+environment variables via dotenv.  It is retained for backwards compatibility
+with a small number of tests but should not be used in new code.
 """
+from __future__ import annotations
+
 import os
+import warnings
 from dotenv import load_dotenv
 
 load_dotenv()
+
+warnings.warn(
+    "src.utils.config (TradingConfig) is deprecated. "
+    "Use src.utils.config_loader.get_config() instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
 
 class TradingConfig:
     """Configuration for trading system"""

@@ -4,6 +4,8 @@ DRY_RUN Mode Wrapper
 Runs full system without broker writes when DRY_RUN=true.
 All logic, sizing, intent creation, and reporting executes normally.
 """
+from __future__ import annotations
+
 
 import os
 import logging

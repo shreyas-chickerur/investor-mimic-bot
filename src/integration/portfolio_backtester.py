@@ -7,6 +7,8 @@ Simulates the full trading pipeline:
 
 Walk-forward windows: 2yr train / 6mo test / 6mo step
 """
+from __future__ import annotations
+
 import pandas as pd
 import numpy as np
 from datetime import timedelta

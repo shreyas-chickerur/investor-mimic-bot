@@ -2,8 +2,12 @@
 """
 Generate Strategy Performance Chart
 
-Creates visual charts for strategy performance to embed in emails
+Creates a two-panel chart (cumulative P&L + win-rate) for strategy performance.
+The P&L panel is built by the shared chart_utils.build_cumulative_pnl_chart;
+the win-rate panel is unique to this script.
 """
+from __future__ import annotations
+
 import sys
 import sqlite3
 import matplotlib
@@ -14,71 +18,68 @@ from pathlib import Path
 import io
 import base64
 
-def generate_strategy_chart(db_path='trading.db', days=7):
-    """Generate strategy performance chart with cumulative P&L"""
-    
+sys.path.insert(0, str(Path(__file__).parent))
+from chart_utils import build_cumulative_pnl_chart  # noqa: F401 – re-exported for callers
+
+_WIN_COLORS = ['#4A90E2', '#FF6B35', '#48bb78', '#ed8936', '#9f7aea']
+
+
+def generate_strategy_chart(db_path: str = 'trading.db', days: int = 7) -> str:
+    """Generate strategy performance chart with cumulative P&L and win-rate panels.
+
+    Args:
+        db_path: Path to the SQLite trading database.
+        days:    Number of calendar days to show in the P&L panel.
+
+    Returns:
+        Base-64 encoded PNG string.
+    """
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
-    
-    # Get all strategies
+
     strategies = conn.execute('SELECT id, name FROM strategies ORDER BY id').fetchall()
-    
-    # Get date range
     end_date = datetime.now()
-    start_date = end_date - timedelta(days=days-1)
-    
-    # Create figure with 2 subplots
+    start_date = end_date - timedelta(days=days - 1)
+    date_labels = [
+        (start_date + timedelta(days=i)).strftime('%m/%d') for i in range(days)
+    ]
+
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
     fig.patch.set_facecolor('#f9fafb')
-    
-    colors = ['#4A90E2', '#FF6B35', '#48bb78', '#ed8936', '#9f7aea']
-    
-    # Generate date labels
-    date_labels = [(start_date + timedelta(days=i)).strftime('%m/%d') for i in range(days)]
-    
-    # Plot 1: Cumulative P&L by strategy
+
+    # --- Panel 1: Cumulative P&L (reuses chart_utils logic inline for the axes object) ---
     ax1.set_facecolor('#ffffff')
-    
     for idx, strategy in enumerate(strategies):
-        # Get daily P&L for this strategy
-        query = '''
-            SELECT DATE(executed_at) as date, SUM(pnl) as daily_pnl
+        rows = conn.execute(
+            '''
+            SELECT DATE(executed_at) AS date, SUM(pnl) AS daily_pnl
             FROM trades
-            WHERE strategy_id = ? 
-            AND pnl IS NOT NULL
-            AND DATE(executed_at) >= DATE(?)
+            WHERE strategy_id = ? AND pnl IS NOT NULL
+              AND DATE(executed_at) >= DATE(?)
             GROUP BY DATE(executed_at)
             ORDER BY date
-        '''
-        
-        trades = conn.execute(query, (strategy['id'], start_date.strftime('%Y-%m-%d'))).fetchall()
-        
-        # Build cumulative P&L array
-        pnl_by_date = {t['date']: float(t['daily_pnl']) for t in trades}
-        cumulative_pnl = []
-        total = 0
-        
+            ''',
+            (strategy['id'], start_date.strftime('%Y-%m-%d')),
+        ).fetchall()
+        pnl_by_date = {r['date']: float(r['daily_pnl']) for r in rows}
+        cumulative, total = [], 0
         for i in range(days):
-            date_str = (start_date + timedelta(days=i)).strftime('%Y-%m-%d')
-            total += pnl_by_date.get(date_str, 0)
-            cumulative_pnl.append(total)
-        
-        # Plot line
-        color = colors[idx % len(colors)]
-        ax1.plot(date_labels, cumulative_pnl, marker='o', linewidth=2.5, 
-                label=strategy['name'], color=color, markersize=6)
-    
+            total += pnl_by_date.get((start_date + timedelta(days=i)).strftime('%Y-%m-%d'), 0)
+            cumulative.append(total)
+        ax1.plot(date_labels, cumulative, marker='o', linewidth=2.5,
+                 label=strategy['name'], color=_WIN_COLORS[idx % len(_WIN_COLORS)], markersize=6)
+
     ax1.set_xlabel('Date', fontsize=11, fontweight='600', color='#4b5563')
     ax1.set_ylabel('Cumulative P&L ($)', fontsize=11, fontweight='600', color='#4b5563')
-    ax1.set_title(f'Strategy Performance - Last {days} Days', fontsize=14, fontweight='700', 
-                 color='#1e3a5f', pad=15)
+    ax1.set_title(f'Strategy Performance — Last {days} Days',
+                  fontsize=14, fontweight='700', color='#1e3a5f', pad=15)
     ax1.legend(loc='upper left', frameon=True, fancybox=True, shadow=True, fontsize=9)
     ax1.grid(True, alpha=0.2, linestyle='--')
     ax1.spines['top'].set_visible(False)
     ax1.spines['right'].set_visible(False)
     ax1.axhline(y=0, color='gray', linestyle='-', linewidth=0.5, alpha=0.5)
-    
-    # Plot 2: Win Rate by Strategy (last 30 days)
+
+    # --- Panel 2: Win Rate by Strategy (last 30 days) ---
     ax2.set_facecolor('#ffffff')
     
     query = '''
@@ -101,7 +102,7 @@ def generate_strategy_chart(db_path='trading.db', days=7):
         strategy_names = [r['name'] for r in results]
         win_rates = [(r['wins'] / r['total_trades'] * 100) if r['total_trades'] > 0 else 0 for r in results]
         
-        bars = ax2.barh(strategy_names, win_rates, color=colors[:len(strategy_names)])
+        bars = ax2.barh(strategy_names, win_rates, color=_WIN_COLORS[:len(strategy_names)])
         
         # Add value labels on bars
         for i, (bar, rate) in enumerate(zip(bars, win_rates)):

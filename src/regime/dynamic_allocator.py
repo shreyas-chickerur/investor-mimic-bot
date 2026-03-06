@@ -3,6 +3,8 @@
 Dynamic Strategy Allocation
 Adjusts capital allocation based on strategy performance
 """
+from __future__ import annotations
+
 import logging
 from typing import Dict, List
 import numpy as np

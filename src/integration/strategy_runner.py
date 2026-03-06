@@ -3,6 +3,8 @@
 Strategy Runner
 Executes all strategies daily and tracks performance
 """
+from __future__ import annotations
+
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))

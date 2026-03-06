@@ -10,6 +10,8 @@ Usage:
     sentiment_map = nf.fetch_for_symbols(['AAPL', 'MSFT'])
     signals = nf.apply(signals, sentiment_map)
 """
+from __future__ import annotations
+
 import logging
 import requests
 import xml.etree.ElementTree as ET

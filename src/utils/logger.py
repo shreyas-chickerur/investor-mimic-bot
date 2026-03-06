@@ -5,6 +5,8 @@ Comprehensive Logging and Alert System
 Logs all critical events: transfers, trades, errors, performance
 Ensures you're never blind to system activity
 """
+from __future__ import annotations
+
 
 import logging
 import json

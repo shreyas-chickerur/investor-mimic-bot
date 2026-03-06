@@ -3,6 +3,8 @@
 Strategy Base Class
 All trading strategies inherit from this base class
 """
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from typing import List, Dict, Optional
 from datetime import datetime

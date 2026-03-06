@@ -3,6 +3,8 @@
 Structured JSON Event Logger
 Logs events as JSON for observability and analysis
 """
+from __future__ import annotations
+
 import json
 import logging
 from datetime import datetime

@@ -3,6 +3,8 @@
 Execution Cost Model
 Adds realistic slippage and transaction costs to trades
 """
+from __future__ import annotations
+
 import logging
 
 logger = logging.getLogger(__name__)

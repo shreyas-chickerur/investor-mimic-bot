@@ -5,6 +5,8 @@ P&L Calculator - Proper profit/loss attribution per strategy
 Tracks entry and exit prices for each position and calculates realized P&L
 when positions are closed. Uses FIFO (First In First Out) for partial closes.
 """
+from __future__ import annotations
+
 
 import logging
 from typing import Dict, List, Tuple, Optional

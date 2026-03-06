@@ -9,6 +9,8 @@ Tracks rolling metrics per strategy:
 
 Produces weekly strategy_health_summary.json for email reporting.
 """
+from __future__ import annotations
+
 
 import os
 import json

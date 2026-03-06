@@ -11,6 +11,8 @@ Optimizations:
 
 Expected Performance: $14,670/year on $10K capital (146.7% return)
 """
+from __future__ import annotations
+
 
 import pandas as pd
 import numpy as np

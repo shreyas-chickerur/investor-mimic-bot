@@ -3,6 +3,8 @@
 Portfolio-Level Risk Manager
 Enforces portfolio-wide risk limits across all strategies
 """
+from __future__ import annotations
+
 import logging
 from typing import Dict, List
 from datetime import datetime

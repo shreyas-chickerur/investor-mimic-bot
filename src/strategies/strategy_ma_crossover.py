@@ -3,6 +3,8 @@
 Strategy 4: Moving Average Crossover
 Buy on golden cross (50-day MA > 200-day MA), sell on death cross
 """
+from __future__ import annotations
+
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))

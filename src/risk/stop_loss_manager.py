@@ -3,6 +3,8 @@
 Catastrophe Stop Loss Manager
 Implements 2-3x ATR stop losses for tail protection
 """
+from __future__ import annotations
+
 import logging
 from typing import Dict
 

@@ -13,6 +13,8 @@ Terminal States:
 - REJECTED_BY_SIZING
 - REJECTED_BY_BROKER
 """
+from __future__ import annotations
+
 import logging
 from typing import Dict, List, Set, Tuple
 from datetime import datetime

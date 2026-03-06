@@ -13,6 +13,8 @@ Notification channels:
 - Email (always)
 - SMS via Twilio (optional, graceful degradation)
 """
+from __future__ import annotations
+
 import os
 import logging
 from datetime import datetime, timedelta

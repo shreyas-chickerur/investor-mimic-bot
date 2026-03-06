@@ -8,6 +8,8 @@ Detects and blocks trading on:
 
 Generates data_quality_report.json per run.
 """
+from __future__ import annotations
+
 
 import os
 import json

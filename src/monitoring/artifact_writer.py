@@ -7,6 +7,8 @@ for each trading day containing complete system state and execution details.
 
 Critical Component for operational validation and audit trail.
 """
+from __future__ import annotations
+
 import os
 import json
 import logging

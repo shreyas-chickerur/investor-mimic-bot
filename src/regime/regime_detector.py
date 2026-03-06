@@ -3,6 +3,8 @@
 Regime Detection System
 Detects market regimes to enable/disable strategies appropriately
 """
+from __future__ import annotations
+
 import logging
 from typing import Dict, Tuple
 from datetime import datetime, timedelta

@@ -3,6 +3,8 @@
 Trade Executor
 Executes approved trades on Alpaca based on user decisions
 """
+from __future__ import annotations
+
 import os
 from typing import List, Dict
 from datetime import datetime

@@ -3,6 +3,8 @@
 Alpha Vantage Data Fetcher
 Fetches historical stock data using Alpha Vantage API
 """
+from __future__ import annotations
+
 import os
 import time
 import requests

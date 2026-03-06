@@ -7,6 +7,8 @@ GENERATED → FILTERED → SIZED → EXECUTED → TRACKED → EXITED
 
 Logs exact rejection reasons at each stage.
 """
+from __future__ import annotations
+
 import logging
 from typing import Dict, List
 from datetime import datetime
