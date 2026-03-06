@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import pandas as pd
 import logging
 from datetime import datetime, timedelta
+from src.data.universe_provider import UniverseProvider
 
 logging.basicConfig(
     level=logging.INFO,
@@ -55,7 +56,7 @@ def check_signal_health():
         logger.info("✅ Data is fresh")
     
     # 3. Check data completeness
-    expected_symbols = 29  # Current universe size
+    expected_symbols = len(UniverseProvider().get_universe())
     actual_symbols = df['symbol'].nunique()
     
     if actual_symbols < expected_symbols:
