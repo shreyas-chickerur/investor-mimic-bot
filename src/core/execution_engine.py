@@ -630,6 +630,12 @@ class MultiStrategyRunner:
         self._news_sentiment_map: dict = {}
         self.reconciliation_discrepancies = []
         current_prices = market_data.groupby('symbol')['close'].last().to_dict()
+
+        # Refresh open position prices so unrealized P&L is current in the email
+        refreshed = self.db.refresh_position_prices(current_prices)
+        if refreshed:
+            logger.info(f"Refreshed current prices for {refreshed} open positions")
+
         allocations = self._calculate_dynamic_allocations(strategies)
         exposures = self._calculate_strategy_exposures(strategies, current_prices)
         self._apply_allocations(strategies, allocations, exposures)
