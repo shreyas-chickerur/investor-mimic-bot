@@ -405,8 +405,13 @@ class MultiStrategyRunner:
             if auto_update:
                 logger.warning("Data validation failed; attempting auto-update.")
                 try:
-                    from scripts import update_data
-                    update_data.main()
+                    import subprocess
+                    result = subprocess.run(
+                        ['python3', str(project_root / 'scripts' / 'update_daily_data.py')],
+                        capture_output=True, text=True, timeout=300
+                    )
+                    if result.returncode != 0:
+                        errors.append(f"Auto-update failed: {result.stderr[:500]}")
                     is_valid, errors = validator.validate_data_file(data_file)
                 except Exception as exc:
                     errors.append(str(exc))

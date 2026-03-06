@@ -63,9 +63,14 @@ def get_snapshot(db):
     return snap, dd, rg
 
 def get_30d(db):
-    return q(db, "SELECT date, SUM(portfolio_value) AS total "
-                 "FROM strategy_performance WHERE date >= date('now','-30 days') "
-                 "GROUP BY date ORDER BY date")
+    """30-day daily portfolio value from broker_state START snapshots."""
+    return q(db, """
+        SELECT snapshot_date AS date, portfolio_value AS total
+        FROM broker_state
+        WHERE snapshot_type = 'START'
+          AND snapshot_date >= date('now', '-30 days')
+        GROUP BY snapshot_date
+        ORDER BY snapshot_date""")
 
 def get_all_time_perf(db):
     return q(db, """
