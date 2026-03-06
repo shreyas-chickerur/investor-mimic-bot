@@ -119,11 +119,11 @@ class TestWorkflowExecution(unittest.TestCase):
         print("✓ Workflow schedule configured")
     
     def test_run_script_exists(self):
-        """Test that main.py exists"""
-        script_path = 'src/core/main.py'
-        self.assertTrue(os.path.exists(script_path), 
-                       f"Run script not found: {script_path}")
-        print("✓ Run script exists")
+        """Test that the production execution engine exists"""
+        script_path = 'src/core/execution_engine.py'
+        self.assertTrue(os.path.exists(script_path),
+                       f"Execution engine not found: {script_path}")
+        print("✓ Execution engine exists")
     
     def test_requirements_file(self):
         """Test that requirements.txt has necessary packages"""
