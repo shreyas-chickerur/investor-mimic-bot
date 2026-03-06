@@ -46,21 +46,24 @@ def check_market_open() -> bool:
             print(f"⏸️  Market closed: Weekend ({now.strftime('%A')})")
             return False
         
-        # Basic holiday check (major US holidays)
-        holidays_2026 = [
-            '2026-01-01',  # New Year's Day
-            '2026-01-19',  # MLK Day
-            '2026-02-16',  # Presidents Day
-            '2026-04-03',  # Good Friday
-            '2026-05-25',  # Memorial Day
-            '2026-07-03',  # Independence Day (observed)
-            '2026-09-07',  # Labor Day
-            '2026-11-26',  # Thanksgiving
-            '2026-12-25',  # Christmas
-        ]
+        # Basic holiday check (major US market holidays 2025-2028)
+        us_market_holidays = {
+            # 2025
+            '2025-01-01', '2025-01-20', '2025-02-17', '2025-04-18',
+            '2025-05-26', '2025-07-04', '2025-09-01', '2025-11-27', '2025-12-25',
+            # 2026
+            '2026-01-01', '2026-01-19', '2026-02-16', '2026-04-03',
+            '2026-05-25', '2026-07-03', '2026-09-07', '2026-11-26', '2026-12-25',
+            # 2027
+            '2027-01-01', '2027-01-18', '2027-02-15', '2027-04-02',
+            '2027-05-31', '2027-07-05', '2027-09-06', '2027-11-25', '2027-12-27',
+            # 2028
+            '2028-01-17', '2028-02-21', '2028-04-14', '2028-05-29',
+            '2028-07-04', '2028-09-04', '2028-11-23', '2028-12-25',
+        }
         
         today = now.strftime('%Y-%m-%d')
-        if today in holidays_2026:
+        if today in us_market_holidays:
             print(f"⏸️  Market closed: Holiday ({today})")
             return False
         
@@ -105,7 +108,7 @@ def check_data_freshness() -> bool:
             # Try to update data
             try:
                 import subprocess
-                result = subprocess.run(['python3', 'scripts/update_data.py'], 
+                result = subprocess.run(['python3', 'scripts/update_daily_data.py'],
                                       capture_output=True, text=True, timeout=300)
                 if result.returncode != 0:
                     raise Exception(f"Update failed: {result.stderr}")
