@@ -3,6 +3,8 @@
 YAML Configuration Loader
 Loads trading system configuration from YAML file
 """
+from __future__ import annotations
+
 import yaml
 from pathlib import Path
 from typing import Any, Dict

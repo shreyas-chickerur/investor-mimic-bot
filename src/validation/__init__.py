@@ -1,6 +1,8 @@
 """
 Data validation schemas and validators for industrial-grade data quality.
 """
+from __future__ import annotations
+
 from .schemas import (
     MarketDataSchema,
     SignalSchema,

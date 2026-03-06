@@ -7,6 +7,8 @@ Enters PAUSED state on mismatch and blocks all trading until resolved.
 
 Critical Component for operational safety and state verification.
 """
+from __future__ import annotations
+
 import os
 import logging
 from typing import Dict, List, Tuple, Optional

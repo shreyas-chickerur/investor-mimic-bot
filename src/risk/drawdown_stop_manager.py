@@ -7,6 +7,8 @@ Implements:
 - Automated health checks before resume
 - 50% sizing ramp-up after cooldown
 """
+from __future__ import annotations
+
 
 import os
 import json

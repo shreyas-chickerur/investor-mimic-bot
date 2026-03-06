@@ -3,6 +3,8 @@
 Universe Provider
 Manages symbol universe with support for static, CSV, and dynamic sources
 """
+from __future__ import annotations
+
 import os
 import logging
 from typing import List

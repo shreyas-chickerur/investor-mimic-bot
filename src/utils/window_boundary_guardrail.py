@@ -5,6 +5,8 @@ Window Boundary Guardrail Test
 Fix 2: Clarify and enforce window boundary behavior
 Ensures that if positions are reset and trades = 0, return must be 0.
 """
+from __future__ import annotations
+
 
 def test_window_boundary_guardrail(trades, initial_capital, final_value, positions_at_start, positions_at_end):
     """

@@ -17,6 +17,8 @@ Academic reference:
   Bernard & Thomas (1989), Garfinkel et al. (2024) — ~20% annual return
   from top SUE decile long portfolio.
 """
+from __future__ import annotations
+
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))

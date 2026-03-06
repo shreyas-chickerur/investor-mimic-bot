@@ -11,6 +11,8 @@ remains fully active and must be validated.
 
 This is NEVER used in production trading.
 """
+from __future__ import annotations
+
 import logging
 from typing import List, Dict
 try:

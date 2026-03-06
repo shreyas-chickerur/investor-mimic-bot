@@ -3,6 +3,8 @@
 Strategy Performance Database
 Tracks all strategies, trades, and performance metrics
 """
+from __future__ import annotations
+
 import sqlite3
 from typing import List, Dict, Optional
 from datetime import datetime

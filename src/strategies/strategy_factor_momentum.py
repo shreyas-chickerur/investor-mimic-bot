@@ -16,6 +16,8 @@ Academic basis:
 
 Holds positions for 20 trading days, then re-ranks.
 """
+from __future__ import annotations
+
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))

@@ -3,7 +3,10 @@
 Pending Signals Manager
 Persists blocked-but-valid signals and re-evaluates them over N days
 """
+from __future__ import annotations
+
 import logging
+import sqlite3
 from typing import List, Dict
 from datetime import datetime, timedelta
 import json
@@ -28,7 +31,6 @@ class PendingSignalsManager:
     
     def _ensure_table_exists(self):
         """Create pending_signals table if not exists"""
-        import sqlite3
         conn = sqlite3.connect(self.db.db_path)
         cursor = conn.cursor()
         
@@ -54,10 +56,9 @@ class PendingSignalsManager:
         conn.commit()
         conn.close()
     
-    def add_pending_signal(self, strategy_id: int, symbol: str, 
+    def add_pending_signal(self, strategy_id: int, symbol: str,
                           signal_data: Dict, blocked_reason: str):
         """Add a signal to pending queue"""
-        import sqlite3
         conn = sqlite3.connect(self.db.db_path)
         cursor = conn.cursor()
         
@@ -78,7 +79,6 @@ class PendingSignalsManager:
     
     def get_pending_signals(self, strategy_id: int = None) -> List[Dict]:
         """Get all active pending signals"""
-        import sqlite3
         conn = sqlite3.connect(self.db.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
@@ -112,7 +112,6 @@ class PendingSignalsManager:
     
     def update_pending_status(self, pending_id: int, status: str):
         """Update status of pending signal"""
-        import sqlite3
         conn = sqlite3.connect(self.db.db_path)
         cursor = conn.cursor()
         
@@ -127,7 +126,6 @@ class PendingSignalsManager:
     
     def cleanup_expired(self):
         """Remove expired pending signals"""
-        import sqlite3
         conn = sqlite3.connect(self.db.db_path)
         cursor = conn.cursor()
         

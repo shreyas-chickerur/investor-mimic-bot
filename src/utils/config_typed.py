@@ -1,14 +1,27 @@
 #!/usr/bin/env python3
 """
-Typed Configuration with Validation
-Uses pydantic for strong typing and validation
+LEGACY — use src.utils.config_loader.get_config() instead.
+
+This module provides a pydantic-validated config model but has not been
+integrated into the production execution path.  It is retained for reference
+and testing only.
 """
+from __future__ import annotations
+
 import os
+import warnings
 from typing import Optional, List
 from pydantic import BaseModel, Field, field_validator
 import logging
 
 logger = logging.getLogger(__name__)
+
+warnings.warn(
+    "src.utils.config_typed (TradingSystemConfig) is deprecated. "
+    "Use src.utils.config_loader.get_config() instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 
 class TradingSystemConfig(BaseModel):

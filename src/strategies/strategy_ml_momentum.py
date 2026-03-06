@@ -8,6 +8,8 @@ mean-reversion signals, and trend strength — all computable from OHLCV+indicat
 
 Training happens on the walk-forward training window; no lookahead.
 """
+from __future__ import annotations
+
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))

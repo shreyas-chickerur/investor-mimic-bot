@@ -3,6 +3,8 @@
 Kill Switch Service
 Manual and automatic circuit breakers for trading system
 """
+from __future__ import annotations
+
 import os
 import logging
 from typing import Dict, List, Optional

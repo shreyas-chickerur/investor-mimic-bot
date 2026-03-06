@@ -10,6 +10,8 @@ Executes full trading pipeline WITHOUT placing broker orders.
 
 Use for testing before live paper trading.
 """
+from __future__ import annotations
+
 import os
 import logging
 from typing import Dict, List, Optional, Tuple, Tuple

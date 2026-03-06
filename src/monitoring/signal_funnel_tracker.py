@@ -4,6 +4,8 @@ Signal Funnel Tracker
 Tracks signals through each stage: raw → regime → correlation → risk → executed
 Provides "Why No Trade" audit trail
 """
+from __future__ import annotations
+
 import logging
 from typing import Dict, List
 from dataclasses import dataclass, field

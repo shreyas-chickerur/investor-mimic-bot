@@ -3,6 +3,8 @@
 VIX Data Fetcher
 Fetches real VIX data from Yahoo Finance or Alpha Vantage
 """
+from __future__ import annotations
+
 import requests
 import pandas as pd
 from datetime import datetime, timedelta

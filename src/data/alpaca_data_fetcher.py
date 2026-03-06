@@ -3,6 +3,8 @@
 Alpaca Data Fetcher
 Fetches real-time data from Alpaca API for email population
 """
+from __future__ import annotations
+
 import os
 from typing import List, Dict, Optional
 from datetime import datetime

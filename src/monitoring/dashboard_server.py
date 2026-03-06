@@ -3,6 +3,8 @@
 Web Dashboard for Multi-Strategy Trading System
 Real-time monitoring of all 5 strategies in browser
 """
+from __future__ import annotations
+
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))

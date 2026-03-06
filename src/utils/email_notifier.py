@@ -3,6 +3,8 @@
 Email Notification System
 Sends daily trading summaries and error alerts
 """
+from __future__ import annotations
+
 import os
 import smtplib
 import html as html_lib
