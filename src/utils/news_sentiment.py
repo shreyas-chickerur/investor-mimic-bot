@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 News Sentiment Module
-Fetches recent headlines via yfinance and scores them using VADER.
-Falls back gracefully when yfinance or vaderSentiment is unavailable.
+Fetches recent headlines via Yahoo Finance JSON API (direct HTTP, no yfinance).
+Scores headlines using VADER; falls back to keyword scoring if VADER is absent.
 
 Usage:
     from src.utils.news_sentiment import NewsSignalFilter, NewsSentimentProvider
@@ -11,23 +11,17 @@ Usage:
     signals = nf.apply(signals, sentiment_map)
 """
 import logging
-import os
-from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FuturesTimeout
+import requests
+import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Optional dependency guard — degrade gracefully if packages are missing
+# Optional dependency guard — VADER (pure-Python, no binary deps)
 # ---------------------------------------------------------------------------
-try:
-    import yfinance as yf
-    _YF_AVAILABLE = True
-except ImportError:
-    _YF_AVAILABLE = False
-    logger.warning("yfinance not installed — news fetching disabled. Run: pip install yfinance")
-
 try:
     from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
     _VADER_AVAILABLE = True
@@ -37,6 +31,15 @@ except ImportError:
     _analyzer = None  # type: ignore
     logger.warning("vaderSentiment not installed — falling back to keyword scoring. "
                    "Run: pip install vaderSentiment")
+
+_GNEWS_URL = "https://news.google.com/rss/search"
+_YF_SEARCH_URL = "https://query1.finance.yahoo.com/v1/finance/search"
+_YF_SEARCH_URL_2 = "https://query2.finance.yahoo.com/v1/finance/search"
+_REQUEST_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                  "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+    "Accept": "application/json, text/xml, */*",
+}
 
 # Neutral defaults when no data is available
 _NEUTRAL_CONTEXT: Dict = {'score': 0.5, 'headlines': [], 'article_count': 0}
@@ -50,7 +53,7 @@ SUPPRESS_MULT = 0.80         # multiply confidence when news is negative
 
 
 # ---------------------------------------------------------------------------
-# Low-level news fetch (single symbol)
+# Low-level news fetch (single symbol) — direct HTTP, no yfinance
 # ---------------------------------------------------------------------------
 def _score_title_keywords(title: str) -> float:
     """Fallback keyword scorer when VADER is not available."""
@@ -70,31 +73,82 @@ def _score_title(title: str) -> float:
     return _score_title_keywords(title)
 
 
+def _fetch_via_google_rss(symbol: str, max_articles: int = 10) -> List[str]:
+    """
+    Fetch headlines via Google News RSS (no auth, no rate limit, stdlib XML).
+    Query: '<symbol> stock' to keep results equity-focused.
+    """
+    params = {
+        'q': f'{symbol} stock',
+        'hl': 'en-US',
+        'gl': 'US',
+        'ceid': 'US:en',
+    }
+    try:
+        resp = requests.get(_GNEWS_URL, params=params, headers=_REQUEST_HEADERS, timeout=8)
+        if resp.status_code != 200:
+            return []
+        root = ET.fromstring(resp.text)
+        titles = []
+        for item in root.findall('.//item')[:max_articles]:
+            title = (item.findtext('title') or '').strip()
+            # Google News titles often end with " - Source Name"; strip the source suffix
+            if ' - ' in title:
+                title = title.rsplit(' - ', 1)[0].strip()
+            if title:
+                titles.append(title)
+        return titles
+    except Exception as exc:
+        logger.debug("Google RSS fetch failed for %s: %s", symbol, exc)
+        return []
+
+
+def _fetch_via_yf_search(symbol: str, max_articles: int = 10) -> List[str]:
+    """
+    Fallback: Yahoo Finance JSON search API.
+    May be rate-limited (429) under heavy parallel use.
+    """
+    params = {
+        'q': symbol,
+        'newsCount': max_articles,
+        'enableFuzzyQuery': 'false',
+        'lang': 'en-US',
+        'region': 'US',
+    }
+    for url in (_YF_SEARCH_URL, _YF_SEARCH_URL_2):
+        try:
+            resp = requests.get(url, params=params, headers=_REQUEST_HEADERS, timeout=8)
+            if resp.status_code != 200:
+                continue
+            items = resp.json().get('news', [])
+            return [item.get('title', '').strip() for item in items if item.get('title', '').strip()]
+        except Exception as exc:
+            logger.debug("YF search fetch failed for %s via %s: %s", symbol, url, exc)
+    return []
+
+
+def _fetch_headlines_http(symbol: str, max_articles: int = 10) -> List[str]:
+    """
+    Fetch news headlines for a symbol.
+    Primary: Google News RSS (reliable, no auth).
+    Fallback: Yahoo Finance JSON search API.
+    """
+    headlines = _fetch_via_google_rss(symbol, max_articles)
+    if headlines:
+        return headlines
+    logger.debug("Google RSS returned no results for %s, trying YF search", symbol)
+    return _fetch_via_yf_search(symbol, max_articles)
+
+
 def fetch_symbol_news(symbol: str, max_articles: int = 10) -> Dict:
     """Fetch news for one symbol and return sentiment context dict."""
-    if not _YF_AVAILABLE:
-        return _NEUTRAL_CONTEXT.copy()
-
     try:
-        ticker = yf.Ticker(symbol)
-        news_items = getattr(ticker, 'news', None) or []
+        headlines = _fetch_headlines_http(symbol, max_articles)
 
-        if not news_items:
+        if not headlines:
             return {'score': 0.5, 'headlines': [], 'article_count': 0}
 
-        scores: List[float] = []
-        headlines: List[str] = []
-
-        for item in news_items[:max_articles]:
-            title = (item.get('title') or '').strip()
-            if not title:
-                continue
-            headlines.append(title)
-            scores.append(_score_title(title))
-
-        if not scores:
-            return {'score': 0.5, 'headlines': headlines, 'article_count': 0}
-
+        scores = [_score_title(t) for t in headlines]
         avg_score = sum(scores) / len(scores)
         return {
             'score': round(avg_score, 4),
@@ -151,18 +205,14 @@ class NewsSentimentProvider:
         if not to_fetch:
             return {s: self._cache[s] for s in symbols if s in self._cache}
 
-        if not _YF_AVAILABLE:
-            for sym in to_fetch:
-                self._cache[sym] = _NEUTRAL_CONTEXT.copy()
-        else:
-            with ThreadPoolExecutor(max_workers=self.max_workers) as pool:
-                futures = {pool.submit(fetch_symbol_news, sym): sym for sym in to_fetch}
-                for future in as_completed(futures, timeout=self.per_symbol_timeout * len(to_fetch)):
-                    sym = futures[future]
-                    try:
-                        self._cache[sym] = future.result(timeout=self.per_symbol_timeout)
-                    except Exception:
-                        self._cache[sym] = _NEUTRAL_CONTEXT.copy()
+        with ThreadPoolExecutor(max_workers=self.max_workers) as pool:
+            futures = {pool.submit(fetch_symbol_news, sym): sym for sym in to_fetch}
+            for future in as_completed(futures, timeout=self.per_symbol_timeout * len(to_fetch)):
+                sym = futures[future]
+                try:
+                    self._cache[sym] = future.result(timeout=self.per_symbol_timeout)
+                except Exception:
+                    self._cache[sym] = _NEUTRAL_CONTEXT.copy()
 
         return {s: self._cache.get(s, _NEUTRAL_CONTEXT.copy()) for s in symbols}
 

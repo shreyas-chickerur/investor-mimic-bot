@@ -10,9 +10,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from src.integration.strategy_database import StrategyDatabase
 from src.strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
 from src.strategies.strategy_ml_momentum import MLMomentumStrategy
-from src.strategies.strategy_news_sentiment import NewsSentimentStrategy
-from src.strategies.strategy_ma_crossover import MACrossoverStrategy
-from src.strategies.strategy_volatility_breakout import VolatilityBreakoutStrategy
+from src.strategies.strategy_earnings_drift import EarningsDriftStrategy
+from src.strategies.strategy_factor_momentum import FactorMomentumStrategy
 from src.data.alpaca_data_fetcher import AlpacaDataFetcher
 from src.integration.trade_executor import TradeExecutor
 import pandas as pd
@@ -39,11 +38,10 @@ class StrategyRunner:
             print("🚀 Initializing 5 strategies...")
             
             strategy_configs = [
-                ("RSI Mean Reversion", "Buy when RSI < 30, sell after 20 days"),
-                ("ML Momentum", "Random Forest predicts momentum from technical features"),
-                ("News Sentiment", "Combines news sentiment with technical indicators"),
-                ("MA Crossover", "Golden cross (50/200 MA) trend following"),
-                ("Volatility Breakout", "Bollinger Band breakouts with volume confirmation")
+                ("RSI Mean Reversion", "Buy when RSI < 40 + slope positive, sell RSI > 55 or 20d"),
+                ("ML Momentum", "LogisticRegression P(5d gain) > 52% on 12 OHLCV features"),
+                ("Earnings Drift", "PEAD: volume-spike + abnormal return event, hold 40d"),
+                ("Factor Momentum", "Cross-sectional percentile rank: top-5 by composite score"),
             ]
             
             for name, desc in strategy_configs:
@@ -53,19 +51,17 @@ class StrategyRunner:
         # Load strategies
         strategies_data = self.db.get_all_strategies()
         
+        strategy_map = {
+            "RSI Mean Reversion": RSIMeanReversionStrategy,
+            "ML Momentum":        MLMomentumStrategy,
+            "Earnings Drift":     EarningsDriftStrategy,
+            "Factor Momentum":    FactorMomentumStrategy,
+        }
         for s in strategies_data:
-            if s['name'] == "RSI Mean Reversion":
-                strategy = RSIMeanReversionStrategy(s['id'], s['capital_allocation'])
-            elif s['name'] == "ML Momentum":
-                strategy = MLMomentumStrategy(s['id'], s['capital_allocation'])
-            elif s['name'] == "News Sentiment":
-                strategy = NewsSentimentStrategy(s['id'], s['capital_allocation'])
-            elif s['name'] == "MA Crossover":
-                strategy = MACrossoverStrategy(s['id'], s['capital_allocation'])
-            elif s['name'] == "Volatility Breakout":
-                strategy = VolatilityBreakoutStrategy(s['id'], s['capital_allocation'])
-            else:
+            cls = strategy_map.get(s['name'])
+            if cls is None:
                 continue
+            strategy = cls(s['id'], s['capital_allocation'])  # type: ignore[abstract]
             
             self.strategies.append(strategy)
         

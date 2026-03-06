@@ -175,7 +175,7 @@ test-watch:
 
 update-data:
 	@echo "$(BLUE)📥 Updating market data...$(NC)"
-	@python3 scripts/update_data.py
+	@set -a && source .env && set +a && python3 scripts/update_daily_data.py
 	@echo "$(GREEN)✅ Market data updated$(NC)"
 
 sync-broker:
@@ -219,35 +219,11 @@ email-test:
 
 news-test:
 	@echo "$(BLUE)📰 Testing news fetch + sentiment...$(NC)"
-	@python3 -c "
-import sys; sys.path.insert(0, '.')
-from src.utils.news_sentiment import NewsSignalFilter
-nf = NewsSignalFilter()
-results = nf.fetch_for_symbols(['AAPL','MSFT','NVDA','GOOGL'])
-for sym, ctx in results.items():
-    print(f'{sym}: score={ctx[\"score\"]:.3f}, articles={ctx[\"article_count\"]}')
-    for h in ctx.get('headlines', [])[:2]:
-        print(f'  - {h[:80]}')
-"
-	@echo "$(GREEN)✅ News test complete$(NC)"
+	@python3 scripts/check_news_sentiment.py
 
 signals-check:
-	@echo "$(BLUE)🔍 Checking today's signals (DRY_RUN=true, no orders)...$(NC)"
-	@set -a && source .env && set +a && export DRY_RUN=true && export SIGNAL_INJECTION=false && \
-		python3 -c "
-import sys; sys.path.insert(0,'.')
-from src.core.execution_engine import MultiStrategyRunner
-runner = MultiStrategyRunner()
-market_data = runner.load_market_data()
-strategies = runner.initialize_strategies()
-for s in strategies:
-    signals = s.generate_signals(market_data)
-    buys  = [x for x in signals if x.get('action')=='BUY']
-    sells = [x for x in signals if x.get('action')=='SELL']
-    print(f'{s.name}: {len(buys)} buys, {len(sells)} sells')
-    for sig in buys[:3]:
-        print(f'  BUY {sig[\"symbol\"]} conf={sig.get(\"confidence\",0):.2f}: {sig.get(\"reasoning\",\"\")[:60]}')
-"
+	@echo "$(BLUE)🔍 Checking today's signals (no orders submitted)...$(NC)"
+	@set -a && source .env && set +a && python3 scripts/check_signals.py
 	@echo "$(GREEN)✅ Signal check complete$(NC)"
 
 # ============================================================================
