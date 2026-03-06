@@ -15,6 +15,7 @@ from __future__ import annotations
 import os
 import json
 import logging
+import sqlite3
 from datetime import datetime, timedelta
 from typing import Dict, List, Tuple
 
@@ -108,7 +109,6 @@ class StrategyHealthScorer:
         """Get recent trades for strategy."""
         cutoff = (datetime.now() - timedelta(days=days)).isoformat()
         
-        import sqlite3
         conn = sqlite3.connect(self.db.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
@@ -128,7 +128,6 @@ class StrategyHealthScorer:
         """Get recent signals for strategy."""
         cutoff = (datetime.now() - timedelta(days=days)).isoformat()
         
-        import sqlite3
         conn = sqlite3.connect(self.db.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
@@ -148,7 +147,6 @@ class StrategyHealthScorer:
         """Get recent rejections for strategy."""
         cutoff = (datetime.now() - timedelta(days=days)).isoformat()
         
-        import sqlite3
         conn = sqlite3.connect(self.db.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()

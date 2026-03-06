@@ -1,19 +1,30 @@
 #!/usr/bin/env python3
 """
-Comprehensive Logging and Alert System
+LEGACY — use Python's standard logging + src.utils.structured_logger instead.
 
-Logs all critical events: transfers, trades, errors, performance
-Ensures you're never blind to system activity
+TradingLogger has no callers in the production codebase and points at the
+obsolete data/trading_system.db path.  It is retained only so that any
+old scripts that import it don't crash, but it will be removed in a future
+clean-up pass.
 """
 from __future__ import annotations
 
 
 import logging
 import json
+import warnings
 from datetime import datetime
 from pathlib import Path
 import sqlite3
 from typing import Dict, Any, Optional
+
+warnings.warn(
+    "src.utils.logger (TradingLogger) is deprecated and has no production callers. "
+    "Use Python logging + src.utils.structured_logger.StructuredLogger instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
 
 class TradingLogger:
     """Centralized logging for all trading activities"""

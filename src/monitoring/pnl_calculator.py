@@ -9,6 +9,7 @@ from __future__ import annotations
 
 
 import logging
+import sqlite3
 from typing import Dict, List, Tuple, Optional
 from datetime import datetime
 from collections import defaultdict
@@ -42,7 +43,6 @@ class PnLCalculator:
     def _load_open_positions(self):
         """Load current open positions from database as lots."""
         try:
-            import sqlite3
             conn = sqlite3.connect(self.db.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
@@ -210,7 +210,6 @@ class PnLCalculator:
         """
         # Get realized P&L from database
         try:
-            import sqlite3
             conn = sqlite3.connect(self.db.db_path)
             cursor = conn.cursor()
             
