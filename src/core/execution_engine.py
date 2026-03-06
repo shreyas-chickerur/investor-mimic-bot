@@ -3,6 +3,8 @@
 Multi-Strategy Trading System - Main Execution
 Runs all 5 strategies independently with separate tracking
 """
+from __future__ import annotations
+
 import os
 import sys
 from pathlib import Path

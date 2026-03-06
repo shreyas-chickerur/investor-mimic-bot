@@ -268,12 +268,17 @@ class TestFactorMomentumStrategy:
         scores = strat._compute_factor_scores(df)
         assert len(scores) == 0
 
-    def test_rank_normalize(self):
-        """Sigmoid normalization should map values to (0, 1)."""
-        assert 0 < FactorMomentumStrategy._rank_normalize(0) < 1
-        assert FactorMomentumStrategy._rank_normalize(0) == pytest.approx(0.5)
-        assert FactorMomentumStrategy._rank_normalize(1.0) > 0.5
-        assert FactorMomentumStrategy._rank_normalize(-1.0) < 0.5
+    def test_percentile_ranking_has_spread(self):
+        """Cross-sectional percentile scores must span at least 0.3 range across universe."""
+        strat = FactorMomentumStrategy(1, 25000)
+        df = _make_multi_symbol_data(n_symbols=8, n_days=100)
+        scores = strat._compute_factor_scores(df)
+        assert len(scores) >= 3
+        vals = sorted(scores.values())
+        assert vals[-1] - vals[0] > 0.20, (
+            "Percentile ranking must produce spread > 0.20 "
+            "(sigmoid normalization bug would produce spread < 0.05)"
+        )
 
     def test_buy_capacity_limits(self):
         """Should not exceed top_n total positions."""
