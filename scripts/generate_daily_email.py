@@ -67,17 +67,81 @@ def get_30d(db):
                  "FROM strategy_performance WHERE date >= date('now','-30 days') "
                  "GROUP BY date ORDER BY date")
 
-def get_strategy_perf(db):
+def get_all_time_perf(db):
     return q(db, """
         SELECT s.name,
-          COUNT(CASE WHEN t.executed_at >= date('now','-7 days') THEN 1 END) t7,
-          SUM(CASE WHEN t.executed_at>=date('now','-7 days') AND t.pnl>0 THEN 1 ELSE 0 END) w7,
-          SUM(CASE WHEN t.executed_at>=date('now','-7 days') THEN COALESCE(t.pnl,0) ELSE 0 END) p7,
-          COUNT(CASE WHEN t.executed_at >= date('now','-30 days') THEN 1 END) t30,
-          SUM(CASE WHEN t.executed_at>=date('now','-30 days') AND t.pnl>0 THEN 1 ELSE 0 END) w30,
-          SUM(CASE WHEN t.executed_at>=date('now','-30 days') THEN COALESCE(t.pnl,0) ELSE 0 END) p30
+          COUNT(t.id)                                          total_trades,
+          SUM(CASE WHEN t.pnl > 0 THEN 1 ELSE 0 END)         wins,
+          SUM(CASE WHEN t.pnl <= 0 THEN 1 ELSE 0 END)        losses,
+          SUM(COALESCE(t.pnl, 0))                             total_pnl,
+          MAX(t.pnl)                                          best_trade,
+          MIN(t.pnl)                                          worst_trade,
+          AVG(CASE WHEN t.pnl > 0 THEN t.pnl END)            avg_win,
+          AVG(CASE WHEN t.pnl <= 0 THEN t.pnl END)           avg_loss,
+          MIN(DATE(t.executed_at))                            first_trade
         FROM trades t JOIN strategies s ON t.strategy_id=s.id
-        WHERE t.pnl IS NOT NULL GROUP BY s.name ORDER BY p30 DESC""")
+        WHERE t.pnl IS NOT NULL GROUP BY s.name ORDER BY total_pnl DESC""")
+
+def get_today_signals_for_trades(db):
+    """Return signal reasoning keyed by (symbol, strategy_id) for today's executed signals."""
+    rows = q(db, """
+        SELECT sg.symbol, sg.strategy_id, sg.signal_type, sg.confidence,
+               sg.reasoning, sg.terminal_state, s.name strat
+        FROM signals sg JOIN strategies s ON sg.strategy_id = s.id
+        WHERE sg.asof_date = DATE('now')
+          AND (sg.terminal_state = 'EXECUTED'
+               OR sg.generated_at >= datetime('now', '-1 day'))
+        ORDER BY sg.generated_at DESC""")
+    out = {}
+    for r in rows:
+        key = (r['symbol'], r['strat'])
+        if key not in out:          # keep first (most recent) per symbol+strategy
+            out[key] = r
+    return out
+
+def get_strategy_concerns_data(db):
+    """Return per-strategy rejection counts and recent win rates for the concerns panel."""
+    rejections = q(db, """
+        SELECT s.name strat, sr.stage, sr.reason_code, COUNT(*) cnt
+        FROM signal_rejections sr JOIN strategies s ON sr.strategy_id = s.id
+        WHERE sr.created_at >= datetime('now', '-7 days')
+        GROUP BY s.name, sr.stage, sr.reason_code ORDER BY cnt DESC""")
+    recent = q(db, """
+        SELECT s.name strat,
+          COUNT(t.id) trades,
+          SUM(CASE WHEN t.pnl > 0 THEN 1 ELSE 0 END) wins,
+          SUM(COALESCE(t.pnl, 0)) pnl
+        FROM trades t JOIN strategies s ON t.strategy_id = s.id
+        WHERE t.executed_at >= datetime('now', '-30 days') AND t.pnl IS NOT NULL
+        GROUP BY s.name""")
+    return rejections, recent
+
+def fetch_symbol_news(symbols):
+    """Fetch top 2 news headlines per symbol via yfinance. Returns {symbol: [headline, ...]}"""
+    news_map = {}
+    if not symbols:
+        return news_map
+    try:
+        import yfinance as yf
+    except Exception:
+        return news_map
+    for sym in symbols:
+        try:
+            ticker = yf.Ticker(sym)
+            items = ticker.news or []
+            headlines = []
+            for item in items[:3]:
+                title = (item.get('content', {}).get('title') or
+                         item.get('title') or '')
+                if title:
+                    headlines.append(title[:90])
+                if len(headlines) >= 2:
+                    break
+            if headlines:
+                news_map[sym] = headlines
+        except Exception:
+            pass
+    return news_map
 
 def get_positions(db):
     return q(db, """
@@ -94,27 +158,6 @@ def get_today_trades(db):
         FROM trades t JOIN strategies s ON t.strategy_id=s.id
         WHERE DATE(t.executed_at)=DATE('now') ORDER BY t.executed_at""")
 
-def get_signal_reasoning(db):
-    return q(db, """
-        SELECT sg.symbol, sg.signal_type, sg.confidence, sg.reasoning,
-               sg.terminal_state, sg.terminal_reason, sg.asof_date, s.name strat
-        FROM signals sg JOIN strategies s ON sg.strategy_id=s.id
-        WHERE sg.asof_date >= date('now','-7 days')
-          AND sg.reasoning IS NOT NULL AND sg.reasoning != ''
-        ORDER BY sg.generated_at DESC LIMIT 20""")
-
-def get_funnel(db):
-    return q(db, """
-        SELECT strategy_name, raw_signals_count, after_regime_count,
-               after_correlation_count, after_risk_count, executed_count
-        FROM signal_funnel WHERE DATE(created_at)=DATE('now')
-        ORDER BY executed_count DESC""")
-
-def get_rejections(db):
-    return q(db, """
-        SELECT stage, reason_code, COUNT(*) cnt
-        FROM signal_rejections WHERE DATE(created_at)=DATE('now')
-        GROUP BY stage, reason_code ORDER BY cnt DESC LIMIT 8""")
 
 def get_health():
     files = glob.glob('artifacts/health/strategy_health_summary_*.json')
@@ -274,38 +317,6 @@ def build_summary(pv, cash, pnl_30d, rows_30d):
             "border:1px solid " + BORDER + ";background:" + WHITE + ";'>"
             "<tr>" + cells + spark_cell + "</tr></table>")
 
-# ── Trades ─────────────────────────────────────────────────────────────────────
-def build_trades(trades):
-    if not trades:
-        return "<p style='color:" + MUTED + ";font-size:13px;font-style:italic;margin:0;'>No trades executed today.</p>"
-    sells = [t for t in trades if t.get('action') == 'SELL']
-    total_r = sum(t.get('pnl', 0) or 0 for t in sells)
-    rows = ''
-    for i, t in enumerate(trades):
-        bg = WHITE if i % 2 == 0 else ROW_ALT
-        a  = t.get('action', '')
-        ac = POS if a == 'BUY' else NEG
-        pnl = t.get('pnl')
-        pnl_s = fmt_pnl(pnl) if pnl is not None else '<span style="color:#9ca3af">open</span>'
-        rows += ("<tr style='background:" + bg + ";'>"
-                 + td_s("<span style='font-weight:700;color:" + ac + ";'>" + a + "</span>")
-                 + td_s("<strong>" + (t.get('symbol') or '') + "</strong>")
-                 + td_s("{:.0f}".format(t.get('shares') or 0), align='right', mono=True)
-                 + td_s("${:.2f}".format(t.get('exec_price') or 0), align='right', mono=True)
-                 + td_s("${:,.0f}".format(t.get('notional') or 0), align='right', small=True, color=TEXT2)
-                 + td_s("<span style='color:" + pnl_col(pnl) + ";font-weight:700;font-family:" + MONO + ";'>" + pnl_s + "</span>", align='right')
-                 + td_s(t.get('strat') or '', small=True, color=TEXT2)
-                 + td_s((t.get('executed_at') or '')[:16], small=True, color=MUTED)
-                 + "</tr>")
-    buys_n = len([t for t in trades if t.get('action') == 'BUY'])
-    note = str(buys_n) + " buys &middot; " + str(len(sells)) + " sells"
-    if sells:
-        note += (" &middot; realized today: <strong style='color:" + pnl_col(total_r) + ";'>"
-                 + fmt_pnl(total_r) + "</strong>")
-    return ("<div style='font-size:11px;color:" + TEXT2 + ";margin-bottom:8px;'>" + note + "</div>"
-            + tbl(['Action','Symbol','Shares','Price','Notional','P&L','Strategy','Time'],
-                  rows, ['left','left','right','right','right','right','left','left']))
-
 # ── Positions ──────────────────────────────────────────────────────────────────
 def build_positions(positions):
     if not positions:
@@ -346,173 +357,238 @@ def build_positions(positions):
     return tbl(['Symbol','Strategy','Shares','Entry','Current','Unrealized P&L','Stop Price','Held'],
                rows, ['left','left','right','right','right','right','right','center'])
 
-# ── Signal reasoning flowchart ─────────────────────────────────────────────────
-def build_reasoning(signal_rows):
-    if not signal_rows:
+# ── Today's Actions (trade table + news-driven reasoning flowchart) ────────────
+def _arrow():
+    return "<span style='color:" + MUTED + ";margin:0 5px;font-size:13px;'>&#x2192;</span>"
+
+def _node_pill(text, bg=None, color=None, bold=False):
+    bg    = bg    or TH_BG
+    color = color or TEXT
+    fw    = 'font-weight:700;' if bold else ''
+    return ("<span style='display:inline-block;background:" + bg + ";"
+            "border:1px solid " + BORDER + ";padding:3px 9px;border-radius:2px;"
+            "font-size:11px;color:" + color + ";font-family:" + MONO + ";" + fw + "'>"
+            + html_lib.escape(str(text)) + "</span>")
+
+def build_today_actions(today_trades, signal_map, news_map):
+    if not today_trades:
         return ("<p style='color:" + MUTED + ";font-size:13px;font-style:italic;margin:0;'>"
-                "No signals with reasoning in last 7 days.</p>")
-    cards = ''
-    for sig in signal_rows[:16]:
-        sym   = html_lib.escape(sig.get('symbol') or '?')
-        strat = html_lib.escape(sig.get('strat') or '?')
-        stype = (sig.get('signal_type') or 'BUY').upper()
-        conf  = sig.get('confidence') or 0
-        raw_r = sig.get('reasoning') or ''
-        term  = (sig.get('terminal_state') or '').upper()
-        t_rsn = sig.get('terminal_reason') or ''
-        asof  = sig.get('asof_date') or ''
+                "No trades executed today.</p>")
 
-        # Split reasoning into discrete steps
-        steps = [s.strip() for s in raw_r.replace(';', ',').split(',') if s.strip()]
-        if not steps:
-            steps = [raw_r.strip()]
+    sells   = [t for t in today_trades if t.get('action') == 'SELL']
+    total_r = sum(t.get('pnl', 0) or 0 for t in sells)
+    buys_n  = len([t for t in today_trades if t.get('action') == 'BUY'])
+    note    = (str(buys_n) + " buys &middot; " + str(len(sells)) + " sells")
+    if sells:
+        note += (" &middot; realized today: <strong style='color:" + pnl_col(total_r) + ";'>"
+                 + fmt_pnl(total_r) + "</strong>")
 
-        executed  = 'EXECUTED' in term
-        ac        = POS if stype == 'BUY' else NEG
-        term_col  = POS if executed else NEG
-        term_label = 'EXECUTED' if executed else (
-            term.replace('REJECTED_', '').replace('_', '\u00a0') if term else 'FILTERED')
+    cards = "<div style='font-size:11px;color:" + TEXT2 + ";margin-bottom:12px;'>" + note + "</div>"
 
-        # Build inline step chain
-        nodes = ''
-        for idx, step in enumerate(steps):
-            nodes += ("<span style='display:inline-block;background:" + TH_BG + ";"
-                      "border:1px solid " + BORDER + ";padding:3px 8px;border-radius:2px;"
-                      "font-size:11px;color:" + TEXT + ";font-family:" + MONO + ";'>"
-                      + html_lib.escape(step) + "</span>")
-            if idx < len(steps) - 1:
-                nodes += "<span style='color:" + MUTED + ";margin:0 4px;'>&rarr;</span>"
+    for t in today_trades:
+        sym    = t.get('symbol') or ''
+        action = t.get('action') or ''
+        strat  = t.get('strat')  or ''
+        price  = t.get('exec_price') or 0
+        shares = t.get('shares') or 0
+        pnl    = t.get('pnl')
+        ac     = POS if action == 'BUY' else NEG
 
-        nodes += ("<span style='color:" + MUTED + ";margin:0 4px;'>&rarr;</span>"
-                  "<span style='display:inline-block;background:" + term_col + ";color:#fff;"
-                  "padding:3px 8px;border-radius:2px;font-size:11px;font-weight:700;'>"
-                  + term_label + "</span>")
-        if t_rsn:
-            nodes += ("<span style='color:" + MUTED + ";font-size:10px;margin-left:6px;'>"
-                      "(" + html_lib.escape(t_rsn[:60]) + ")</span>")
+        sig        = signal_map.get((sym, strat)) or {}
+        conf       = sig.get('confidence') or 0
+        raw_r      = sig.get('reasoning') or ''
+        tech_steps = [s.strip() for s in raw_r.replace(';', ',').split(',') if s.strip()]
 
-        cards += ("<div style='border:1px solid " + BORDER + ";border-left:3px solid " + ac + ";"
-                  "padding:12px 14px;margin-bottom:8px;background:" + WHITE + ";'>"
-                  "<div style='margin-bottom:8px;'>"
-                  "<span style='font-weight:700;font-size:12px;color:" + TEXT + ";'>" + sym + "</span>"
-                  "<span style='color:" + MUTED + ";font-size:11px;margin:0 8px;'>&middot;</span>"
-                  "<span style='color:" + TEXT2 + ";font-size:11px;'>" + strat + "</span>"
-                  "<span style='color:" + MUTED + ";font-size:11px;margin:0 8px;'>&middot;</span>"
-                  "<span style='font-weight:700;font-size:11px;color:" + ac + ";'>" + stype + "</span>"
-                  "<span style='color:" + MUTED + ";font-size:11px;margin:0 8px;'>&middot;</span>"
-                  "<span style='font-size:11px;color:" + MUTED + ";'>conf {:.3f}</span>".format(conf)
-                  + "<span style='float:right;font-size:10px;color:" + MUTED + ";'>" + asof + "</span>"
-                  "</div>"
-                  "<div style='line-height:2;'>" + nodes + "</div>"
-                  "</div>")
+        headlines = news_map.get(sym) or []
+
+        pnl_s = ("<span style='color:" + pnl_col(pnl) + ";font-weight:700;'>"
+                 + fmt_pnl(pnl) + "</span>") if pnl is not None else (
+                 "<span style='color:" + MUTED + ";'>open</span>")
+
+        # ── card header ──
+        card = ("<div style='border:1px solid " + BORDER + ";border-left:3px solid " + ac + ";"
+                "padding:14px 16px;margin-bottom:10px;background:" + WHITE + ";'>"
+                # trade headline row
+                "<table style='width:100%;border-collapse:collapse;margin-bottom:10px;'><tr>"
+                "<td><span style='font-size:14px;font-weight:700;color:" + TEXT + ";'>"
+                + html_lib.escape(sym) + "</span>"
+                "<span style='margin-left:10px;font-size:12px;font-weight:700;color:" + ac + ";'>"
+                + action + "</span>"
+                "<span style='margin-left:10px;font-size:12px;color:" + TEXT2 + ";'>"
+                + "{:.0f} sh @ ${:.2f}".format(shares, price) + "</span>"
+                "<span style='margin-left:10px;font-size:11px;color:" + MUTED + ";'>"
+                + html_lib.escape(strat) + "</span></td>"
+                "<td style='text-align:right;'>" + pnl_s + "</td>"
+                "</tr></table>")
+
+        # ── news context row ──
+        if headlines:
+            card += ("<div style='background:#f0f4ff;border-left:2px solid " + ACCENT + ";"
+                     "padding:7px 10px;margin-bottom:10px;border-radius:0 2px 2px 0;'>"
+                     "<span style='font-size:10px;font-weight:700;letter-spacing:0.8px;"
+                     "text-transform:uppercase;color:" + ACCENT + ";'>Market Context</span><br>")
+            for h in headlines:
+                card += ("<span style='font-size:11px;color:" + TEXT2 + ";'>"
+                         + html_lib.escape(h) + "</span><br>")
+            card += "</div>"
+
+        # ── flowchart row ──
+        card += "<div style='line-height:2.2;flex-wrap:wrap;'>"
+        if tech_steps:
+            for idx, step in enumerate(tech_steps):
+                card += _node_pill(step)
+                card += _arrow()
+        elif raw_r:
+            card += _node_pill(raw_r[:70])
+            card += _arrow()
+        else:
+            card += _node_pill("Signal generated")
+            card += _arrow()
+
+        if conf:
+            card += _node_pill("conf {:.2f}".format(conf), bg='#f0fdf4', color=POS)
+            card += _arrow()
+
+        card += _node_pill("EXECUTED " + action, bg=ac, color='#fff', bold=True)
+        card += "</div></div>"
+        cards += card
+
     return cards
 
-# ── Strategy performance ───────────────────────────────────────────────────────
-def build_strat_perf(rows):
+# ── Overall strategy performance (all-time) ────────────────────────────────────
+def build_all_time_perf(rows):
     if not rows:
-        return "<p style='color:" + MUTED + ";font-size:13px;font-style:italic;margin:0;'>No trade history.</p>"
+        return ("<p style='color:" + MUTED + ";font-size:13px;font-style:italic;margin:0;'>"
+                "No trade history yet.</p>")
     trows = ''
     for i, r in enumerate(rows):
-        bg  = WHITE if i % 2 == 0 else ROW_ALT
-        t7  = r.get('t7')  or 0; w7  = r.get('w7')  or 0; p7  = r.get('p7')  or 0
-        t30 = r.get('t30') or 0; w30 = r.get('w30') or 0; p30 = r.get('p30') or 0
-        wr7  = "{:.0f}%".format(w7  / t7  * 100) if t7  > 0 else '\u2014'
-        wr30 = "{:.0f}%".format(w30 / t30 * 100) if t30 > 0 else '\u2014'
+        bg    = WHITE if i % 2 == 0 else ROW_ALT
+        tot   = r.get('total_trades') or 0
+        wins  = r.get('wins') or 0
+        pnl   = r.get('total_pnl') or 0
+        best  = r.get('best_trade')
+        worst = r.get('worst_trade')
+        aw    = r.get('avg_win')
+        al    = r.get('avg_loss')
+        since = (r.get('first_trade') or '')[:10] or '\u2014'
+        wr    = "{:.0f}%".format(wins / tot * 100) if tot > 0 else '\u2014'
+        pf    = (abs(aw * wins) / abs(al * (tot - wins))
+                 if al and al != 0 and (tot - wins) > 0 and aw else None)
+        pf_s  = "{:.2f}".format(pf) if pf else '\u2014'
         trows += ("<tr style='background:" + bg + ";'>"
-                  + td_s("<strong>" + (r.get('name') or '') + "</strong>")
-                  + td_s(str(t7),  align='center', color=TEXT2)
-                  + td_s(wr7,      align='center', color=MUTED)
-                  + td_s("<span style='color:" + pnl_col(p7) + ";font-weight:700;font-family:" + MONO + ";'>" + fmt_pnl(p7) + "</span>", align='right')
-                  + td_s(str(t30), align='center', color=TEXT2)
-                  + td_s(wr30,     align='center', color=MUTED)
-                  + td_s("<span style='color:" + pnl_col(p30) + ";font-weight:700;font-family:" + MONO + ";'>" + fmt_pnl(p30) + "</span>", align='right')
+                  + td_s("<strong>" + html_lib.escape(r.get('name') or '') + "</strong>")
+                  + td_s(str(tot), align='center', color=TEXT2)
+                  + td_s(wr, align='center',
+                         color=(POS if wins / tot >= 0.5 else NEG) if tot > 0 else MUTED)
+                  + td_s("<span style='color:" + pnl_col(pnl) + ";font-weight:700;font-family:"
+                         + MONO + ";'>" + fmt_pnl(pnl) + "</span>", align='right')
+                  + td_s(pf_s, align='center', color=TEXT2)
+                  + td_s(fmt_pnl(best) if best is not None else '\u2014',
+                         align='right', color=POS, small=True)
+                  + td_s(fmt_pnl(worst) if worst is not None else '\u2014',
+                         align='right', color=NEG, small=True)
+                  + td_s(since, align='center', small=True, color=MUTED)
                   + "</tr>")
-    return tbl(['Strategy','Trades (7d)','Win% (7d)','P&L (7d)',
-                'Trades (30d)','Win% (30d)','P&L (30d)'], trows,
-               ['left','center','center','right','center','center','right'])
+    return tbl(
+        ['Strategy', 'Trades', 'Win %', 'Total P&L', 'Profit Factor',
+         'Best Trade', 'Worst Trade', 'Since'],
+        trows,
+        ['left', 'center', 'center', 'right', 'center', 'right', 'right', 'center'])
 
-# ── Signal funnel ──────────────────────────────────────────────────────────────
-def build_funnel(funnel_rows):
-    if not funnel_rows:
-        return "<p style='color:" + MUTED + ";font-size:13px;font-style:italic;margin:0;'>No funnel data for today.</p>"
-    rows = ''
-    for i, r in enumerate(funnel_rows):
-        bg  = WHITE if i % 2 == 0 else ROW_ALT
-        raw = r.get('raw_signals_count') or 0
-        reg = r.get('after_regime_count') or raw
-        cor = r.get('after_correlation_count') or reg
-        rsk = r.get('after_risk_count') or cor
-        exc = r.get('executed_count') or 0
-        conv = "{:.0f}%".format(exc / raw * 100) if raw > 0 else '\u2014'
-        def _node(v, total):
-            pct = int(v / total * 100) if total > 0 else 0
-            c   = POS if pct >= 80 else ('#d97706' if pct >= 40 else NEG)
-            return str(v) + " <span style='font-size:10px;color:" + c + ";'>(" + str(pct) + "%)</span>"
-        rows += ("<tr style='background:" + bg + ";'>"
-                 + td_s("<strong>" + (r.get('strategy_name') or '?') + "</strong>")
-                 + td_s("<strong style='font-family:" + MONO + ";'>" + str(raw) + "</strong>", align='center')
-                 + td_s(_node(reg, raw), align='center', small=True)
-                 + td_s(_node(cor, raw), align='center', small=True)
-                 + td_s(_node(rsk, raw), align='center', small=True)
-                 + td_s("<strong style='color:" + POS + ";font-family:" + MONO + ";'>" + str(exc) + "</strong>", align='center')
-                 + td_s(conv, align='center', small=True, color=TEXT2)
-                 + "</tr>")
-    return tbl(['Strategy','Raw','After Regime','After Correlation','After Risk','Executed','Conv%'],
-               rows, ['left','center','center','center','center','center','center'])
+# ── Strategy-by-strategy concerns ─────────────────────────────────────────────
+def build_strategy_concerns(health_data, rejection_rows, recent_rows):
+    # Index rejections and recent perf by strategy name
+    rej_by_strat = {}
+    for r in (rejection_rows or []):
+        rej_by_strat.setdefault(r['strat'], []).append(r)
+    recent_by_strat = {r['strat']: r for r in (recent_rows or [])}
 
-# ── Rejections ─────────────────────────────────────────────────────────────────
-def build_rejections(rows):
-    if not rows:
-        return "<p style='color:" + MUTED + ";font-size:13px;font-style:italic;margin:0;'>No rejections today.</p>"
-    trows = ''
-    for i, r in enumerate(rows):
-        bg = WHITE if i % 2 == 0 else ROW_ALT
-        trows += ("<tr style='background:" + bg + ";'>"
-                  + td_s(r.get('stage') or '', color=TEXT2)
-                  + td_s("<span style='font-family:" + MONO + ";'>" + (r.get('reason_code') or '') + "</span>")
-                  + td_s("<strong style='color:" + NEG + ";'>" + str(r.get('cnt') or 0) + "</strong>", align='right')
-                  + "</tr>")
-    return tbl(['Stage','Reason','Count'], trows, ['left','left','right'])
+    strategies = []
+    if health_data:
+        strategies = health_data.get('strategies', [])
 
-# ── Strategy health ────────────────────────────────────────────────────────────
-def build_health(health_data):
-    if not health_data: return ''
-    strategies = health_data.get('strategies', [])
-    if not strategies: return ''
-    portfolio_score = health_data.get('portfolio_health_score', 0)
-    ps_col = POS if portfolio_score >= 70 else ('#d97706' if portfolio_score >= 40 else NEG)
-    trows = ''
-    for i, s in enumerate(strategies):
-        bg     = WHITE if i % 2 == 0 else ROW_ALT
-        sc     = s.get('health_score', 0)
-        status = s.get('health_status', 'UNKNOWN')
-        issues = ', '.join(s.get('issues', [])[:2]) or 'None'
-        sc_col = POS if status == 'HEALTHY' else ('#d97706' if status == 'WARNING' else NEG)
-        trows += ("<tr style='background:" + bg + ";'>"
-                  + td_s("<strong>" + html_lib.escape(s.get('strategy_name') or '?') + "</strong>")
-                  + td_s("<span style='font-weight:700;color:" + sc_col + ";font-family:" + MONO + ";'>"
-                         + str(sc) + "/100</span>", align='center')
-                  + td_s(chip(status, sc_col))
-                  + td_s(html_lib.escape(issues), small=True, color=TEXT2)
-                  + "</tr>")
-    summary = ("<div style='margin-top:10px;font-size:11px;color:" + TEXT2 + ";'>"
-               "Portfolio health: <strong style='color:" + ps_col + ";font-size:14px;'>"
-               + str(portfolio_score) + "/100</strong></div>")
-    return section('Strategy Health',
-                   tbl(['Strategy','Score','Status','Issues'], trows,
-                       ['left','center','left','left']) + summary)
+    # If no health data, build minimal cards from DB data alone
+    if not strategies and not rej_by_strat and not recent_by_strat:
+        return ("<p style='color:" + MUTED + ";font-size:13px;font-style:italic;margin:0;'>"
+                "No concern data available.</p>")
+
+    strat_names = list({s.get('strategy_name') for s in strategies} |
+                       set(rej_by_strat.keys()) | set(recent_by_strat.keys()))
+
+    cards = ''
+    for name in sorted(strat_names):
+        # Health scorer data
+        hs = next((s for s in strategies if s.get('strategy_name') == name), {})
+        score    = hs.get('health_score', None)
+        status   = hs.get('health_status', 'UNKNOWN')
+        issues   = hs.get('issues', [])
+        sc_col   = POS if status == 'HEALTHY' else ('#d97706' if status == 'WARNING' else NEG)
+
+        # Recent 30-day performance
+        rec = recent_by_strat.get(name, {})
+        r_trades = rec.get('trades') or 0
+        r_wins   = rec.get('wins') or 0
+        r_pnl    = rec.get('pnl') or 0
+        r_wr     = "{:.0f}%".format(r_wins / r_trades * 100) if r_trades > 0 else 'n/a'
+        wr_col   = (POS if r_trades > 0 and r_wins / r_trades >= 0.5 else
+                    NEG if r_trades > 0 else MUTED)
+
+        # Top rejections for this strategy
+        top_rej = sorted(rej_by_strat.get(name, []),
+                         key=lambda x: x.get('cnt', 0), reverse=True)[:3]
+
+        concern_items = list(issues[:4])
+        if r_pnl < 0:
+            concern_items.append("30d P&L negative ({})".format(fmt_pnl(r_pnl)))
+        if r_trades > 0 and r_wins / r_trades < 0.4:
+            concern_items.append("Win rate below 40% (30d: {})".format(r_wr))
+        for rej in top_rej:
+            concern_items.append("Rejected by {} — {} ({} times)".format(
+                rej.get('stage', ''), rej.get('reason_code', ''), rej.get('cnt', 0)))
+
+        border_col = sc_col if score is not None else MUTED
+        card = ("<div style='border:1px solid " + BORDER + ";border-left:3px solid "
+                + border_col + ";padding:14px 16px;margin-bottom:10px;background:" + WHITE + ";'>"
+                "<table style='width:100%;border-collapse:collapse;margin-bottom:8px;'><tr>"
+                "<td><span style='font-size:13px;font-weight:700;color:" + TEXT + ";'>"
+                + html_lib.escape(name) + "</span>")
+        if score is not None:
+            card += ("<span style='margin-left:12px;font-size:11px;font-weight:700;color:"
+                     + sc_col + ";'>" + str(score) + "/100</span>"
+                     + "<span style='margin-left:8px;'>" + chip(status, sc_col) + "</span>")
+        card += ("</td>"
+                 "<td style='text-align:right;font-size:11px;color:" + TEXT2 + ";'>"
+                 "30d: <span style='color:" + wr_col + ";font-weight:700;'>" + r_wr + "</span>"
+                 " win rate &middot; "
+                 "<span style='color:" + pnl_col(r_pnl) + ";font-weight:700;font-family:"
+                 + MONO + ";'>" + fmt_pnl(r_pnl) + "</span>"
+                 "</td></tr></table>")
+
+        if concern_items:
+            card += "<ul style='margin:0;padding-left:18px;'>"
+            for item in concern_items:
+                card += ("<li style='font-size:11px;color:" + TEXT2 + ";margin-bottom:3px;'>"
+                         + html_lib.escape(str(item)) + "</li>")
+            card += "</ul>"
+        else:
+            card += ("<p style='font-size:11px;color:" + POS + ";margin:0;font-style:italic;'>"
+                     "No active concerns.</p>")
+
+        card += "</div>"
+        cards += card
+
+    return cards
 
 # ── Main ───────────────────────────────────────────────────────────────────────
 def generate_email_body(artifact_path=None, db_path='trading.db', include_visuals=False):
     db = _conn(db_path)
-    snap, dd, regime   = get_snapshot(db)
-    rows_30d            = get_30d(db)
-    strat_perf          = get_strategy_perf(db)
-    positions           = get_positions(db)
-    today_trades        = get_today_trades(db)
-    signal_rows         = get_signal_reasoning(db)
-    funnel              = get_funnel(db)
-    rejections          = get_rejections(db)
+    snap, dd, regime        = get_snapshot(db)
+    rows_30d                = get_30d(db)
+    all_time_perf           = get_all_time_perf(db)
+    positions               = get_positions(db)
+    today_trades            = get_today_trades(db)
+    signal_map              = get_today_signals_for_trades(db)
+    rej_rows, recent_rows   = get_strategy_concerns_data(db)
     db.close()
 
     pv    = snap.get('portfolio_value') or 100_000
@@ -526,19 +602,28 @@ def generate_email_body(artifact_path=None, db_path='trading.db', include_visual
         daily_pct = (curr / prev - 1) * 100 if prev > 0 else 0
         pnl_30d   = rows_30d[-1]['total'] - rows_30d[0]['total']
 
-    header  = build_header(pv, cash, daily_pnl, daily_pct, dd, regime, recon, len(today_trades))
-    summary = build_summary(pv, cash, pnl_30d, rows_30d)
-    health  = build_health(get_health())
+    # Fetch news for every symbol traded today (best-effort, never blocks)
+    traded_symbols = list({t.get('symbol') for t in today_trades if t.get('symbol')})
+    news_map = fetch_symbol_news(traded_symbols)
+
+    header      = build_header(pv, cash, daily_pnl, daily_pct, dd, regime, recon, len(today_trades))
+    summary     = build_summary(pv, cash, pnl_30d, rows_30d)
+    health_data = get_health()
 
     body_sections = (
         "    <div style='margin-bottom:20px;'>" + summary + "</div>\n"
-        + section("Today's Trades",         build_trades(today_trades),    str(len(today_trades)) + " total")
-        + section("Open Positions",          build_positions(positions),    str(len(positions)) + " active")
-        + section("Signal Reasoning Chains", build_reasoning(signal_rows),  "last 7 days")
-        + section("Strategy Performance",    build_strat_perf(strat_perf),  "7-day and 30-day")
-        + health
-        + section("Signal Funnel",           build_funnel(funnel),          "today")
-        + section("Top Rejection Reasons",   build_rejections(rejections),  "today")
+        + section("Open Positions",
+                  build_positions(positions),
+                  str(len(positions)) + " active")
+        + section("Today's Actions",
+                  build_today_actions(today_trades, signal_map, news_map),
+                  str(len(today_trades)) + " executed")
+        + section("Strategy Performance",
+                  build_all_time_perf(all_time_perf),
+                  "all-time")
+        + section("Strategy Concerns",
+                  build_strategy_concerns(health_data, rej_rows, recent_rows),
+                  "30-day window")
         + "    <div style='padding-top:20px;border-top:1px solid " + BORDER + ";"
           "font-size:11px;color:" + MUTED + ";text-align:center;'>"
           "Investor Mimic Bot &middot; Generated "
