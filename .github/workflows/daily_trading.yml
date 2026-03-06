@@ -211,17 +211,20 @@ jobs:
         retention-days: 90
     
     - name: Generate strategy performance report
-      if: success()
+      if: always() && steps.check_execution.outputs.executed == 'true'
+      continue-on-error: true
       run: |
         python3 scripts/generate_strategy_performance.py --days 30
     
     - name: Generate strategy performance chart
-      if: success()
+      if: always() && steps.check_execution.outputs.executed == 'true'
+      continue-on-error: true
       run: |
         python3 scripts/generate_strategy_chart.py --days 7
     
     - name: Generate performance chart
-      if: success()
+      if: always() && steps.check_execution.outputs.executed == 'true'
+      continue-on-error: true
       run: |
         python3 scripts/generate_email_chart.py
     
@@ -251,7 +254,7 @@ jobs:
         server_port: 587
         username: ${{ secrets.EMAIL_USERNAME }}
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: "📊 Daily Trading Digest - ${{ github.run_number }}"
+        subject: "📊 Daily Trading Digest - $(date +%Y-%m-%d)"
         to: ${{ secrets.EMAIL_TO }}
         from: Trading System
         html_body: file:///tmp/daily_email.html
