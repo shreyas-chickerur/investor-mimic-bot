@@ -84,11 +84,16 @@ class DailyDataUpdater:
             df = pd.DataFrame(records)
             df['date'] = pd.to_datetime(df['date'])
             df = df.sort_values('date')
-            
+
+            # Use split/dividend-adjusted close — unadjusted close makes stock
+            # splits appear as -75% to -95% crashes, corrupting all indicators.
+            df['raw_close'] = df['close']
+            df['close'] = df['adjusted_close']
+
             # Get only the latest days
             cutoff = datetime.now() - timedelta(days=days)
             df = df[df['date'] >= cutoff]
-            
+
             return df
             
         except Exception as e:
