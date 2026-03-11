@@ -45,6 +45,8 @@ class EarningsDriftStrategy(TradingStrategy):
         self.return_threshold_mult = 2.0    # Return must be 2x 20-day vol
         self.drift_hold_days = 40           # Hold for drift period (academic: 60-90d, we use 40 for safety)
         self.min_surprise_return = 0.02     # Minimum 2% absolute return on event day
+        self.profit_target_pct = 0.20       # Lock in at 20% — PEAD can spike hard then revert
+        self.stop_loss_pct = 0.10           # Exit at 10% loss — false signal protection
         self.entry_dates = {}
         self.event_returns = {}             # Track the surprise magnitude per position
 
@@ -120,9 +122,33 @@ class EarningsDriftStrategy(TradingStrategy):
             # Check for SELL first (existing positions)
             if symbol in self.positions:
                 days_held = self.get_days_held(symbol, latest_date)
+                entry_price = getattr(self, 'entry_prices', {}).get(symbol)
 
-                # Exit after drift window
-                if days_held >= self.drift_hold_days:
+                exit_reason = None
+                exit_confidence = 0.8
+
+                # Profit target / stop-loss check (highest priority)
+                if entry_price and entry_price > 0:
+                    pnl_pct = (price - entry_price) / entry_price
+                    if pnl_pct >= self.profit_target_pct:
+                        exit_reason = f'PEAD profit target: {pnl_pct:.1%} gain (target {self.profit_target_pct:.0%})'
+                        exit_confidence = 0.95
+                    elif pnl_pct <= -self.stop_loss_pct:
+                        exit_reason = f'PEAD stop-loss: {pnl_pct:.1%} loss (limit -{self.stop_loss_pct:.0%})'
+                        exit_confidence = 0.95
+
+                # Time-based exit
+                if exit_reason is None and days_held >= self.drift_hold_days:
+                    exit_reason = f'Drift window expired ({days_held}d held)'
+
+                # New negative earnings surprise while holding
+                if exit_reason is None:
+                    event = self._detect_earnings_events(symbol_data)
+                    if event and event['direction'] == 'negative':
+                        exit_reason = f'Negative surprise detected ({event["event_return"]:.1%}), exiting'
+                        exit_confidence = 0.9
+
+                if exit_reason:
                     shares = self.positions[symbol]
                     signals.append({
                         'symbol': symbol,
@@ -130,23 +156,8 @@ class EarningsDriftStrategy(TradingStrategy):
                         'shares': shares,
                         'price': price,
                         'value': shares * price,
-                        'confidence': 0.8,
-                        'reasoning': f'Drift window expired ({days_held}d held)',
-                    })
-                    continue
-
-                # Exit if a NEW negative surprise detected while holding
-                event = self._detect_earnings_events(symbol_data)
-                if event and event['direction'] == 'negative':
-                    shares = self.positions[symbol]
-                    signals.append({
-                        'symbol': symbol,
-                        'action': 'SELL',
-                        'shares': shares,
-                        'price': price,
-                        'value': shares * price,
-                        'confidence': 0.9,
-                        'reasoning': f'Negative surprise detected ({event["event_return"]:.1%}), exiting',
+                        'confidence': exit_confidence,
+                        'reasoning': exit_reason,
                     })
                 continue
 
