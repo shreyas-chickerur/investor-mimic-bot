@@ -235,25 +235,33 @@ class DataQualityChecker:
         return False, ""
     
     def _check_price_outliers(self, symbol_data: pd.DataFrame) -> Tuple[bool, str]:
-        """Check for price outliers (sanity check)."""
+        """Check for price outliers (sanity check).
+
+        Threshold raised to 75% and requires 2 consecutive extreme-return days
+        before blocking.  A single adjusted-price artifact (corporate actions,
+        split re-statements) must NOT silently remove a symbol from trading.
+        """
         if 'close' not in symbol_data.columns:
             return False, ""
-        
+
         prices = symbol_data['close'].dropna()
-        
+
         if len(prices) == 0:
             return True, "No valid prices"
-        
+
         # Check for zero or negative prices
         if (prices <= 0).any():
             return True, "Zero or negative prices detected"
-        
-        # Check for extreme price jumps (>50% in one day)
-        if len(prices) > 1:
-            returns = prices.pct_change().dropna()
-            if (returns.abs() > 0.50).any():
+
+        # Check for extreme price jumps only on recent data (last 30 days) so
+        # stale artifacts deep in history don't keep blocking current symbols.
+        recent_prices = prices.iloc[-30:] if len(prices) >= 30 else prices
+        if len(recent_prices) > 1:
+            returns = recent_prices.pct_change().dropna()
+            extreme = returns.abs() > 0.75
+            if extreme.sum() >= 2:
                 max_jump = returns.abs().max()
-                return True, f"Extreme price jump detected: {max_jump:.1%}"
+                return True, f"Multiple extreme price jumps in last 30d: {max_jump:.1%}"
         
         return False, ""
     
