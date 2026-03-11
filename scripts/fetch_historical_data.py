@@ -128,6 +128,13 @@ class ExtendedDataFetcher:
             df = pd.DataFrame(records)
             df['date'] = pd.to_datetime(df['date'])
             df = df.sort_values('date')
+
+            # Use split/dividend-adjusted close for all indicator calculations.
+            # The raw 'close' (values['4. close']) is unadjusted — stock splits
+            # appear as -75% to -95% single-day crashes and corrupt every
+            # momentum feature and ML training label.
+            df['raw_close'] = df['close']
+            df['close'] = df['adjusted_close']
             
             # Filter to requested years
             cutoff_date = datetime.now() - timedelta(days=self.years * 365)
