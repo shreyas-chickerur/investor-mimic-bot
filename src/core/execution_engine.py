@@ -122,7 +122,7 @@ class MultiStrategyRunner:
         # Initialize professional-grade modules with config
         self.email_notifier = EmailNotifier()
         self.data_validator = DataValidator()
-        self.cash_manager = CashManager(self.portfolio_value)
+        self.cash_manager = CashManager(self.portfolio_value, num_strategies=4)
         
         # Portfolio risk manager - load from config
         max_heat = self.config.get('risk.max_portfolio_heat', 0.30)
@@ -1301,10 +1301,26 @@ class MultiStrategyRunner:
         return executed
     
     def _record_performance(self, strategy, current_prices):
-        """Record daily performance for a strategy"""
-        # Strategies don't have record_daily_performance method yet
-        # This is a no-op for now to avoid runtime exceptions
-        pass
+        """Record daily performance for a strategy into DB for dynamic allocation."""
+        try:
+            positions_value = sum(
+                shares * current_prices.get(symbol, 0)
+                for symbol, shares in strategy.positions.items()
+            )
+            portfolio_value = strategy.capital + positions_value
+            initial = getattr(strategy, 'initial_capital', strategy.capital)
+            return_pct = ((portfolio_value - initial) / initial * 100) if initial > 0 else 0.0
+            self.db.record_daily_performance(
+                strategy_id=strategy.strategy_id,
+                portfolio_value=portfolio_value,
+                cash=strategy.capital,
+                positions_value=positions_value,
+                total_return_pct=return_pct,
+                num_positions=len(strategy.positions),
+                num_trades=0,
+            )
+        except Exception as exc:
+            logger.warning("_record_performance failed for %s: %s", strategy.name, exc)
     
 
     def _get_all_positions(self, strategies):

@@ -20,7 +20,7 @@ from typing import List, Dict
 import pandas as pd
 import numpy as np
 import logging
-from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.preprocessing import StandardScaler
 
 logger = logging.getLogger(__name__)
@@ -56,11 +56,15 @@ class MLMomentumStrategy(TradingStrategy):
         self.hold_days = 5
         self.entry_dates = {}
 
-        self.model = LogisticRegression(
-            max_iter=2000, C=1.0, random_state=42,
-            class_weight='balanced',  # handle slight class imbalance
+        self.model = GradientBoostingClassifier(
+            n_estimators=200,
+            max_depth=3,          # shallow trees avoid overfitting on ~500 samples
+            learning_rate=0.05,
+            subsample=0.8,        # stochastic gradient boosting reduces variance
+            min_samples_leaf=10,  # prevent fitting noise
+            random_state=42,
         )
-        self.scaler = StandardScaler()
+        self.scaler = StandardScaler()  # still scale for numerical stability
         self.is_trained = False
         self._train_date: str = ""  # track when model was last trained
 
@@ -189,9 +193,8 @@ class MLMomentumStrategy(TradingStrategy):
                 X = self.scaler.transform([feats])
                 prob_positive = float(self.model.predict_proba(X)[0][1])
 
-                # BUY: probability above threshold.  min_confidence=0.52 is intentionally
-                # low — logistic regression on financial data rarely exceeds 0.60, so
-                # a 0.55 threshold would kill nearly all signals.
+                # BUY: probability above threshold. GBM produces wider probability
+                # spread than LR, so 0.52 acts as a modest signal quality floor.
                 if prob_positive > self.min_confidence and symbol not in self.positions:
                     shares = self.calculate_position_size(price, atr=atr, max_position_pct=0.10)
                     if shares <= 0:

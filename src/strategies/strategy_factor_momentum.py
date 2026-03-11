@@ -42,6 +42,8 @@ class FactorMomentumStrategy(TradingStrategy):
         )
         self.hold_days = 20
         self.top_n = 5              # Buy top 5 stocks
+        self.profit_target_pct = 0.12   # Exit at 12% gain — lock in before mean-reversion
+        self.stop_loss_pct = 0.08       # Exit at 8% loss — factor momentum can trend hard
         self.entry_dates = {}
         self._last_rerank_date = None
 
@@ -120,23 +122,35 @@ class FactorMomentumStrategy(TradingStrategy):
         if latest_date is None:
             return signals
 
-        # Check SELL first — exit positions past hold period
+        # Check SELL first — profit target, stop-loss, or time-based rebalance
         for symbol in list(self.positions.keys()):
             days_held = self.get_days_held(symbol, latest_date)
-            if days_held >= self.hold_days:
-                sym_data = market_data[market_data['symbol'] == symbol]
-                if sym_data.empty:
-                    continue
-                price = float(sym_data.iloc[-1]['close'])
-                shares = self.positions[symbol]
+            sym_data = market_data[market_data['symbol'] == symbol]
+            if sym_data.empty:
+                continue
+            price = float(sym_data.iloc[-1]['close'])
+            shares = self.positions[symbol]
+            entry_price = getattr(self, 'entry_prices', {}).get(symbol)
+
+            exit_reason = None
+            if entry_price and entry_price > 0:
+                pnl_pct = (price - entry_price) / entry_price
+                if pnl_pct >= self.profit_target_pct:
+                    exit_reason = f'Profit target: {pnl_pct:.1%} gain (target {self.profit_target_pct:.0%})'
+                elif pnl_pct <= -self.stop_loss_pct:
+                    exit_reason = f'Stop-loss: {pnl_pct:.1%} loss (limit -{self.stop_loss_pct:.0%})'
+            if exit_reason is None and days_held >= self.hold_days:
+                exit_reason = f'Factor rebalance: held {days_held}d'
+
+            if exit_reason:
                 signals.append({
                     'symbol': symbol,
                     'action': 'SELL',
                     'shares': shares,
                     'price': price,
                     'value': shares * price,
-                    'confidence': 0.7,
-                    'reasoning': f'Factor rebalance: held {days_held}d',
+                    'confidence': 0.9 if 'Profit' in (exit_reason or '') or 'Stop' in (exit_reason or '') else 0.7,
+                    'reasoning': exit_reason,
                 })
 
         # Only generate new BUY signals if we have capacity

@@ -5,12 +5,15 @@ Single source of truth for paper trading operational validation
 """
 from __future__ import annotations
 
+import logging
 import sqlite3
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timedelta
 import json
 import random
 import string
+
+logger = logging.getLogger(__name__)
 
 
 class TradingDatabase:
@@ -209,6 +212,30 @@ class TradingDatabase:
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_order_intents_run_id ON order_intents(run_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_order_intents_status ON order_intents(status)')
         
+        # Per-strategy daily performance snapshots (feeds dynamic allocator)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS strategy_performance (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL,
+                strategy_id INTEGER NOT NULL,
+                snapshot_date TEXT NOT NULL,
+                portfolio_value REAL NOT NULL,
+                cash REAL NOT NULL,
+                positions_value REAL NOT NULL,
+                total_return_pct REAL NOT NULL,
+                num_positions INTEGER DEFAULT 0,
+                num_trades INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (strategy_id) REFERENCES strategies(id)
+            )
+        ''')
+        cursor.execute(
+            'CREATE INDEX IF NOT EXISTS idx_strategy_perf_strat ON strategy_performance(strategy_id)'
+        )
+        cursor.execute(
+            'CREATE INDEX IF NOT EXISTS idx_strategy_perf_date ON strategy_performance(snapshot_date)'
+        )
+
         conn.commit()
         conn.close()
     
@@ -506,22 +533,75 @@ class TradingDatabase:
         return trades
     
     def get_strategy_performance(self, strategy_id: int, days: int = 30) -> List[Dict]:
-        """Get strategy performance history (stub - returns empty for now)"""
-        # Performance snapshots not yet implemented
-        # Return empty list to avoid breaking dynamic allocation
-        return []
-    
-    def get_latest_performance(self, strategy_id: int) -> Dict:
-        """Get latest performance snapshot (stub - returns None for now)"""
-        # Performance snapshots not yet implemented
-        return None
+        """Get strategy performance history for dynamic allocation."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        try:
+            rows = conn.execute(
+                '''
+                SELECT snapshot_date, portfolio_value, total_return_pct
+                FROM strategy_performance
+                WHERE strategy_id = ?
+                  AND snapshot_date >= date('now', ?)
+                ORDER BY snapshot_date ASC
+                ''',
+                (strategy_id, f'-{days} days')
+            ).fetchall()
+            return [dict(r) for r in rows]
+        except Exception:
+            return []
+        finally:
+            conn.close()
+
+    def get_latest_performance(self, strategy_id: int) -> Optional[Dict]:
+        """Get the most recent performance snapshot for a strategy."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        try:
+            row = conn.execute(
+                '''
+                SELECT * FROM strategy_performance
+                WHERE strategy_id = ?
+                ORDER BY snapshot_date DESC, created_at DESC
+                LIMIT 1
+                ''',
+                (strategy_id,)
+            ).fetchone()
+            return dict(row) if row else None
+        except Exception:
+            return None
+        finally:
+            conn.close()
     
     def record_daily_performance(self, strategy_id: int, **kwargs):
-        """Record daily performance (stub - not yet implemented)"""
-        # Daily performance snapshots not yet implemented
-        # This is a no-op to maintain compatibility
-        pass
-    
+        """Record a daily performance snapshot for a strategy."""
+        conn = sqlite3.connect(self.db_path)
+        try:
+            conn.execute(
+                '''
+                INSERT INTO strategy_performance
+                    (run_id, strategy_id, snapshot_date, portfolio_value, cash,
+                     positions_value, total_return_pct, num_positions, num_trades)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''',
+                (
+                    self.run_id,
+                    strategy_id,
+                    datetime.now().strftime('%Y-%m-%d'),
+                    kwargs.get('portfolio_value', 0.0),
+                    kwargs.get('cash', 0.0),
+                    kwargs.get('positions_value', 0.0),
+                    kwargs.get('total_return_pct', 0.0),
+                    kwargs.get('num_positions', 0),
+                    kwargs.get('num_trades', 0),
+                )
+            )
+            conn.commit()
+        except Exception as e:
+            logger.warning("record_daily_performance failed for strategy %s: %s", strategy_id, e)
+        finally:
+            conn.close()
+
     def save_signal_funnel(self, strategy_id: int, strategy_name: str, 
                            raw: int, regime: int, correlation: int, risk: int, executed: int):
         """Save signal funnel counts for a strategy"""
