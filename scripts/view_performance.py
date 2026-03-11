@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
 View Multi-Strategy Performance Dashboard
-Shows individual performance for each of the 5 strategies
+Shows individual performance for each of the 4 canonical strategies
 """
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.integration.strategy_database import StrategyDatabase
+from src.core.database import TradingDatabase
 from datetime import datetime
 import sqlite3
 
 def main():
-    db = StrategyDatabase()
+    db = TradingDatabase()
     
     print("=" * 100)
     print("MULTI-STRATEGY PERFORMANCE DASHBOARD")
@@ -99,14 +99,14 @@ def main():
         conn = sqlite3.connect(db.db_path)
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT symbol, signal, confidence, reasoning, generated_at 
-            FROM strategy_signals 
-            WHERE strategy_id = ? 
+            SELECT symbol, signal_type, confidence, reasoning, generated_at
+            FROM signals
+            WHERE strategy_id = ?
             ORDER BY generated_at DESC LIMIT 5
         ''', (strat['id'],))
         signals = cursor.fetchall()
         conn.close()
-        
+
         if signals:
             print(f"\n🎯 Recent Signals (Last 5):")
             for sig in signals:

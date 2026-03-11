@@ -372,6 +372,24 @@ class MultiStrategyRunner:
             strategy.entry_dates = entry_dates
             strategy.entry_prices = entry_prices
             logger.info(f"  Loaded {len(positions)} positions for {strategy.name}")
+
+            # Re-initialize stop losses for carried positions — stop_levels is
+            # in-memory only and is empty at every startup, so without this all
+            # multi-day positions run with zero downside protection.
+            for position in self.db.get_positions(strategy.strategy_id):
+                symbol = position['symbol']
+                if float(position.get('shares', 0)) <= 0:
+                    continue
+                avg_price = float(position.get('avg_price') or position.get('entry_price') or 0)
+                if avg_price <= 0:
+                    continue
+                atr = float(position.get('atr') or 0)
+                if atr <= 0:
+                    # Fallback: use 3% of price as ATR proxy
+                    atr = avg_price * 0.03
+                    logger.warning(f"  No ATR stored for {symbol}, using 3% fallback for stop loss")
+                self.stop_loss_manager.set_stop_loss(symbol, avg_price, atr)
+                logger.info(f"  Re-initialized stop loss for carried position {symbol}")
         except Exception as e:
             strategy_name = getattr(strategy, 'name', 'Unknown')
             logger.error(f"Error loading positions for {strategy_name}: {e}")
