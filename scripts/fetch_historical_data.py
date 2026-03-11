@@ -280,7 +280,31 @@ class ExtendedDataFetcher:
             minus_di = 100 * (minus_dm.rolling(window=14).mean() / tr_smooth)
             dx = 100 * abs(plus_di - minus_di) / (plus_di + minus_di)
             symbol_data['adx'] = dx.rolling(window=14).mean()
-            
+
+            # Price returns (required by ML Momentum + Factor Momentum)
+            symbol_data['returns_5d']  = symbol_data['close'].pct_change(5)
+            symbol_data['returns_20d'] = symbol_data['close'].pct_change(20)
+            symbol_data['returns_60d'] = symbol_data['close'].pct_change(60)
+
+            # Volatility (60-day)
+            symbol_data['volatility_60d'] = (
+                symbol_data['close'].pct_change().rolling(60).std()
+            )
+
+            # Volume ratio: current / 20-day average
+            vol_sma20 = symbol_data['volume'].rolling(20).mean()
+            symbol_data['volume_ratio'] = (
+                symbol_data['volume'] / vol_sma20.replace(0, float('nan'))
+            )
+
+            # Price relative to moving averages
+            symbol_data['price_to_sma20'] = (
+                (symbol_data['close'] - symbol_data['sma_20']) / symbol_data['sma_20'].replace(0, float('nan'))
+            )
+            symbol_data['price_to_sma50'] = (
+                (symbol_data['close'] - symbol_data['sma_50']) / symbol_data['sma_50'].replace(0, float('nan'))
+            )
+
             # Update main dataframe
             df.loc[mask, symbol_data.columns] = symbol_data
         
