@@ -231,6 +231,8 @@ jobs:
     - name: Generate daily email digest
       if: always()
       run: |
+        # Export today's date for use in email subject lines
+        echo "TODAY_DATE=$(date +%Y-%m-%d)" >> $GITHUB_ENV
         # Check if today is Mon/Wed/Fri for visual reports
         DAY_OF_WEEK=$(date +%u)  # 1=Mon, 3=Wed, 5=Fri
         if [ "$DAY_OF_WEEK" = "1" ] || [ "$DAY_OF_WEEK" = "3" ] || [ "$DAY_OF_WEEK" = "5" ]; then
@@ -254,7 +256,7 @@ jobs:
         server_port: 587
         username: ${{ secrets.EMAIL_USERNAME }}
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: "📊 Daily Trading Digest - $(date +%Y-%m-%d)"
+        subject: "📊 Daily Trading Digest - ${{ env.TODAY_DATE }}"
         to: ${{ secrets.EMAIL_TO }}
         from: Trading System
         html_body: file:///tmp/daily_email.html
@@ -313,14 +315,14 @@ jobs:
         server_port: 587
         username: ${{ secrets.EMAIL_USERNAME }}
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: "⏸️ Trading Skipped - Market Closed (Expected) - ${{ github.run_number }}"
+        subject: "⏸️ Trading Skipped - Market Closed (Expected) - ${{ env.TODAY_DATE }}"
         to: ${{ secrets.EMAIL_TO }}
         from: Trading System
         body: |
           Trading Run Skipped - Market Closed (Expected)
           
           Run: ${{ github.run_number }}
-          Date: $(date +%Y-%m-%d)
+          Date: ${{ env.TODAY_DATE }}
           Status: Market closed (weekend or holiday)
           
           This is expected behavior. The trading system automatically skips execution when:
@@ -339,14 +341,14 @@ jobs:
         server_port: 587
         username: ${{ secrets.EMAIL_USERNAME }}
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: "⚠️ Trading Reconciliation Warning - ${{ github.run_number }}"
+        subject: "⚠️ Trading Reconciliation Warning - ${{ env.TODAY_DATE }}"
         to: ${{ secrets.EMAIL_TO }}
         from: Trading System
         body: |
           Trading Execution Completed - Reconciliation Discrepancies Detected
           
           Run: ${{ github.run_number }}
-          Date: $(date +%Y-%m-%d)
+          Date: ${{ env.TODAY_DATE }}
           Status: Execution successful, reconciliation has ${{ steps.check_reconciliation.outputs.discrepancies }} discrepancies
           
           The trading system executed successfully, but found differences between:
@@ -369,7 +371,7 @@ jobs:
         server_port: 587
         username: ${{ secrets.EMAIL_USERNAME }}
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: "❌ Daily Trading Workflow Failed (UNEXPECTED) - ${{ github.run_number }}"
+        subject: "❌ Daily Trading Workflow Failed (UNEXPECTED) - ${{ env.TODAY_DATE }}"
         to: ${{ secrets.EMAIL_TO }}
         from: Trading System
         body: |
