@@ -57,7 +57,7 @@ class MLMomentumStrategy(TradingStrategy):
         self.entry_dates = {}
 
         self.model = LogisticRegression(
-            max_iter=2000, C=0.1, random_state=42,
+            max_iter=2000, C=1.0, random_state=42,
             class_weight='balanced',  # handle slight class imbalance
         )
         self.scaler = StandardScaler()

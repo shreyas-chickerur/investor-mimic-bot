@@ -6,7 +6,7 @@ on:
       include_visuals:
         description: 'Include P&L chart'
         required: false
-        default: 'true'
+        default: true
         type: boolean
 
 jobs:
