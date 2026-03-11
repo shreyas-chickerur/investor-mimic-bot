@@ -357,15 +357,20 @@ class MultiStrategyRunner:
         try:
             positions = {}
             entry_dates = {}
+            entry_prices = {}
             for position in self.db.get_positions(strategy.strategy_id):
                 symbol = position['symbol']
                 shares = float(position['shares'])
                 if shares > 0:
                     positions[symbol] = shares
-                    entry_dates[symbol] = position.get('last_updated')
+                    entry_dates[symbol] = position.get('entry_date') or position.get('last_updated')
+                    avg_price = position.get('avg_price') or position.get('entry_price')
+                    if avg_price:
+                        entry_prices[symbol] = float(avg_price)
 
             strategy.positions = positions
             strategy.entry_dates = entry_dates
+            strategy.entry_prices = entry_prices
             logger.info(f"  Loaded {len(positions)} positions for {strategy.name}")
         except Exception as e:
             strategy_name = getattr(strategy, 'name', 'Unknown')

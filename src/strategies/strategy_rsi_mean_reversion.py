@@ -88,17 +88,17 @@ class RSIMeanReversionStrategy(TradingStrategy):
             elif symbol in self.positions:
                 days_held = self.get_days_held(symbol, latest_date)
                 shares = self.positions[symbol]
-                entry_price = None
-                if hasattr(self, 'entry_dates') and symbol in self.entry_dates:
-                    # Best proxy for entry price: walk back in time is unavailable here,
-                    # so rely on RSI / time exits which don't need entry price.
-                    pass
+                entry_price = getattr(self, 'entry_prices', {}).get(symbol)
 
                 exit_reason = None
                 if rsi > self.rsi_exit:
                     exit_reason = f'RSI {rsi:.1f} > {self.rsi_exit} (mean reversion complete)'
                 elif days_held >= self.hold_days:
                     exit_reason = f'Held {days_held}d >= {self.hold_days}d (time-based exit)'
+                elif entry_price and entry_price > 0:
+                    profit_pct = (price - entry_price) / entry_price
+                    if profit_pct >= self.profit_target_pct:
+                        exit_reason = f'Profit target hit: {profit_pct:.1%} gain vs {self.profit_target_pct:.0%} target'
 
                 if exit_reason:
                     signals.append({
