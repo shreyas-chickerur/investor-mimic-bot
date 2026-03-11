@@ -1,0 +1,73 @@
+name: Resend Daily Email
+
+on:
+  workflow_dispatch:
+    inputs:
+      include_visuals:
+        description: 'Include P&L chart'
+        required: false
+        default: 'true'
+        type: boolean
+
+jobs:
+  resend:
+    runs-on: ubuntu-latest
+    env:
+      ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+      ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+      ALPACA_PAPER: "true"
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: pip install -r requirements.txt
+
+    - name: Download latest trading database
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        ARTIFACT_ID=$(gh api \
+          repos/${{ github.repository }}/actions/artifacts \
+          --jq '[.artifacts[] | select(.name=="trading-database") | select(.expired==false)] | sort_by(.created_at) | last | .id')
+        if [ -n "$ARTIFACT_ID" ] && [ "$ARTIFACT_ID" != "null" ]; then
+          echo "Downloading artifact $ARTIFACT_ID"
+          gh api repos/${{ github.repository }}/actions/artifacts/${ARTIFACT_ID}/zip \
+            > /tmp/db_artifact.zip
+          unzip -o /tmp/db_artifact.zip
+          echo "Database downloaded successfully"
+        else
+          echo "No database artifact found — using empty DB"
+          python3 -c "from src.core.database import TradingDatabase; TradingDatabase('trading.db')"
+        fi
+
+    - name: Generate and send email
+      run: |
+        echo "TODAY_DATE=$(date +%Y-%m-%d)" >> $GITHUB_ENV
+        if [ "${{ inputs.include_visuals }}" = "true" ]; then
+          python3 scripts/generate_daily_email.py --include-visuals || python3 scripts/generate_daily_email.py
+        else
+          python3 scripts/generate_daily_email.py
+        fi
+        if [ ! -f /tmp/daily_email.html ]; then
+          echo "Email generation failed — writing fallback"
+          python3 -c "import datetime; open('/tmp/daily_email.html','w').write('<html><body><h2>Email resend failed</h2><p>'+datetime.date.today().isoformat()+'</p></body></html>')"
+        fi
+
+    - name: Send email
+      uses: dawidd6/action-send-mail@v3
+      with:
+        server_address: smtp.gmail.com
+        server_port: 587
+        username: ${{ secrets.EMAIL_USERNAME }}
+        password: ${{ secrets.EMAIL_PASSWORD }}
+        subject: "📊 Daily Trading Digest - ${{ env.TODAY_DATE }} (resent)"
+        to: ${{ secrets.EMAIL_TO }}
+        from: Trading System
+        html_body: file:///tmp/daily_email.html
