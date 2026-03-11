@@ -464,6 +464,68 @@ def build_today_actions(today_trades, signal_map, news_map):
 
     return cards
 
+# ── Portfolio-level holistic metrics ─────────────────────────────────────────
+def build_portfolio_metrics(db_path):
+    """Render a top-line metrics bar: CAGR, Sharpe, win rate, max drawdown."""
+    try:
+        import sys as _sys
+        from pathlib import Path as _Path
+        _sys.path.insert(0, str(_Path(__file__).parent))
+        from performance_tracker import compute_portfolio_metrics
+        m = compute_portfolio_metrics(db_path)
+    except Exception:
+        return ''
+
+    def _pct(v, d=1):
+        return ("{:.{}f}%".format(v, d)) if v is not None else '—'
+
+    def _f(v, d=2):
+        return ("{:.{}f}".format(v, d)) if v is not None else '—'
+
+    total_ret  = m.get('total_return_pct')
+    cagr       = m.get('cagr')
+    sharpe     = m.get('sharpe')
+    win_rate   = m.get('win_rate')
+    max_dd     = m.get('max_drawdown')
+    pf         = m.get('profit_factor')
+    n_trades   = m.get('total_trades') or 0
+    since      = m.get('data_since') or ''
+    days       = m.get('trading_days') or 0
+
+    cagr_col  = POS if cagr and cagr > 0 else (NEG if cagr and cagr < 0 else MUTED)
+    wr_col    = POS if win_rate and win_rate >= 0.5 else (NEG if win_rate and win_rate < 0.4 else MUTED)
+    dd_col    = NEG if max_dd and max_dd > 5 else MUTED
+    ret_col   = POS if total_ret and total_ret > 0 else (NEG if total_ret and total_ret < 0 else MUTED)
+
+    def _kpi(label, val, color):
+        return ("<div style='text-align:center;padding:10px 16px;'>"
+                "<div style='font-size:18px;font-weight:700;font-family:" + MONO + ";color:"
+                + color + ";'>" + val + "</div>"
+                "<div style='font-size:10px;color:" + TEXT2 + ";margin-top:3px;"
+                "text-transform:uppercase;letter-spacing:0.6px;'>" + label + "</div></div>")
+
+    note = ''
+    if days < 10:
+        note = ("<div style='font-size:11px;color:" + MUTED + ";font-style:italic;"
+                "margin-bottom:8px;'>Building track record — "
+                + str(n_trades) + " trades across " + str(days) + " trading days since "
+                + since + ".</div>")
+
+    return (
+        note
+        + "<div style='display:flex;flex-wrap:wrap;background:" + TH_BG + ";border:1px solid "
+        + BORDER + ";border-radius:4px;margin-bottom:16px;'>"
+        + _kpi('Total Return', _pct(total_ret), ret_col)
+        + _kpi('CAGR (ann.)', _pct((cagr or 0) * 100, 1), cagr_col)
+        + _kpi('Sharpe', _f(sharpe), POS if sharpe and sharpe > 0.8 else MUTED)
+        + _kpi('Win Rate', _pct((win_rate or 0) * 100, 0), wr_col)
+        + _kpi('Max DD', _pct(max_dd), dd_col)
+        + _kpi('Profit Factor', _f(pf), POS if pf and pf > 1.0 else NEG)
+        + _kpi('Trades', str(n_trades), MUTED)
+        + "</div>"
+    )
+
+
 # ── Overall strategy performance (all-time) ────────────────────────────────────
 def build_all_time_perf(rows):
     if not rows:
@@ -650,7 +712,7 @@ def generate_email_body(artifact_path=None, db_path='trading.db', include_visual
                   build_today_actions(today_trades, signal_map, news_map),
                   str(len(today_trades)) + " executed")
         + section("Strategy Performance",
-                  build_all_time_perf(all_time_perf),
+                  build_portfolio_metrics(db_path) + build_all_time_perf(all_time_perf),
                   "all-time")
         + section("Strategy Concerns",
                   build_strategy_concerns(health_data, rej_rows, recent_rows),

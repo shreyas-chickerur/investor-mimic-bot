@@ -18,10 +18,21 @@ class UniverseProvider:
     """Provides trading universe from multiple sources"""
     
     DEFAULT_UNIVERSE = [
+        # Tech / Growth
         'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'TSLA', 'NVDA',
-        'NFLX', 'DIS', 'ADBE', 'AVGO', 'COST', 'MCD', 'NKE', 'WMT',
-        'HD', 'JNJ', 'ABBV', 'MRK', 'TMO', 'DHR', 'BRK.B', 'ACN',
-        'ABT', 'KO', 'MA', 'PEP', 'PG', 'VZ'
+        'NFLX', 'ADBE', 'AVGO', 'CRM', 'AMD',
+        # Consumer / Retail
+        'COST', 'MCD', 'NKE', 'WMT', 'HD', 'DIS',
+        # Healthcare
+        'JNJ', 'ABBV', 'MRK', 'TMO', 'DHR', 'ABT', 'UNH', 'LLY',
+        # Financials
+        'MA', 'JPM', 'V',
+        # Consumer Staples
+        'KO', 'PEP', 'PG',
+        # Energy / Telecom
+        'XOM', 'VZ',
+        # IT Services
+        'ACN',
     ]
     
     def __init__(self, mode: str = None):
@@ -113,7 +124,7 @@ class UniverseProvider:
             
             symbol = symbol.strip().upper()
             
-            if 1 <= len(symbol) <= 5 and symbol.isalnum():
+            if 1 <= len(symbol) <= 6 and all(c.isalnum() or c in '.-' for c in symbol):
                 valid_symbols.append(symbol)
             else:
                 logger.warning(f"Invalid symbol filtered out: {symbol}")

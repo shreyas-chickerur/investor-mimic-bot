@@ -49,7 +49,7 @@ _NEUTRAL_CONTEXT: Dict = {'score': 0.5, 'headlines': [], 'article_count': 0}
 # Thresholds for signal modification
 POSITIVE_THRESHOLD = 0.62   # score above this → boost confidence
 NEGATIVE_THRESHOLD = 0.38   # score below this → suppress confidence
-SUPPRESS_THRESHOLD = 0.25   # score below this → drop BUY signal entirely
+SUPPRESS_THRESHOLD = 0.20   # score below this → drop BUY signal entirely
 BOOST_MULT = 1.15            # multiply confidence when news is positive
 SUPPRESS_MULT = 0.80         # multiply confidence when news is negative
 

@@ -228,6 +228,12 @@ jobs:
       run: |
         python3 scripts/generate_email_chart.py
     
+    - name: Run live performance tracker
+      if: always()
+      continue-on-error: true
+      run: |
+        python3 scripts/performance_tracker.py --db trading.db
+    
     - name: Generate daily email digest
       if: always()
       run: |
