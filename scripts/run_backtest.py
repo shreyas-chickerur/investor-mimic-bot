@@ -20,9 +20,7 @@ import pandas as pd
 
 from src.integration.portfolio_backtester import PortfolioBacktester
 from src.strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
-from src.strategies.strategy_ma_crossover import MACrossoverStrategy
 from src.strategies.strategy_ml_momentum import MLMomentumStrategy
-from src.strategies.strategy_news_sentiment import NewsSentimentStrategy
 from src.strategies.strategy_earnings_drift import EarningsDriftStrategy
 from src.strategies.strategy_factor_momentum import FactorMomentumStrategy
 
