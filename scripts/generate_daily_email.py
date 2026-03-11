@@ -85,7 +85,8 @@ def get_all_time_perf(db):
           AVG(CASE WHEN t.pnl <= 0 THEN t.pnl END)           avg_loss,
           MIN(DATE(t.executed_at))                            first_trade
         FROM trades t JOIN strategies s ON t.strategy_id=s.id
-        WHERE t.pnl IS NOT NULL GROUP BY s.name ORDER BY total_pnl DESC""")
+        WHERE t.pnl IS NOT NULL AND s.name != 'BROKER_SYNC'
+        GROUP BY s.name ORDER BY total_pnl DESC""")
 
 def get_today_signals_for_trades(db):
     """Return signal reasoning keyed by (symbol, strategy_id) for today's executed signals."""
@@ -109,7 +110,7 @@ def get_strategy_concerns_data(db):
     rejections = q(db, """
         SELECT s.name strat, sr.stage, sr.reason_code, COUNT(*) cnt
         FROM signal_rejections sr JOIN strategies s ON sr.strategy_id = s.id
-        WHERE sr.created_at >= datetime('now', '-7 days')
+        WHERE sr.created_at >= datetime('now', '-7 days') AND s.name != 'BROKER_SYNC'
         GROUP BY s.name, sr.stage, sr.reason_code ORDER BY cnt DESC""")
     recent = q(db, """
         SELECT s.name strat,
@@ -118,6 +119,7 @@ def get_strategy_concerns_data(db):
           SUM(COALESCE(t.pnl, 0)) pnl
         FROM trades t JOIN strategies s ON t.strategy_id = s.id
         WHERE t.executed_at >= datetime('now', '-30 days') AND t.pnl IS NOT NULL
+          AND s.name != 'BROKER_SYNC'
         GROUP BY s.name""")
     return rejections, recent
 
@@ -154,14 +156,16 @@ def get_positions(db):
                p.unrealized_pnl, p.entry_date, p.entry_price, p.stop_loss_price,
                CAST(julianday('now') - julianday(COALESCE(p.entry_date, date('now'))) AS INTEGER) days
         FROM positions p JOIN strategies s ON p.strategy_id=s.id
-        WHERE p.shares > 0 ORDER BY p.unrealized_pnl DESC""")
+        WHERE p.shares > 0 AND s.name != 'BROKER_SYNC'
+        ORDER BY p.unrealized_pnl DESC""")
 
 def get_today_trades(db):
     return q(db, """
         SELECT t.symbol, t.action, t.shares, t.exec_price,
                t.notional, t.pnl, s.name strat, t.executed_at
         FROM trades t JOIN strategies s ON t.strategy_id=s.id
-        WHERE DATE(t.executed_at)=DATE('now') ORDER BY t.executed_at""")
+        WHERE DATE(t.executed_at)=DATE('now') AND s.name != 'BROKER_SYNC'
+        ORDER BY t.executed_at""")
 
 
 def get_health():
