@@ -59,7 +59,26 @@ jobs:
     - name: Create required directories
       run: |
         mkdir -p artifacts/json artifacts/markdown artifacts/funnel artifacts/data_quality artifacts/drawdown artifacts/health logs data
-    
+
+    - name: Download previous training data (if exists)
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        echo "=== Downloading latest training-data artifact ==="
+        ARTIFACT_ID=$(gh api repos/${{ github.repository }}/actions/artifacts \
+          --jq '.artifacts | map(select(.name == "training-data" and .expired == false)) | sort_by(.created_at) | reverse | .[0].id // empty')
+        if [ -n "$ARTIFACT_ID" ]; then
+          echo "Found artifact ID: $ARTIFACT_ID"
+          gh api repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip > training-data.zip
+          unzip -o training-data.zip -d data/
+          rm -f training-data.zip
+          echo "✅ Downloaded training_data.csv ($(wc -l < data/training_data.csv) rows)"
+        else
+          echo "⚠️ No training-data artifact found — will fetch full history"
+          python3 scripts/fetch_historical_data.py
+        fi
+
     - name: Update market data
       env:
         ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
@@ -199,7 +218,16 @@ jobs:
         path: trading.db
         retention-days: 90
         overwrite: true
-    
+
+    - name: Upload training data
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: training-data
+        path: data/training_data.csv
+        retention-days: 90
+        overwrite: true
+
     - name: Upload artifacts
       if: always()
       uses: actions/upload-artifact@v4
