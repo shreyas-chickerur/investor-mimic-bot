@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Generate Daily Email Digest v3 — professional, minimal, data-dense.
-No gradients. No emoji headers. Signal reasoning flowchart from DB.
+Daily Email Digest — plain-English summary of today's trading decisions.
+For every trade: shows the news headline, what the system noticed, and why
+it bought or sold. No jargon. Readable by anyone.
 """
 import sys
 import json
@@ -124,31 +125,124 @@ def get_strategy_concerns_data(db):
     return rejections, recent
 
 def fetch_symbol_news(symbols):
-    """Fetch top 2 news headlines per symbol via yfinance. Returns {symbol: [headline, ...]}"""
-    news_map = {}
+    """Fetch headlines via Google News RSS (no API key needed). Returns {symbol: [headline, ...]}"""
     if not symbols:
-        return news_map
+        return {}
     try:
-        import yfinance as yf
+        sys.path.insert(0, str(project_root))
+        from src.utils.news_sentiment import fetch_symbol_news as _fetch
+        result = {}
+        for sym in symbols:
+            ctx = _fetch(sym, max_articles=5)
+            if ctx.get('headlines'):
+                result[sym] = ctx['headlines'][:3]
+        return result
     except Exception:
-        return news_map
-    for sym in symbols:
-        try:
-            ticker = yf.Ticker(sym)
-            items = ticker.news or []
-            headlines = []
-            for item in items[:3]:
-                title = (item.get('content', {}).get('title') or
-                         item.get('title') or '')
-                if title:
-                    headlines.append(title[:90])
-                if len(headlines) >= 2:
-                    break
-            if headlines:
-                news_map[sym] = headlines
-        except Exception:
-            pass
-    return news_map
+        return {}
+
+
+# ── Plain-English translation helpers ────────────────────────────────────────
+
+_STRATEGY_LABELS = {
+    'RSI Mean Reversion': 'Bounce-Back Strategy',
+    'ML Momentum':        'AI Prediction Strategy',
+    'Earnings Drift':     'Earnings Momentum Strategy',
+    'Factor Momentum':    'Best-in-Class Strategy',
+}
+
+def _strategy_label(name):
+    return _STRATEGY_LABELS.get(name, name)
+
+
+def _translate_buy_reason(raw, strategy):
+    """Convert a technical signal reasoning string into one plain-English sentence."""
+    import re
+    r = (raw or '').lower()
+
+    if 'rsi' in r and ('oversold' in r or 'slope' in r or '< 40' in r or '<40' in r):
+        return ("The stock had fallen sharply and our system detected it was "
+                "starting to bounce back — a classic entry point.")
+
+    if 'ml' in r or 'probability' in r or 'p(up)' in r:
+        m = re.search(r'p\(up\)[=:\s]*([\d.]+)', r)
+        if m:
+            pct = int(float(m.group(1)) * 100)
+            return (f"Our AI model calculated a {pct}% probability the stock "
+                    f"would rise over the next 5 trading days.")
+        return "Our AI model predicted the stock was more likely than not to rise over the next 5 days."
+
+    if any(w in r for w in ['earnings', 'drift', 'pead', 'volume spike', 'abnormal']):
+        m = re.search(r'volume[_\s]*ratio[=:\s]*([\d.]+)', r)
+        vol = f"{float(m.group(1)):.1f}×" if m else "unusually high"
+        return (f"The stock made a large move on {vol} its normal trading volume — "
+                f"often a signal of a significant earnings or news event.")
+
+    if any(w in r for w in ['factor', 'rank', 'composite', 'top 3', 'top 4', 'top 5']):
+        m = re.search(r'top\s*(\d+)/(\d+)', r)
+        if m:
+            rank, total = m.group(1), m.group(2)
+            return (f"This stock ranked #{rank} out of {total} companies we track "
+                    f"across strength, momentum, and quality — one of the best.")
+        return ("This stock ranked in the top 5 of all 36 companies we track "
+                "for overall strength and momentum.")
+
+    return "Multiple signals aligned to suggest a good buying opportunity."
+
+
+def _translate_sell_reason(raw, strategy):
+    """Convert a technical exit reasoning string into one plain-English sentence."""
+    import re
+    r = (raw or '').lower()
+
+    m_gain = re.search(r'([\d.]+)%\s*gain', r)
+    m_loss = re.search(r'([\d.]+)%\s*loss', r)
+
+    if 'profit target' in r or ('profit' in r and 'target' in r):
+        pct = m_gain.group(1) if m_gain else None
+        suffix = f" — locked in a +{pct}% gain" if pct else ""
+        return f"The stock hit our profit target{suffix}. We sold to lock in the gains."
+
+    if 'stop-loss' in r or 'stop loss' in r:
+        pct = m_loss.group(1) if m_loss else None
+        suffix = f" (down {pct}%)" if pct else ""
+        return (f"The stock dropped to our stop-loss level{suffix}. "
+                f"We sold to prevent further losses.")
+
+    if 'rsi' in r and ('>' in r or 'recovery' in r or 'reversion' in r or 'complete' in r):
+        return ("The stock fully recovered from its oversold level — "
+                "the bounce-back trade played out as planned.")
+
+    if any(w in r for w in ['rebalance', 'held', 'expired', 'window', 'drift window']):
+        m_d = re.search(r'(\d+)\s*d', r)
+        days = m_d.group(1) if m_d else None
+        suffix = f" after {days} days as planned" if days else " as scheduled"
+        return f"We held this position for the planned duration and exited{suffix}."
+
+    if 'negative surprise' in r or ('negative' in r and 'sentiment' in r):
+        return ("Our system detected a negative signal — we exited early "
+                "to protect any remaining gains.")
+
+    return "The planned exit conditions were met — we sold as scheduled."
+
+
+def _translate_rejection(stage, reason_code):
+    """Translate a technical rejection code to a plain-English explanation."""
+    code = (reason_code or '').upper()
+    stage = (stage or '').upper()
+    m = {
+        'MAX_HEAT_EXCEEDED':        'The portfolio was already too invested (over our safe limit)',
+        'CORRELATION_FILTER':       'Too similar to a stock we already hold — avoids concentration risk',
+        'DAILY_LOSS_LIMIT':         'The portfolio hit today\'s loss limit — paused to protect capital',
+        'DATA_QUALITY_FAIL':        'The price data for this stock looked suspicious — skipped for safety',
+        'DRAWDOWN_STOP':            'The portfolio drew down too far — all buying paused until recovery',
+        'REGIME_FILTER':            'Market conditions were too volatile — held back this trade',
+        'KILL_SWITCH':              'The system\'s kill switch was active — no trading today',
+        'RECONCILIATION_FAILED':    'Account positions didn\'t match our records — trading paused',
+        'NO_BUYING_POWER':          'Not enough cash available for this trade',
+        'POSITION_ALREADY_OPEN':    'We already hold this stock — avoided doubling up',
+        'CONFIDENCE_TOO_LOW':       'The signal wasn\'t strong enough to act on',
+    }
+    return m.get(code, f"Blocked at the {stage.lower()} stage ({reason_code})")
 
 def get_positions(db):
     return q(db, """
@@ -249,11 +343,11 @@ def build_header(pv, cash, daily_pnl, daily_pct, dd, regime, recon, n_trades):
     pc = POS if daily_pnl >= 0 else NEG
 
     recon_ok = 'SYNCED' in recon.upper() or 'PASS' in recon.upper()
-    recon_chip = chip('SYNCED' if recon_ok else 'DRIFT', POS if recon_ok else NEG)
+    recon_chip = chip('Account Synced' if recon_ok else 'Out of Sync', POS if recon_ok else NEG)
 
-    regime_col = {
-        'NORMAL': POS, 'HIGH_VOL': '#d97706', 'CRISIS': NEG
-    }.get(regime_str, MUTED)
+    regime_labels = {'NORMAL': 'Normal market', 'HIGH_VOL': 'Volatile market', 'CRISIS': 'Crisis mode', 'LOW_VOL': 'Calm market'}
+    regime_display = regime_labels.get(regime_str, regime_str.replace('_', ' ').title())
+    regime_col = {'NORMAL': POS, 'LOW_VOL': POS, 'HIGH_VOL': '#d97706', 'CRISIS': NEG}.get(regime_str, MUTED)
     dd_col = {'NORMAL': POS, 'RAMPUP': '#d97706', 'HALT': NEG, 'PANIC': '#7c3aed'}.get(dd_str, MUTED)
 
     return (
@@ -276,15 +370,12 @@ def build_header(pv, cash, daily_pnl, daily_pct, dd, regime, recon, n_trades):
         "<td style='padding:9px 28px;background:" + HDR_SUB + ";border-top:1px solid #1f2937;"
         "font-size:11px;color:#9ca3af;'>"
         "<table style='border-collapse:collapse;'><tr>"
-        "<td style='padding:0 16px 0 0;'><span style='color:#6b7280;'>Reconciliation&nbsp;</span>" + recon_chip + "</td>"
-        "<td style='padding:0 16px;'><span style='color:#6b7280;'>Regime&nbsp;</span>" + chip(regime_str, regime_col) + "</td>"
-        "<td style='padding:0 16px;'><span style='color:#6b7280;'>VIX proxy&nbsp;</span>"
-        "<span style='color:#d1d5db;'>" + str(vix) + "</span></td>"
-        "<td style='padding:0 16px;'><span style='color:#6b7280;'>Drawdown&nbsp;</span>"
-        + chip(dd_str, dd_col)
-        + "<span style='color:#6b7280;'>&nbsp;{:.1f}%</span></td>".format(dd_pct)
-        + "<td style='padding:0 16px;'><span style='color:#6b7280;'>Heat&nbsp;</span>"
+        "<td style='padding:0 16px 0 0;'><span style='color:#6b7280;'>Account&nbsp;</span>" + recon_chip + "</td>"
+        "<td style='padding:0 16px;'><span style='color:#6b7280;'>Market conditions&nbsp;</span>" + chip(regime_display, regime_col) + "</td>"
+        "<td style='padding:0 16px;'><span style='color:#6b7280;'>Currently invested&nbsp;</span>"
         "<span style='color:#d1d5db;'>{:.1f}%</span></td>".format(heat)
+        + "<td style='padding:0 16px;'><span style='color:#6b7280;'>Drawdown from peak&nbsp;</span>"
+        "<span style='color:#d1d5db;'>{:.1f}%</span></td>".format(dd_pct)
         + "<td style='padding:0;'><span style='color:#6b7280;'>Trades today&nbsp;</span>"
         "<span style='color:#d1d5db;'>" + str(n_trades) + "</span></td>"
         "</tr></table>"
@@ -303,10 +394,10 @@ def build_summary(pv, cash, pnl_30d, rows_30d):
                 "<div style='font-size:20px;font-weight:700;color:" + col + ";font-family:" + MONO + ";'>"
                 + val + "</div></td>")
 
-    cells = (metric('Portfolio Value', '${:,.2f}'.format(pv), TEXT)
-           + metric('Cash Available',  '${:,.0f}'.format(cash), TEXT)
-           + metric('Invested',        '${:,.0f} ({:.1f}%)'.format(invested, inv_pct), TEXT2)
-           + metric('30-Day P&L',      fmt_pnl(pnl_30d), pnl_col(pnl_30d)))
+    cells = (metric('Total Portfolio Value', '${:,.2f}'.format(pv), TEXT)
+           + metric('Cash Available to Invest', '${:,.0f}'.format(cash), TEXT)
+           + metric('Currently Invested', '${:,.0f} ({:.1f}%)'.format(invested, inv_pct), TEXT2)
+           + metric('Profit / Loss (30 days)', fmt_pnl(pnl_30d), pnl_col(pnl_30d)))
 
     spark_cell = ''
     if rows_30d and len(rows_30d) >= 2:
@@ -363,36 +454,62 @@ def build_positions(positions):
              + td_s("<strong style='color:" + tc + ";font-family:" + MONO + ";font-size:14px;'>"
                     + fmt_pnl(total_unr) + "</strong>", align='right')
              + td_s('') + td_s('') + "</tr>")
-    return tbl(['Symbol','Strategy','Shares','Entry','Current','Unrealized P&L','Stop Price','Held'],
+    return tbl(['Company','Strategy','Shares','We Paid','Price Now','Unrealized Gain / Loss','Safety Stop','Days Held'],
                rows, ['left','left','right','right','right','right','right','center'])
 
-# ── Today's Actions (trade table + news-driven reasoning flowchart) ────────────
-def _arrow():
-    return "<span style='color:" + MUTED + ";margin:0 5px;font-size:13px;'>&#x2192;</span>"
+# ── Flowchart helpers ─────────────────────────────────────────────────────────
 
-def _node_pill(text, bg=None, color=None, bold=False):
-    bg    = bg    or TH_BG
-    color = color or TEXT
-    fw    = 'font-weight:700;' if bold else ''
-    return ("<span style='display:inline-block;background:" + bg + ";"
-            "border:1px solid " + BORDER + ";padding:3px 9px;border-radius:2px;"
-            "font-size:11px;color:" + color + ";font-family:" + MONO + ";" + fw + "'>"
-            + html_lib.escape(str(text)) + "</span>")
+def _flow_box(label, icon, body_lines, bg, border_color, label_color):
+    """Render one box in the news→signal→decision flowchart."""
+    lines_html = ''.join(
+        "<div style='font-size:12px;color:" + TEXT + ";line-height:1.5;margin-top:4px;'>"
+        + html_lib.escape(str(ln)) + "</div>"
+        for ln in body_lines if ln
+    )
+    return (
+        "<td style='vertical-align:top;width:32%;background:" + bg + ";"
+        "border:1px solid " + border_color + ";border-top:3px solid " + border_color + ";"
+        "padding:12px 14px;border-radius:2px;'>"
+        "<div style='font-size:10px;font-weight:700;letter-spacing:1px;"
+        "text-transform:uppercase;color:" + label_color + ";margin-bottom:6px;'>"
+        + icon + "&nbsp;" + label + "</div>"
+        + lines_html
+        + "</td>"
+    )
+
+def _flow_arrow():
+    return ("<td style='vertical-align:middle;text-align:center;padding:0 6px;"
+            "font-size:22px;color:" + MUTED + ";width:4%;'>&rarr;</td>")
+
 
 def build_today_actions(today_trades, signal_map, news_map):
+    """
+    For every trade today, render a 3-box flowchart:
+      [What the news said] → [What our system noticed] → [What we decided]
+    All plain English — no jargon.
+    """
     if not today_trades:
         return ("<p style='color:" + MUTED + ";font-size:13px;font-style:italic;margin:0;'>"
-                "No trades executed today.</p>")
+                "No trades today.</p>")
 
     sells   = [t for t in today_trades if t.get('action') == 'SELL']
+    buys    = [t for t in today_trades if t.get('action') == 'BUY']
     total_r = sum(t.get('pnl', 0) or 0 for t in sells)
-    buys_n  = len([t for t in today_trades if t.get('action') == 'BUY'])
-    note    = (str(buys_n) + " buys &middot; " + str(len(sells)) + " sells")
-    if sells:
-        note += (" &middot; realized today: <strong style='color:" + pnl_col(total_r) + ";'>"
-                 + fmt_pnl(total_r) + "</strong>")
 
-    cards = "<div style='font-size:11px;color:" + TEXT2 + ";margin-bottom:12px;'>" + note + "</div>"
+    summary_parts = []
+    if buys:
+        summary_parts.append("<strong>" + str(len(buys)) + "</strong> stock"
+                             + ("s" if len(buys) != 1 else "") + " purchased")
+    if sells:
+        summary_parts.append("<strong>" + str(len(sells)) + "</strong> position"
+                             + ("s" if len(sells) != 1 else "") + " closed")
+    if sells and total_r != 0:
+        col = POS if total_r >= 0 else NEG
+        summary_parts.append("realized today: <strong style='color:" + col + ";'>"
+                              + fmt_pnl(total_r) + "</strong>")
+
+    cards = ("<div style='font-size:13px;color:" + TEXT2 + ";margin-bottom:16px;'>"
+             + " &nbsp;&middot;&nbsp; ".join(summary_parts) + "</div>")
 
     for t in today_trades:
         sym    = t.get('symbol') or ''
@@ -402,64 +519,105 @@ def build_today_actions(today_trades, signal_map, news_map):
         shares = t.get('shares') or 0
         pnl    = t.get('pnl')
         ac     = POS if action == 'BUY' else NEG
+        action_word = 'Bought' if action == 'BUY' else 'Sold'
 
-        sig        = signal_map.get((sym, strat)) or {}
-        conf       = sig.get('confidence') or 0
-        raw_r      = sig.get('reasoning') or ''
-        tech_steps = [s.strip() for s in raw_r.replace(';', ',').split(',') if s.strip()]
+        sig    = signal_map.get((sym, strat)) or {}
+        raw_r  = sig.get('reasoning') or ''
 
-        headlines = news_map.get(sym) or []
+        headlines  = news_map.get(sym) or []
+        strat_lbl  = _strategy_label(strat)
 
-        pnl_s = ("<span style='color:" + pnl_col(pnl) + ";font-weight:700;'>"
-                 + fmt_pnl(pnl) + "</span>") if pnl is not None else (
-                 "<span style='color:" + MUTED + ";'>open</span>")
-
-        # ── card header ──
-        card = ("<div style='border:1px solid " + BORDER + ";border-left:3px solid " + ac + ";"
-                "padding:14px 16px;margin-bottom:10px;background:" + WHITE + ";'>"
-                # trade headline row
-                "<table style='width:100%;border-collapse:collapse;margin-bottom:10px;'><tr>"
-                "<td><span style='font-size:14px;font-weight:700;color:" + TEXT + ";'>"
-                + html_lib.escape(sym) + "</span>"
-                "<span style='margin-left:10px;font-size:12px;font-weight:700;color:" + ac + ";'>"
-                + action + "</span>"
-                "<span style='margin-left:10px;font-size:12px;color:" + TEXT2 + ";'>"
-                + "{:.0f} sh @ ${:.2f}".format(shares, price) + "</span>"
-                "<span style='margin-left:10px;font-size:11px;color:" + MUTED + ";'>"
-                + html_lib.escape(strat) + "</span></td>"
-                "<td style='text-align:right;'>" + pnl_s + "</td>"
-                "</tr></table>")
-
-        # ── news context row ──
-        if headlines:
-            card += ("<div style='background:#f0f4ff;border-left:2px solid " + ACCENT + ";"
-                     "padding:7px 10px;margin-bottom:10px;border-radius:0 2px 2px 0;'>"
-                     "<span style='font-size:10px;font-weight:700;letter-spacing:0.8px;"
-                     "text-transform:uppercase;color:" + ACCENT + ";'>Market Context</span><br>")
-            for h in headlines:
-                card += ("<span style='font-size:11px;color:" + TEXT2 + ";'>"
-                         + html_lib.escape(h) + "</span><br>")
-            card += "</div>"
-
-        # ── flowchart row ──
-        card += "<div style='line-height:2.2;flex-wrap:wrap;'>"
-        if tech_steps:
-            for idx, step in enumerate(tech_steps):
-                card += _node_pill(step)
-                card += _arrow()
-        elif raw_r:
-            card += _node_pill(raw_r[:70])
-            card += _arrow()
+        # P&L display
+        if pnl is not None:
+            pnl_disp = fmt_pnl(pnl)
+            pnl_col_ = pnl_col(pnl)
         else:
-            card += _node_pill("Signal generated")
-            card += _arrow()
+            pnl_disp, pnl_col_ = 'Position still open', MUTED
 
-        if conf:
-            card += _node_pill("conf {:.2f}".format(conf), bg='#f0fdf4', color=POS)
-            card += _arrow()
+        # Trade headline bar
+        card = (
+            "<div style='border:1px solid " + BORDER + ";border-left:4px solid " + ac + ";"
+            "padding:14px 16px;margin-bottom:16px;background:" + WHITE + ";border-radius:2px;'>"
+            "<table style='width:100%;border-collapse:collapse;margin-bottom:14px;'><tr>"
+            "<td>"
+            "<span style='font-size:16px;font-weight:700;color:" + TEXT + ";'>"
+            + html_lib.escape(sym) + "</span>"
+            "<span style='margin-left:10px;font-size:13px;font-weight:700;color:" + ac + ";'>"
+            + action_word + " " + "{:.0f}".format(shares)
+            + " share" + ("s" if shares != 1 else "")
+            + " at ${:.2f}".format(price) + "</span>"
+            "<br><span style='font-size:11px;color:" + MUTED + ";margin-top:3px;display:inline-block;'>"
+            + html_lib.escape(strat_lbl) + "</span>"
+            "</td>"
+            "<td style='text-align:right;vertical-align:top;'>"
+            "<span style='font-size:13px;font-weight:700;color:" + pnl_col_ + ";'>"
+            + pnl_disp + "</span>"
+            "</td>"
+            "</tr></table>"
+        )
 
-        card += _node_pill("EXECUTED " + action, bg=ac, color='#fff', bold=True)
-        card += "</div></div>"
+        # ── 3-box flowchart ──────────────────────────────────────────────────
+        card += "<table style='width:100%;border-collapse:separate;border-spacing:0;'><tr>"
+
+        # Box 1 — NEWS
+        if headlines:
+            news_lines = headlines[:2]
+            card += _flow_box(
+                "What the news said", "&#128240;",
+                news_lines,
+                "#f0f4ff", ACCENT, ACCENT
+            )
+        else:
+            card += _flow_box(
+                "News today", "&#128240;",
+                ["No major headlines found for this stock today."],
+                TH_BG, BORDER, MUTED
+            )
+
+        card += _flow_arrow()
+
+        # Box 2 — WHAT WE NOTICED
+        if action == 'BUY':
+            observed = _translate_buy_reason(raw_r, strat)
+        else:
+            observed = _translate_sell_reason(raw_r, strat)
+
+        card += _flow_box(
+            "What our system noticed", "&#128269;",
+            [observed],
+            "#fffbeb", "#d97706", "#92400e"
+        )
+
+        card += _flow_arrow()
+
+        # Box 3 — DECISION
+        if action == 'BUY':
+            decision_lines = [
+                action_word + " " + "{:.0f}".format(shares)
+                + " share" + ("s" if shares != 1 else "") + " at ${:.2f}".format(price) + ".",
+                "This position is now open and being monitored.",
+            ]
+            dec_bg, dec_border = "#f0fdf4", POS
+            dec_label_col = POS
+        else:
+            result_line = ("Gained " + fmt_pnl(pnl) if pnl and pnl > 0
+                           else "Lost " + fmt_pnl(abs(pnl)) if pnl and pnl < 0
+                           else "Trade closed.")
+            decision_lines = [
+                action_word + " " + "{:.0f}".format(shares)
+                + " share" + ("s" if shares != 1 else "") + " at ${:.2f}".format(price) + ".",
+                result_line,
+            ]
+            dec_bg, dec_border = "#fff1f2", NEG
+            dec_label_col = NEG
+
+        card += _flow_box(
+            "What we decided", "&#9989;" if action == 'BUY' else "&#128683;",
+            decision_lines,
+            dec_bg, dec_border, dec_label_col
+        )
+
+        card += "</tr></table></div>"
         cards += card
 
     return cards
@@ -516,12 +674,12 @@ def build_portfolio_metrics(db_path):
         + "<div style='display:flex;flex-wrap:wrap;background:" + TH_BG + ";border:1px solid "
         + BORDER + ";border-radius:4px;margin-bottom:16px;'>"
         + _kpi('Total Return', _pct(total_ret), ret_col)
-        + _kpi('CAGR (ann.)', _pct((cagr or 0) * 100, 1), cagr_col)
-        + _kpi('Sharpe', _f(sharpe), POS if sharpe and sharpe > 0.8 else MUTED)
+        + _kpi('Annual Return', _pct((cagr or 0) * 100, 1), cagr_col)
+        + _kpi('Risk Score', _f(sharpe), POS if sharpe and sharpe > 0.8 else MUTED)
         + _kpi('Win Rate', _pct((win_rate or 0) * 100, 0), wr_col)
-        + _kpi('Max DD', _pct(max_dd), dd_col)
-        + _kpi('Profit Factor', _f(pf), POS if pf and pf > 1.0 else NEG)
-        + _kpi('Trades', str(n_trades), MUTED)
+        + _kpi('Biggest Drop', _pct(max_dd), dd_col)
+        + _kpi('Wins vs Losses', _f(pf), POS if pf and pf > 1.0 else NEG)
+        + _kpi('Total Trades', str(n_trades), MUTED)
         + "</div>"
     )
 
@@ -561,8 +719,8 @@ def build_all_time_perf(rows):
                   + td_s(since, align='center', small=True, color=MUTED)
                   + "</tr>")
     return tbl(
-        ['Strategy', 'Trades', 'Win %', 'Total P&L', 'Profit Factor',
-         'Best Trade', 'Worst Trade', 'Since'],
+        ['Strategy', 'Trades', 'Win Rate', 'Total Profit / Loss', 'Wins vs Losses Ratio',
+         'Best Single Trade', 'Worst Single Trade', 'Trading Since'],
         trows,
         ['left', 'center', 'center', 'right', 'center', 'right', 'right', 'center'])
 
@@ -610,12 +768,13 @@ def build_strategy_concerns(health_data, rejection_rows, recent_rows):
 
         concern_items = list(issues[:4])
         if r_pnl < 0:
-            concern_items.append("30d P&L negative ({})".format(fmt_pnl(r_pnl)))
+            concern_items.append("Lost money over the last 30 days ({})".format(fmt_pnl(r_pnl)))
         if r_trades > 0 and r_wins / r_trades < 0.4:
-            concern_items.append("Win rate below 40% (30d: {})".format(r_wr))
+            concern_items.append("Only {} of recent trades were profitable — this strategy is underperforming".format(r_wr))
         for rej in top_rej:
-            concern_items.append("Rejected by {} — {} ({} times)".format(
-                rej.get('stage', ''), rej.get('reason_code', ''), rej.get('cnt', 0)))
+            cnt = rej.get('cnt', 0)
+            reason = _translate_rejection(rej.get('stage', ''), rej.get('reason_code', ''))
+            concern_items.append("{} — blocked {} time{}".format(reason, cnt, 's' if cnt != 1 else ''))
 
         border_col = sc_col if score is not None else MUTED
         card = ("<div style='border:1px solid " + BORDER + ";border-left:3px solid "
@@ -629,21 +788,23 @@ def build_strategy_concerns(health_data, rejection_rows, recent_rows):
                      + "<span style='margin-left:8px;'>" + chip(status, sc_col) + "</span>")
         card += ("</td>"
                  "<td style='text-align:right;font-size:11px;color:" + TEXT2 + ";'>"
-                 "30d: <span style='color:" + wr_col + ";font-weight:700;'>" + r_wr + "</span>"
-                 " win rate &middot; "
+                 "Last 30 days: <span style='color:" + wr_col + ";font-weight:700;'>" + r_wr + "</span>"
+                 " win rate &nbsp;&middot;&nbsp; "
                  "<span style='color:" + pnl_col(r_pnl) + ";font-weight:700;font-family:"
                  + MONO + ";'>" + fmt_pnl(r_pnl) + "</span>"
                  "</td></tr></table>")
 
         if concern_items:
+            translated = [_translate_rejection('', i) if i.startswith('Rejected by') else i
+                          for i in concern_items]
             card += "<ul style='margin:0;padding-left:18px;'>"
-            for item in concern_items:
-                card += ("<li style='font-size:11px;color:" + TEXT2 + ";margin-bottom:3px;'>"
+            for item in translated:
+                card += ("<li style='font-size:12px;color:" + TEXT2 + ";margin-bottom:4px;'>"
                          + html_lib.escape(str(item)) + "</li>")
             card += "</ul>"
         else:
-            card += ("<p style='font-size:11px;color:" + POS + ";margin:0;font-style:italic;'>"
-                     "No active concerns.</p>")
+            card += ("<p style='font-size:12px;color:" + POS + ";margin:0;font-style:italic;'>"
+                     "Everything looks healthy &mdash; no concerns right now.</p>")
 
         card += "</div>"
         cards += card
@@ -705,18 +866,18 @@ def generate_email_body(artifact_path=None, db_path='trading.db', include_visual
 
     body_sections = (
         "    <div style='margin-bottom:20px;'>" + summary + chart_section + "</div>\n"
-        + section("Open Positions",
+        + section("Stocks We Currently Hold",
                   build_positions(positions),
-                  str(len(positions)) + " active")
-        + section("Today's Actions",
+                  str(len(positions)) + " open positions")
+        + section("What Happened Today",
                   build_today_actions(today_trades, signal_map, news_map),
-                  str(len(today_trades)) + " executed")
-        + section("Strategy Performance",
+                  str(len(today_trades)) + " trade" + ("s" if len(today_trades) != 1 else ""))
+        + section("How We've Done Overall",
                   build_portfolio_metrics(db_path) + build_all_time_perf(all_time_perf),
-                  "all-time")
-        + section("Strategy Concerns",
+                  "all-time results")
+        + section("Things to Watch",
                   build_strategy_concerns(health_data, rej_rows, recent_rows),
-                  "30-day window")
+                  "last 30 days")
         + "    <div style='padding-top:20px;border-top:1px solid " + BORDER + ";"
           "font-size:11px;color:" + MUTED + ";text-align:center;'>"
           "Investor Mimic Bot &middot; Generated "
