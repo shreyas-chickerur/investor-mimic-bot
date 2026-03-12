@@ -85,10 +85,15 @@ class DailyDataUpdater:
             df['date'] = pd.to_datetime(df['date'])
             df = df.sort_values('date')
 
-            # Use split/dividend-adjusted close — unadjusted close makes stock
-            # splits appear as -75% to -95% crashes, corrupting all indicators.
+            # Use split/dividend-adjusted OHLC — unadjusted prices make stock
+            # splits appear as -75% to -95% crashes and inflate ATR by the
+            # split factor for all pre-split historical rows.
             df['raw_close'] = df['close']
+            adj_factor = df['adjusted_close'] / df['raw_close'].replace(0, float('nan'))
             df['close'] = df['adjusted_close']
+            df['open']  = df['open']  * adj_factor
+            df['high']  = df['high']  * adj_factor
+            df['low']   = df['low']   * adj_factor
 
             # Get only the latest days
             cutoff = datetime.now() - timedelta(days=days)

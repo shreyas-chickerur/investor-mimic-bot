@@ -35,6 +35,11 @@ data/*.db
 # ML model artifacts (regenerated on train)
 data/*.pkl
 
+# Large market data CSVs (50-60MB each) — stored as GitHub Actions artifacts,
+# NOT in git. Regenerate locally: python3 scripts/fetch_historical_data.py
+data/training_data.csv
+data/extended_historical_data.csv
+
 # Artifacts directories (generated per run)
 artifacts/
 
