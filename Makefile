@@ -1,5 +1,5 @@
 .PHONY: help install install-news setup init fetch-data update-data sync-broker clean-data \
-	run run-dry dashboard logs shell \
+	run run-dry dashboard logs shell status close-positions \
 	test test-unit test-integration test-component test-functional test-coverage test-watch \
 	report analyze backtest metrics email-test signals-check news-test \
 	validate verify check-broker check-health debug-signal import-check \
@@ -29,11 +29,13 @@ help:
 	@echo "  make check-health     Verify imports and system health"
 	@echo ""
 	@echo "$(GREEN)🚀 TRADING$(NC)"
-	@echo "  make run              Execute trading (live paper)"
+	@echo "  make run              Execute trading (paper mode)"
 	@echo "  make run-dry          Dry run — no orders submitted"
 	@echo "  make signals-check    Preview today's signals without trading"
+	@echo "  make status           One-stop system status dashboard"
 	@echo "  make dashboard        Launch Streamlit dashboard"
 	@echo "  make logs             View last 50 log lines"
+	@echo "  make close-positions  Close all open positions (emergency)"
 	@echo ""
 	@echo "$(GREEN)📰 NEWS & SENTIMENT$(NC)"
 	@echo "  make news-test        Test news fetch + sentiment for sample symbols"
@@ -128,8 +130,10 @@ logs:
 	@tail -50 logs/multi_strategy.log 2>/dev/null || echo "$(YELLOW)No logs yet$(NC)"
 
 shell:
-	@echo "$(BLUE)🐍 Opening Python shell with imports...$(NC)"
-	@python3 -c "import sys; sys.path.insert(0, 'src'); from IPython import embed; embed()"
+	@echo "$(BLUE)🐍 Opening Python shell with sys.path configured...$(NC)"
+	@python3 -c "import sys; sys.path.insert(0, '.'); import src; print('src/ on path — import freely'); \
+	__import__('IPython').embed()" 2>/dev/null || \
+	python3 -i -c "import sys; sys.path.insert(0, '.'); print('src/ on path. Try: from src.core.database import TradingDatabase')"
 
 # ============================================================================
 # TESTING
@@ -216,6 +220,14 @@ email-test:
 	@python3 scripts/generate_daily_email.py
 	@open /tmp/daily_email.html 2>/dev/null || xdg-open /tmp/daily_email.html 2>/dev/null || echo "Email HTML at /tmp/daily_email.html"
 	@echo "$(GREEN)✅ Email preview ready$(NC)"
+
+status:
+	@echo "$(BLUE)📊 System status dashboard...$(NC)"
+	@python3 scripts/status.py
+
+close-positions:
+	@echo "$(RED)⚠️  Closing ALL open positions...$(NC)"
+	@set -a && source .env && set +a && python3 scripts/close_all_positions.py
 
 news-test:
 	@echo "$(BLUE)📰 Testing news fetch + sentiment...$(NC)"
