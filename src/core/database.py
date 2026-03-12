@@ -229,6 +229,16 @@ class TradingDatabase:
                 FOREIGN KEY (strategy_id) REFERENCES strategies(id)
             )
         ''')
+        # Schema migration: add snapshot_date if missing from a pre-existing DB.
+        # Must run BEFORE the index creation below which references snapshot_date.
+        cursor.execute("PRAGMA table_info(strategy_performance)")
+        existing_cols = {row[1] for row in cursor.fetchall()}
+        if 'snapshot_date' not in existing_cols:
+            cursor.execute(
+                "ALTER TABLE strategy_performance ADD COLUMN snapshot_date TEXT NOT NULL DEFAULT ''"
+            )
+            logger.info("Migrated strategy_performance: added snapshot_date column")
+
         cursor.execute(
             'CREATE INDEX IF NOT EXISTS idx_strategy_perf_strat ON strategy_performance(strategy_id)'
         )
