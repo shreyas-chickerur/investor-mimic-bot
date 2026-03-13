@@ -74,7 +74,16 @@ jobs:
           gh api repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip > training-data.zip
           unzip -o training-data.zip -d data/
           rm -f training-data.zip
-          echo "✅ Downloaded training_data.csv ($(wc -l < data/training_data.csv) rows)"
+          ROWS=$(wc -l < data/training_data.csv 2>/dev/null || echo "0")
+          echo "Downloaded training_data.csv ($ROWS rows)"
+          # Need at least 36 symbols × 200 days = 7200 rows for 200-day MA
+          if [ "$ROWS" -lt "7200" ]; then
+            echo "⚠️ Insufficient data ($ROWS rows < 7200 required) — running full historical fetch"
+            rm -f data/training_data.csv
+            python3 scripts/fetch_historical_data.py
+          else
+            echo "✅ Training data sufficient ($ROWS rows)"
+          fi
         else
           echo "⚠️ No training-data artifact found — will fetch full history"
           python3 scripts/fetch_historical_data.py
