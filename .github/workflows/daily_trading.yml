@@ -64,6 +64,7 @@ jobs:
       continue-on-error: true
       env:
         GH_TOKEN: ${{ github.token }}
+        ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
       run: |
         echo "=== Downloading latest training-data artifact ==="
         ARTIFACT_ID=$(gh api repos/${{ github.repository }}/actions/artifacts \
@@ -84,9 +85,11 @@ jobs:
         ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
       run: |
         echo "=== Fetching Latest Market Data ==="
-        python3 scripts/update_daily_data.py || echo "Data update completed with warnings"
+        python3 scripts/update_daily_data.py
     
     - name: Check signal generation health
+      env:
+        ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
       run: |
         echo "=== Signal Generation Health Check ==="
         python3 scripts/monitor_signal_health.py || echo "Health check completed with warnings"
