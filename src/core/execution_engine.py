@@ -490,16 +490,19 @@ class MultiStrategyRunner:
             # Check if stop loss is hit
             if self.stop_loss_manager.check_stop_loss(symbol, current_price):
                 stop_price = self.stop_loss_manager.get_stop_price(symbol)
+                entry_price = position.get('entry_price') or 0
+                stop_str = f"${stop_price:.2f}" if stop_price is not None else "N/A"
+                entry_str = f"${entry_price:.2f}" if entry_price else "N/A"
                 logger.warning(f"CATASTROPHE STOP HIT: {symbol} at ${current_price:.2f} "
-                             f"(stop: ${stop_price:.2f}, entry: ${position.get('entry_price', 0):.2f})")
-                
+                             f"(stop: {stop_str}, entry: {entry_str})")
+
                 positions_to_close.append({
                     'symbol': symbol,
                     'strategy_id': strategy_id,
                     'shares': position['shares'],
                     'current_price': current_price,
                     'stop_price': stop_price,
-                    'entry_price': position.get('entry_price', 0),
+                    'entry_price': entry_price,
                     'reason': 'CATASTROPHE_STOP_LOSS'
                 })
         

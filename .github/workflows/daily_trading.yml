@@ -65,6 +65,7 @@ jobs:
       env:
         GH_TOKEN: ${{ github.token }}
         ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+        ALPHA_VANTAGE_PREMIUM: ${{ secrets.ALPHA_VANTAGE_PREMIUM }}
       run: |
         echo "=== Downloading latest training-data artifact ==="
         ARTIFACT_ID=$(gh api repos/${{ github.repository }}/actions/artifacts \

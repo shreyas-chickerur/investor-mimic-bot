@@ -346,9 +346,10 @@ def main():
     logger.info("="*80)
     logger.info("EXTENDED HISTORICAL DATA FETCH")
     logger.info("="*80)
-    
-    # Initialize fetcher (premium=True by default)
-    fetcher = ExtendedDataFetcher(years=15)
+
+    premium = os.getenv('ALPHA_VANTAGE_PREMIUM', 'false').lower() == 'true'
+    logger.info(f"API tier: {'PREMIUM' if premium else 'FREE (sequential)'}")
+    fetcher = ExtendedDataFetcher(years=15, premium=premium)
     
     # Fetch all stock data
     logger.info("\nFetching stock data...")
