@@ -210,10 +210,14 @@ class DailyDataUpdater:
         new_data = []
         failed = []
         
+        days_to_fetch = 5 if existing_df is not None else 100
+        if existing_df is None:
+            logger.info("No existing data — fetching full compact window (100 days per symbol)")
+
         for i, symbol in enumerate(self.universe, 1):
             logger.info(f"[{i}/{len(self.universe)}] {symbol}")
-            
-            df = self.fetch_latest_data(symbol, days=5)
+
+            df = self.fetch_latest_data(symbol, days=days_to_fetch)
             
             if df is not None and len(df) > 0:
                 new_data.append(df)
