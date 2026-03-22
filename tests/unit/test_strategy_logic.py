@@ -249,11 +249,16 @@ class TestMLMomentumFixes:
             "on financial data rarely exceeds 0.55, killing all signals."
         )
 
-    def test_model_uses_balanced_class_weight(self):
+    def test_model_is_gradient_boosting_with_correct_params(self):
+        """GBM replaced LogisticRegression; verify it is configured to prevent overfitting."""
+        from sklearn.ensemble import GradientBoostingClassifier
         s = MLMomentumStrategy(1, 25_000)
-        assert s.model.class_weight == "balanced", (
-            "class_weight must be 'balanced' to avoid bias toward majority class"
+        assert isinstance(s.model, GradientBoostingClassifier), (
+            "MLMomentumStrategy.model must be GradientBoostingClassifier"
         )
+        assert s.model.n_estimators == 200, "n_estimators must be 200"
+        assert s.model.max_depth == 3, "max_depth must be 3 to prevent overfitting"
+        assert s.model.subsample == 0.8, "subsample must be 0.8 for stochastic GBM"
 
     def test_training_uses_precomputed_future_returns(self):
         """If future_return_5d column exists, training should use it."""
