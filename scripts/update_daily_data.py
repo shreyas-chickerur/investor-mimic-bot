@@ -261,6 +261,15 @@ class DailyDataUpdater:
         else:
             combined_df = new_df
         
+        # Drop orphaned symbols not in the current universe — stale/removed symbols
+        # accumulate NaN indicators and trigger EXCESSIVE_NAN / STALE_DATA blocks every run.
+        active_symbols = set(self.universe)
+        before_count = combined_df['symbol'].nunique()
+        combined_df = combined_df[combined_df['symbol'].isin(active_symbols)]
+        after_count = combined_df['symbol'].nunique()
+        if before_count != after_count:
+            logger.info(f"Pruned {before_count - after_count} orphaned symbol(s) not in current universe")
+
         # Calculate indicators for the combined dataset
         logger.info("\nCalculating technical indicators...")
         combined_df = self.calculate_indicators(combined_df)

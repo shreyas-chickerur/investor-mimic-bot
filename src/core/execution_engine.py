@@ -1105,7 +1105,7 @@ class MultiStrategyRunner:
                             actual_fill_price = float(filled_order.filled_avg_price) if filled_order.filled_avg_price else exec_price
                             logger.info(f"Order {order.id} verified: {filled_order.status}, filled_qty={actual_filled_qty}, avg_price={actual_fill_price}")
                         else:
-                            logger.warning(f"Order {order.id} not filled yet: status={filled_order.status}")
+                            logger.info(f"Order {order.id} not filled yet: status={filled_order.status} (expected at market close)")
                             # For paper trading, assume immediate fill
                             if self.paper_mode:
                                 fill_verified = True
@@ -1238,7 +1238,7 @@ class MultiStrategyRunner:
                             actual_fill_price = float(filled_order.filled_avg_price) if filled_order.filled_avg_price else exec_price
                             logger.info(f"SELL Order {order.id} verified: {filled_order.status}, filled_qty={actual_filled_qty}, avg_price={actual_fill_price}")
                         else:
-                            logger.warning(f"SELL Order {order.id} not filled yet: status={filled_order.status}")
+                            logger.info(f"SELL Order {order.id} not filled yet: status={filled_order.status} (expected at market close)")
                             # For paper trading, assume immediate fill
                             if self.paper_mode:
                                 fill_verified = True
