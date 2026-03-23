@@ -257,9 +257,15 @@ class StrategyHealthScorer:
         issues = []
         
         # Check 1: Trade activity (30 points)
+        no_signals_either = metrics['signal_count_30d'] == 0 and metrics['trade_count_30d'] == 0
         if metrics['trade_count_30d'] < self.min_trades_for_scoring:
-            score -= 30
-            issues.append(f"Low trade count: {metrics['trade_count_30d']} in 30d (need {self.min_trades_for_scoring})")
+            if no_signals_either:
+                # No signals AND no trades: event-driven strategy saw no qualifying events
+                score -= 10  # minor penalty only — strategy is idle, not broken
+                issues.append(f"No activity in 30d (0 signals, 0 trades) — event-driven silence or new deployment")
+            else:
+                score -= 30
+                issues.append(f"Low trade count: {metrics['trade_count_30d']} in 30d (need {self.min_trades_for_scoring})")
         elif metrics['trade_count_7d'] == 0:
             score -= 15
             issues.append("No trades in past 7 days")
@@ -366,10 +372,16 @@ class StrategyHealthScorer:
                 )
             
             if strategy['trade_count_30d'] == 0:
-                recommendations.append(
-                    f"No trades for {strategy['strategy_name']} in 30 days - "
-                    f"Check if strategy is generating signals"
-                )
+                if strategy['signal_count_30d'] == 0:
+                    recommendations.append(
+                        f"{strategy['strategy_name']} had no qualifying events in 30 days "
+                        f"(0 signals generated) — normal for event-driven strategies"
+                    )
+                else:
+                    recommendations.append(
+                        f"{strategy['strategy_name']} generated {strategy['signal_count_30d']} signals "
+                        f"but executed 0 trades in 30 days — review risk/cash filters"
+                    )
         
         if not recommendations:
             recommendations.append("All strategies operating within normal parameters")

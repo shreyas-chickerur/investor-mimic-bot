@@ -47,7 +47,20 @@ def get_strategy_performance(db_path='trading.db', days=30):
         strategy_id = strategy['id']
         strategy_name = strategy['name']
         
-        # Get trades for this strategy
+        # Count ALL trades (including open BUY positions with null pnl)
+        all_trades_query = '''
+            SELECT COUNT(*) as cnt, action
+            FROM trades
+            WHERE strategy_id = ?
+            AND executed_at >= DATE('now', ?)
+            GROUP BY action
+        '''
+        all_trade_rows = conn.execute(all_trades_query, (strategy_id, f'-{days} days')).fetchall()
+        all_trade_count = sum(r['cnt'] for r in all_trade_rows)
+        open_buys = sum(r['cnt'] for r in all_trade_rows if r['action'] == 'BUY')
+        closed_sells = sum(r['cnt'] for r in all_trade_rows if r['action'] == 'SELL')
+
+        # Get only closed (SELL) trades for P&L metrics
         query = '''
             SELECT 
                 DATE(executed_at) as date,
@@ -56,6 +69,7 @@ def get_strategy_performance(db_path='trading.db', days=30):
             WHERE strategy_id = ?
             AND executed_at >= DATE('now', ?)
             AND pnl IS NOT NULL
+            AND pnl != 0
             ORDER BY executed_at
         '''
         
@@ -63,7 +77,9 @@ def get_strategy_performance(db_path='trading.db', days=30):
         
         if not trades:
             performance[strategy_name] = {
-                'total_trades': 0,
+                'total_trades': all_trade_count,
+                'open_positions': open_buys,
+                'closed_trades': closed_sells,
                 'wins': 0,
                 'losses': 0,
                 'win_rate': 0.0,
@@ -78,11 +94,11 @@ def get_strategy_performance(db_path='trading.db', days=30):
             }
             continue
         
-        # Calculate metrics
-        total_trades = len(trades)
+        # Calculate metrics (closed trades only)
+        total_trades = all_trade_count
         wins = sum(1 for t in trades if t['pnl'] > 0)
         losses = sum(1 for t in trades if t['pnl'] < 0)
-        win_rate = (wins / total_trades * 100) if total_trades > 0 else 0.0
+        win_rate = (wins / closed_sells * 100) if closed_sells > 0 else 0.0
         
         pnls = [t['pnl'] for t in trades]
         total_pnl = sum(pnls)
@@ -112,6 +128,8 @@ def get_strategy_performance(db_path='trading.db', days=30):
         
         performance[strategy_name] = {
             'total_trades': total_trades,
+            'open_positions': open_buys,
+            'closed_trades': closed_sells,
             'wins': wins,
             'losses': losses,
             'win_rate': win_rate,
@@ -191,14 +209,19 @@ def generate_strategy_summary(performance, rankings, days=30):
             continue
         
         summary += f"\n{strategy}:\n"
-        summary += f"  Trades: {perf['total_trades']} ({perf['wins']}W / {perf['losses']}L)\n"
-        summary += f"  Win Rate: {perf['win_rate']:.1f}%\n"
-        summary += f"  Total P&L: ${perf['total_pnl']:,.2f}\n"
-        summary += f"  Avg P&L: ${perf['avg_pnl']:.2f}\n"
-        summary += f"  Max Win: ${perf['max_win']:.2f}\n"
-        summary += f"  Max Loss: ${perf['max_loss']:.2f}\n"
-        summary += f"  Sharpe Ratio: {perf['sharpe_ratio']:.2f}\n"
-        summary += f"  Profit Factor: {perf['profit_factor']:.2f}\n"
+        open_pos = perf.get('open_positions', 0)
+        closed = perf.get('closed_trades', 0)
+        summary += f"  Trades: {perf['total_trades']} total ({open_pos} open positions, {closed} closed)\n"
+        if closed == 0 and open_pos > 0:
+            summary += f"  P&L: $0.00 (all positions still open — unrealized P&L pending close)\n"
+        else:
+            summary += f"  Win Rate: {perf['win_rate']:.1f}% (closed trades)\n"
+            summary += f"  Total P&L: ${perf['total_pnl']:,.2f}\n"
+            summary += f"  Avg P&L: ${perf['avg_pnl']:.2f}\n"
+            summary += f"  Max Win: ${perf['max_win']:.2f}\n"
+            summary += f"  Max Loss: ${perf['max_loss']:.2f}\n"
+            summary += f"  Sharpe Ratio: {perf['sharpe_ratio']:.2f}\n"
+            summary += f"  Profit Factor: {perf['profit_factor']:.2f}\n"
     
     return summary
 
