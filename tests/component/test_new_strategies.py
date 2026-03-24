@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 import pandas as pd
 import numpy as np
 import pytest
+pytestmark = pytest.mark.timeout(30)  # per-test safety net
 
 from src.strategies.strategy_earnings_drift import EarningsDriftStrategy
 from src.strategies.strategy_factor_momentum import FactorMomentumStrategy
@@ -158,6 +159,7 @@ class TestEarningsDriftStrategy:
         desc = strat.get_description()
         assert 'drift' in desc.lower() or 'earnings' in desc.lower()
 
+    @pytest.mark.slow
     def test_with_real_data(self, market_data):
         """Integration test with real market data."""
         strat = EarningsDriftStrategy(1, 25000)
@@ -295,6 +297,7 @@ class TestFactorMomentumStrategy:
         assert 'factor' in desc.lower()
         assert 'momentum' in desc.lower()
 
+    @pytest.mark.slow
     def test_with_real_data(self, market_data):
         """Integration test with real market data."""
         strat = FactorMomentumStrategy(1, 25000)
@@ -319,6 +322,7 @@ class TestFactorMomentumStrategy:
 # Cross-strategy tests
 # ---------------------------------------------------------------------------
 
+@pytest.mark.slow
 class TestStrategyIntegration:
 
     def test_both_strategies_produce_valid_signals(self, market_data):

@@ -159,6 +159,7 @@ class TestUpdateDailyDataColdStart:
         training data file is absent (no network call is made).
         """
         monkeypatch.setenv("ALPHA_VANTAGE_API_KEY", "FAKE_KEY_FOR_TEST")
+        import scripts.update_daily_data as _udm
         from scripts.update_daily_data import DailyDataUpdater
 
         updater = DailyDataUpdater()
@@ -172,6 +173,8 @@ class TestUpdateDailyDataColdStart:
             return None  # simulate failure for all symbols
 
         monkeypatch.setattr(updater, "fetch_latest_data", fake_fetch)
+        # Also eliminate the 12s inter-symbol sleep (35 symbols × 12s = 420s otherwise)
+        monkeypatch.setattr(_udm.time, "sleep", lambda _: None)
 
         # Run with non-existent data file (cold start)
         updater.update_training_data(data_file=str(data_file))

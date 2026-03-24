@@ -9,6 +9,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 import pandas as pd
 import pytest
 
+pytestmark = pytest.mark.slow  # loads training_data.csv for all tests
+
 from src.strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
 from src.strategies.strategy_ma_crossover import MACrossoverStrategy
 from src.strategies.strategy_volatility_breakout import VolatilityBreakoutStrategy

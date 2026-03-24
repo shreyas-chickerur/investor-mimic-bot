@@ -123,8 +123,9 @@ class MLMomentumStrategy(TradingStrategy):
         y_train = []
         use_precomputed = 'future_return_5d' in market_data.columns
 
-        for symbol in market_data['symbol'].unique():
-            sym = market_data[market_data['symbol'] == symbol].copy()
+        sym_map = {sym: grp.copy() for sym, grp in market_data.groupby('symbol')}
+
+        for symbol, sym in sym_map.items():
             if len(sym) < 60:
                 continue
 
@@ -176,8 +177,9 @@ class MLMomentumStrategy(TradingStrategy):
         if not self.is_trained:
             return signals
 
-        for symbol in market_data['symbol'].unique():
-            symbol_data = market_data[market_data['symbol'] == symbol]
+        sym_map = {sym: grp for sym, grp in market_data.groupby('symbol')}
+
+        for symbol, symbol_data in sym_map.items():
             if len(symbol_data) < 20:
                 continue
 

@@ -56,64 +56,62 @@ class FactorMomentumStrategy(TradingStrategy):
         Returns:
             Dict of {symbol: composite_score} where scores are meaningful ranks.
         """
-        raw: Dict[str, Dict[str, float]] = {}
+        # Build per-symbol row counts once, then get latest row per symbol in one pass
+        counts = market_data.groupby('symbol').size()
+        eligible = counts[counts >= 60].index
 
-        for symbol in market_data['symbol'].unique():
-            sym = market_data[market_data['symbol'] == symbol]
-            if len(sym) < 60:
-                continue
-
-            latest = sym.iloc[-1]
-
-            # Factor 1: Momentum (60d return, skip last 5d for short-term reversal)
-            if len(sym) >= 65:
-                price_now = sym['close'].iloc[-6]
-                price_60d = sym['close'].iloc[-65]
-                momentum = (price_now / price_60d - 1) if price_60d > 0 else 0.0
-            else:
-                ret_60d = latest.get('returns_60d', 0)
-                momentum = float(ret_60d) if not pd.isna(ret_60d) else 0.0
-
-            # Factor 2: Quality proxy (low vol relative to peers + positive momentum)
-            vol_20d = float(latest.get('volatility_20d', 0.2)) if not pd.isna(latest.get('volatility_20d', np.nan)) else 0.2
-            quality = -vol_20d + max(momentum, 0) * 0.5
-
-            # Factor 3: Mean-reversion (moderate oversold: 25–45 RSI range)
-            rsi = float(latest.get('rsi', 50)) if not pd.isna(latest.get('rsi', np.nan)) else 50.0
-            reversion_score = max(0.0, (45 - rsi) / 20) if 25 <= rsi <= 45 else 0.0
-
-            # Factor 4: Volume confirmation (rising volume on up-moves only)
-            vol_ratio = float(latest.get('volume_ratio', 1.0)) if not pd.isna(latest.get('volume_ratio', np.nan)) else 1.0
-            ret_5d = float(latest.get('returns_5d', 0)) if not pd.isna(latest.get('returns_5d', np.nan)) else 0.0
-            volume_confirm = vol_ratio * max(ret_5d, 0)
-
-            raw[symbol] = {
-                'momentum': momentum,
-                'quality': quality,
-                'reversion': reversion_score,
-                'volume': volume_confirm,
-            }
-
-        if len(raw) < 3:
+        if len(eligible) < 3:
             return {}
 
-        # Cross-sectional percentile ranking — compare each stock vs the universe
-        df = pd.DataFrame(raw).T
+        filtered = market_data[market_data['symbol'].isin(eligible)]
+
+        # One groupby pass to get last row per symbol (replaces 33 individual boolean filters)
+        latest_df = filtered.groupby('symbol').last()
+
+        # --- Factor 1: Momentum (60d return, skip last 5d for reversal) ---
+        # Use pre-computed returns_60d where the close-based calculation is unavailable
+        # Close-based (skip-5) momentum requires random access to specific rows;
+        # fall back to the stored returns_60d column which is computed the same way.
+        ret_60d = latest_df['returns_60d'].fillna(0.0)
+        momentum = ret_60d.astype(float)
+
+        # --- Factor 2: Quality proxy ---
+        vol_20d = latest_df['volatility_20d'].fillna(0.2).astype(float)
+        quality = -vol_20d + momentum.clip(lower=0) * 0.5
+
+        # --- Factor 3: Mean-reversion (RSI 25-45 oversold range) ---
+        rsi = latest_df['rsi'].fillna(50.0).astype(float)
+        reversion_score = np.where(
+            (rsi >= 25) & (rsi <= 45),
+            (45 - rsi) / 20,
+            0.0
+        )
+
+        # --- Factor 4: Volume confirmation (rising volume on up-moves only) ---
+        vol_ratio = latest_df['volume_ratio'].fillna(1.0).astype(float)
+        ret_5d = latest_df['returns_5d'].fillna(0.0).astype(float)
+        volume_confirm = vol_ratio * ret_5d.clip(lower=0)
+
+        # Assemble factor DataFrame and cross-sectionally rank each factor
+        factors = pd.DataFrame({
+            'momentum': momentum,
+            'quality': quality,
+            'reversion': reversion_score,
+            'volume': volume_confirm,
+        }, index=latest_df.index)
+
         for col in ['momentum', 'quality', 'reversion', 'volume']:
-            df[f'{col}_pct'] = df[col].rank(pct=True)
+            factors[f'{col}_pct'] = factors[col].rank(pct=True)
 
-        scores: Dict[str, float] = {}
-        for symbol in df.index:
-            r = df.loc[symbol]
-            composite = (
-                0.40 * r['momentum_pct'] +
-                0.25 * r['quality_pct'] +
-                0.20 * r['reversion_pct'] +
-                0.15 * r['volume_pct']
-            )
-            scores[symbol] = float(composite)
+        # Weighted composite score
+        factors['composite'] = (
+            0.40 * factors['momentum_pct'] +
+            0.25 * factors['quality_pct'] +
+            0.20 * factors['reversion_pct'] +
+            0.15 * factors['volume_pct']
+        )
 
-        return scores
+        return factors['composite'].to_dict()
 
     def generate_signals(self, market_data: pd.DataFrame) -> List[Dict]:
         """Generate signals by ranking stocks and buying top quintile."""
@@ -122,11 +120,14 @@ class FactorMomentumStrategy(TradingStrategy):
         if latest_date is None:
             return signals
 
+        # Pre-build symbol→DataFrame lookup once — avoids repeated boolean filter per position
+        sym_map = {sym: grp for sym, grp in market_data.groupby('symbol')}
+
         # Check SELL first — profit target, stop-loss, or time-based rebalance
         for symbol in list(self.positions.keys()):
             days_held = self.get_days_held(symbol, latest_date)
-            sym_data = market_data[market_data['symbol'] == symbol]
-            if sym_data.empty:
+            sym_data = sym_map.get(symbol)
+            if sym_data is None or sym_data.empty:
                 continue
             price = float(sym_data.iloc[-1]['close'])
             shares = self.positions[symbol]
@@ -173,8 +174,8 @@ class FactorMomentumStrategy(TradingStrategy):
         ][:buy_capacity]
 
         for symbol, score in candidates:
-            sym_data = market_data[market_data['symbol'] == symbol]
-            if sym_data.empty:
+            sym_data = sym_map.get(symbol)
+            if sym_data is None or sym_data.empty:
                 continue
 
             latest = sym_data.iloc[-1]

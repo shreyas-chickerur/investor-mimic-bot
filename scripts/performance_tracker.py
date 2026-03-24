@@ -22,11 +22,9 @@ from typing import Dict, List, Optional, Tuple
 # DB helpers
 # ---------------------------------------------------------------------------
 
-def _q(db_path: str, sql: str, params: tuple = ()) -> List[dict]:
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
+def _q(conn: sqlite3.Connection, sql: str, params: tuple = ()) -> List[dict]:
+    """Run a query on an already-open connection."""
     rows = conn.execute(sql, params).fetchall()
-    conn.close()
     return [dict(r) for r in rows]
 
 
@@ -92,8 +90,8 @@ def _cagr(start_val: float, end_val: float, trading_days: int) -> Optional[float
 # Data loading
 # ---------------------------------------------------------------------------
 
-def load_trades(db_path: str) -> List[dict]:
-    return _q(db_path, """
+def load_trades(conn: sqlite3.Connection) -> List[dict]:
+    return _q(conn, """
         SELECT t.*, s.name strategy_name
         FROM trades t
         LEFT JOIN strategies s ON t.strategy_id = s.id
@@ -102,9 +100,9 @@ def load_trades(db_path: str) -> List[dict]:
     """)
 
 
-def load_portfolio_snapshots(db_path: str) -> List[dict]:
+def load_portfolio_snapshots(conn: sqlite3.Connection) -> List[dict]:
     """Load daily START snapshots for portfolio equity curve."""
-    return _q(db_path, """
+    return _q(conn, """
         SELECT snapshot_date, portfolio_value, cash
         FROM broker_state
         WHERE snapshot_type = 'START'
@@ -117,8 +115,13 @@ def load_portfolio_snapshots(db_path: str) -> List[dict]:
 # ---------------------------------------------------------------------------
 
 def compute_portfolio_metrics(db_path: str) -> Dict:
-    snapshots = load_portfolio_snapshots(db_path)
-    trades = load_trades(db_path)
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        snapshots = load_portfolio_snapshots(conn)
+        trades = load_trades(conn)
+    finally:
+        conn.close()
 
     result: Dict = {
         'computed_at': datetime.now().isoformat(),

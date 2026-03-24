@@ -6,7 +6,9 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
+import os
 import unittest
+from unittest.mock import patch
 from src.utils.email_notifier import EmailNotifier
 
 
@@ -15,7 +17,15 @@ class TestEmailAlert(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures"""
+        # Force credentials absent so EmailNotifier.enabled=False (no live SMTP)
+        self._env_patch = patch.dict(os.environ, {
+            'SENDER_EMAIL': '', 'SENDER_PASSWORD': '', 'RECIPIENT_EMAIL': ''
+        })
+        self._env_patch.start()
         self.notifier = EmailNotifier()
+
+    def tearDown(self):
+        self._env_patch.stop()
     
     def test_send_alert_method_exists(self):
         """Test that send_alert method exists"""
