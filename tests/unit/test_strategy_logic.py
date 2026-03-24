@@ -239,6 +239,18 @@ class TestFactorMomentumRanking:
 # 3. ML Momentum
 # ===========================================================================
 
+# Module-scoped: train once and reuse across all ML tests (GBM with 200
+# estimators is non-trivial; training 3 separate instances was the main slow
+# path in this file).
+@pytest.fixture(scope="module")
+def ml_strategy_and_data():
+    """Returns (trained_strategy, data) — trained once per test module."""
+    data = _multi_symbol_data(n_symbols=8, n_bars=120)
+    s = MLMomentumStrategy(1, 25_000)
+    s._train_model(data)
+    return s, data
+
+
 class TestMLMomentumFixes:
 
     def test_min_confidence_is_0_52(self):
@@ -260,34 +272,24 @@ class TestMLMomentumFixes:
         assert s.model.max_depth == 3, "max_depth must be 3 to prevent overfitting"
         assert s.model.subsample == 0.8, "subsample must be 0.8 for stochastic GBM"
 
-    def test_training_uses_precomputed_future_returns(self):
+    def test_training_uses_precomputed_future_returns(self, ml_strategy_and_data):
         """If future_return_5d column exists, training should use it."""
-        s = MLMomentumStrategy(1, 25_000)
-        # Use 8 symbols so both classes appear reliably
-        data = _multi_symbol_data(n_symbols=8, n_bars=120)
+        s, data = ml_strategy_and_data
         assert "future_return_5d" in data.columns
-        # Confirm both classes present
         positives = (data["future_return_5d"] > 0.005).sum()
         negatives = (data["future_return_5d"] <= 0.005).sum()
         assert positives > 0 and negatives > 0, "Fixture must have both classes"
-
-        s._train_model(data)
         assert s.is_trained, "Model should train successfully on multi-symbol data"
 
-    def test_generates_signals_after_training(self):
-        s = MLMomentumStrategy(1, 25_000)
-        data = _multi_symbol_data(n_symbols=8, n_bars=120)
-        # No exception should occur; returns a list (may be empty depending on data)
+    def test_generates_signals_after_training(self, ml_strategy_and_data):
+        s, data = ml_strategy_and_data
         signals = s.generate_signals(data)
         assert isinstance(signals, list)
 
-    def test_daily_retrain_triggered_by_date_change(self):
+    def test_daily_retrain_triggered_by_date_change(self, ml_strategy_and_data):
         """Model should retrain when _train_date differs from latest data date."""
-        s = MLMomentumStrategy(1, 25_000)
-        data = _multi_symbol_data(n_symbols=8, n_bars=120)
-        s._train_model(data)
+        s, data = ml_strategy_and_data
         s._train_date = "2020-01-01"  # force stale date
-
         s.generate_signals(data)
         today = str(data.index.max().date())
         assert s._train_date == today, "Model should retrain and update _train_date"

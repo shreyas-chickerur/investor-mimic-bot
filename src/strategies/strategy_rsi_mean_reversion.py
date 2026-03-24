@@ -45,9 +45,9 @@ class RSIMeanReversionStrategy(TradingStrategy):
         if market_data.empty or 'symbol' not in market_data.columns:
             return signals
 
-        for symbol in market_data['symbol'].unique():
-            symbol_data = market_data[market_data['symbol'] == symbol]
+        sym_map = {sym: grp for sym, grp in market_data.groupby('symbol')}
 
+        for symbol, symbol_data in sym_map.items():
             if len(symbol_data) < 2:
                 continue
 

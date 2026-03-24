@@ -33,6 +33,8 @@ class TradingDatabase:
     def _init_database(self):
         """Initialize trading database schema"""
         conn = sqlite3.connect(self.db_path)
+        conn.execute('PRAGMA journal_mode=WAL')   # concurrent readers don't block each other
+        conn.execute('PRAGMA synchronous=NORMAL') # safe + faster than FULL for WAL mode
         cursor = conn.cursor()
         
         # Strategies table
@@ -72,6 +74,7 @@ class TradingDatabase:
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_signals_symbol ON signals(symbol)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_signals_terminal_state ON signals(terminal_state)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_signals_generated_at ON signals(generated_at)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_signals_strategy_date ON signals(strategy_id, generated_at)')
         
         # Trades table with execution costs
         cursor.execute('''
@@ -97,8 +100,9 @@ class TradingDatabase:
             )
         ''')
         
-        # Add index on run_id for performance
+        # Indexes for trades: run_id lookups + strategy/date range queries (health scorer, performance report)
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_trades_run_id ON trades(run_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_trades_strategy_date ON trades(strategy_id, executed_at)')
         
         # Positions table
         cursor.execute('''
@@ -209,6 +213,7 @@ class TradingDatabase:
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_signal_funnel_run_id ON signal_funnel(run_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_signal_rejections_run_id ON signal_rejections(run_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_signal_rejections_stage ON signal_rejections(stage)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_rejections_strategy_date ON signal_rejections(strategy_id, created_at)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_order_intents_run_id ON order_intents(run_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_order_intents_status ON order_intents(status)')
         

@@ -140,13 +140,18 @@ shell:
 # ============================================================================
 
 test:
-	@echo "$(BLUE)🧪 Running all tests...$(NC)"
-	@python3 -m pytest tests/ -v --tb=short
+	@echo "$(BLUE)🧪 Running fast tests (use 'make test-all' to include slow/real-data tests)...$(NC)"
+	@python3 -m pytest tests/unit/ tests/component/ --durations=5
+	@echo "$(GREEN)✅ Fast tests passed$(NC)"
+
+test-all:
+	@echo "$(BLUE)🧪 Running full test suite (including slow/real-data tests)...$(NC)"
+	@python3 -m pytest tests/ -m "" --durations=10
 	@echo "$(GREEN)✅ All tests passed$(NC)"
 
 test-unit:
 	@echo "$(BLUE)🧪 Running unit tests...$(NC)"
-	@python3 -m pytest tests/unit/ -v --tb=short
+	@python3 -m pytest tests/unit/ --durations=5
 	@echo "$(GREEN)✅ Unit tests passed$(NC)"
 
 test-integration:
@@ -156,7 +161,7 @@ test-integration:
 
 test-component:
 	@echo "$(BLUE)🧪 Running component tests...$(NC)"
-	@python3 -m pytest tests/component/ -v --tb=short
+	@python3 -m pytest tests/component/ --durations=5
 	@echo "$(GREEN)✅ Component tests passed$(NC)"
 
 test-functional:
@@ -166,12 +171,12 @@ test-functional:
 
 test-coverage:
 	@echo "$(BLUE)📊 Running tests with coverage...$(NC)"
-	@python3 -m pytest tests/ --cov=src --cov-report=html --cov-report=term
+	@python3 -m pytest tests/ -m "" --cov=src --cov-report=html --cov-report=term
 	@echo "$(GREEN)✅ Coverage report generated: htmlcov/index.html$(NC)"
 
 test-watch:
 	@echo "$(BLUE)👀 Running tests in watch mode...$(NC)"
-	@python3 -m pytest tests/ -v --tb=short -f
+	@python3 -m pytest tests/unit/ tests/component/ -f
 
 # ============================================================================
 # DATA MANAGEMENT

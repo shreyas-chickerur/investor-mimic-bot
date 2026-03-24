@@ -65,12 +65,16 @@ class StrategyHealthScorer:
         Returns:
             Dict with health metrics and score
         """
-        # Get recent trades
-        trades = self._get_recent_trades(strategy_id, days=self.long_window)
-        
-        # Get recent signals and rejections
-        signals = self._get_recent_signals(strategy_id, days=self.long_window)
-        rejections = self._get_recent_rejections(strategy_id, days=self.long_window)
+        # Single shared connection for all three queries — avoids 3 open/close cycles per strategy
+        conn = sqlite3.connect(self.db.db_path)
+        conn.row_factory = sqlite3.Row
+        conn.execute('PRAGMA journal_mode=WAL')  # faster concurrent reads
+        try:
+            trades = self._get_recent_trades(strategy_id, days=self.long_window, conn=conn)
+            signals = self._get_recent_signals(strategy_id, days=self.long_window, conn=conn)
+            rejections = self._get_recent_rejections(strategy_id, days=self.long_window, conn=conn)
+        finally:
+            conn.close()
         
         # Calculate metrics
         metrics = {
@@ -105,61 +109,58 @@ class StrategyHealthScorer:
         
         return metrics
     
-    def _get_recent_trades(self, strategy_id: int, days: int) -> List[Dict]:
+    def _get_recent_trades(self, strategy_id: int, days: int, conn=None) -> List[Dict]:
         """Get recent trades for strategy."""
         cutoff = (datetime.now() - timedelta(days=days)).isoformat()
-        
-        conn = sqlite3.connect(self.db.db_path)
-        conn.row_factory = sqlite3.Row
+        _own_conn = conn is None
+        if _own_conn:
+            conn = sqlite3.connect(self.db.db_path)
+            conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        
         cursor.execute('''
             SELECT * FROM trades
             WHERE strategy_id = ? AND executed_at >= ?
             ORDER BY executed_at DESC
         ''', (strategy_id, cutoff))
-        
         trades = [dict(row) for row in cursor.fetchall()]
-        conn.close()
-        
+        if _own_conn:
+            conn.close()
         return trades
     
-    def _get_recent_signals(self, strategy_id: int, days: int) -> List[Dict]:
+    def _get_recent_signals(self, strategy_id: int, days: int, conn=None) -> List[Dict]:
         """Get recent signals for strategy."""
         cutoff = (datetime.now() - timedelta(days=days)).isoformat()
-        
-        conn = sqlite3.connect(self.db.db_path)
-        conn.row_factory = sqlite3.Row
+        _own_conn = conn is None
+        if _own_conn:
+            conn = sqlite3.connect(self.db.db_path)
+            conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        
         cursor.execute('''
             SELECT * FROM signals
             WHERE strategy_id = ? AND generated_at >= ?
             ORDER BY generated_at DESC
         ''', (strategy_id, cutoff))
-        
         signals = [dict(row) for row in cursor.fetchall()]
-        conn.close()
-        
+        if _own_conn:
+            conn.close()
         return signals
     
-    def _get_recent_rejections(self, strategy_id: int, days: int) -> List[Dict]:
+    def _get_recent_rejections(self, strategy_id: int, days: int, conn=None) -> List[Dict]:
         """Get recent rejections for strategy."""
         cutoff = (datetime.now() - timedelta(days=days)).isoformat()
-        
-        conn = sqlite3.connect(self.db.db_path)
-        conn.row_factory = sqlite3.Row
+        _own_conn = conn is None
+        if _own_conn:
+            conn = sqlite3.connect(self.db.db_path)
+            conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        
         cursor.execute('''
             SELECT * FROM signal_rejections
             WHERE strategy_id = ? AND created_at >= ?
             ORDER BY created_at DESC
         ''', (strategy_id, cutoff))
-        
         rejections = [dict(row) for row in cursor.fetchall()]
-        conn.close()
-        
+        if _own_conn:
+            conn.close()
         return rejections
     
     def _is_within_days(self, timestamp_str: str, days: int) -> bool:
