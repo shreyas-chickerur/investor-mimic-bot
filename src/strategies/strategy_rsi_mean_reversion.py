@@ -37,6 +37,7 @@ class RSIMeanReversionStrategy(TradingStrategy):
         self.rsi_exit = 55       # exit threshold (> 55 = recovery complete)
         self.hold_days = 20
         self.profit_target_pct = 0.05  # exit at 5% profit
+        self.stop_loss_pct = 0.07      # exit at 7% loss (mean reversion can fail hard)
 
     def generate_signals(self, market_data: pd.DataFrame) -> List[Dict]:
         """Generate buy signals for oversold stocks with improved filters."""
@@ -84,7 +85,7 @@ class RSIMeanReversionStrategy(TradingStrategy):
                     'asof_date': latest_date,
                 })
 
-            # SELL: RSI recovered > 55  OR  5% profit target  OR  20-day time exit
+            # SELL: RSI recovered > 55  OR  5% profit target  OR  7% stop-loss  OR  20-day time exit
             elif symbol in self.positions:
                 days_held = self.get_days_held(symbol, latest_date)
                 shares = self.positions[symbol]
@@ -93,12 +94,14 @@ class RSIMeanReversionStrategy(TradingStrategy):
                 exit_reason = None
                 if rsi > self.rsi_exit:
                     exit_reason = f'RSI {rsi:.1f} > {self.rsi_exit} (mean reversion complete)'
-                elif days_held >= self.hold_days:
-                    exit_reason = f'Held {days_held}d >= {self.hold_days}d (time-based exit)'
                 elif entry_price and entry_price > 0:
                     profit_pct = (price - entry_price) / entry_price
                     if profit_pct >= self.profit_target_pct:
                         exit_reason = f'Profit target hit: {profit_pct:.1%} gain vs {self.profit_target_pct:.0%} target'
+                    elif profit_pct <= -self.stop_loss_pct:
+                        exit_reason = f'Stop-loss hit: {profit_pct:.1%} loss (limit -{self.stop_loss_pct:.0%})'
+                if exit_reason is None and days_held >= self.hold_days:
+                    exit_reason = f'Held {days_held}d >= {self.hold_days}d (time-based exit)'
 
                 if exit_reason:
                     signals.append({

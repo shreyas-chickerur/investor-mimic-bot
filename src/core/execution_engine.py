@@ -1015,6 +1015,14 @@ class MultiStrategyRunner:
                         logger.warning(f"Skipping BUY {symbol} - already sold this run (wash trade prevention)")
                         continue
 
+                    # Duplicate prevention: skip if we already hold this symbol for this strategy today
+                    existing_pos = self.db.get_position(strategy.strategy_id, symbol)
+                    if existing_pos and float(existing_pos.get('shares', 0)) > 0:
+                        entry_dt = existing_pos.get('entry_date', '')
+                        if entry_dt and entry_dt[:10] == self.asof_date:
+                            logger.warning(f"Skipping BUY {symbol} - position opened today (duplicate prevention)")
+                            continue
+
                     # Apply size multiplier from correlation attenuation
                     size_mult = signal.get('size_multiplier', 1.0)
                     # Apply drawdown sizing multiplier (rampup mode)
@@ -1135,7 +1143,12 @@ class MultiStrategyRunner:
                     self.performance_metrics.add_trade('BUY', symbol, actual_filled_qty, actual_fill_price, actual_trade_value)
                     
                     # CRITICAL: Only update database AFTER verifying fill
-                    self._update_position_record(strategy.strategy_id, symbol, actual_filled_qty, actual_fill_price)
+                    entry_date_str = (
+                        entry_date.date().isoformat()
+                        if hasattr(entry_date, 'date')
+                        else str(entry_date)[:10]
+                    )
+                    self._update_position_record(strategy.strategy_id, symbol, actual_filled_qty, actual_fill_price, entry_date=entry_date_str)
                     
                     # CRITICAL: Set stop loss for new position
                     atr = signal.get('atr', 0)
@@ -1367,7 +1380,7 @@ class MultiStrategyRunner:
             combined['avg_price'] = total_cost / combined['qty'] if combined['qty'] else 0.0
         return local_positions
 
-    def _update_position_record(self, strategy_id, symbol, shares_delta, exec_price):
+    def _update_position_record(self, strategy_id, symbol, shares_delta, exec_price, entry_date=None):
         """Persist position updates for reconciliation."""
         existing = self.db.get_position(strategy_id, symbol)
         if existing:
@@ -1388,12 +1401,16 @@ class MultiStrategyRunner:
         else:
             avg_price = current_avg
 
+        # Only pass entry_date for brand-new positions (current_shares == 0)
+        effective_entry_date = entry_date if (shares_delta > 0 and current_shares == 0.0) else None
+
         self.db.update_position(
             strategy_id=strategy_id,
             symbol=symbol,
             shares=new_shares,
             avg_price=avg_price,
-            current_price=exec_price
+            current_price=exec_price,
+            entry_date=effective_entry_date
         )
 
     def _calculate_dynamic_allocations(self, strategies):
