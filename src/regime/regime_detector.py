@@ -12,6 +12,14 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+# Lazy-import to avoid circular deps and keep startup fast
+def _get_vix_fetcher():
+    try:
+        from src.data.vix_data_fetcher import VIXDataFetcher
+        return VIXDataFetcher(source='yahoo')
+    except Exception:
+        return None
+
 class RegimeDetector:
     """Detects market regime (trend/chop, high/low volatility)"""
     
@@ -38,24 +46,36 @@ class RegimeDetector:
         logger.info(f"Regime Detector: VIX low={vix_low_threshold}, high={vix_high_threshold}")
     
     def get_vix_level(self, market_data=None) -> float:
-        """
-        Get VIX level estimate.
+        """Get VIX level.
 
-        Uses 20-day annualized realized volatility of the market proxy as a
-        VIX proxy (scale: 100 * annualized_vol).  Falls back to 18.0 when
-        insufficient data is available.
+        Primary: live ^VIX from Yahoo Finance via VIXDataFetcher (free, no key).
+        Fallback: 20-day annualized realized volatility of the market proxy.
+        Final fallback: 18.0 (moderate regime default).
         """
+        # 1. Try real VIX first
+        try:
+            fetcher = _get_vix_fetcher()
+            if fetcher is not None:
+                vix = fetcher.get_current_vix()
+                if 5.0 <= vix <= 80.0:
+                    logger.info(f"VIX (live ^VIX): {vix:.1f}")
+                    return round(vix, 1)
+        except Exception as exc:
+            logger.warning(f"Live VIX fetch failed, using realized-vol proxy: {exc}")
+
+        # 2. Realized-vol proxy from market data
         if market_data is not None and not market_data.empty:
             try:
                 proxy = self._get_market_proxy(market_data)
                 if len(proxy) >= 21:
                     returns = proxy.pct_change().dropna().tail(20)
                     realized_vol = returns.std() * (252 ** 0.5) * 100
-                    if 5.0 <= realized_vol <= 80.0:  # sanity bounds
+                    if 5.0 <= realized_vol <= 80.0:
                         logger.info(f"VIX proxy (realized vol): {realized_vol:.1f}")
                         return round(realized_vol, 1)
             except Exception as exc:
                 logger.warning(f"Could not calculate VIX proxy: {exc}")
+
         return 18.0
 
     def _get_market_proxy(self, market_data: pd.DataFrame) -> pd.Series:
