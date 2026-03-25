@@ -240,6 +240,65 @@ class AlphaVantageFetcher:
         return combined
 
 
+    def fetch_earnings_calendar(self, symbols: Optional[List[str]] = None,
+                                horizon: str = '3month',
+                                save_path: Optional[str] = None) -> pd.DataFrame:
+        """Fetch upcoming earnings dates from Alpha Vantage EARNINGS_CALENDAR endpoint.
+
+        This is a single CSV download (one API call), not per-symbol.
+
+        Args:
+            symbols: Filter to only these symbols. None = return all.
+            horizon: '3month' (default) or '6month' or '12month'.
+            save_path: If set, save filtered DataFrame to this CSV path.
+
+        Returns:
+            DataFrame with columns: symbol, name, reportDate, fiscalDateEnding,
+            estimate, currency.  reportDate is a date string 'YYYY-MM-DD'.
+        """
+        self._rate_limit()
+        params = {
+            'function': 'EARNINGS_CALENDAR',
+            'horizon': horizon,
+            'apikey': self.api_key,
+        }
+        try:
+            resp = requests.get(self.BASE_URL, params=params, timeout=30, stream=True)
+            resp.raise_for_status()
+
+            # Response is a CSV stream
+            from io import StringIO
+            df = pd.read_csv(StringIO(resp.text))
+            df.columns = [c.strip() for c in df.columns]
+
+            # Normalise the reportDate column name (AV sometimes ships 'reportDate')
+            if 'reportDate' not in df.columns and 'report_date' in df.columns:
+                df = df.rename(columns={'report_date': 'reportDate'})
+
+            if 'symbol' not in df.columns or 'reportDate' not in df.columns:
+                logger.error("Unexpected EARNINGS_CALENDAR schema: %s", list(df.columns))
+                return pd.DataFrame()
+
+            df['reportDate'] = pd.to_datetime(df['reportDate'], errors='coerce')
+            df = df.dropna(subset=['reportDate'])
+
+            if symbols:
+                df = df[df['symbol'].isin(symbols)].copy()
+
+            logger.info("Earnings calendar: %d upcoming events for %d symbols",
+                        len(df), df['symbol'].nunique())
+
+            if save_path:
+                df.to_csv(save_path, index=False)
+                logger.info("Saved earnings calendar to %s", save_path)
+
+            return df
+
+        except Exception as exc:
+            logger.error("Failed to fetch earnings calendar: %s", exc)
+            return pd.DataFrame()
+
+
 def test_fetcher():
     """Test the Alpha Vantage fetcher"""
     fetcher = AlphaVantageFetcher(premium=True)
