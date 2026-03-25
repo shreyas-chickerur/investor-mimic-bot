@@ -5,13 +5,13 @@ Strategy 5: Post-Earnings Announcement Drift (PEAD)
 Exploits the most persistent market anomaly: stocks that report positive
 earnings surprises continue drifting upward for 60+ days.
 
-Since we lack actual earnings dates/estimates, we detect earnings events
-via a price-based proxy:
-  - Abnormal volume spike (>2x 20-day avg)
-  - Combined with abnormal return (|return| > 2x 20-day vol)
-  - On a single day (earnings are point events)
+Primary signal source: data/earnings_calendar.csv (fetched by
+scripts/update_earnings_calendar.py via Alpha Vantage EARNINGS_CALENDAR).
+Fallback: price-based proxy (volume spike + abnormal return) when the
+calendar file is absent or stale.
 
-Buy after positive surprise, sell after negative or after drift window.
+Buy after positive surprise within the drift entry window, sell after
+profit target, stop-loss, drift window expiry, or negative re-surprise.
 
 Academic reference:
   Bernard & Thomas (1989), Garfinkel et al. (2024) — ~20% annual return
@@ -24,16 +24,23 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.core.strategy_base import TradingStrategy
-from typing import List, Dict
+from typing import List, Dict, Optional, Set
 import pandas as pd
 import numpy as np
 import logging
+
+_PROJECT_ROOT = Path(__file__).parent.parent.parent
+_EARNINGS_CALENDAR_PATH = _PROJECT_ROOT / 'data' / 'earnings_calendar.csv'
 
 logger = logging.getLogger(__name__)
 
 
 class EarningsDriftStrategy(TradingStrategy):
-    """Post-Earnings Announcement Drift strategy using price-based surprise proxy."""
+    """Post-Earnings Announcement Drift strategy.
+
+    Uses actual earnings calendar (data/earnings_calendar.csv) as the primary
+    event trigger.  Falls back to volume-spike proxy when the file is absent.
+    """
 
     def __init__(self, strategy_id: int, capital: float):
         super().__init__(
@@ -41,14 +48,45 @@ class EarningsDriftStrategy(TradingStrategy):
             name="Earnings Drift",
             capital=capital,
         )
-        self.volume_spike_threshold = 2.0   # Volume must be 2x 20-day avg
-        self.return_threshold_mult = 2.0    # Return must be 2x 20-day vol
-        self.drift_hold_days = 40           # Hold for drift period (academic: 60-90d, we use 40 for safety)
-        self.min_surprise_return = 0.02     # Minimum 2% absolute return on event day
-        self.profit_target_pct = 0.20       # Lock in at 20% — PEAD can spike hard then revert
-        self.stop_loss_pct = 0.10           # Exit at 10% loss — false signal protection
+        self.volume_spike_threshold = 2.0
+        self.return_threshold_mult = 2.0
+        self.drift_hold_days = 40
+        self.min_surprise_return = 0.02
+        self.profit_target_pct = 0.20
+        self.stop_loss_pct = 0.10
         self.entry_dates = {}
-        self.event_returns = {}             # Track the surprise magnitude per position
+        self.event_returns = {}
+        # Entry window: buy up to N trading days after the earnings date
+        self.calendar_entry_window_days = 3
+
+    def _load_earnings_calendar(self) -> pd.DataFrame:
+        """Load earnings calendar from disk. Returns empty DataFrame if unavailable."""
+        try:
+            if not _EARNINGS_CALENDAR_PATH.exists():
+                return pd.DataFrame()
+            df = pd.read_csv(_EARNINGS_CALENDAR_PATH, parse_dates=['reportDate'])
+            return df
+        except Exception as exc:
+            logger.warning("Could not load earnings calendar: %s", exc)
+            return pd.DataFrame()
+
+    def _symbols_with_recent_earnings(self, as_of_date: pd.Timestamp,
+                                      symbols: Set[str]) -> Set[str]:
+        """Return symbols that reported earnings in the last calendar_entry_window_days."""
+        cal = self._load_earnings_calendar()
+        if cal.empty:
+            return set()
+        window_start = as_of_date - pd.Timedelta(days=self.calendar_entry_window_days)
+        recent = cal[
+            (cal['symbol'].isin(symbols)) &
+            (cal['reportDate'] >= window_start) &
+            (cal['reportDate'] <= as_of_date)
+        ]
+        result = set(recent['symbol'].unique())
+        if result:
+            logger.info("Earnings calendar: %d symbols reported in last %dd: %s",
+                        len(result), self.calendar_entry_window_days, sorted(result))
+        return result
 
     def _detect_earnings_events(self, symbol_data: pd.DataFrame) -> Dict:
         """
@@ -106,10 +144,19 @@ class EarningsDriftStrategy(TradingStrategy):
         return None
 
     def generate_signals(self, market_data: pd.DataFrame) -> List[Dict]:
-        """Generate signals based on detected earnings surprises."""
+        """Generate signals based on actual earnings calendar (primary) or volume proxy (fallback)."""
         signals = []
-
         sym_map = {sym: grp for sym, grp in market_data.groupby('symbol')}
+        latest_date = market_data.index.max()
+
+        # --- Primary: actual earnings calendar ---
+        calendar_symbols = self._symbols_with_recent_earnings(
+            as_of_date=latest_date,
+            symbols=set(sym_map.keys()),
+        )
+        using_calendar = bool(calendar_symbols)
+        if not using_calendar:
+            logger.info("Earnings calendar empty or no recent events — falling back to volume proxy")
 
         for symbol, symbol_data in sym_map.items():
             if len(symbol_data) < 25:
@@ -117,36 +164,34 @@ class EarningsDriftStrategy(TradingStrategy):
 
             latest = symbol_data.iloc[-1]
             price = float(latest['close'])
-            atr = float(latest.get('atr_20', 0)) if not pd.isna(latest.get('atr_20', np.nan)) else 0
-            latest_date = symbol_data.index[-1]
+            atr_raw = latest.get('atr_20', None)
+            atr = float(atr_raw) if atr_raw is not None and not pd.isna(atr_raw) else 0
+            sym_latest_date = symbol_data.index[-1]
 
-            # Check for SELL first (existing positions)
+            # --- SELL: check existing positions first ---
             if symbol in self.positions:
-                days_held = self.get_days_held(symbol, latest_date)
+                days_held = self.get_days_held(symbol, sym_latest_date)
                 entry_price = getattr(self, 'entry_prices', {}).get(symbol)
 
                 exit_reason = None
                 exit_confidence = 0.8
 
-                # Profit target / stop-loss check (highest priority)
                 if entry_price and entry_price > 0:
                     pnl_pct = (price - entry_price) / entry_price
                     if pnl_pct >= self.profit_target_pct:
-                        exit_reason = f'PEAD profit target: {pnl_pct:.1%} gain (target {self.profit_target_pct:.0%})'
+                        exit_reason = f'PEAD profit target: {pnl_pct:.1%} gain'
                         exit_confidence = 0.95
                     elif pnl_pct <= -self.stop_loss_pct:
-                        exit_reason = f'PEAD stop-loss: {pnl_pct:.1%} loss (limit -{self.stop_loss_pct:.0%})'
+                        exit_reason = f'PEAD stop-loss: {pnl_pct:.1%} loss'
                         exit_confidence = 0.95
 
-                # Time-based exit
                 if exit_reason is None and days_held >= self.drift_hold_days:
                     exit_reason = f'Drift window expired ({days_held}d held)'
 
-                # New negative earnings surprise while holding
                 if exit_reason is None:
                     event = self._detect_earnings_events(symbol_data)
                     if event and event['direction'] == 'negative':
-                        exit_reason = f'Negative surprise detected ({event["event_return"]:.1%}), exiting'
+                        exit_reason = f'Negative re-surprise ({event["event_return"]:.1%}), exiting'
                         exit_confidence = 0.9
 
                 if exit_reason:
@@ -162,18 +207,32 @@ class EarningsDriftStrategy(TradingStrategy):
                     })
                 continue
 
-            # Check for BUY (new positions only)
-            event = self._detect_earnings_events(symbol_data)
-            if event is None:
-                continue
+            # --- BUY: calendar path ---
+            if using_calendar:
+                if symbol not in calendar_symbols:
+                    continue
+                # Confirm the post-earnings price action is positive
+                event = self._detect_earnings_events(symbol_data)
+                if event and event['direction'] == 'negative':
+                    logger.info("Skipping %s: negative post-earnings move despite calendar trigger", symbol)
+                    continue
+                surprise_mag = abs(event['event_return']) if event else self.min_surprise_return
+                confidence = min(0.90, 0.55 + surprise_mag * 4)
+                reasoning = f'PEAD (calendar): earnings reported, entry within {self.calendar_entry_window_days}d window'
+                if event:
+                    reasoning += f', {event["event_return"]:+.1%} day-of move'
 
-            # Only buy on POSITIVE surprises
-            if event['direction'] != 'positive':
-                continue
-
-            # Confidence scales with surprise magnitude
-            surprise_mag = abs(event['event_return'])
-            confidence = min(0.95, 0.5 + surprise_mag * 5)  # 2% surprise → 0.6, 5% → 0.75, 9% → 0.95
+            # --- BUY: volume-proxy fallback ---
+            else:
+                event = self._detect_earnings_events(symbol_data)
+                if event is None or event['direction'] != 'positive':
+                    continue
+                surprise_mag = abs(event['event_return'])
+                confidence = min(0.95, 0.5 + surprise_mag * 5)
+                reasoning = (
+                    f'PEAD (proxy): +{event["event_return"]:.1%} surprise {event["days_ago"]}d ago, '
+                    f'vol spike {event["volume_ratio"]:.1f}x'
+                )
 
             shares = self.calculate_position_size(price, atr=atr if atr > 0 else None, max_position_pct=0.10)
             if shares <= 0:
@@ -186,10 +245,7 @@ class EarningsDriftStrategy(TradingStrategy):
                 'price': price,
                 'value': shares * price,
                 'confidence': confidence,
-                'reasoning': (
-                    f'PEAD: +{event["event_return"]:.1%} surprise {event["days_ago"]}d ago, '
-                    f'vol spike {event["volume_ratio"]:.1f}x'
-                ),
+                'reasoning': reasoning,
                 'atr': atr if atr > 0 else None,
             })
 
