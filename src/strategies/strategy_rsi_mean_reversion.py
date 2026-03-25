@@ -67,9 +67,13 @@ class RSIMeanReversionStrategy(TradingStrategy):
             # RSI slope (1-day delta)
             rsi_slope = float(symbol_data['rsi'].iloc[-1] - symbol_data['rsi'].iloc[-2])
 
-            # BUY: RSI < 40 and turning up (slope > 0) — no VWAP check (trailing VWAP
-            # in the dataset is a long-run average always below current price in uptrends)
-            if rsi < self.rsi_threshold and rsi_slope > 0 and symbol not in self.positions:
+            # Trend filter: skip oversold buys when price is below SMA-100 (downtrend).
+            # Mean reversion in a downtrend = catching a falling knife.
+            sma_100 = latest.get('sma_100', None)
+            in_uptrend = (sma_100 is None or pd.isna(sma_100) or price > float(sma_100))
+
+            # BUY: RSI < 40 AND turning up AND price above SMA-100 (uptrend confirmation)
+            if rsi < self.rsi_threshold and rsi_slope > 0 and in_uptrend and symbol not in self.positions:
                 shares = self.calculate_position_size(price, atr=atr, max_position_pct=0.10)
                 if shares <= 0:
                     continue
