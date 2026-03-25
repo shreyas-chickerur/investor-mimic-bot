@@ -105,6 +105,19 @@ jobs:
         echo "=== Updating Earnings Calendar ==="
         python3 scripts/update_earnings_calendar.py || echo "Earnings calendar update skipped (API key missing or AV error)"
 
+    - name: Update fundamental data (weekly, Mondays only)
+      continue-on-error: true
+      env:
+        ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+      run: |
+        DAY=$(date +%u)
+        if [ "$DAY" = "1" ]; then
+          echo "=== Updating Fundamental Data (Monday refresh) ==="
+          python3 scripts/update_fundamental_data.py || echo "Fundamental data update skipped (API key missing or AV error)"
+        else
+          echo "=== Skipping fundamental update (runs Mondays only, today is day $DAY) ==="
+        fi
+
     - name: Check signal generation health
       env:
         ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
@@ -142,6 +155,13 @@ jobs:
           echo "executed=false" >> $GITHUB_OUTPUT
         fi
     
+    - name: Paper trading validation report
+      if: always()
+      continue-on-error: true
+      run: |
+        echo "=== Paper Trading Validation Report ==="
+        python3 scripts/paper_trading_report.py --days 30 || echo "Report skipped (DB not yet populated)"
+
     - name: Check reconciliation status
       id: check_reconciliation
       if: always()

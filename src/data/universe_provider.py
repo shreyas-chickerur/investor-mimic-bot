@@ -30,10 +30,15 @@ class UniverseProvider:
         # Consumer Staples
         'KO', 'PEP', 'PG',
         # Energy / Telecom
-        'XOM', 'VZ',
+        'XOM', 'CVX', 'VZ',
         # IT Services
         'ACN',
+        # Sector ETFs (used for relative-strength factor computation; excluded from trading)
+        'SPY', 'QQQ', 'XLK', 'XLF', 'XLE', 'XLV', 'XLP', 'XLY',
     ]
+
+    # Symbols used only for factor benchmarking — never traded as positions
+    BENCHMARK_SYMBOLS = {'SPY', 'QQQ', 'XLK', 'XLF', 'XLE', 'XLV', 'XLP', 'XLY'}
     
     def __init__(self, mode: str = None):
         """

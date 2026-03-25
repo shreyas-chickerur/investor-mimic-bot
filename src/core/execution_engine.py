@@ -1303,17 +1303,44 @@ class MultiStrategyRunner:
                     )
                     
                     # CRITICAL FIX: Update strategy positions with actual filled quantities
+                    entry_price_for_pnl = getattr(strategy, 'entry_prices', {}).get(symbol)
+                    entry_date_for_pnl = getattr(strategy, 'entry_dates', {}).get(symbol)
+                    if entry_date_for_pnl and hasattr(entry_date_for_pnl, 'date'):
+                        entry_date_for_pnl = entry_date_for_pnl.date().isoformat()
+                    elif entry_date_for_pnl:
+                        entry_date_for_pnl = str(entry_date_for_pnl)[:10]
+
                     if symbol in strategy.positions:
                         strategy.positions[symbol] -= actual_filled_qty
                         if strategy.positions[symbol] <= 0:
                             del strategy.positions[symbol]
                             if symbol in strategy.entry_dates:
                                 del strategy.entry_dates[symbol]
+                            if hasattr(strategy, 'entry_prices') and symbol in strategy.entry_prices:
+                                del strategy.entry_prices[symbol]
                             # Remove stop loss when position is fully closed
                             self.stop_loss_manager.remove_stop_loss(symbol)
                             logger.info(f"Stop loss removed for {symbol} (position closed)")
                             total_exposure = max(total_exposure - trade_value, 0)
-                    
+
+                    # Record matched buy→sell P&L for paper trading metrics
+                    if entry_price_for_pnl and entry_price_for_pnl > 0:
+                        try:
+                            exit_reason = signal.get('reasoning', '')
+                            self.db.log_trade_pnl(
+                                strategy_id=strategy.strategy_id,
+                                strategy_name=strategy.name,
+                                symbol=symbol,
+                                sell_run_id=self.run_id,
+                                entry_price=float(entry_price_for_pnl),
+                                exit_price=actual_fill_price,
+                                shares=actual_filled_qty,
+                                entry_date=entry_date_for_pnl,
+                                exit_reason=exit_reason,
+                            )
+                        except Exception as _pnl_exc:
+                            logger.warning("log_trade_pnl failed for %s: %s", symbol, _pnl_exc)
+
                     # CRITICAL: Only update database AFTER verifying fill
                     self._update_position_record(strategy.strategy_id, symbol, -actual_filled_qty, actual_fill_price)
                     
@@ -1616,6 +1643,27 @@ def main():
                     pos['shares'] * pos['current_price'] for pos in positions_data
                 )
                 portfolio_heat = (total_exposure / runner.portfolio_value) * 100
+
+            # Paper trading validation: write daily snapshot
+            try:
+                import json as _json
+                _alloc_json = _json.dumps({
+                    str(s.strategy_id): round(getattr(s, 'capital', 0), 2)
+                    for s in runner.strategies_cache if hasattr(s, 'capital')
+                }) if hasattr(runner, 'strategies_cache') else None
+                runner.db.log_daily_snapshot(
+                    run_id=runner.run_id,
+                    portfolio_value=runner.portfolio_value,
+                    cash=runner.cash_available,
+                    positions_value=total_exposure,
+                    heat_pct=portfolio_heat,
+                    vix=regime.get('vix'),
+                    regime=f"{regime.get('volatility_regime','?')}/{regime.get('trend_regime','?')}",
+                    allocation_json=_alloc_json,
+                )
+                logger.info("Daily portfolio snapshot recorded")
+            except Exception as _snap_exc:
+                logger.warning("log_daily_snapshot failed: %s", _snap_exc)
 
             placed_orders = [
                 {

@@ -251,9 +251,203 @@ class TradingDatabase:
             'CREATE INDEX IF NOT EXISTS idx_strategy_perf_date ON strategy_performance(snapshot_date)'
         )
 
+        # Paper trading validation: portfolio-level daily snapshot
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS daily_portfolio_snapshot (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL,
+                snapshot_date TEXT NOT NULL,
+                portfolio_value REAL NOT NULL,
+                cash REAL NOT NULL,
+                positions_value REAL NOT NULL,
+                heat_pct REAL,
+                daily_pnl REAL,
+                daily_pnl_pct REAL,
+                cumulative_pnl REAL,
+                drawdown_pct REAL,
+                peak_value REAL,
+                num_open_positions INTEGER DEFAULT 0,
+                vix REAL,
+                regime TEXT,
+                allocation_json TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(snapshot_date)
+            )
+        ''')
+        cursor.execute(
+            'CREATE INDEX IF NOT EXISTS idx_daily_snap_date ON daily_portfolio_snapshot(snapshot_date)'
+        )
+
+        # Per-trade P&L detail: matched BUY→SELL for win rate and profit factor
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS trade_pnl_detail (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                strategy_id INTEGER NOT NULL,
+                strategy_name TEXT,
+                symbol TEXT NOT NULL,
+                buy_run_id TEXT,
+                sell_run_id TEXT NOT NULL,
+                entry_date TEXT,
+                exit_date TEXT NOT NULL,
+                entry_price REAL NOT NULL,
+                exit_price REAL NOT NULL,
+                shares REAL NOT NULL,
+                gross_pnl REAL NOT NULL,
+                gross_pnl_pct REAL NOT NULL,
+                hold_days INTEGER,
+                exit_reason TEXT,
+                is_winner INTEGER,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (strategy_id) REFERENCES strategies(id)
+            )
+        ''')
+        cursor.execute(
+            'CREATE INDEX IF NOT EXISTS idx_trade_pnl_strategy ON trade_pnl_detail(strategy_id)'
+        )
+        cursor.execute(
+            'CREATE INDEX IF NOT EXISTS idx_trade_pnl_exit ON trade_pnl_detail(exit_date)'
+        )
+
         conn.commit()
         conn.close()
-    
+
+    def log_daily_snapshot(self, run_id: str, portfolio_value: float, cash: float,
+                            positions_value: float, heat_pct: float = None,
+                            vix: float = None, regime: str = None,
+                            allocation_json: str = None):
+        """Record end-of-run portfolio state for paper trading validation tracking."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        today = datetime.now().strftime('%Y-%m-%d')
+
+        # Compute daily P&L vs yesterday's snapshot
+        cursor.execute(
+            'SELECT portfolio_value, peak_value FROM daily_portfolio_snapshot ORDER BY snapshot_date DESC LIMIT 1'
+        )
+        prev = cursor.fetchone()
+        prev_value = prev[0] if prev else portfolio_value
+        prev_peak = prev[1] if prev else portfolio_value
+
+        daily_pnl = portfolio_value - prev_value
+        daily_pnl_pct = daily_pnl / prev_value if prev_value else 0.0
+        peak_value = max(prev_peak, portfolio_value)
+
+        # Cumulative P&L: read initial capital from strategies table
+        cursor.execute('SELECT SUM(initial_capital) FROM strategies WHERE name != "BROKER_SYNC"')
+        row = cursor.fetchone()
+        initial_capital = row[0] if row and row[0] else portfolio_value
+        cumulative_pnl = portfolio_value - initial_capital
+
+        drawdown_pct = (portfolio_value - peak_value) / peak_value if peak_value else 0.0
+
+        cursor.execute('''
+            INSERT INTO daily_portfolio_snapshot
+            (run_id, snapshot_date, portfolio_value, cash, positions_value,
+             heat_pct, daily_pnl, daily_pnl_pct, cumulative_pnl, drawdown_pct,
+             peak_value, num_open_positions, vix, regime, allocation_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(snapshot_date) DO UPDATE SET
+                portfolio_value = excluded.portfolio_value,
+                cash = excluded.cash,
+                positions_value = excluded.positions_value,
+                heat_pct = excluded.heat_pct,
+                daily_pnl = excluded.daily_pnl,
+                daily_pnl_pct = excluded.daily_pnl_pct,
+                cumulative_pnl = excluded.cumulative_pnl,
+                drawdown_pct = excluded.drawdown_pct,
+                peak_value = excluded.peak_value,
+                vix = excluded.vix,
+                regime = excluded.regime,
+                allocation_json = excluded.allocation_json
+        ''', (run_id, today, portfolio_value, cash, positions_value,
+              heat_pct, daily_pnl, daily_pnl_pct, cumulative_pnl, drawdown_pct,
+              peak_value, 0, vix, regime, allocation_json))
+        conn.commit()
+        conn.close()
+
+    def log_trade_pnl(self, strategy_id: int, strategy_name: str, symbol: str,
+                       sell_run_id: str, entry_price: float, exit_price: float,
+                       shares: float, entry_date: str = None, exit_reason: str = None):
+        """Record matched buy→sell P&L for win-rate and profit-factor tracking."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        gross_pnl = (exit_price - entry_price) * shares
+        gross_pnl_pct = (exit_price - entry_price) / entry_price if entry_price else 0.0
+        exit_date = datetime.now().strftime('%Y-%m-%d')
+        hold_days = None
+        if entry_date:
+            try:
+                from datetime import date
+                ed = date.fromisoformat(entry_date[:10])
+                hold_days = (date.today() - ed).days
+            except Exception:
+                pass
+
+        # Look up buy_run_id from trades table
+        cursor.execute(
+            "SELECT run_id FROM trades WHERE strategy_id=? AND symbol=? AND action='BUY' ORDER BY executed_at DESC LIMIT 1",
+            (strategy_id, symbol)
+        )
+        buy_row = cursor.fetchone()
+        buy_run_id = buy_row[0] if buy_row else None
+
+        cursor.execute('''
+            INSERT INTO trade_pnl_detail
+            (strategy_id, strategy_name, symbol, buy_run_id, sell_run_id,
+             entry_date, exit_date, entry_price, exit_price, shares,
+             gross_pnl, gross_pnl_pct, hold_days, exit_reason, is_winner)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (strategy_id, strategy_name, symbol, buy_run_id, sell_run_id,
+              entry_date, exit_date, entry_price, exit_price, shares,
+              gross_pnl, gross_pnl_pct, hold_days, exit_reason,
+              1 if gross_pnl > 0 else 0))
+        conn.commit()
+        conn.close()
+
+    def get_paper_trading_stats(self, days: int = 30) -> dict:
+        """Return win rate, profit factor, avg hold days, and streak stats for the last N days."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        since = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+
+        cursor.execute('''
+            SELECT gross_pnl, gross_pnl_pct, hold_days, is_winner, strategy_name
+            FROM trade_pnl_detail WHERE exit_date >= ? ORDER BY exit_date
+        ''', (since,))
+        rows = cursor.fetchall()
+
+        cursor.execute('''
+            SELECT snapshot_date, portfolio_value, daily_pnl_pct, drawdown_pct, cumulative_pnl
+            FROM daily_portfolio_snapshot WHERE snapshot_date >= ?
+            ORDER BY snapshot_date
+        ''', (since,))
+        snapshots = cursor.fetchall()
+        conn.close()
+
+        if not rows:
+            return {'trades': 0, 'win_rate': None, 'profit_factor': None,
+                    'avg_hold_days': None, 'snapshots': snapshots}
+
+        wins = [r for r in rows if r[3] == 1]
+        losses = [r for r in rows if r[3] == 0]
+        gross_wins = sum(r[0] for r in wins)
+        gross_losses = abs(sum(r[0] for r in losses)) or 1e-9
+        hold_days_list = [r[2] for r in rows if r[2] is not None]
+
+        return {
+            'trades': len(rows),
+            'wins': len(wins),
+            'losses': len(losses),
+            'win_rate': len(wins) / len(rows),
+            'profit_factor': gross_wins / gross_losses,
+            'avg_hold_days': sum(hold_days_list) / len(hold_days_list) if hold_days_list else None,
+            'total_pnl': sum(r[0] for r in rows),
+            'avg_win_pct': sum(r[1] for r in wins) / len(wins) if wins else 0,
+            'avg_loss_pct': sum(r[1] for r in losses) / len(losses) if losses else 0,
+            'snapshots': snapshots,
+        }
+
     def create_strategy(self, name: str, description: str, capital: float) -> int:
         """Create or get strategy"""
         conn = sqlite3.connect(self.db_path)

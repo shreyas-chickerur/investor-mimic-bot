@@ -33,11 +33,12 @@ class RSIMeanReversionStrategy(TradingStrategy):
         self.vwap_proximity_pct = config.get('strategies.rsi_mean_reversion.vwap_proximity_pct', 0.02)
         
         # Legacy attributes for backward compatibility
-        self.rsi_threshold = 40  # entry threshold (< 40 = oversold)
+        self.rsi_threshold = 35  # entry threshold (< 35 = meaningfully oversold, not just dip)
         self.rsi_exit = 55       # exit threshold (> 55 = recovery complete)
         self.hold_days = 20
         self.profit_target_pct = 0.05  # exit at 5% profit
         self.stop_loss_pct = 0.07      # exit at 7% loss (mean reversion can fail hard)
+        self.volume_spike_threshold = 1.5  # skip if volume >1.5x avg (capitulation, not reversion)
 
     def generate_signals(self, market_data: pd.DataFrame) -> List[Dict]:
         """Generate buy signals for oversold stocks with improved filters."""
@@ -68,12 +69,22 @@ class RSIMeanReversionStrategy(TradingStrategy):
             rsi_slope = float(symbol_data['rsi'].iloc[-1] - symbol_data['rsi'].iloc[-2])
 
             # Trend filter: skip oversold buys when price is below SMA-100 (downtrend).
-            # Mean reversion in a downtrend = catching a falling knife.
             sma_100 = latest.get('sma_100', None)
             in_uptrend = (sma_100 is None or pd.isna(sma_100) or price > float(sma_100))
 
-            # BUY: RSI < 40 AND turning up AND price above SMA-100 (uptrend confirmation)
-            if rsi < self.rsi_threshold and rsi_slope > 0 and in_uptrend and symbol not in self.positions:
+            # Volume filter: skip if today's volume > 1.5x 20-day avg (panic/capitulation selling).
+            # High-volume oversold = distribution, not mean reversion setup.
+            vol_ratio_raw = latest.get('volume_ratio', None)
+            is_capitulation = (
+                vol_ratio_raw is not None
+                and not pd.isna(vol_ratio_raw)
+                and float(vol_ratio_raw) > self.volume_spike_threshold
+            )
+
+            # BUY: RSI < 35 AND turning up AND uptrend AND not capitulation selling
+            if (rsi < self.rsi_threshold and rsi_slope > 0
+                    and in_uptrend and not is_capitulation
+                    and symbol not in self.positions):
                 shares = self.calculate_position_size(price, atr=atr, max_position_pct=0.10)
                 if shares <= 0:
                     continue
@@ -84,7 +95,10 @@ class RSIMeanReversionStrategy(TradingStrategy):
                     'price': price,
                     'value': shares * price,
                     'confidence': max(0.1, min(1.0, (self.rsi_threshold - rsi) / self.rsi_threshold)),
-                    'reasoning': f'RSI {rsi:.1f} < {self.rsi_threshold} (oversold), slope {rsi_slope:+.2f} (turning up)',
+                    'reasoning': (
+                        f'RSI {rsi:.1f} < {self.rsi_threshold} (oversold), slope {rsi_slope:+.2f} (turning up)'
+                        + (f', vol_ratio {float(vol_ratio_raw):.1f}x (normal)' if vol_ratio_raw is not None else '')
+                    ),
                     'atr': atr,
                     'asof_date': latest_date,
                 })

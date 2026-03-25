@@ -3,11 +3,15 @@
 Strategy 6: Cross-Sectional Factor Momentum
 
 Ranks stocks by a composite factor score and buys the top quintile.
-Factors used (all computable from existing data):
-  1. Price momentum (60-day return, skip last 5 days for reversal)
-  2. Earnings quality proxy (low volatility + positive momentum = quality)
-  3. Mean-reversion signal (RSI z-score for oversold bounce)
-  4. Volume confirmation (rising volume on up-moves)
+Factors (all computable from existing market data + optional fundamentals):
+  1. Price momentum (60-day return)
+  2. Quality proxy (low vol + positive momentum)
+  3. Mean-reversion signal (RSI oversold range)
+  4. Volume confirmation (rising vol on up-moves)
+  5. Excess momentum over SPY (alpha, not beta)
+  6. Sector relative strength (stock vs sector ETF)
+  7. Fundamental quality (ROE / debt, optional via data/fundamentals.json)
+  8. Fundamental value (1/PE ratio, optional via data/fundamentals.json)
 
 Academic basis:
   - Jegadeesh & Titman (1993): 12-1 momentum
@@ -18,17 +22,43 @@ Holds positions for 20 trading days, then re-ranks.
 """
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.core.strategy_base import TradingStrategy
-from typing import List, Dict
+from typing import List, Dict, Optional
 import pandas as pd
 import numpy as np
 import logging
 
 logger = logging.getLogger(__name__)
+
+_PROJECT_ROOT = Path(__file__).parent.parent.parent
+_FUNDAMENTALS_PATH = _PROJECT_ROOT / 'data' / 'fundamentals.json'
+
+# Stock → sector ETF mapping
+_SECTOR_MAP: Dict[str, str] = {
+    # Tech
+    'AAPL': 'XLK', 'MSFT': 'XLK', 'GOOGL': 'XLK', 'AMZN': 'XLK',
+    'META': 'XLK', 'NVDA': 'XLK', 'ADBE': 'XLK', 'AVGO': 'XLK',
+    'CRM': 'XLK', 'AMD': 'XLK', 'ACN': 'XLK',
+    # Consumer Discretionary
+    'TSLA': 'XLY', 'NFLX': 'XLY', 'COST': 'XLY', 'MCD': 'XLY',
+    'NKE': 'XLY', 'WMT': 'XLY', 'HD': 'XLY', 'DIS': 'XLY',
+    # Healthcare
+    'JNJ': 'XLV', 'ABBV': 'XLV', 'MRK': 'XLV', 'TMO': 'XLV',
+    'DHR': 'XLV', 'ABT': 'XLV', 'UNH': 'XLV', 'LLY': 'XLV',
+    # Financials
+    'MA': 'XLF', 'JPM': 'XLF', 'V': 'XLF',
+    # Consumer Staples
+    'KO': 'XLP', 'PEP': 'XLP', 'PG': 'XLP',
+    # Energy
+    'XOM': 'XLE', 'CVX': 'XLE',
+    # Telecom → use SPY as fallback
+    'VZ': 'SPY',
+}
 
 
 class FactorMomentumStrategy(TradingStrategy):
@@ -47,69 +77,133 @@ class FactorMomentumStrategy(TradingStrategy):
         self.entry_dates = {}
         self._last_rerank_date = None
 
-    def _compute_factor_scores(self, market_data: pd.DataFrame) -> Dict[str, float]:
-        """
-        Compute composite factor score for each symbol using cross-sectional
-        percentile ranking so that scores reflect relative standing, not absolute
-        values that cluster around 0.5 when sigmoid-normalised independently.
+    def _load_fundamentals(self) -> Dict[str, Dict]:
+        """Load fundamental data from data/fundamentals.json. Returns empty dict if absent."""
+        try:
+            if _FUNDAMENTALS_PATH.exists():
+                with open(_FUNDAMENTALS_PATH) as f:
+                    return json.load(f)
+        except Exception as exc:
+            logger.warning("Could not load fundamentals: %s", exc)
+        return {}
 
-        Returns:
-            Dict of {symbol: composite_score} where scores are meaningful ranks.
+    def _compute_factor_scores(self, market_data: pd.DataFrame) -> Dict[str, float]:
+        """Compute composite factor score per symbol using cross-sectional percentile ranks.
+
+        Factors:
+          1. Momentum (60d return)              weight 0.25
+          2. Quality proxy (low vol + momentum)  weight 0.15
+          3. Mean-reversion (RSI 25-45)          weight 0.10
+          4. Volume confirmation                  weight 0.10
+          5. Excess momentum over SPY             weight 0.15
+          6. Sector relative strength             weight 0.10
+          7. Fundamental quality (ROE/debt)       weight 0.10  (if available)
+          8. Fundamental value (1/PE)             weight 0.05  (if available)
         """
-        # Build per-symbol row counts once, then get latest row per symbol in one pass
         counts = market_data.groupby('symbol').size()
         eligible = counts[counts >= 60].index
-
         if len(eligible) < 3:
             return {}
 
         filtered = market_data[market_data['symbol'].isin(eligible)]
-
-        # One groupby pass to get last row per symbol (replaces 33 individual boolean filters)
         latest_df = filtered.groupby('symbol').last()
 
-        # --- Factor 1: Momentum (60d return, skip last 5d for reversal) ---
-        # Use pre-computed returns_60d where the close-based calculation is unavailable
-        # Close-based (skip-5) momentum requires random access to specific rows;
-        # fall back to the stored returns_60d column which is computed the same way.
-        ret_60d = latest_df['returns_60d'].fillna(0.0)
-        momentum = ret_60d.astype(float)
+        # Exclude benchmark ETFs from scoring (they are data sources, not trading candidates)
+        from src.data.universe_provider import UniverseProvider
+        benchmarks = UniverseProvider.BENCHMARK_SYMBOLS
+        tradeable = latest_df.index.difference(list(benchmarks))
+        if len(tradeable) < 3:
+            return {}
+        latest_df = latest_df.loc[tradeable]
+
+        # --- Factor 1: 60d momentum ---
+        momentum = latest_df['returns_60d'].fillna(0.0).astype(float)
 
         # --- Factor 2: Quality proxy ---
         vol_20d = latest_df['volatility_20d'].fillna(0.2).astype(float)
         quality = -vol_20d + momentum.clip(lower=0) * 0.5
 
-        # --- Factor 3: Mean-reversion (RSI 25-45 oversold range) ---
+        # --- Factor 3: Mean-reversion (RSI 25-45 oversold) ---
         rsi = latest_df['rsi'].fillna(50.0).astype(float)
-        reversion_score = np.where(
-            (rsi >= 25) & (rsi <= 45),
-            (45 - rsi) / 20,
-            0.0
+        reversion_score = pd.Series(
+            np.where((rsi >= 25) & (rsi <= 45), (45 - rsi) / 20, 0.0),
+            index=latest_df.index,
         )
 
-        # --- Factor 4: Volume confirmation (rising volume on up-moves only) ---
+        # --- Factor 4: Volume confirmation ---
         vol_ratio = latest_df['volume_ratio'].fillna(1.0).astype(float)
         ret_5d = latest_df['returns_5d'].fillna(0.0).astype(float)
         volume_confirm = vol_ratio * ret_5d.clip(lower=0)
 
-        # Assemble factor DataFrame and cross-sectionally rank each factor
+        # --- Factor 5: Excess momentum over SPY (alpha momentum) ---
+        spy_ret = 0.0
+        if 'SPY' in filtered['symbol'].values or (
+                'symbol' in market_data.columns and 'SPY' in market_data['symbol'].values):
+            spy_rows = market_data[market_data['symbol'] == 'SPY']
+            if not spy_rows.empty:
+                spy_last = spy_rows.iloc[-1]
+                spy_ret = float(spy_last.get('returns_60d', 0.0) or 0.0)
+        excess_momentum = momentum - spy_ret
+
+        # --- Factor 6: Sector relative strength ---
+        sector_excess = pd.Series(0.0, index=latest_df.index)
+        for sym in latest_df.index:
+            sector_etf = _SECTOR_MAP.get(sym, 'SPY')
+            etf_rows = market_data[market_data['symbol'] == sector_etf] if 'symbol' in market_data.columns else pd.DataFrame()
+            if not etf_rows.empty:
+                etf_ret = float(etf_rows.iloc[-1].get('returns_60d', 0.0) or 0.0)
+                sector_excess[sym] = float(latest_df.loc[sym, 'returns_60d'] or 0.0) - etf_ret
+
+        # --- Factors 7 & 8: Fundamental quality + value (optional) ---
+        fundamentals = self._load_fundamentals()
+        fund_quality = pd.Series(0.0, index=latest_df.index)
+        fund_value = pd.Series(0.0, index=latest_df.index)
+        has_fundamentals = bool(fundamentals)
+        if has_fundamentals:
+            for sym in latest_df.index:
+                f = fundamentals.get(sym, {})
+                roe = float(f.get('roe', 0.0) or 0.0)
+                debt_eq = float(f.get('debt_to_equity', 1.0) or 1.0)
+                pe = float(f.get('pe_ratio', 20.0) or 20.0)
+                fund_quality[sym] = roe / max(debt_eq, 0.1)
+                fund_value[sym] = 1.0 / max(pe, 1.0)
+
+        # Assemble and cross-sectionally rank
         factors = pd.DataFrame({
             'momentum': momentum,
             'quality': quality,
             'reversion': reversion_score,
             'volume': volume_confirm,
+            'excess_momentum': excess_momentum,
+            'sector_rs': sector_excess,
+            'fund_quality': fund_quality,
+            'fund_value': fund_value,
         }, index=latest_df.index)
 
-        for col in ['momentum', 'quality', 'reversion', 'volume']:
+        for col in factors.columns:
             factors[f'{col}_pct'] = factors[col].rank(pct=True)
 
-        # Weighted composite score
-        factors['composite'] = (
-            0.40 * factors['momentum_pct'] +
-            0.25 * factors['quality_pct'] +
-            0.20 * factors['reversion_pct'] +
-            0.15 * factors['volume_pct']
-        )
+        if has_fundamentals:
+            factors['composite'] = (
+                0.25 * factors['momentum_pct'] +
+                0.15 * factors['quality_pct'] +
+                0.10 * factors['reversion_pct'] +
+                0.10 * factors['volume_pct'] +
+                0.15 * factors['excess_momentum_pct'] +
+                0.10 * factors['sector_rs_pct'] +
+                0.10 * factors['fund_quality_pct'] +
+                0.05 * factors['fund_value_pct']
+            )
+        else:
+            factors['composite'] = (
+                0.30 * factors['momentum_pct'] +
+                0.15 * factors['quality_pct'] +
+                0.10 * factors['reversion_pct'] +
+                0.10 * factors['volume_pct'] +
+                0.20 * factors['excess_momentum_pct'] +
+                0.15 * factors['sector_rs_pct']
+            )
+            logger.debug("Fundamentals unavailable — using 6-factor model")
 
         return factors['composite'].to_dict()
 
