@@ -117,22 +117,25 @@ def sync_broker_to_database(db_path='trading.db'):
                 continue
 
             if local_total == 0:
-                # Entirely new position — add under BROKER_SYNC
+                # Entirely new position — add under BROKER_SYNC.
+                # Use today as entry_date fallback so time-based exits can fire.
+                today = datetime.now().strftime('%Y-%m-%d')
                 cursor.execute("""
                     INSERT INTO positions
                         (strategy_id, symbol, shares, avg_price, current_price,
-                         market_value, unrealized_pnl, last_updated)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                         market_value, unrealized_pnl, entry_date, last_updated)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(strategy_id, symbol) DO UPDATE SET
                         shares = excluded.shares,
                         avg_price = excluded.avg_price,
                         current_price = excluded.current_price,
                         market_value = excluded.market_value,
                         unrealized_pnl = excluded.unrealized_pnl,
+                        entry_date = COALESCE(positions.entry_date, excluded.entry_date),
                         last_updated = excluded.last_updated
                 """, (
                     sync_id, symbol, broker_qty, broker_avg, broker_avg,
-                    broker_qty * broker_avg, 0.0, datetime.now().isoformat()
+                    broker_qty * broker_avg, 0.0, today, datetime.now().isoformat()
                 ))
                 logger.info(f"  🆕 {symbol}: added {broker_qty} shares under BROKER_SYNC")
                 changes += 1

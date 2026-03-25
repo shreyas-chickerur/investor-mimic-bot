@@ -338,29 +338,32 @@ class TradingDatabase:
         
         return trade_id
     
-    def update_position(self, strategy_id: int, symbol: str, shares: float, 
-                       avg_price: float, current_price: Optional[float] = None):
-        """Update or create position"""
+    def update_position(self, strategy_id: int, symbol: str, shares: float,
+                       avg_price: float, current_price: Optional[float] = None,
+                       entry_date: Optional[str] = None):
+        """Update or create position. entry_date is only written on the first insert;
+        subsequent updates preserve the original value via COALESCE."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
         market_value = shares * current_price if current_price else shares * avg_price
         unrealized_pnl = (current_price - avg_price) * shares if current_price else 0
-        
+
         cursor.execute('''
-            INSERT INTO positions 
-            (strategy_id, symbol, shares, avg_price, current_price, market_value, 
-             unrealized_pnl, last_updated)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO positions
+            (strategy_id, symbol, shares, avg_price, current_price, market_value,
+             unrealized_pnl, entry_date, last_updated)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(strategy_id, symbol) DO UPDATE SET
                 shares = excluded.shares,
                 avg_price = excluded.avg_price,
                 current_price = excluded.current_price,
                 market_value = excluded.market_value,
                 unrealized_pnl = excluded.unrealized_pnl,
+                entry_date = COALESCE(positions.entry_date, excluded.entry_date),
                 last_updated = excluded.last_updated
         ''', (strategy_id, symbol, shares, avg_price, current_price, market_value,
-              unrealized_pnl, datetime.now().isoformat()))
+              unrealized_pnl, entry_date, datetime.now().isoformat()))
         
         conn.commit()
         conn.close()
