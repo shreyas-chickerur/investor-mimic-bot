@@ -97,6 +97,14 @@ jobs:
         echo "=== Fetching Latest Market Data ==="
         python3 scripts/update_daily_data.py
     
+    - name: Update earnings calendar
+      continue-on-error: true
+      env:
+        ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+      run: |
+        echo "=== Updating Earnings Calendar ==="
+        python3 scripts/update_earnings_calendar.py || echo "Earnings calendar update skipped (API key missing or AV error)"
+
     - name: Check signal generation health
       env:
         ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
