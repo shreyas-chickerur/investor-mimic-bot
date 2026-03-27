@@ -1,0 +1,148 @@
+name: API Key Health Check
+
+on:
+  schedule:
+    # Runs every Monday at 8 AM UTC (before market open)
+    - cron: '0 8 * * 1'
+  workflow_dispatch:  # Allow manual trigger at any time
+
+env:
+  PYTHON_VERSION: "3.8"
+
+jobs:
+  api-health-check:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install minimal dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests python-dotenv alpaca-py
+
+    - name: Check Alpaca API key
+      id: alpaca_check
+      env:
+        ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+        ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+      run: |
+        python3 - <<'EOF'
+        import os, sys
+        api_key = os.getenv("ALPACA_API_KEY", "")
+        secret_key = os.getenv("ALPACA_SECRET_KEY", "")
+        if not api_key or not secret_key:
+            print("❌ ALPACA_API_KEY or ALPACA_SECRET_KEY is missing")
+            sys.exit(1)
+        try:
+            from alpaca.trading.client import TradingClient
+            client = TradingClient(api_key, secret_key, paper=True)
+            account = client.get_account()
+            print(f"✅ Alpaca API: OK — account status={account.status}, "
+                  f"buying_power=${float(account.buying_power):,.2f}")
+        except Exception as e:
+            print(f"❌ Alpaca API check failed: {e}")
+            sys.exit(1)
+        EOF
+
+    - name: Check Alpha Vantage API key
+      id: av_check
+      env:
+        ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+      run: |
+        python3 - <<'EOF'
+        import os, sys, requests
+        av_key = os.getenv("ALPHA_VANTAGE_API_KEY", "")
+        if not av_key:
+            print("❌ ALPHA_VANTAGE_API_KEY is missing")
+            sys.exit(1)
+        try:
+            url = (
+                f"https://www.alphavantage.co/query"
+                f"?function=GLOBAL_QUOTE&symbol=SPY&apikey={av_key}"
+            )
+            r = requests.get(url, timeout=15)
+            r.raise_for_status()
+            data = r.json()
+            if "Note" in data:
+                print(f"⚠️  Alpha Vantage rate-limited: {data['Note']}")
+                sys.exit(1)
+            if "Error Message" in data:
+                print(f"❌ Alpha Vantage API error: {data['Error Message']}")
+                sys.exit(1)
+            if "Global Quote" in data and data["Global Quote"]:
+                price = data["Global Quote"].get("05. price", "N/A")
+                print(f"✅ Alpha Vantage API: OK — SPY last price=${price}")
+            else:
+                print(f"⚠️  Alpha Vantage: unexpected response: {list(data.keys())}")
+                sys.exit(1)
+        except Exception as e:
+            print(f"❌ Alpha Vantage API check failed: {e}")
+            sys.exit(1)
+        EOF
+
+    - name: Check email secrets present
+      id: email_check
+      run: |
+        python3 - <<'EOF'
+        import os, sys
+        missing = [k for k in ("EMAIL_USERNAME", "EMAIL_PASSWORD", "EMAIL_TO")
+                   if not os.getenv(k)]
+        if missing:
+            print(f"❌ Missing email secrets: {missing}")
+            sys.exit(1)
+        print("✅ Email secrets: all present")
+        EOF
+      env:
+        EMAIL_USERNAME: ${{ secrets.EMAIL_USERNAME }}
+        EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+        EMAIL_TO: ${{ secrets.EMAIL_TO }}
+
+    - name: Create health summary
+      if: always()
+      run: |
+        ALPACA_STATUS="${{ steps.alpaca_check.outcome }}"
+        AV_STATUS="${{ steps.av_check.outcome }}"
+        EMAIL_STATUS="${{ steps.email_check.outcome }}"
+        DATE=$(date +%Y-%m-%d)
+
+        cat > $GITHUB_STEP_SUMMARY << EOF
+        # API Key Health Check — ${DATE}
+
+        | Service            | Status |
+        |--------------------|--------|
+        | Alpaca Trading API | $([ "$ALPACA_STATUS" = "success" ] && echo "✅ OK" || echo "❌ FAIL") |
+        | Alpha Vantage API  | $([ "$AV_STATUS" = "success" ] && echo "✅ OK" || echo "❌ FAIL") |
+        | Email Secrets      | $([ "$EMAIL_STATUS" = "success" ] && echo "✅ OK" || echo "❌ FAIL") |
+
+        _Run: ${{ github.run_number }} · Triggered: ${{ github.event_name }}_
+        EOF
+
+    - name: Send failure alert
+      if: failure()
+      uses: dawidd6/action-send-mail@v3
+      with:
+        server_address: smtp.gmail.com
+        server_port: 587
+        username: ${{ secrets.EMAIL_USERNAME }}
+        password: ${{ secrets.EMAIL_PASSWORD }}
+        subject: "🔑 API Key Health Check FAILED — ${{ github.run_number }}"
+        to: ${{ secrets.EMAIL_TO }}
+        from: Trading System
+        body: |
+          One or more API keys failed the weekly health check.
+
+          Alpaca:       ${{ steps.alpaca_check.outcome }}
+          AlphaVantage: ${{ steps.av_check.outcome }}
+          Email:        ${{ steps.email_check.outcome }}
+
+          Check the workflow logs for details:
+          ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          Action required: rotate or renew failing keys before the next trading day.
