@@ -82,24 +82,24 @@ def _multi_symbol_data(n_symbols: int = 10, n_bars: int = 100) -> pd.DataFrame:
 
 class TestRSIMeanReversionFixes:
 
-    def test_rsi_threshold_is_40(self):
+    def test_rsi_threshold_is_35(self):
         s = RSIMeanReversionStrategy(1, 25_000)
-        assert s.rsi_threshold == 40, "Entry threshold must be 40 (not 30)"
+        assert s.rsi_threshold == 35, "Entry threshold must be 35 (meaningfully oversold)"
 
     def test_rsi_exit_threshold_is_55(self):
         s = RSIMeanReversionStrategy(1, 25_000)
         assert s.rsi_exit == 55, "Exit threshold must be 55"
 
-    def test_buy_when_rsi_below_40_and_slope_positive(self):
+    def test_buy_when_rsi_below_35_and_slope_positive(self):
         s = RSIMeanReversionStrategy(1, 25_000)
-        data = _make_symbol_data("AAPL", rsi_val=35.0)
-        # slope = rsi[-1] - rsi[-2] = 35 - 34 = +1  → positive slope
-        data["rsi"] = 35.0
-        data.loc[data.index[-2], "rsi"] = 34.0
+        data = _make_symbol_data("AAPL", rsi_val=30.0)
+        # slope = rsi[-1] - rsi[-2] = 30 - 29 = +1  → positive slope
+        data["rsi"] = 30.0
+        data.loc[data.index[-2], "rsi"] = 29.0
 
         signals = s.generate_signals(data)
         buys = [x for x in signals if x["action"] == "BUY"]
-        assert len(buys) >= 1, "Should generate BUY when RSI < 40 and slope > 0"
+        assert len(buys) >= 1, "Should generate BUY when RSI < 35 and slope > 0"
         assert buys[0]["symbol"] == "AAPL"
 
     def test_no_buy_when_rsi_slope_negative(self):
