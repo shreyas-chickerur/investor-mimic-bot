@@ -534,9 +534,9 @@ class TradingDatabase:
     
     def update_position(self, strategy_id: int, symbol: str, shares: float,
                        avg_price: float, current_price: Optional[float] = None,
-                       entry_date: Optional[str] = None):
-        """Update or create position. entry_date is only written on the first insert;
-        subsequent updates preserve the original value via COALESCE."""
+                       entry_date: Optional[str] = None, atr: Optional[float] = None):
+        """Update or create position. entry_date and atr are only written on the
+        first insert; subsequent updates preserve the original values via COALESCE."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
@@ -546,8 +546,8 @@ class TradingDatabase:
         cursor.execute('''
             INSERT INTO positions
             (strategy_id, symbol, shares, avg_price, current_price, market_value,
-             unrealized_pnl, entry_date, last_updated)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+             unrealized_pnl, entry_date, atr, last_updated)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(strategy_id, symbol) DO UPDATE SET
                 shares = excluded.shares,
                 avg_price = excluded.avg_price,
@@ -555,9 +555,10 @@ class TradingDatabase:
                 market_value = excluded.market_value,
                 unrealized_pnl = excluded.unrealized_pnl,
                 entry_date = COALESCE(positions.entry_date, excluded.entry_date),
+                atr = COALESCE(positions.atr, excluded.atr),
                 last_updated = excluded.last_updated
         ''', (strategy_id, symbol, shares, avg_price, current_price, market_value,
-              unrealized_pnl, entry_date, datetime.now().isoformat()))
+              unrealized_pnl, entry_date, atr, datetime.now().isoformat()))
         
         conn.commit()
         conn.close()

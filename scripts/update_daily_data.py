@@ -205,17 +205,31 @@ class DailyDataUpdater:
             existing_df = None
             latest_date = None
         
+        # Detect symbols that need a full backfill (new to universe or insufficient history)
+        _MIN_ROWS_FOR_INDICATORS = 50  # need ≥14 for RSI, 20 for ATR, etc.
+        if existing_df is not None:
+            rows_per_symbol = existing_df.groupby('symbol').size()
+            _backfill_symbols = {
+                s for s in self.universe
+                if rows_per_symbol.get(s, 0) < _MIN_ROWS_FOR_INDICATORS
+            }
+        else:
+            _backfill_symbols = set(self.universe)
+        if _backfill_symbols:
+            logger.info(f"\n{len(_backfill_symbols)} symbol(s) need backfill (< {_MIN_ROWS_FOR_INDICATORS} rows): {sorted(_backfill_symbols)}")
+
         # Fetch latest data for all symbols
         logger.info(f"\nFetching latest data for {len(self.universe)} symbols...")
         new_data = []
         failed = []
-        
-        days_to_fetch = 5 if existing_df is not None else 100
+
         if existing_df is None:
             logger.info("No existing data — fetching full compact window (100 days per symbol)")
 
         for i, symbol in enumerate(self.universe, 1):
-            logger.info(f"[{i}/{len(self.universe)}] {symbol}")
+            days_to_fetch = 100 if symbol in _backfill_symbols else 5
+            label = "backfill" if symbol in _backfill_symbols else "update"
+            logger.info(f"[{i}/{len(self.universe)}] {symbol} ({label}, {days_to_fetch}d)")
 
             df = self.fetch_latest_data(symbol, days=days_to_fetch)
             

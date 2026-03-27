@@ -35,25 +35,23 @@ def test_data_pipeline():
 
 
 def test_strategy_initialization():
-    """Test all strategies can be initialized"""
+    """Test all active strategies can be initialized"""
     print("\n" + "="*80)
     print("TEST 2: STRATEGY INITIALIZATION")
     print("="*80)
-    
+
     from src.strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
-    from src.strategies.strategy_ma_crossover import MACrossoverStrategy
     from src.strategies.strategy_ml_momentum import MLMomentumStrategy
-    from src.strategies.strategy_news_sentiment import NewsSentimentStrategy
-    from src.strategies.strategy_volatility_breakout import VolatilityBreakoutStrategy
-    
+    from src.strategies.strategy_earnings_drift import EarningsDriftStrategy
+    from src.strategies.strategy_factor_momentum import FactorMomentumStrategy
+
     strategies = [
         RSIMeanReversionStrategy(1, 20000),
-        MACrossoverStrategy(2, 20000),
-        MLMomentumStrategy(3, 20000),
-        NewsSentimentStrategy(4, 20000),
-        VolatilityBreakoutStrategy(5, 20000)
+        MLMomentumStrategy(2, 20000),
+        EarningsDriftStrategy(3, 20000),
+        FactorMomentumStrategy(4, 20000),
     ]
-    
+
     for strategy in strategies:
         assert hasattr(strategy, 'generate_signals'), f"{strategy.name} missing generate_signals"
         print(f"✅ {strategy.name} initialized")
@@ -61,29 +59,29 @@ def test_strategy_initialization():
 
 
 def test_signal_generation():
-    """Test signal generation from strategies"""
+    """Test signal generation from active strategies"""
     print("\n" + "="*80)
     print("TEST 3: SIGNAL GENERATION")
     print("="*80)
-    
+
     from src.strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
-    from src.strategies.strategy_ma_crossover import MACrossoverStrategy
-    
+    from src.strategies.strategy_factor_momentum import FactorMomentumStrategy
+
     df = pd.read_csv('data/training_data.csv', index_col=0)
     df.index = pd.to_datetime(df.index)
     test_data = df.tail(1000)
-    
+
     strategies = [
         RSIMeanReversionStrategy(1, 20000),
-        MACrossoverStrategy(2, 20000)
+        FactorMomentumStrategy(2, 20000),
     ]
-    
+
     total_signals = 0
     for strategy in strategies:
         signals = strategy.generate_signals(test_data)
         print(f"   {strategy.name}: {len(signals)} signals")
         total_signals += len(signals)
-    
+
     print(f"✅ Total signals generated: {total_signals}")
 
 
