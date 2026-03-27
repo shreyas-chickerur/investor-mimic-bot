@@ -87,6 +87,28 @@ class FactorMomentumStrategy(TradingStrategy):
             logger.warning("Could not load fundamentals: %s", exc)
         return {}
 
+    def _sector_regime_multipliers(self, market_data: pd.DataFrame) -> Dict[str, float]:
+        """Return a score multiplier per sector ETF based on 20-day trend.
+
+        Sector ETF above its 20-day SMA  → multiplier 1.10 (mild tailwind)
+        Sector ETF below its 20-day SMA  → multiplier 0.80 (mild headwind)
+        Insufficient data                → multiplier 1.00 (neutral)
+        """
+        multipliers: Dict[str, float] = {}
+        for etf in set(_SECTOR_MAP.values()):
+            rows = market_data[market_data['symbol'] == etf] if 'symbol' in market_data.columns else pd.DataFrame()
+            if len(rows) < 20:
+                multipliers[etf] = 1.0
+                continue
+            prices = rows['close'].values
+            sma20 = float(np.mean(prices[-20:]))
+            last_price = float(prices[-1])
+            if last_price > sma20:
+                multipliers[etf] = 1.10
+            else:
+                multipliers[etf] = 0.80
+        return multipliers
+
     def _compute_factor_scores(self, market_data: pd.DataFrame) -> Dict[str, float]:
         """Compute composite factor score per symbol using cross-sectional percentile ranks.
 
@@ -205,7 +227,17 @@ class FactorMomentumStrategy(TradingStrategy):
             )
             logger.debug("Fundamentals unavailable — using 6-factor model")
 
-        return factors['composite'].to_dict()
+        # E2: Apply sector regime tilt — multiply composite by sector ETF trend multiplier
+        sector_mults = self._sector_regime_multipliers(market_data)
+        tilted: Dict[str, float] = {}
+        for sym, score in factors['composite'].items():
+            etf = _SECTOR_MAP.get(sym, 'SPY')
+            mult = sector_mults.get(etf, 1.0)
+            tilted[sym] = score * mult
+            if mult != 1.0:
+                logger.debug(f"Sector tilt {sym} ({etf}): {score:.3f} × {mult:.2f} = {tilted[sym]:.3f}")
+
+        return tilted
 
     def generate_signals(self, market_data: pd.DataFrame) -> List[Dict]:
         """Generate signals by ranking stocks and buying top quintile."""
