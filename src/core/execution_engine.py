@@ -24,7 +24,7 @@ from src.strategies.strategy_ml_momentum import MLMomentumStrategy
 from src.strategies.strategy_earnings_drift import EarningsDriftStrategy
 from src.strategies.strategy_factor_momentum import FactorMomentumStrategy
 from alpaca.trading.client import TradingClient
-from alpaca.trading.requests import MarketOrderRequest
+from alpaca.trading.requests import MarketOrderRequest, LimitOrderRequest
 from alpaca.trading.enums import OrderSide, TimeInForce
 import pandas as pd
 
@@ -486,7 +486,12 @@ class MultiStrategyRunner:
                 continue
             
             current_price = current_prices[symbol]
-            
+
+            # Ratchet trailing stop upward before checking — stop only moves up, never down
+            atr = float(position.get('atr') or 0)
+            if atr > 0:
+                self.stop_loss_manager.update_trailing_stop(symbol, current_price, atr)
+
             # Check if stop loss is hit
             if self.stop_loss_manager.check_stop_loss(symbol, current_price):
                 stop_price = self.stop_loss_manager.get_stop_price(symbol)
@@ -555,6 +560,20 @@ class MultiStrategyRunner:
                 logger.error(f"Error executing stop loss exit for {symbol}: {e}")
                 self.errors.append(f"Stop loss exit failed for {symbol}: {e}")
     
+    def _get_symbols_reporting_tomorrow(self) -> set:
+        """Return set of symbols with earnings in the next 1 trading day."""
+        cal_path = Path('data/earnings_calendar.csv')
+        if not cal_path.exists():
+            return set()
+        try:
+            cal = pd.read_csv(cal_path)
+            cal['reportDate'] = pd.to_datetime(cal['reportDate'], errors='coerce')
+            tomorrow = (pd.Timestamp.today() + pd.Timedelta(days=1)).normalize()
+            return set(cal[cal['reportDate'] == tomorrow]['symbol'].dropna().str.upper())
+        except Exception as e:
+            logger.warning(f"Could not load earnings calendar for pre-earnings check: {e}")
+            return set()
+
     def run_all_strategies(self, market_data):
         """Run all strategies and execute trades"""
         strategies = self.initialize_strategies()
@@ -655,6 +674,31 @@ class MultiStrategyRunner:
         self._news_filter = NewsSignalFilter()
         self._news_sentiment_map: dict = {}
         self.reconciliation_discrepancies = []
+        # Pre-earnings: symbols reporting tomorrow — block new BUY entries
+        self._reporting_tomorrow: set = self._get_symbols_reporting_tomorrow()
+        if self._reporting_tomorrow:
+            logger.info(f"Pre-earnings guard active for {len(self._reporting_tomorrow)} symbol(s): "
+                        f"{sorted(self._reporting_tomorrow)}")
+
+        # ML risk-off pre-scan: generate ML signals once before the main loop so the
+        # risk-off flag is available to RSI / Factor strategies that run before ML.
+        self._ml_risk_off: bool = False
+        self._ml_signals_cache = None
+        ml_strategy = next((s for s in strategies if 'ml' in s.name.lower()), None)
+        if ml_strategy is not None:
+            try:
+                ml_pre = ml_strategy.generate_signals(market_data)
+                ml_sell_count = sum(1 for s in ml_pre if s.get('action') == 'SELL')
+                self._ml_risk_off = ml_sell_count >= 3
+                self._ml_signals_cache = ml_pre
+                if self._ml_risk_off:
+                    logger.warning(f"ML risk-off: {ml_sell_count} broad SELL signals — "
+                                   f"BUY suppressed for non-ML strategies this run")
+                else:
+                    logger.info(f"ML pre-scan: {ml_sell_count} SELL(s) — risk-off threshold not reached")
+            except Exception as _e:
+                logger.warning(f"ML risk-off pre-scan skipped: {_e}")
+
         current_prices = market_data.groupby('symbol')['close'].last().to_dict()
 
         # Refresh open position prices so unrealized P&L is current in the email
@@ -806,9 +850,13 @@ class MultiStrategyRunner:
                         self.funnel_tracker.record_after_regime(strategy.strategy_id, 0)
                         continue
 
-                    # Generate signals with detailed logging
+                    # Generate signals (reuse ML pre-scan cache to avoid double-training)
                     logger.info(f"  Calling {strategy.name}.generate_signals() with {len(market_data)} rows, {market_data['symbol'].nunique()} symbols")
-                    signals = strategy.generate_signals(market_data)
+                    if strategy is ml_strategy and self._ml_signals_cache is not None:
+                        signals = self._ml_signals_cache
+                        self._ml_signals_cache = None  # consume cache
+                    else:
+                        signals = strategy.generate_signals(market_data)
                     
                     # FUNNEL STAGE 1: Raw signals
                     raw_count = len(signals) if signals else 0
@@ -1015,6 +1063,17 @@ class MultiStrategyRunner:
                         logger.warning(f"Skipping BUY {symbol} - already sold this run (wash trade prevention)")
                         continue
 
+                    # Pre-earnings guard: skip new entries for symbols reporting tomorrow
+                    if symbol in getattr(self, '_reporting_tomorrow', set()):
+                        logger.info(f"Skipping BUY {symbol} — reports earnings tomorrow (binary event protection)")
+                        continue
+
+                    # ML risk-off guard: suppress BUY from non-ML strategies when ML detected
+                    # broad bearish conditions (≥3 SELL signals across the universe)
+                    if getattr(self, '_ml_risk_off', False) and 'ml' not in strategy.name.lower():
+                        logger.info(f"Skipping BUY {symbol} ({strategy.name}) — ML risk-off active")
+                        continue
+
                     # Duplicate prevention: skip if we already hold this symbol for this strategy today
                     existing_pos = self.db.get_position(strategy.strategy_id, symbol)
                     if existing_pos and float(existing_pos.get('shares', 0)) > 0:
@@ -1027,7 +1086,9 @@ class MultiStrategyRunner:
                     size_mult = signal.get('size_multiplier', 1.0)
                     # Apply drawdown sizing multiplier (rampup mode)
                     drawdown_mult = self.drawdown_manager.get_sizing_multiplier()
-                    combined_mult = size_mult * drawdown_mult
+                    # Apply conviction multiplier: scale 50%–100% based on signal confidence
+                    conviction_mult = max(0.5, min(1.0, float(signal.get('confidence', 0.7))))
+                    combined_mult = size_mult * drawdown_mult * conviction_mult
                     adjusted_shares = int(shares * combined_mult)
                     
                     if adjusted_shares == 0:
@@ -1035,8 +1096,8 @@ class MultiStrategyRunner:
                         continue
                     
                     logger.info(f"Size adjustment for {symbol}: {shares} → {adjusted_shares} "
-                               f"(corr_mult={size_mult:.2f}, drawdown_mult={drawdown_mult:.2f}, "
-                               f"combined={combined_mult:.2f})")
+                               f"(corr={size_mult:.2f}, drawdown={drawdown_mult:.2f}, "
+                               f"conviction={conviction_mult:.2f}, combined={combined_mult:.2f})")
                     
                     exec_price, slippage_cost, commission_cost, total_cost = self.cost_model.calculate_execution_price(
                         price, 'BUY', adjusted_shares
@@ -1071,10 +1132,12 @@ class MultiStrategyRunner:
                         intent_id, strategy.strategy_id, symbol, 'BUY', adjusted_shares
                     )
 
-                    order_data = MarketOrderRequest(
+                    limit_price = round(price * 1.001, 2)  # 0.1% above last close
+                    order_data = LimitOrderRequest(
                         symbol=symbol,
                         qty=adjusted_shares,
                         side=OrderSide.BUY,
+                        limit_price=limit_price,
                         time_in_force=TimeInForce.DAY
                     )
                     
@@ -1221,10 +1284,12 @@ class MultiStrategyRunner:
                     exec_price, slippage_cost, commission_cost, total_cost = self.cost_model.calculate_execution_price(
                         price, 'SELL', shares
                     )
-                    order_data = MarketOrderRequest(
+                    limit_price_sell = round(price * 0.999, 2)  # 0.1% below last close
+                    order_data = LimitOrderRequest(
                         symbol=symbol,
                         qty=shares,
                         side=OrderSide.SELL,
+                        limit_price=limit_price_sell,
                         time_in_force=TimeInForce.DAY
                     )
                     
@@ -1611,16 +1676,46 @@ def main():
         # Send email summary
         try:
             positions = runner.trading_client.get_all_positions()
-            positions_data = [
-                {
+
+            # Enrich broker positions with days_held from DB (F3)
+            db_positions = {p['symbol']: p for p in runner.db.get_positions()}
+            today = datetime.now().date()
+            positions_data = []
+            for p in positions:
+                db_pos = db_positions.get(p.symbol, {})
+                entry_date_str = db_pos.get('entry_date', '') or ''
+                days_held = None
+                if entry_date_str:
+                    try:
+                        ed = datetime.strptime(entry_date_str[:10], '%Y-%m-%d').date()
+                        days_held = (today - ed).days
+                    except ValueError:
+                        pass
+                positions_data.append({
                     'symbol': p.symbol,
                     'shares': float(p.qty),
                     'entry_price': float(p.avg_entry_price),
                     'current_price': float(p.current_price),
-                }
-                for p in positions
-            ]
-            
+                    'days_held': days_held,
+                    'strategy_name': db_pos.get('strategy_name', ''),
+                })
+
+            # Build per-strategy P&L attribution from today's closed trades (F3)
+            today_trades = runner.db.get_todays_trades(today.strftime('%Y-%m-%d'))
+            strat_pnl: dict = {}
+            for t in today_trades:
+                sname = t.get('strategy_name', 'Unknown')
+                if sname not in strat_pnl:
+                    strat_pnl[sname] = {'trade_count': 0, 'win_count': 0, 'realized_pnl': 0.0}
+                strat_pnl[sname]['trade_count'] += 1
+                pnl_val = float(t.get('pnl', 0) or 0)
+                strat_pnl[sname]['realized_pnl'] += pnl_val
+                if pnl_val > 0:
+                    strat_pnl[sname]['win_count'] += 1
+            per_strategy_pnl = [
+                {'strategy_name': k, **v} for k, v in sorted(strat_pnl.items())
+            ] or None
+
             runner.email_notifier.send_daily_summary(
                 trades=runner.executed_trades,
                 positions=positions_data,
@@ -1628,6 +1723,7 @@ def main():
                 cash=runner.cash_available,
                 errors=runner.errors if runner.errors else None,
                 signal_reasoning_chains=runner.build_signal_reasoning_chains(),
+                per_strategy_pnl=per_strategy_pnl,
             )
             logger.info("Email summary sent successfully")
         except Exception as e:

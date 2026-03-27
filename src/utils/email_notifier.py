@@ -50,7 +50,8 @@ class EmailNotifier:
                           errors: List[str] = None,
                           funnel_summary: List[Dict] = None,
                           why_no_trade_reports: List[str] = None,
-                          signal_reasoning_chains: Optional[List[Dict]] = None):
+                          signal_reasoning_chains: Optional[List[Dict]] = None,
+                          per_strategy_pnl: Optional[List[Dict]] = None):
         """Send daily trading summary email"""
         
         if not self.enabled:
@@ -69,6 +70,7 @@ class EmailNotifier:
             funnel_summary,
             why_no_trade_reports,
             signal_reasoning_chains,
+            per_strategy_pnl,
         )
         
         self._send_email(subject, body)
@@ -108,7 +110,7 @@ class EmailNotifier:
     
     def _build_summary_email(self, trades, positions, portfolio_value, cash, errors,
                             funnel_summary=None, why_no_trade_reports=None,
-                            signal_reasoning_chains=None):
+                            signal_reasoning_chains=None, per_strategy_pnl=None):
         """Build HTML email body for daily summary"""
         
         # Count trades by action
@@ -165,6 +167,7 @@ class EmailNotifier:
             positions_html += "<th style='padding: 10px 12px; text-align: right;'>Shares</th>"
             positions_html += "<th style='padding: 10px 12px; text-align: right;'>You Paid / Share</th>"
             positions_html += "<th style='padding: 10px 12px; text-align: right;'>Now Worth / Share</th>"
+            positions_html += "<th style='padding: 10px 12px; text-align: right;'>Days Held</th>"
             positions_html += "<th style='padding: 10px 12px; text-align: right;'>Current Value</th>"
             positions_html += "<th style='padding: 10px 12px; text-align: right;'>Unrealized Gain/Loss</th>"
             positions_html += "</tr>"
@@ -187,11 +190,17 @@ class EmailNotifier:
                 total_value += mkt_val
                 total_pnl += pnl
 
+                days_held = pos.get('days_held')
+                days_held_str = f"{int(days_held)}d" if days_held is not None else "-"
+                age_color = '#dc2626' if days_held and days_held >= 18 else '#6b7280'
+
                 positions_html += f"<tr style='border-bottom: 1px solid #e2e8f0;'>"
                 positions_html += f"<td style='padding: 10px 12px; font-weight: 600;'>{pos.get('symbol', 'N/A')}</td>"
                 positions_html += f"<td style='padding: 10px 12px; text-align: right;'>{shares:.0f}</td>"
                 positions_html += f"<td style='padding: 10px 12px; text-align: right; color: #555;'>${entry:.2f}</td>"
                 positions_html += f"<td style='padding: 10px 12px; text-align: right; font-weight: 500;'>${current:.2f}</td>"
+                positions_html += (f"<td style='padding: 10px 12px; text-align: right; color: {age_color}; font-weight: 600;'>"
+                                   f"{days_held_str}</td>")
                 positions_html += f"<td style='padding: 10px 12px; text-align: right;'>${mkt_val:,.2f}</td>"
                 positions_html += (
                     f"<td style='padding: 10px 12px; text-align: right; background: {pnl_bg}; "
@@ -208,7 +217,7 @@ class EmailNotifier:
             positions_html += (
                 f"<tr style='border-top: 2px solid #cbd5e0; background: #f8fafc; font-weight: 700;'>"
                 f"<td style='padding: 10px 12px;'>TOTAL ({len(positions)} positions)</td>"
-                f"<td colspan='3' style='padding: 10px 12px;'></td>"
+                f"<td colspan='4' style='padding: 10px 12px;'></td>"
                 f"<td style='padding: 10px 12px; text-align: right;'>${total_value:,.2f}</td>"
                 f"<td style='padding: 10px 12px; text-align: right; background: {total_pnl_bg}; color: {total_pnl_color};'>"
                 f"{total_arrow} ${abs(total_pnl):,.2f} ({total_pnl_pct:+.1f}%)</td>"
@@ -218,6 +227,37 @@ class EmailNotifier:
         else:
             positions_html = "<p style='color: #666; font-style: italic;'>No open positions</p>"
         
+        # Build per-strategy P&L attribution section
+        strategy_pnl_html = ""
+        if per_strategy_pnl:
+            rows_html = "".join(
+                f"<tr style='border-bottom: 1px solid #e2e8f0;'>"
+                f"<td style='padding: 10px 12px;'>{html_lib.escape(str(row.get('strategy_name', 'N/A')))}</td>"
+                f"<td style='padding: 10px 12px; text-align: right;'>{row.get('trade_count', 0)}</td>"
+                f"<td style='padding: 10px 12px; text-align: right;'>{row.get('win_count', 0)}</td>"
+                f"<td style='padding: 10px 12px; text-align: right; font-weight: 700; "
+                f"color: {'#16a34a' if (row.get('realized_pnl') or 0) >= 0 else '#dc2626'};'>"
+                f"{'▲' if (row.get('realized_pnl') or 0) >= 0 else '▼'} "
+                f"${abs(float(row.get('realized_pnl') or 0)):,.2f}</td>"
+                f"</tr>"
+                for row in per_strategy_pnl
+            )
+            strategy_pnl_html = f"""
+            <div style="margin-bottom: 30px;">
+                <h2 style="color: #2c5282; border-bottom: 2px solid #4A90E2; padding-bottom: 10px;
+                           font-size: 20px; font-weight: 600;">&#x1F4CA; Per-Strategy P&amp;L Attribution</h2>
+                <table style='width: 100%%; border-collapse: collapse; margin-top: 10px; font-size: 14px;'>
+                    <tr style='background: #f0f4f8; border-bottom: 2px solid #cbd5e0;'>
+                        <th style='padding: 10px 12px; text-align: left;'>Strategy</th>
+                        <th style='padding: 10px 12px; text-align: right;'>Trades</th>
+                        <th style='padding: 10px 12px; text-align: right;'>Wins</th>
+                        <th style='padding: 10px 12px; text-align: right;'>Realized P&amp;L</th>
+                    </tr>
+                    {rows_html}
+                </table>
+            </div>
+            """
+
         # Build funnel summary section
         funnel_html = ""
         if funnel_summary:
@@ -375,6 +415,8 @@ class EmailNotifier:
         {reasoning_html}
         
         {funnel_html}
+
+        {strategy_pnl_html}
         
         <!-- Current Positions -->
         <div style="margin-bottom: 30px;">
