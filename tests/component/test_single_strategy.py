@@ -12,8 +12,7 @@ import pytest
 pytestmark = pytest.mark.slow  # loads training_data.csv for all tests
 
 from src.strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
-from src.strategies.strategy_ma_crossover import MACrossoverStrategy
-from src.strategies.strategy_volatility_breakout import VolatilityBreakoutStrategy
+from src.strategies.strategy_ml_momentum import MLMomentumStrategy
 from src.strategies.strategy_earnings_drift import EarningsDriftStrategy
 from src.strategies.strategy_factor_momentum import FactorMomentumStrategy
 
@@ -33,8 +32,7 @@ def market_data():
 
 STRATEGY_CLASSES = [
     ("RSI Mean Reversion", RSIMeanReversionStrategy),
-    ("MA Crossover", MACrossoverStrategy),
-    ("Volatility Breakout", VolatilityBreakoutStrategy),
+    ("ML Momentum", MLMomentumStrategy),
     ("Earnings Drift", EarningsDriftStrategy),
     ("Factor Momentum", FactorMomentumStrategy),
 ]

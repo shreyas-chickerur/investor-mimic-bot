@@ -1,7 +1,6 @@
 """Integration and execution components.
 
 Import directly from submodules for best performance:
-    from src.integration.strategy_runner import StrategyRunner
     from src.integration.pending_signals_manager import PendingSignalsManager
 
 Package-level imports (``from src.integration import X``) are supported via
@@ -12,19 +11,15 @@ from __future__ import annotations
 __all__ = [
     'DryRunExecutor',
     'PortfolioBacktester',
-    'StrategyRunner',
-    'StrategyDatabase',
     'PendingSignalsManager',
     'CashManager',
 ]
 
 _lazy_map = {
-    'DryRunExecutor':      ('src.integration.dry_run_executor',    'DryRunExecutor'),
-    'PortfolioBacktester': ('src.integration.portfolio_backtester', 'PortfolioBacktester'),
-    'StrategyRunner':      ('src.integration.strategy_runner',      'StrategyRunner'),
-    'StrategyDatabase':    ('src.integration.strategy_database',    'StrategyDatabase'),
+    'DryRunExecutor':        ('src.integration.dry_run_executor',       'DryRunExecutor'),
+    'PortfolioBacktester':   ('src.integration.portfolio_backtester',   'PortfolioBacktester'),
     'PendingSignalsManager': ('src.integration.pending_signals_manager', 'PendingSignalsManager'),
-    'CashManager':         ('src.integration.cash_manager',         'CashManager'),
+    'CashManager':           ('src.integration.cash_manager',           'CashManager'),
 }
 
 

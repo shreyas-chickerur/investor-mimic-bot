@@ -340,22 +340,7 @@ class TestPortfolioBacktesterMaximize:
 
 
 # ============================================================================
-# STRATEGY DATABASE - 101 lines
-# ============================================================================
-
-class TestStrategyDatabaseMaximize:
-    """Maximize coverage of strategy_database.py"""
-    
-    def test_init(self):
-        from src.integration.strategy_database import StrategyDatabase
-        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as f:
-            db = StrategyDatabase(f.name)
-            assert db is not None
-            os.unlink(f.name)
-
-
-# ============================================================================
-# CONFIG MODULES - 110 lines (logger.py)
+# CONFIG MODULES - config_loader.py
 # ============================================================================
 
 class TestConfigModulesMaximize:
@@ -365,8 +350,3 @@ class TestConfigModulesMaximize:
         from src.utils.config_loader import ConfigLoader
         loader = ConfigLoader()
         assert loader is not None
-
-    def test_typed_config_import(self):
-        from src.utils.config_typed import TradingSystemConfig
-        config = TradingSystemConfig()
-        assert config is not None
