@@ -118,25 +118,32 @@ class EmailNotifier:
         # Build trades table
         trades_html = ""
         if trades:
-            trades_html = "<table style='width: 100%; border-collapse: collapse; margin-top: 10px;'>"
-            trades_html += "<tr style='background: #f8f9fa; border-bottom: 2px solid #dee2e6;'>"
-            trades_html += "<th style='padding: 10px; text-align: left;'>Action</th>"
-            trades_html += "<th style='padding: 10px; text-align: left;'>Symbol</th>"
-            trades_html += "<th style='padding: 10px; text-align: right;'>Shares</th>"
-            trades_html += "<th style='padding: 10px; text-align: right;'>Price</th>"
-            trades_html += "<th style='padding: 10px; text-align: left;'>Strategy</th>"
+            trades_html = "<table style='width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px;'>"
+            trades_html += "<tr style='background: #f0f4f8; border-bottom: 2px solid #cbd5e0;'>"
+            trades_html += "<th style='padding: 10px 12px; text-align: left;'>Action</th>"
+            trades_html += "<th style='padding: 10px 12px; text-align: left;'>Stock</th>"
+            trades_html += "<th style='padding: 10px 12px; text-align: right;'>Shares</th>"
+            trades_html += "<th style='padding: 10px 12px; text-align: right;'>Price / Share</th>"
+            trades_html += "<th style='padding: 10px 12px; text-align: right;'>Total Value</th>"
+            trades_html += "<th style='padding: 10px 12px; text-align: left;'>Strategy</th>"
             trades_html += "</tr>"
-            
+
             for trade in trades:
-                action_color = '#28a745' if trade.get('action') == 'BUY' else '#dc3545'
-                trades_html += f"<tr style='border-bottom: 1px solid #dee2e6;'>"
-                trades_html += f"<td style='padding: 10px; color: {action_color}; font-weight: bold;'>{trade.get('action', 'N/A')}</td>"
-                trades_html += f"<td style='padding: 10px;'>{trade.get('symbol', 'N/A')}</td>"
-                trades_html += f"<td style='padding: 10px; text-align: right;'>{trade.get('shares', 0)}</td>"
-                trades_html += f"<td style='padding: 10px; text-align: right;'>${trade.get('price', 0):.2f}</td>"
-                trades_html += f"<td style='padding: 10px;'>{trade.get('strategy', 'N/A')}</td>"
+                is_buy = trade.get('action') == 'BUY'
+                action_label = '🟢 Bought' if is_buy else '🔴 Sold'
+                action_bg = '#f0fdf4' if is_buy else '#fff5f5'
+                shares = trade.get('shares', 0)
+                price = trade.get('price', 0)
+                total_val = shares * price
+                trades_html += f"<tr style='border-bottom: 1px solid #e2e8f0; background: {action_bg};'>"
+                trades_html += f"<td style='padding: 10px 12px; font-weight: 600;'>{action_label}</td>"
+                trades_html += f"<td style='padding: 10px 12px; font-weight: 600;'>{trade.get('symbol', 'N/A')}</td>"
+                trades_html += f"<td style='padding: 10px 12px; text-align: right;'>{shares}</td>"
+                trades_html += f"<td style='padding: 10px 12px; text-align: right;'>${price:.2f}</td>"
+                trades_html += f"<td style='padding: 10px 12px; text-align: right; font-weight: 600;'>${total_val:,.2f}</td>"
+                trades_html += f"<td style='padding: 10px 12px; color: #555;'>{trade.get('strategy', 'N/A')}</td>"
                 trades_html += "</tr>"
-            
+
             trades_html += "</table>"
         else:
             trades_html = "<p style='color: #666; font-style: italic;'>No trades executed today</p>"
@@ -144,27 +151,69 @@ class EmailNotifier:
         # Build positions table
         positions_html = ""
         if positions:
-            positions_html = "<table style='width: 100%; border-collapse: collapse; margin-top: 10px;'>"
-            positions_html += "<tr style='background: #f8f9fa; border-bottom: 2px solid #dee2e6;'>"
-            positions_html += "<th style='padding: 10px; text-align: left;'>Symbol</th>"
-            positions_html += "<th style='padding: 10px; text-align: right;'>Shares</th>"
-            positions_html += "<th style='padding: 10px; text-align: right;'>Entry Price</th>"
-            positions_html += "<th style='padding: 10px; text-align: right;'>Current Price</th>"
-            positions_html += "<th style='padding: 10px; text-align: right;'>P&L</th>"
+            # note explaining unrealized
+            positions_html = (
+                "<p style='font-size:13px; color:#555; margin:0 0 8px 0; background:#fffbeb; "
+                "border-left:3px solid #f59e0b; padding:8px 12px; border-radius:4px;'>"
+                "<strong>What is Unrealized Gain/Loss?</strong> These positions are still open — "
+                "the gain or loss exists on paper but hasn't been collected yet. "
+                "It becomes real (realized) only when the position is sold.</p>"
+            )
+            positions_html += "<table style='width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 14px;'>"
+            positions_html += "<tr style='background: #f0f4f8; border-bottom: 2px solid #cbd5e0;'>"
+            positions_html += "<th style='padding: 10px 12px; text-align: left;'>Stock</th>"
+            positions_html += "<th style='padding: 10px 12px; text-align: right;'>Shares</th>"
+            positions_html += "<th style='padding: 10px 12px; text-align: right;'>You Paid / Share</th>"
+            positions_html += "<th style='padding: 10px 12px; text-align: right;'>Now Worth / Share</th>"
+            positions_html += "<th style='padding: 10px 12px; text-align: right;'>Current Value</th>"
+            positions_html += "<th style='padding: 10px 12px; text-align: right;'>Unrealized Gain/Loss</th>"
             positions_html += "</tr>"
-            
-            for pos in positions[:10]:  # Top 10 positions
-                pnl = (pos.get('current_price', 0) - pos.get('entry_price', 0)) * pos.get('shares', 0)
-                pnl_color = '#28a745' if pnl >= 0 else '#dc3545'
-                
-                positions_html += f"<tr style='border-bottom: 1px solid #dee2e6;'>"
-                positions_html += f"<td style='padding: 10px;'>{pos.get('symbol', 'N/A')}</td>"
-                positions_html += f"<td style='padding: 10px; text-align: right;'>{pos.get('shares', 0)}</td>"
-                positions_html += f"<td style='padding: 10px; text-align: right;'>${pos.get('entry_price', 0):.2f}</td>"
-                positions_html += f"<td style='padding: 10px; text-align: right;'>${pos.get('current_price', 0):.2f}</td>"
-                positions_html += f"<td style='padding: 10px; text-align: right; color: {pnl_color}; font-weight: bold;'>${pnl:+.2f}</td>"
+
+            total_cost = 0.0
+            total_value = 0.0
+            total_pnl = 0.0
+            for pos in positions[:15]:
+                entry = pos.get('entry_price', 0) or 0
+                current = pos.get('current_price', 0) or 0
+                shares = pos.get('shares', 0) or 0
+                cost_basis = entry * shares
+                mkt_val = current * shares
+                pnl = mkt_val - cost_basis
+                pnl_pct = ((current - entry) / entry * 100) if entry else 0.0
+                pnl_color = '#16a34a' if pnl >= 0 else '#dc2626'
+                pnl_bg = '#f0fdf4' if pnl >= 0 else '#fff5f5'
+                arrow = '▲' if pnl >= 0 else '▼'
+                total_cost += cost_basis
+                total_value += mkt_val
+                total_pnl += pnl
+
+                positions_html += f"<tr style='border-bottom: 1px solid #e2e8f0;'>"
+                positions_html += f"<td style='padding: 10px 12px; font-weight: 600;'>{pos.get('symbol', 'N/A')}</td>"
+                positions_html += f"<td style='padding: 10px 12px; text-align: right;'>{shares:.0f}</td>"
+                positions_html += f"<td style='padding: 10px 12px; text-align: right; color: #555;'>${entry:.2f}</td>"
+                positions_html += f"<td style='padding: 10px 12px; text-align: right; font-weight: 500;'>${current:.2f}</td>"
+                positions_html += f"<td style='padding: 10px 12px; text-align: right;'>${mkt_val:,.2f}</td>"
+                positions_html += (
+                    f"<td style='padding: 10px 12px; text-align: right; background: {pnl_bg}; "
+                    f"color: {pnl_color}; font-weight: 700;'>"
+                    f"{arrow} ${abs(pnl):,.2f} ({pnl_pct:+.1f}%)</td>"
+                )
                 positions_html += "</tr>"
-            
+
+            # Totals footer
+            total_pnl_color = '#16a34a' if total_pnl >= 0 else '#dc2626'
+            total_pnl_bg = '#f0fdf4' if total_pnl >= 0 else '#fff5f5'
+            total_pnl_pct = ((total_value - total_cost) / total_cost * 100) if total_cost else 0.0
+            total_arrow = '▲' if total_pnl >= 0 else '▼'
+            positions_html += (
+                f"<tr style='border-top: 2px solid #cbd5e0; background: #f8fafc; font-weight: 700;'>"
+                f"<td style='padding: 10px 12px;'>TOTAL ({len(positions)} positions)</td>"
+                f"<td colspan='3' style='padding: 10px 12px;'></td>"
+                f"<td style='padding: 10px 12px; text-align: right;'>${total_value:,.2f}</td>"
+                f"<td style='padding: 10px 12px; text-align: right; background: {total_pnl_bg}; color: {total_pnl_color};'>"
+                f"{total_arrow} ${abs(total_pnl):,.2f} ({total_pnl_pct:+.1f}%)</td>"
+                f"</tr>"
+            )
             positions_html += "</table>"
         else:
             positions_html = "<p style='color: #666; font-style: italic;'>No open positions</p>"
