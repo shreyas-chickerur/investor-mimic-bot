@@ -73,21 +73,38 @@ def get_30d(db):
         GROUP BY snapshot_date
         ORDER BY snapshot_date""")
 
+_CANONICAL_STRATEGIES = [
+    'RSI Mean Reversion',
+    'ML Momentum',
+    'Earnings Drift',
+    'Factor Momentum',
+]
+
 def get_all_time_perf(db):
-    return q(db, """
+    rows = q(db, """
         SELECT s.name,
           COUNT(t.id)                                          total_trades,
           SUM(CASE WHEN t.pnl > 0 THEN 1 ELSE 0 END)         wins,
-          SUM(CASE WHEN t.pnl <= 0 THEN 1 ELSE 0 END)        losses,
+          SUM(CASE WHEN t.pnl IS NOT NULL AND t.pnl <= 0 THEN 1 ELSE 0 END) losses,
           SUM(COALESCE(t.pnl, 0))                             total_pnl,
           MAX(t.pnl)                                          best_trade,
           MIN(t.pnl)                                          worst_trade,
           AVG(CASE WHEN t.pnl > 0 THEN t.pnl END)            avg_win,
-          AVG(CASE WHEN t.pnl <= 0 THEN t.pnl END)           avg_loss,
+          AVG(CASE WHEN t.pnl IS NOT NULL AND t.pnl <= 0 THEN t.pnl END) avg_loss,
           MIN(DATE(t.executed_at))                            first_trade
-        FROM trades t JOIN strategies s ON t.strategy_id=s.id
-        WHERE t.pnl IS NOT NULL AND s.name != 'BROKER_SYNC'
+        FROM strategies s LEFT JOIN trades t
+          ON t.strategy_id = s.id AND t.pnl IS NOT NULL
+        WHERE s.name IN ('RSI Mean Reversion','ML Momentum','Earnings Drift','Factor Momentum')
         GROUP BY s.name ORDER BY total_pnl DESC""")
+    # Ensure all 4 canonical strategies appear even if missing from DB
+    found = {r['name'] for r in rows}
+    for name in _CANONICAL_STRATEGIES:
+        if name not in found:
+            rows.append({'name': name, 'total_trades': 0, 'wins': 0, 'losses': 0,
+                         'total_pnl': 0, 'best_trade': None, 'worst_trade': None,
+                         'avg_win': None, 'avg_loss': None, 'first_trade': None})
+    rows.sort(key=lambda r: r.get('total_pnl') or 0, reverse=True)
+    return rows
 
 def get_today_signals_for_trades(db):
     """Return signal reasoning keyed by (symbol, strategy_id) for today's executed signals."""
@@ -736,13 +753,13 @@ def build_strategy_concerns(health_data, rejection_rows, recent_rows):
     if health_data:
         strategies = health_data.get('strategies', [])
 
-    # If no health data, build minimal cards from DB data alone
-    if not strategies and not rej_by_strat and not recent_by_strat:
-        return ("<p style='color:" + MUTED + ";font-size:13px;font-style:italic;margin:0;'>"
-                "No concern data available.</p>")
-
-    strat_names = list({s.get('strategy_name') for s in strategies} |
-                       set(rej_by_strat.keys()) | set(recent_by_strat.keys()))
+    # Always include all 4 canonical strategies so the section is never blank
+    strat_names = list(
+        {s.get('strategy_name') for s in strategies}
+        | set(rej_by_strat.keys())
+        | set(recent_by_strat.keys())
+        | set(_CANONICAL_STRATEGIES)
+    )
 
     cards = ''
     for name in sorted(strat_names):

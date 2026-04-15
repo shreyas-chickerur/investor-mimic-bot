@@ -1223,19 +1223,7 @@ class MultiStrategyRunner:
                     else:
                         logger.warning(f"No ATR available for {symbol}, stop loss not set")
 
-                    # Calculate P&L for this trade
-                    total_costs = slippage_cost + commission_cost
-                    pnl, pnl_explanation = self.pnl_calculator.calculate_trade_pnl(
-                        strategy.strategy_id,
-                        symbol,
-                        'BUY',
-                        adjusted_shares,
-                        exec_price,
-                        total_costs
-                    )
-                    logger.info(f"P&L: {pnl_explanation}")
-                    
-                    # Log trade with full execution details and P&L
+                    # BUY opens a position — realized P&L is None until the position is sold
                     signal_id = signal.get('signal_id')
                     self.db.log_trade(
                         strategy.strategy_id,
@@ -1248,7 +1236,7 @@ class MultiStrategyRunner:
                         slippage_cost,
                         commission_cost,
                         str(order.id),
-                        pnl
+                        None  # pnl is None for open positions; set on SELL
                     )
                     
                     # Track as executed (will verify fill status later)

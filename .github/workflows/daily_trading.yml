@@ -91,11 +91,12 @@ jobs:
         fi
 
     - name: Update market data
+      continue-on-error: true
       env:
         ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
       run: |
         echo "=== Fetching Latest Market Data ==="
-        python3 scripts/update_daily_data.py
+        python3 scripts/update_daily_data.py || echo "⚠️  Market data update failed — pre-flight will enforce staleness threshold"
     
     - name: Update earnings calendar
       continue-on-error: true
