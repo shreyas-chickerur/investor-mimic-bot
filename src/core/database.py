@@ -545,19 +545,20 @@ class TradingDatabase:
 
         cursor.execute('''
             INSERT INTO positions
-            (strategy_id, symbol, shares, avg_price, current_price, market_value,
+            (strategy_id, symbol, shares, avg_price, entry_price, current_price, market_value,
              unrealized_pnl, entry_date, atr, last_updated)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(strategy_id, symbol) DO UPDATE SET
                 shares = excluded.shares,
                 avg_price = excluded.avg_price,
+                entry_price = COALESCE(positions.entry_price, excluded.entry_price),
                 current_price = excluded.current_price,
                 market_value = excluded.market_value,
                 unrealized_pnl = excluded.unrealized_pnl,
                 entry_date = COALESCE(positions.entry_date, excluded.entry_date),
                 atr = COALESCE(positions.atr, excluded.atr),
                 last_updated = excluded.last_updated
-        ''', (strategy_id, symbol, shares, avg_price, current_price, market_value,
+        ''', (strategy_id, symbol, shares, avg_price, avg_price, current_price, market_value,
               unrealized_pnl, entry_date, atr, datetime.now().isoformat()))
         
         conn.commit()
