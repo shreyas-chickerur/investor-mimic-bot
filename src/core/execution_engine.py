@@ -930,6 +930,10 @@ class MultiStrategyRunner:
                         # Use strategy's own top_n if set (e.g. FactorMomentum=5), else 5
                         max_signals = getattr(strategy, 'top_n', 5)
                         signals_to_execute = signals[:max_signals]
+                        self.funnel_tracker.record_after_risk(
+                            strategy.strategy_id,
+                            len(signals_to_execute)
+                        )
 
                         # Execute trades
                         executed = self._execute_strategy_trades(
@@ -940,7 +944,10 @@ class MultiStrategyRunner:
                         )
 
                         # FUNNEL STAGE 5: Executed
-                        self.funnel_tracker.record_executed(strategy.strategy_id, len(executed))
+                        self.funnel_tracker.record_executed(
+                            strategy.strategy_id,
+                            min(len(executed), len(signals_to_execute))
+                        )
 
                         # Log risk rejections
                         for sig in signals_to_execute:

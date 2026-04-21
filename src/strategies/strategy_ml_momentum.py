@@ -20,8 +20,12 @@ from typing import List, Dict
 import pandas as pd
 import numpy as np
 import logging
-from sklearn.ensemble import GradientBoostingClassifier
-from sklearn.preprocessing import StandardScaler
+try:
+    import lightgbm as lgb
+    _LGBM_AVAILABLE = True
+except (ImportError, OSError):  # OSError covers missing libomp.dylib on macOS
+    from sklearn.ensemble import GradientBoostingClassifier as _FallbackGBT
+    _LGBM_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -53,18 +57,28 @@ class MLMomentumStrategy(TradingStrategy):
         )
         config = get_config()
         self.min_confidence = config.get('strategies.ml_momentum.min_confidence', 0.55)
+        self.max_new_positions_per_day = config.get('strategies.ml_momentum.max_new_positions_per_day', 3)
+        self.buy_quantile_threshold = config.get('strategies.ml_momentum.buy_quantile_threshold', 0.65)
         self.hold_days = 5
         self.entry_dates = {}
 
-        self.model = GradientBoostingClassifier(
-            n_estimators=200,
-            max_depth=3,          # shallow trees avoid overfitting on ~500 samples
-            learning_rate=0.05,
-            subsample=0.8,        # stochastic gradient boosting reduces variance
-            min_samples_leaf=10,  # prevent fitting noise
-            random_state=42,
-        )
-        self.scaler = StandardScaler()  # still scale for numerical stability
+        if _LGBM_AVAILABLE:
+            self.model = lgb.LGBMClassifier(
+                n_estimators=500,
+                learning_rate=0.03,
+                num_leaves=15,          # shallow — prevents overfitting on ~500 train samples
+                min_child_samples=20,   # equivalent to min_samples_leaf
+                subsample=0.8,
+                colsample_bytree=0.8,
+                class_weight='balanced',
+                random_state=42,
+                verbose=-1,             # suppress LightGBM training output
+            )
+        else:
+            self.model = _FallbackGBT(
+                n_estimators=200, max_depth=3, learning_rate=0.05,
+                subsample=0.8, min_samples_leaf=10, random_state=42,
+            )
         self.is_trained = False
         self._train_date: str = ""  # track when model was last trained
 
@@ -154,9 +168,7 @@ class MLMomentumStrategy(TradingStrategy):
 
         X_arr = np.array(X_train)
         y_arr = np.array(y_train)
-        self.scaler.fit(X_arr)
-        X_scaled = self.scaler.transform(X_arr)
-        self.model.fit(X_scaled, y_arr)
+        self.model.fit(X_arr, y_arr)  # LightGBM is scale-invariant; no scaler needed
         self.is_trained = True
         pos_rate = y_arr.mean()
         logger.info("ML trained on %d samples (%.1f%% positive, precomputed=%s)",
@@ -167,7 +179,8 @@ class MLMomentumStrategy(TradingStrategy):
     # ------------------------------------------------------------------
     def generate_signals(self, market_data: pd.DataFrame) -> List[Dict]:
         """Generate signals using ML predictions."""
-        signals = []
+        signals: List[Dict] = []
+        buy_candidates: List[Dict] = []
 
         # Retrain daily (model is cheap and data changes each day)
         today = str(market_data.index.max().date()) if len(market_data) > 0 else ""
@@ -192,8 +205,7 @@ class MLMomentumStrategy(TradingStrategy):
                 if any(np.isnan(f) or np.isinf(f) for f in feats):
                     continue
 
-                X = self.scaler.transform([feats])
-                prob_positive = float(self.model.predict_proba(X)[0][1])
+                prob_positive = float(self.model.predict_proba([feats])[0][1])
 
                 # BUY: probability above threshold. GBM produces wider probability
                 # spread than LR, so 0.52 acts as a modest signal quality floor.
@@ -201,7 +213,7 @@ class MLMomentumStrategy(TradingStrategy):
                     shares = self.calculate_position_size(price, atr=atr, max_position_pct=0.10)
                     if shares <= 0:
                         continue
-                    signals.append({
+                    buy_candidates.append({
                         'symbol': symbol,
                         'action': 'BUY',
                         'shares': shares,
@@ -232,7 +244,25 @@ class MLMomentumStrategy(TradingStrategy):
                 logger.warning("ML prediction failed for %s: %s", symbol, e)
                 continue
 
+        # Calibrated top-k BUY selection: avoid over-trading weak-probability names
+        # by keeping only the strongest daily candidates above an adaptive floor.
+        if buy_candidates:
+            probs = np.array([float(c['confidence']) for c in buy_candidates], dtype=float)
+            quantile = float(np.quantile(probs, self.buy_quantile_threshold))
+            adaptive_floor = max(float(self.min_confidence), quantile)
+
+            filtered = [c for c in buy_candidates if float(c['confidence']) >= adaptive_floor]
+            filtered.sort(key=lambda x: float(x['confidence']), reverse=True)
+
+            selected = filtered[: max(0, int(self.max_new_positions_per_day))]
+            logger.info(
+                "ML BUY selection: %d candidates -> %d selected (adaptive_floor=%.3f)",
+                len(buy_candidates), len(selected), adaptive_floor,
+            )
+            signals.extend(selected)
+
         return signals
 
     def get_description(self) -> str:
-        return "GradientBoosting classifier (12 features) predicting 5-day positive return"
+        backend = "LightGBM" if _LGBM_AVAILABLE else "GradientBoosting (fallback)"
+        return f"{backend} classifier (12 features) predicting 5-day positive return"

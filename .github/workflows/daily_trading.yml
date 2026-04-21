@@ -155,6 +155,15 @@ jobs:
         else
           echo "executed=false" >> $GITHUB_OUTPUT
         fi
+
+    - name: Post-run liveness and funnel guardrails
+      if: always() && steps.check_execution.outputs.executed == 'true'
+      run: |
+        echo "=== Post-run Guardrails ==="
+        python3 scripts/diagnostics/post_run_guardrails.py \
+          --db trading.db \
+          --status-file /tmp/run_status.txt \
+          --out artifacts/diagnostics/post_run_guardrails.json
     
     - name: Paper trading validation report
       if: always()
