@@ -759,6 +759,7 @@ def build_strategy_concerns(health_data, rejection_rows, recent_rows):
         | set(recent_by_strat.keys())
         | set(_CANONICAL_STRATEGIES)
     )
+    strat_names = [n for n in strat_names if n in _CANONICAL_STRATEGIES]
 
     cards = ''
     for name in sorted(strat_names):
