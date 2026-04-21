@@ -55,7 +55,7 @@ help:
 	@echo "$(GREEN)📈 ANALYSIS & REPORTING$(NC)"
 	@echo "  make report           30-day strategy performance report"
 	@echo "  make email-test       Preview daily email HTML locally"
-	@echo "  make analyze          Analyze signal flow (no trading)"
+	@echo "  make analyze          Analyze canonical strategy signals (no trading)"
 	@echo "  make backtest         Walk-forward backtest"
 	@echo "  make metrics          Live portfolio metrics"
 	@echo ""
@@ -207,8 +207,8 @@ report:
 	@echo "$(GREEN)✅ Report generated$(NC)"
 
 analyze:
-	@echo "$(BLUE)🔍 Analyzing signals (no trading)...$(NC)"
-	@python3 scripts/analyze_signals.py
+	@echo "$(BLUE)🔍 Analyzing canonical strategy signals (no trading)...$(NC)"
+	@set -a && source .env && set +a && python3 scripts/check_signals.py
 	@echo "$(GREEN)✅ Analysis complete$(NC)"
 
 backtest:
