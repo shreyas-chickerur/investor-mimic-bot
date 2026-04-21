@@ -16,20 +16,21 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 # ── Palette ──────────────────────────────────────────────────────────────────
-BG      = '#f4f5f7'
-WHITE   = '#ffffff'
-HDR     = '#0d1117'
-HDR_SUB = '#161b22'
-ACCENT  = '#2563eb'
-POS     = '#15803d'
-NEG     = '#dc2626'
+BG      = '#f6f0e6'
+WHITE   = '#fffdf8'
+HDR     = '#17384f'
+HDR_SUB = '#eef7fb'
+ACCENT  = '#0f766e'
+POS     = '#2f855a'
+NEG     = '#c2410c'
 MUTED   = '#6b7280'
-BORDER  = '#e2e8f0'
-ROW_ALT = '#fafafa'
-TH_BG   = '#f1f3f5'
-TEXT    = '#0f172a'
-TEXT2   = '#475569'
-MONO    = '"SFMono-Regular",Consolas,monospace'
+BORDER  = '#e6d8c3'
+ROW_ALT = '#fff8ec'
+TH_BG   = '#fdf3e2'
+TEXT    = '#1f2937'
+TEXT2   = '#4b5563'
+MONO    = '"Menlo",Consolas,monospace'
+FONT_UI = '"Avenir Next","Segoe UI","Helvetica Neue",Arial,sans-serif'
 
 # ── DB helpers ────────────────────────────────────────────────────────────────
 def _conn(db_path):
@@ -308,42 +309,42 @@ def pnl_col(v):
 
 def chip(label, color):
     return ("<span style='display:inline-block;background:" + color + ";color:#fff;"
-            "font-size:10px;font-weight:700;letter-spacing:0.5px;"
-            "padding:2px 7px;border-radius:2px;text-transform:uppercase;'>"
+            "font-size:10px;font-weight:700;letter-spacing:0.4px;"
+            "padding:3px 9px;border-radius:999px;text-transform:uppercase;'>"
             + label + "</span>")
 
 # ── Layout helpers ────────────────────────────────────────────────────────────
 def section(title, body, note=''):
     note_html = ''
     if note:
-        note_html = ("<span style='font-size:11px;color:" + MUTED + ";font-weight:400;"
+        note_html = ("<span style='font-size:12px;color:" + MUTED + ";font-weight:500;"
                      "margin-left:10px;'>" + note + "</span>")
-    return ("  <div style='margin-bottom:28px;'>\n"
-            "    <div style='font-size:10px;font-weight:700;letter-spacing:1.5px;"
-            "text-transform:uppercase;color:" + TEXT2 + ";"
-            "border-bottom:1px solid " + BORDER + ";padding-bottom:7px;"
-            "margin-bottom:14px;'>" + title + note_html + "</div>\n"
+    return ("  <div style='margin-bottom:26px;'>\n"
+            "    <div style='font-size:20px;font-weight:700;color:" + TEXT + ";"
+            "padding-bottom:10px;margin-bottom:14px;line-height:1.35;"
+            "border-bottom:2px solid " + BORDER + ";'>" + title + note_html + "</div>\n"
             "    " + body + "\n"
             "  </div>\n")
 
 def th(label, align='left'):
-    return ("<th style='padding:8px 12px;text-align:" + align + ";font-size:10px;"
-            "font-weight:700;letter-spacing:0.8px;text-transform:uppercase;"
+    return ("<th style='padding:11px 13px;text-align:" + align + ";font-size:11px;"
+            "font-weight:700;letter-spacing:0.4px;text-transform:uppercase;"
             "color:" + TEXT2 + ";background:" + TH_BG + ";"
             "border-bottom:2px solid " + BORDER + ";'>" + label + "</th>")
 
 def tbl(headers, rows_html, aligns=None):
     ths = ''.join(th(h, (aligns[i] if aligns else 'left')) for i, h in enumerate(headers))
-    return ("<table style='width:100%;border-collapse:collapse;font-size:12.5px;'>"
+    return ("<table style='width:100%;border-collapse:collapse;font-size:13px;"
+            "border:1px solid " + BORDER + ";border-radius:10px;overflow:hidden;'>"
             "<thead><tr>" + ths + "</tr></thead>"
             "<tbody>" + rows_html + "</tbody></table>")
 
 def td_s(val, align='left', bold=False, color=None, mono=False, small=False):
-    s = "padding:8px 12px;text-align:" + align + ";border-bottom:1px solid " + BORDER + ";vertical-align:middle;"
+    s = "padding:11px 13px;text-align:" + align + ";border-bottom:1px solid " + BORDER + ";vertical-align:middle;"
     if bold:  s += "font-weight:700;"
     if color: s += "color:" + color + ";"
     if mono:  s += "font-family:" + MONO + ";"
-    if small: s += "font-size:11px;"
+    if small: s += "font-size:12px;"
     return "<td style='" + s + "'>" + str(val) + "</td>"
 
 # ── Header ────────────────────────────────────────────────────────────────────
@@ -369,32 +370,32 @@ def build_header(pv, cash, daily_pnl, daily_pct, dd, regime, recon, n_trades):
 
     return (
         "<table style='width:100%;border-collapse:collapse;background:" + HDR + ";'><tr>"
-        "<td style='padding:22px 28px 18px;'>"
-        "<div style='font-size:10px;font-weight:700;letter-spacing:2px;color:#6b7280;"
-        "margin-bottom:10px;text-transform:uppercase;'>Investor Mimic Bot &mdash; Daily Report</div>"
+        "<td style='padding:28px 30px 18px;'>"
+        "<div style='font-size:12px;font-weight:700;letter-spacing:1.1px;color:#b7d4e6;"
+        "margin-bottom:10px;text-transform:uppercase;'>Investor Mimic Bot</div>"
+        "<div style='font-size:21px;font-weight:700;color:#f6fbff;margin-bottom:8px;'>Your Daily Portfolio Snapshot</div>"
         "<table style='width:100%;border-collapse:collapse;'><tr>"
         "<td style='vertical-align:bottom;'>"
-        "<span style='font-size:30px;font-weight:700;color:#f9fafb;font-family:" + MONO + ";'>"
+        "<span style='font-size:36px;font-weight:700;color:#ffffff;font-family:" + MONO + ";'>"
         "${:,.2f}".format(pv) + "</span>"
-        "<span style='font-size:14px;font-weight:600;margin-left:14px;color:" + pc + ";'>"
-        + pnl_sign + "${:,.2f}".format(daily_pnl) + "&nbsp;&nbsp;"
-        + pnl_sign + "{:.2f}%".format(daily_pct) + "</span>"
+        "<span style='font-size:16px;font-weight:600;margin-left:14px;color:" + pc + ";'>"
+        + pnl_sign + "${:,.2f}".format(daily_pnl) + " (" + pnl_sign + "{:.2f}%".format(daily_pct) + ")</span>"
         "</td>"
-        "<td style='vertical-align:bottom;text-align:right;color:#9ca3af;font-size:12px;'>"
+        "<td style='vertical-align:bottom;text-align:right;color:#d7e8f2;font-size:13px;'>"
         + today + "</td>"
         "</tr></table>"
         "</td></tr><tr>"
-        "<td style='padding:9px 28px;background:" + HDR_SUB + ";border-top:1px solid #1f2937;"
-        "font-size:11px;color:#9ca3af;'>"
+        "<td style='padding:12px 30px;background:" + HDR_SUB + ";"
+        "font-size:12px;color:" + TEXT2 + ";'>"
         "<table style='border-collapse:collapse;'><tr>"
-        "<td style='padding:0 16px 0 0;'><span style='color:#6b7280;'>Account&nbsp;</span>" + recon_chip + "</td>"
-        "<td style='padding:0 16px;'><span style='color:#6b7280;'>Market conditions&nbsp;</span>" + chip(regime_display, regime_col) + "</td>"
-        "<td style='padding:0 16px;'><span style='color:#6b7280;'>Currently invested&nbsp;</span>"
-        "<span style='color:#d1d5db;'>{:.1f}%</span></td>".format(heat)
-        + "<td style='padding:0 16px;'><span style='color:#6b7280;'>Drawdown from peak&nbsp;</span>"
-        "<span style='color:#d1d5db;'>{:.1f}%</span></td>".format(dd_pct)
-        + "<td style='padding:0;'><span style='color:#6b7280;'>Trades today&nbsp;</span>"
-        "<span style='color:#d1d5db;'>" + str(n_trades) + "</span></td>"
+        "<td style='padding:0 16px 0 0;'><span style='color:" + MUTED + ";'>Account:&nbsp;</span>" + recon_chip + "</td>"
+        "<td style='padding:0 16px;'><span style='color:" + MUTED + ";'>Market:&nbsp;</span>" + chip(regime_display, regime_col) + "</td>"
+        "<td style='padding:0 16px;'><span style='color:" + MUTED + ";'>Invested:&nbsp;</span>"
+        "<span style='color:" + TEXT2 + ";'>{:.1f}%</span></td>".format(heat)
+        + "<td style='padding:0 16px;'><span style='color:" + MUTED + ";'>Peak drop:&nbsp;</span>"
+        "<span style='color:" + TEXT2 + ";'>{:.1f}%</span></td>".format(dd_pct)
+        + "<td style='padding:0;'><span style='color:" + MUTED + ";'>Trades today:&nbsp;</span>"
+        "<span style='color:" + TEXT2 + ";'>" + str(n_trades) + "</span></td>"
         "</tr></table>"
         "</td></tr></table>"
     )
@@ -405,16 +406,15 @@ def build_summary(pv, cash, pnl_30d, rows_30d):
     inv_pct = invested / pv * 100 if pv > 0 else 0
 
     def metric(label, val, col):
-        return ("<td style='padding:16px 20px;border-right:1px solid " + BORDER + ";'>"
-                "<div style='font-size:10px;font-weight:700;letter-spacing:1px;"
-                "text-transform:uppercase;color:" + MUTED + ";margin-bottom:6px;'>" + label + "</div>"
-                "<div style='font-size:20px;font-weight:700;color:" + col + ";font-family:" + MONO + ";'>"
+        return ("<td style='padding:18px 18px;border-right:1px solid " + BORDER + ";'>"
+                "<div style='font-size:12px;font-weight:600;color:" + MUTED + ";margin-bottom:6px;'>" + label + "</div>"
+                "<div style='font-size:22px;font-weight:700;color:" + col + ";font-family:" + MONO + ";'>"
                 + val + "</div></td>")
 
-    cells = (metric('Total Portfolio Value', '${:,.2f}'.format(pv), TEXT)
-           + metric('Cash Available to Invest', '${:,.0f}'.format(cash), TEXT)
-           + metric('Currently Invested', '${:,.0f} ({:.1f}%)'.format(invested, inv_pct), TEXT2)
-           + metric('Profit / Loss (30 days)', fmt_pnl(pnl_30d), pnl_col(pnl_30d)))
+    cells = (metric('Portfolio value', '${:,.2f}'.format(pv), TEXT)
+           + metric('Cash available', '${:,.0f}'.format(cash), TEXT)
+           + metric('Amount currently invested', '${:,.0f} ({:.1f}%)'.format(invested, inv_pct), TEXT2)
+           + metric('30-day change', fmt_pnl(pnl_30d), pnl_col(pnl_30d)))
 
     spark_cell = ''
     if rows_30d and len(rows_30d) >= 2:
@@ -431,7 +431,7 @@ def build_summary(pv, cash, pnl_30d, rows_30d):
                       + d0 + " &rarr; " + d1 + "</div></td>")
 
     return ("<table style='width:100%;border-collapse:collapse;"
-            "border:1px solid " + BORDER + ";background:" + WHITE + ";'>"
+            "border:1px solid " + BORDER + ";background:" + WHITE + ";border-radius:12px;overflow:hidden;'>"
             "<tr>" + cells + spark_cell + "</tr></table>")
 
 # ── Positions ──────────────────────────────────────────────────────────────────
@@ -485,9 +485,9 @@ def _flow_box(label, icon, body_lines, bg, border_color, label_color):
     )
     return (
         "<td style='vertical-align:top;width:32%;background:" + bg + ";"
-        "border:1px solid " + border_color + ";border-top:3px solid " + border_color + ";"
-        "padding:12px 14px;border-radius:2px;'>"
-        "<div style='font-size:10px;font-weight:700;letter-spacing:1px;"
+        "border:1px solid " + border_color + ";border-top:4px solid " + border_color + ";"
+        "padding:13px 14px;border-radius:8px;'>"
+        "<div style='font-size:10px;font-weight:700;letter-spacing:0.8px;"
         "text-transform:uppercase;color:" + label_color + ";margin-bottom:6px;'>"
         + icon + "&nbsp;" + label + "</div>"
         + lines_html
@@ -496,7 +496,7 @@ def _flow_box(label, icon, body_lines, bg, border_color, label_color):
 
 def _flow_arrow():
     return ("<td style='vertical-align:middle;text-align:center;padding:0 6px;"
-            "font-size:22px;color:" + MUTED + ";width:4%;'>&rarr;</td>")
+            "font-size:22px;color:#b08968;width:4%;'>&rarr;</td>")
 
 
 def build_today_actions(today_trades, signal_map, news_map):
@@ -554,7 +554,7 @@ def build_today_actions(today_trades, signal_map, news_map):
         # Trade headline bar
         card = (
             "<div style='border:1px solid " + BORDER + ";border-left:4px solid " + ac + ";"
-            "padding:14px 16px;margin-bottom:16px;background:" + WHITE + ";border-radius:2px;'>"
+            "padding:15px 16px;margin-bottom:16px;background:" + WHITE + ";border-radius:10px;'>"
             "<table style='width:100%;border-collapse:collapse;margin-bottom:14px;'><tr>"
             "<td>"
             "<span style='font-size:16px;font-weight:700;color:" + TEXT + ";'>"
@@ -673,11 +673,10 @@ def build_portfolio_metrics(db_path):
     ret_col   = POS if total_ret and total_ret > 0 else (NEG if total_ret and total_ret < 0 else MUTED)
 
     def _kpi(label, val, color):
-        return ("<div style='text-align:center;padding:10px 16px;'>"
-                "<div style='font-size:18px;font-weight:700;font-family:" + MONO + ";color:"
+        return ("<div style='text-align:center;padding:12px 16px;'>"
+                "<div style='font-size:19px;font-weight:700;font-family:" + MONO + ";color:"
                 + color + ";'>" + val + "</div>"
-                "<div style='font-size:10px;color:" + TEXT2 + ";margin-top:3px;"
-                "text-transform:uppercase;letter-spacing:0.6px;'>" + label + "</div></div>")
+                "<div style='font-size:11px;color:" + TEXT2 + ";margin-top:3px;'>" + label + "</div></div>")
 
     note = ''
     if days < 10:
@@ -689,14 +688,14 @@ def build_portfolio_metrics(db_path):
     return (
         note
         + "<div style='display:flex;flex-wrap:wrap;background:" + TH_BG + ";border:1px solid "
-        + BORDER + ";border-radius:4px;margin-bottom:16px;'>"
-        + _kpi('Total Return', _pct(total_ret), ret_col)
-        + _kpi('Annual Return', _pct((cagr or 0) * 100, 1), cagr_col)
-        + _kpi('Risk Score', _f(sharpe), POS if sharpe and sharpe > 0.8 else MUTED)
-        + _kpi('Win Rate', _pct((win_rate or 0) * 100, 0), wr_col)
-        + _kpi('Biggest Drop', _pct(max_dd), dd_col)
-        + _kpi('Wins vs Losses', _f(pf), POS if pf and pf > 1.0 else NEG)
-        + _kpi('Total Trades', str(n_trades), MUTED)
+        + BORDER + ";border-radius:12px;margin-bottom:16px;'>"
+        + _kpi('Total growth', _pct(total_ret), ret_col)
+        + _kpi('Estimated yearly pace', _pct((cagr or 0) * 100, 1), cagr_col)
+        + _kpi('Consistency score', _f(sharpe), POS if sharpe and sharpe > 0.8 else MUTED)
+        + _kpi('Trades that won', _pct((win_rate or 0) * 100, 0), wr_col)
+        + _kpi('Largest pullback', _pct(max_dd), dd_col)
+        + _kpi('Wins/losses balance', _f(pf), POS if pf and pf > 1.0 else NEG)
+        + _kpi('Closed trades', str(n_trades), MUTED)
         + "</div>"
     )
 
@@ -736,8 +735,8 @@ def build_all_time_perf(rows):
                   + td_s(since, align='center', small=True, color=MUTED)
                   + "</tr>")
     return tbl(
-        ['Strategy', 'Trades', 'Win Rate', 'Total Profit / Loss', 'Wins vs Losses Ratio',
-         'Best Single Trade', 'Worst Single Trade', 'Trading Since'],
+        ['Strategy', 'Closed Trades', 'Win Rate', 'Net Profit / Loss', 'Wins vs Losses',
+         'Best Trade', 'Worst Trade', 'Started'],
         trows,
         ['left', 'center', 'center', 'right', 'center', 'right', 'right', 'center'])
 
@@ -883,16 +882,16 @@ def generate_email_body(artifact_path=None, db_path='trading.db', include_visual
 
     body_sections = (
         "    <div style='margin-bottom:20px;'>" + summary + chart_section + "</div>\n"
-        + section("Stocks We Currently Hold",
+        + section("Your Current Investments",
                   build_positions(positions),
-                  str(len(positions)) + " open positions")
-        + section("What Happened Today",
+                  str(len(positions)) + " open position" + ("s" if len(positions) != 1 else ""))
+        + section("Today's Activity",
                   build_today_actions(today_trades, signal_map, news_map),
-                  str(len(today_trades)) + " trade" + ("s" if len(today_trades) != 1 else ""))
-        + section("How We've Done Overall",
+                  str(len(today_trades)) + " trade" + ("s" if len(today_trades) != 1 else "") + " today")
+        + section("How Your Portfolio Has Performed",
                   build_portfolio_metrics(db_path) + build_all_time_perf(all_time_perf),
-                  "all-time results")
-        + section("Things to Watch",
+                  "results so far")
+        + section("What Needs Attention",
                   build_strategy_concerns(health_data, rej_rows, recent_rows),
                   "last 30 days")
         + "    <div style='padding-top:20px;border-top:1px solid " + BORDER + ";"
@@ -904,11 +903,10 @@ def generate_email_body(artifact_path=None, db_path='trading.db', include_visual
     return ("<!DOCTYPE html>\n<html>\n"
             "<head><meta charset='utf-8'>"
             "<meta name='viewport' content='width=device-width,initial-scale=1'></head>\n"
-            "<body style='font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,"
-            "\"Helvetica Neue\",Arial,sans-serif;background:" + BG + ";margin:0;padding:0;'>\n"
-            "<div style='max-width:900px;margin:0 auto;'>\n"
+            "<body style='font-family:" + FONT_UI + ";background:" + BG + ";margin:0;padding:22px 12px;line-height:1.6;'>\n"
+            "<div style='max-width:920px;margin:0 auto;background:" + WHITE + ";border:1px solid " + BORDER + ";border-radius:14px;overflow:hidden;box-shadow:0 8px 26px rgba(88,72,48,0.08);'>\n"
             + header + "\n"
-            "<div style='padding:24px 28px;background:" + BG + ";'>\n"
+            "<div style='padding:28px 30px;background:" + WHITE + ";'>\n"
             + body_sections
             + "</div>\n</div>\n</body>\n</html>")
 
