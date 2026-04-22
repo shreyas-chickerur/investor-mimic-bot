@@ -182,6 +182,11 @@ def _translate_buy_reason(raw, strategy):
                 "starting to bounce back — a classic entry point.")
 
     if 'ml' in r or 'probability' in r or 'p(up)' in r:
+        m_pct = re.search(r'positive\s*5d\s*return[:=\s]*([\d.]+)%', r)
+        if m_pct:
+            pct = int(float(m_pct.group(1)))
+            return (f"Our AI model estimated about a {pct}% chance this stock "
+                    f"would rise over the next 5 trading days.")
         m = re.search(r'p\(up\)[=:\s]*([\d.]+)', r)
         if m:
             pct = int(float(m.group(1)) * 100)
@@ -288,6 +293,18 @@ def get_health():
         with open(path) as f:
             return json.load(f)
     except Exception: return None
+
+
+def get_guardrail_report():
+    """Load latest post-run guardrail report when available."""
+    path = Path('artifacts/diagnostics/post_run_guardrails.json')
+    if not path.exists():
+        return None
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except Exception:
+        return None
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
 def sparkline(values, width=28):
@@ -639,6 +656,49 @@ def build_today_actions(today_trades, signal_map, news_map):
 
     return cards
 
+
+def build_system_checks(guardrail_report):
+    """Render latest operational guardrail status for the email."""
+    if not guardrail_report:
+        return ("<p style='color:" + MUTED + ";font-size:13px;font-style:italic;margin:0;'>"
+                "Guardrail report not available for this run.</p>")
+
+    critical = guardrail_report.get('critical_failures') or []
+    warnings = guardrail_report.get('warnings') or []
+    run_id = guardrail_report.get('latest_run_id') or 'unknown'
+    status = 'PASS' if not critical else 'FAIL'
+    status_col = POS if status == 'PASS' else NEG
+
+    out = (
+        "<div style='border:1px solid " + BORDER + ";border-left:4px solid " + status_col + ";"
+        "padding:12px 14px;border-radius:8px;background:" + WHITE + ";'>"
+        "<div style='font-size:13px;color:" + TEXT + ";font-weight:700;margin-bottom:8px;'>"
+        "Run safety checks: <span style='color:" + status_col + ";'>" + status + "</span>"
+        "</div>"
+        "<div style='font-size:12px;color:" + TEXT2 + ";margin-bottom:8px;'>"
+        "Run ID: " + html_lib.escape(str(run_id)) + " &middot; Canonical strategy set enforced (4 strategies)"
+        "</div>"
+    )
+
+    if critical:
+        out += "<ul style='margin:0;padding-left:18px;'>"
+        for item in critical[:6]:
+            out += ("<li style='font-size:12px;color:" + NEG + ";margin-bottom:4px;'>"
+                    + html_lib.escape(str(item)) + "</li>")
+        out += "</ul>"
+    elif warnings:
+        out += "<ul style='margin:0;padding-left:18px;'>"
+        for item in warnings[:6]:
+            out += ("<li style='font-size:12px;color:#b45309;margin-bottom:4px;'>"
+                    + html_lib.escape(str(item)) + "</li>")
+        out += "</ul>"
+    else:
+        out += ("<p style='font-size:12px;color:" + POS + ";margin:0;font-style:italic;'>"
+                "No critical guardrail issues detected in the latest run.</p>")
+
+    out += "</div>"
+    return out
+
 # ── Portfolio-level holistic metrics ─────────────────────────────────────────
 def build_portfolio_metrics(db_path):
     """Render a top-line metrics bar: CAGR, Sharpe, win rate, max drawdown."""
@@ -858,6 +918,7 @@ def generate_email_body(artifact_path=None, db_path='trading.db', include_visual
     header      = build_header(pv, cash, daily_pnl, daily_pct, dd, regime, recon, len(today_trades))
     summary     = build_summary(pv, cash, pnl_30d, rows_30d)
     health_data = get_health()
+    guardrails  = get_guardrail_report()
 
     # Build optional inline chart block (Mon/Wed/Fri via --include-visuals)
     chart_section = ""
@@ -892,6 +953,9 @@ def generate_email_body(artifact_path=None, db_path='trading.db', include_visual
         + section("How Your Portfolio Has Performed",
                   build_portfolio_metrics(db_path) + build_all_time_perf(all_time_perf),
                   "results so far")
+        + section("System Health Checks",
+                  build_system_checks(guardrails),
+                  "latest run")
         + section("What Needs Attention",
                   build_strategy_concerns(health_data, rej_rows, recent_rows),
                   "last 30 days")

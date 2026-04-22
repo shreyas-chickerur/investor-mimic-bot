@@ -1041,6 +1041,3 @@ class TradingDatabase:
         conn.commit()
         conn.close()
 
-
-# Backward compatibility alias
-Phase5Database = TradingDatabase

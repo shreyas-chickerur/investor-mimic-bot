@@ -14,7 +14,7 @@ Automated quantitative trading system running **4 independent strategies** on **
 | Strategy | Signal Edge | Profit Target | Stop Loss | Hold Period |
 |---|---|---|---|---|
 | **RSI Mean Reversion** | RSI < 40 turning up; sells RSI > 55 or 20d | — | 2.5× ATR | Up to 20 days |
-| **ML Momentum** | Gradient Boosting (200 trees) on 12 OHLCV+indicator features; P(5d gain) > 52% | — | 2.5× ATR | 5 days |
+| **ML Momentum** | LightGBM (fallback: GradientBoosting) on 12 OHLCV+indicator features; calibrated top-k entries on P(5d gain) | — | 2.5× ATR | 5 days |
 | **Earnings Drift (PEAD)** | Volume spike + abnormal return as earnings proxy | 20% | 10% | Up to 40 days |
 | **Factor Momentum** | Cross-sectional rank: momentum/quality/reversion/volume; top 5 | 12% | 8% | Up to 20 days |
 
@@ -179,9 +179,9 @@ investor-mimic-bot/
 - **Universe**: All 36 symbols
 
 ### 2. ML Momentum
-- **Model**: `GradientBoostingClassifier` (200 trees, depth 3, LR 0.05)
+- **Model**: `LightGBM` (`LGBMClassifier`); fallback to `GradientBoostingClassifier` when LightGBM is unavailable
 - **Features**: RSI, returns (5d/20d/60d), volatility (60d), volume ratio, price-to-SMA (20/50), SMA ratio, MACD signal, ATR ratio, Bollinger width + position (12 total)
-- **Entry**: P(positive 5d return) > 52%; news sentiment ≥ 0.20
+- **Entry**: P(positive 5d return) above confidence floor with daily calibrated top-k selection; news sentiment ≥ 0.20
 - **Exit**: 5-day hold period
 - **Training**: Rolling walk-forward on 15 years of split-adjusted data
 
