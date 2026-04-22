@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Multi-Strategy Trading System - Main Execution
-Runs all 5 strategies independently with separate tracking
+Runs all 4 canonical strategies independently with separate tracking
 """
 from __future__ import annotations
 
@@ -67,7 +67,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class MultiStrategyRunner:
-    """Runs all 5 strategies with independent tracking"""
+    """Runs all 4 canonical strategies with independent tracking"""
     
     def __init__(self):
         # Load configuration
@@ -1695,32 +1695,10 @@ def main():
                     'strategy_name': db_pos.get('strategy_name', ''),
                 })
 
-            # Build per-strategy P&L attribution from today's closed trades (F3)
-            today_trades = runner.db.get_todays_trades(today.strftime('%Y-%m-%d'))
-            strat_pnl: dict = {}
-            for t in today_trades:
-                sname = t.get('strategy_name', 'Unknown')
-                if sname not in strat_pnl:
-                    strat_pnl[sname] = {'trade_count': 0, 'win_count': 0, 'realized_pnl': 0.0}
-                strat_pnl[sname]['trade_count'] += 1
-                pnl_val = float(t.get('pnl', 0) or 0)
-                strat_pnl[sname]['realized_pnl'] += pnl_val
-                if pnl_val > 0:
-                    strat_pnl[sname]['win_count'] += 1
-            per_strategy_pnl = [
-                {'strategy_name': k, **v} for k, v in sorted(strat_pnl.items())
-            ] or None
-
-            runner.email_notifier.send_daily_summary(
-                trades=runner.executed_trades,
-                positions=positions_data,
-                portfolio_value=runner.portfolio_value,
-                cash=runner.cash_available,
-                errors=runner.errors if runner.errors else None,
-                signal_reasoning_chains=runner.build_signal_reasoning_chains(),
-                per_strategy_pnl=per_strategy_pnl,
+            logger.info(
+                "Skipping runtime notifier daily summary; "
+                "digest delivery is unified via scripts/generate_daily_email.py"
             )
-            logger.info("Email summary sent successfully")
         except Exception as e:
             logger.error(f"Failed to send email summary: {e}")
 
