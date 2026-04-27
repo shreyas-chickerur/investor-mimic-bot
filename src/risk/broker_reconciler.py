@@ -95,10 +95,9 @@ class BrokerReconciler:
             if local_orders is not None:
                 order_discrepancies = self._reconcile_orders(local_orders)
                 discrepancies.extend(order_discrepancies)
-            
-            # 4. Check for phantom positions (in broker but not local)
-            phantom_discrepancies = self._check_phantom_positions(local_positions)
-            discrepancies.extend(phantom_discrepancies)
+            # Note: phantom positions (broker but not local) are already reported
+            # by _reconcile_positions above; _check_phantom_positions is not called
+            # here to avoid double-counting every untracked broker position.
             
             self.last_reconciliation = datetime.now()
             
@@ -131,7 +130,7 @@ class BrokerReconciler:
             broker_positions = self.client.get_all_positions()
             broker_dict = {
                 pos.symbol: {
-                    'qty': int(pos.qty),
+                    'qty': float(pos.qty),
                     'avg_price': float(pos.avg_entry_price)
                 }
                 for pos in broker_positions
@@ -148,8 +147,9 @@ class BrokerReconciler:
                 
                 broker_data = broker_dict[symbol]
                 
-                # Check quantity
-                if local_data['qty'] != broker_data['qty']:
+                # Check quantity — use 0.5-share tolerance to handle fractional
+                # share rounding and paper-trading fill estimation differences
+                if abs(local_data['qty'] - broker_data['qty']) > 0.5:
                     disc = f"Quantity mismatch for {symbol}: local={local_data['qty']}, broker={broker_data['qty']}"
                     discrepancies.append(disc)
                 
@@ -182,10 +182,12 @@ class BrokerReconciler:
             
             logger.info(f"Cash - Local: ${local_cash:,.2f}, Broker: ${broker_cash:,.2f}, Buying Power: ${broker_buying_power:,.2f}")
             
-            # Allow 1% tolerance for rounding
+            # Allow 2% tolerance for rounding: paper-trading limit orders submitted
+            # near end-of-day create a time gap between the local refresh and the
+            # reconciler's own API call, so small differences are expected.
             cash_diff_pct = abs(local_cash - broker_cash) / broker_cash * 100 if broker_cash > 0 else 0
-            
-            if cash_diff_pct > 1.0:
+
+            if cash_diff_pct > 2.0:
                 disc = f"Cash mismatch: local=${local_cash:,.2f}, broker=${broker_cash:,.2f} ({cash_diff_pct:.2f}% diff)"
                 discrepancies.append(disc)
             

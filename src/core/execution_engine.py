@@ -18,7 +18,7 @@ sys.path.insert(0, str(project_root))
 from dotenv import load_dotenv
 load_dotenv()
 
-from src.core.database import TradingDatabase
+from src.core.db_factory import get_database
 from src.strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
 from src.strategies.strategy_ml_momentum import MLMomentumStrategy
 from src.strategies.strategy_earnings_drift import EarningsDriftStrategy
@@ -50,6 +50,10 @@ from src.data.data_quality_checker import DataQualityChecker
 from src.integration.dry_run_wrapper import DryRunWrapper, get_dry_run_wrapper
 from src.monitoring.strategy_health_scorer import StrategyHealthScorer
 from src.monitoring.pnl_calculator import PnLCalculator
+from src.monitoring.daily_strategy_weights import (
+    apply_strategy_weight_to_signals,
+    compute_strategy_weights,
+)
 from src.utils.config_loader import get_config
 from src.utils.news_sentiment import NewsSignalFilter
 
@@ -66,6 +70,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+CANONICAL_STRATEGY_SPECS = [
+    ("RSI Mean Reversion", "Buy when RSI < 30 + low volatility, hold 20 days", RSIMeanReversionStrategy),
+    ("ML Momentum", "GradientBoosting 12-feature classifier predicting 5d return", MLMomentumStrategy),
+    ("Earnings Drift", "Post-earnings announcement drift via volume spike detection", EarningsDriftStrategy),
+    ("Factor Momentum", "Cross-sectional factor ranking: momentum+quality+reversion", FactorMomentumStrategy),
+]
+
 class MultiStrategyRunner:
     """Runs all 4 canonical strategies with independent tracking"""
     
@@ -74,9 +85,10 @@ class MultiStrategyRunner:
         self.config = get_config()
         logger.info("Configuration loaded from YAML")
         
-        self.db = TradingDatabase('trading.db')
+        self.db = get_database(default_sqlite_path='trading.db')
         self.run_id = self.db.run_id
         self.asof_date = datetime.now().strftime('%Y-%m-%d')
+        self.db.upsert_run_state(stage='INIT', status='RUNNING', metadata={'asof_date': self.asof_date})
         
         # CRITICAL: Log startup datetime for audit trail
         import time
@@ -120,7 +132,7 @@ class MultiStrategyRunner:
         logger.info(f"Portfolio: ${self.portfolio_value:.2f}, Cash: ${self.cash_available:.2f}")
         
         # Initialize professional-grade modules with config
-        self.email_notifier = EmailNotifier()
+        self.email_notifier = EmailNotifier(outbox_writer=self.db.enqueue_notification)
         self.data_validator = DataValidator()
         self.cash_manager = CashManager(self.portfolio_value, num_strategies=4)
         
@@ -201,12 +213,75 @@ class MultiStrategyRunner:
         self.confirmed_fills = []  # Track confirmed fills from Alpaca
         self.pending_orders = []   # Track pending orders from Alpaca
         self.rejected_orders = []  # Track rejected/canceled orders from Alpaca
+        self.alpha_vantage_usage: dict = {}
         
         # Track P&L metrics
         self.initial_portfolio_value = self.portfolio_value
         self.peak_portfolio_value = self._get_peak_portfolio_value()
         self.cumulative_pnl = 0.0
         self.max_drawdown = 0.0
+
+    def _set_run_stage(self, stage: str, status: str,
+                       error_message: str = None, metadata: dict = None,
+                       completed: bool = False):
+        """Persist run state machine updates for observability and recovery."""
+        try:
+            self.db.upsert_run_state(
+                stage=stage,
+                status=status,
+                error_message=error_message,
+                metadata=metadata,
+                completed=completed,
+            )
+        except Exception as exc:
+            logger.warning("Failed to persist run stage %s/%s: %s", stage, status, exc)
+
+    def execute_pipeline(self, market_data):
+        """Run staged trading pipeline and return execution outputs."""
+        self._set_run_stage('TRADING', 'RUNNING')
+        try:
+            signals = self.run_all_strategies(market_data)
+            self._set_run_stage('TRADING', 'SUCCESS', metadata={'signals': len(signals)})
+        except Exception as exc:
+            self._set_run_stage('TRADING', 'FAILED', error_message=str(exc))
+            raise
+
+        self._set_run_stage('REPORTING', 'RUNNING')
+        try:
+            self.generate_performance_report()
+            pnl_metrics = self.update_pnl_metrics()
+            self.verify_order_statuses()
+            self._set_run_stage('REPORTING', 'SUCCESS')
+            return signals, pnl_metrics
+        except Exception as exc:
+            self._set_run_stage('REPORTING', 'FAILED', error_message=str(exc))
+            raise
+
+    def emit_slo_metrics(self, start_time: float, signals: list, pnl_metrics: dict):
+        """Compute and persist per-run service-level observability metrics."""
+        total_signals, with_terminal = self.db.verify_terminal_states(self.run_id)
+        runtime_seconds = round(time.time() - start_time, 3)
+        metrics = {
+            'runtime_seconds': runtime_seconds,
+            'signals_total': int(total_signals),
+            'signals_terminalized': int(with_terminal),
+            'signals_terminalized_pct': (
+                round((with_terminal / total_signals) * 100.0, 2) if total_signals else 100.0
+            ),
+            'executed_trades_count': len(self.executed_trades),
+            'confirmed_fills_count': len(self.confirmed_fills),
+            'rejected_orders_count': len(self.rejected_orders),
+            'pending_orders_count': len(self.pending_orders),
+            'error_count': len(self.errors),
+            'reconciliation_status': self.reconciliation_status,
+            'drawdown': pnl_metrics.get('drawdown', 0.0),
+            'max_drawdown': pnl_metrics.get('max_drawdown', 0.0),
+            'daily_pnl': pnl_metrics.get('daily_pnl', 0.0),
+            'cumulative_pnl': pnl_metrics.get('cumulative_pnl', 0.0),
+            'run_id': self.run_id,
+        }
+        self.db.save_run_slo_metrics(metrics)
+        return metrics
 
     def _refresh_account_values(self):
         """Refresh account values from Alpaca."""
@@ -317,24 +392,17 @@ class MultiStrategyRunner:
         
     def initialize_strategies(self):
         """Initialize the 4 canonical active strategies, creating DB entries for any that are missing."""
-        CANONICAL_STRATEGIES = [
-            ("RSI Mean Reversion", "Buy when RSI < 30 + low volatility, hold 20 days", RSIMeanReversionStrategy),
-            ("ML Momentum", "GradientBoosting 12-feature classifier predicting 5d return", MLMomentumStrategy),
-            ("Earnings Drift", "Post-earnings announcement drift via volume spike detection", EarningsDriftStrategy),
-            ("Factor Momentum", "Cross-sectional factor ranking: momentum+quality+reversion", FactorMomentumStrategy),
-        ]
-
-        capital_per_strategy = self.portfolio_value / len(CANONICAL_STRATEGIES)
+        capital_per_strategy = self.portfolio_value / len(CANONICAL_STRATEGY_SPECS)
 
         # Build a name→id lookup from whatever is already in the DB
         existing_by_name = {s['name']: s for s in self.db.get_all_strategies()}
         logger.info(
             f"DB has {len(existing_by_name)} strategies: {list(existing_by_name.keys())}. "
-            f"Enforcing canonical set: {[n for n, _, _ in CANONICAL_STRATEGIES]}"
+            f"Enforcing canonical set: {[n for n, _, _ in CANONICAL_STRATEGY_SPECS]}"
         )
 
         strategies = []
-        for name, desc, strategy_class in CANONICAL_STRATEGIES:
+        for name, desc, strategy_class in CANONICAL_STRATEGY_SPECS:
             if name in existing_by_name:
                 strategy_id = existing_by_name[name]['id']
                 logger.info(f"  Loaded existing: {name} (ID: {strategy_id})")
@@ -410,6 +478,20 @@ class MultiStrategyRunner:
         if strategy_class:
             return strategy_class(strategy_id, capital)
         return None
+
+    def _collect_strategy_health(self, strategies):
+        """Collect a lightweight health snapshot for strategy weighting."""
+        health_by_strategy = {}
+        for strategy in strategies:
+            try:
+                health_by_strategy[strategy.name] = self.health_scorer.calculate_strategy_health(
+                    strategy.strategy_id,
+                    strategy.name,
+                )
+            except Exception as exc:
+                logger.warning("Health scoring unavailable for %s: %s", strategy.name, exc)
+                health_by_strategy[strategy.name] = {}
+        return health_by_strategy
     
     def load_market_data(self):
         """Load market data from CSV"""
@@ -420,7 +502,9 @@ class MultiStrategyRunner:
             return None
 
         # Allow configurable max age for automated runs (weekends/holidays)
-        max_age_hours = int(os.getenv('DATA_MAX_AGE_HOURS', '24'))
+        max_age_hours = int(
+            os.getenv('DATA_MAX_AGE_HOURS', os.getenv('DATA_VALIDATOR_MAX_AGE_HOURS', '24'))
+        )
         validator = DataValidator(max_age_hours=max_age_hours)
         is_valid, errors = validator.validate_data_file(data_file)
         if not is_valid:
@@ -586,8 +670,8 @@ class MultiStrategyRunner:
         
         kill_context = {
             'reconciliation_status': 'UNKNOWN',
-            'daily_drawdown': 0.0,
-            'consecutive_failures': 0,
+            'daily_drawdown': abs(float(self.max_drawdown or 0.0)),
+            'consecutive_failures': self.db.get_consecutive_failed_runs(),
             'rejected_orders_count': 0,
             'total_orders': 0
         }
@@ -673,6 +757,7 @@ class MultiStrategyRunner:
         # Pre-fetch news sentiment once per run for all signal symbols
         self._news_filter = NewsSignalFilter()
         self._news_sentiment_map: dict = {}
+        self.alpha_vantage_usage = self._news_filter.get_usage_summary()
         self.reconciliation_discrepancies = []
         # Pre-earnings: symbols reporting tomorrow — block new BUY entries
         self._reporting_tomorrow: set = self._get_symbols_reporting_tomorrow()
@@ -713,6 +798,44 @@ class MultiStrategyRunner:
 
         regime_adjustments = self.regime_detector.get_regime_adjustments(market_data=market_data)
         self.portfolio_risk.max_portfolio_heat = regime_adjustments['max_portfolio_heat']
+
+        # Persist regime so daily email shows the correct market status (not 'Unknown')
+        _VOL_TO_CLASSIFICATION = {
+            'low_volatility': 'LOW_VOL',
+            'normal': 'NORMAL',
+            'high_volatility': 'HIGH_VOL',
+        }
+        try:
+            import json as _json
+            self.db.set_system_state('regime', _json.dumps({
+                'classification': _VOL_TO_CLASSIFICATION.get(
+                    regime_adjustments.get('volatility_regime', 'normal'), 'NORMAL'
+                ),
+                'vix': regime_adjustments.get('vix'),
+                'volatility_regime': regime_adjustments.get('volatility_regime'),
+                'trend_regime': regime_adjustments.get('trend_regime'),
+                'hmm_regime': regime_adjustments.get('hmm_regime'),
+            }))
+            logger.info(
+                "Regime persisted: %s (VIX=%.1f, trend=%s, hmm=%s)",
+                regime_adjustments.get('volatility_regime'),
+                regime_adjustments.get('vix') or 0,
+                regime_adjustments.get('trend_regime'),
+                regime_adjustments.get('hmm_regime'),
+            )
+        except Exception as _exc:
+            logger.warning("Could not persist regime to system_state: %s", _exc)
+
+        health_by_strategy = self._collect_strategy_health(strategies)
+        self.strategy_weights = compute_strategy_weights(
+            strategy_names=[s.name for s in strategies],
+            regime_adjustments=regime_adjustments,
+            health_by_strategy=health_by_strategy,
+        )
+        logger.info(
+            "Daily strategy weights: %s",
+            ", ".join(f"{name}={weight:.2f}" for name, weight in sorted(self.strategy_weights.items())),
+        )
         all_signals = []
 
         try:
@@ -772,6 +895,34 @@ class MultiStrategyRunner:
             )
             
             # HARD GATE: Block trading on failure
+            if not success:
+                auto_sync_enabled = os.getenv('AUTO_SYNC_ON_RECON_FAIL', 'true').lower() == 'true'
+                if auto_sync_enabled:
+                    retry_success, retry_discrepancies = self._attempt_auto_sync_and_reconciliation_retry()
+                    if retry_success:
+                        self.reconciliation_status = "PASS"
+                        self.reconciliation_discrepancies = []
+                        kill_context['reconciliation_status'] = self.reconciliation_status
+
+                        logger.warning("✅ Reconciliation recovered after automatic sync and retry")
+                        account = self.trading_client.get_account()
+                        broker_positions = self.trading_client.get_all_positions()
+                        self.db.save_broker_state(
+                            snapshot_date=self.asof_date,
+                            snapshot_type='RECONCILIATION_RETRY',
+                            cash=float(account.cash),
+                            portfolio_value=float(account.portfolio_value),
+                            buying_power=float(account.buying_power),
+                            positions=[{'symbol': p.symbol, 'qty': float(p.qty), 'market_value': float(p.market_value)} for p in broker_positions],
+                            reconciliation_status='PASS',
+                            discrepancies=[]
+                        )
+                        success = True
+                        discrepancies = []
+                    else:
+                        discrepancies = discrepancies + retry_discrepancies
+                        self.reconciliation_discrepancies = discrepancies
+
             if not success:
                 logger.critical("🛑 RECONCILIATION FAILED - TRADING BLOCKED")
                 logger.critical("Discrepancies:")
@@ -909,7 +1060,13 @@ class MultiStrategyRunner:
                             self._news_sentiment_map.update(
                                 self._news_filter.fetch_for_symbols(new_syms)
                             )
+                            self.alpha_vantage_usage = self._news_filter.get_usage_summary()
                         signals = self._news_filter.apply(signals, self._news_sentiment_map)
+                        signals = apply_strategy_weight_to_signals(
+                            strategy_name=strategy.name,
+                            signals=signals,
+                            strategy_weights=self.strategy_weights,
+                        )
                         logger.info(f"  After news filter: {len(signals)} signals")
 
                         # Log signals to database
@@ -1093,9 +1250,11 @@ class MultiStrategyRunner:
                     size_mult = signal.get('size_multiplier', 1.0)
                     # Apply drawdown sizing multiplier (rampup mode)
                     drawdown_mult = self.drawdown_manager.get_sizing_multiplier()
+                    # Daily strategy weighting multiplier (meta-layer)
+                    strategy_mult = float(signal.get('strategy_weight', 1.0))
                     # Apply conviction multiplier: scale 50%–100% based on signal confidence
                     conviction_mult = max(0.5, min(1.0, float(signal.get('confidence', 0.7))))
-                    combined_mult = size_mult * drawdown_mult * conviction_mult
+                    combined_mult = size_mult * drawdown_mult * strategy_mult * conviction_mult
                     adjusted_shares = int(shares * combined_mult)
                     
                     if adjusted_shares == 0:
@@ -1104,7 +1263,7 @@ class MultiStrategyRunner:
                     
                     logger.info(f"Size adjustment for {symbol}: {shares} → {adjusted_shares} "
                                f"(corr={size_mult:.2f}, drawdown={drawdown_mult:.2f}, "
-                               f"conviction={conviction_mult:.2f}, combined={combined_mult:.2f})")
+                               f"strategy={strategy_mult:.2f}, conviction={conviction_mult:.2f}, combined={combined_mult:.2f})")
                     
                     exec_price, slippage_cost, commission_cost, total_cost = self.cost_model.calculate_execution_price(
                         price, 'BUY', adjusted_shares
@@ -1470,6 +1629,29 @@ class MultiStrategyRunner:
             combined['avg_price'] = total_cost / combined['qty'] if combined['qty'] else 0.0
         return local_positions
 
+    def _attempt_auto_sync_and_reconciliation_retry(self):
+        """Attempt corrective DB sync to broker and retry reconciliation once."""
+        try:
+            from scripts.sync_broker_state import sync_broker_to_database
+        except Exception as exc:
+            return False, [f"Auto-sync unavailable: {exc}"]
+
+        try:
+            logger.warning("Attempting automatic broker-state sync before reconciliation retry...")
+            synced = sync_broker_to_database(self.db.db_path)
+            if not synced:
+                return False, ["Auto-sync completed with unresolved discrepancies"]
+
+            self._refresh_account_state()
+            local_positions = self._build_local_positions()
+            retry_success, retry_discrepancies = self.broker_reconciler.reconcile_daily(
+                local_positions=local_positions,
+                local_cash=self.cash_available,
+            )
+            return retry_success, retry_discrepancies
+        except Exception as exc:
+            return False, [f"Auto-sync retry failed: {exc}"]
+
     def _update_position_record(self, strategy_id, symbol, shares_delta, exec_price,
                                  entry_date=None, atr=None):
         """Persist position updates for reconciliation."""
@@ -1643,6 +1825,7 @@ def main():
     
     try:
         runner = MultiStrategyRunner()
+        runner._set_run_stage('LOAD_DATA', 'RUNNING')
         
         # Load market data with validation
         print("\n📊 Loading and validating market data...")
@@ -1651,22 +1834,23 @@ def main():
         if market_data is None:
             error_msg = "Failed to load market data"
             logger.error(error_msg)
+            runner._set_run_stage('LOAD_DATA', 'FAILED', error_message=error_msg)
             if runner:
                 runner.email_notifier.send_error_alert(error_msg, "\n".join(runner.errors))
             sys.exit(1)
+        runner._set_run_stage('LOAD_DATA', 'SUCCESS')
         
-        # Run all strategies
-        signals = runner.run_all_strategies(market_data)
-        
-        # Generate report
-        runner.generate_performance_report()
-
-        pnl_metrics = runner.update_pnl_metrics()
-        runner.verify_order_statuses()
+        signals, pnl_metrics = runner.execute_pipeline(market_data)
+        slo_metrics = runner.emit_slo_metrics(start_time, signals, pnl_metrics)
 
         print("\n" + "=" * 80)
         print(f"✅ EXECUTION COMPLETE - {len(signals)} trades executed")
         print("=" * 80)
+        runner._set_run_stage(
+            'EXECUTION_COMPLETE',
+            'SUCCESS',
+            metadata={'trades_executed': len(signals), 'slo': slo_metrics},
+        )
         
         # Send email summary
         try:
@@ -1703,6 +1887,7 @@ def main():
             logger.error(f"Failed to send email summary: {e}")
 
         try:
+            runner._set_run_stage('ARTIFACTS', 'RUNNING')
             writer = DailyArtifactWriter()
             latest_date = market_data.index.max()
             data_freshness_hours = (datetime.now() - latest_date).total_seconds() / 3600
@@ -1788,16 +1973,23 @@ def main():
                 cash=runner.cash_available,
             )
             artifact['system_health']['reconciliation_discrepancies'] = runner.reconciliation_discrepancies
+            artifact['system_health']['slo_metrics'] = slo_metrics
+            artifact['system_health']['alpha_vantage_usage'] = runner.alpha_vantage_usage
             writer.write_daily_artifact(datetime.now().strftime('%Y-%m-%d'), artifact)
+            runner._set_run_stage('ARTIFACTS', 'SUCCESS')
         except Exception as e:
             logger.error(f"Failed to write daily artifact: {e}")
+            runner._set_run_stage('ARTIFACTS', 'FAILED', error_message=str(e))
 
         logger.info("Multi-strategy execution completed successfully")
+        runner._set_run_stage('COMPLETE', 'SUCCESS', completed=True)
         
     except Exception as e:
         error_msg = f"Fatal error: {e}"
         logger.error(error_msg, exc_info=True)
         print(f"\n❌ FATAL ERROR: {e}")
+        if runner:
+            runner._set_run_stage('FAILED', 'FAILED', error_message=error_msg, completed=True)
         
         # Send error alert
         if runner:

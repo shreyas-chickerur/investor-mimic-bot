@@ -6,9 +6,16 @@ Detects market regimes to enable/disable strategies appropriately
 from __future__ import annotations
 
 import logging
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 from datetime import datetime, timedelta
+import numpy as np
 import pandas as pd
+
+try:
+    from hmmlearn import hmm as _hmm_lib
+    _HMM_AVAILABLE = True
+except (ImportError, OSError):  # OSError covers missing shared libs on macOS
+    _HMM_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +50,9 @@ class RegimeDetector:
         self.vol_low_threshold = vol_low_threshold
         self.vol_high_threshold = vol_high_threshold
         
-        logger.info(f"Regime Detector: VIX low={vix_low_threshold}, high={vix_high_threshold}")
+        self._hmm_cache: Optional[Tuple[str, str]] = None  # (date_str, regime)
+        logger.info(f"Regime Detector: VIX low={vix_low_threshold}, high={vix_high_threshold}, "
+                    f"HMM={'enabled' if _HMM_AVAILABLE else 'unavailable (pip install hmmlearn)'}")
     
     def get_vix_level(self, market_data=None) -> float:
         """Get VIX level.
@@ -122,6 +131,55 @@ class RegimeDetector:
         logger.info(f"Volatility regime: {regime} (VIX: {vix:.2f})")
         return regime
     
+    def detect_hmm_regime(self, market_data: pd.DataFrame) -> str:
+        """Fit a 2-state Gaussian HMM on SPY returns + realized vol.
+
+        Returns 'bull', 'bear', or 'unknown'.
+        Bull state = higher mean return. Bear state = lower/negative mean return.
+        Only refits when date changes (cached intraday).
+        """
+        today_str = str(pd.Timestamp.today().date())
+        if self._hmm_cache and self._hmm_cache[0] == today_str:
+            return self._hmm_cache[1]  # cache hit: skip refitting
+
+        if not _HMM_AVAILABLE or market_data is None or market_data.empty:
+            return 'unknown'
+
+        try:
+            spy = (
+                market_data[market_data['symbol'] == 'SPY']['close']
+                if 'symbol' in market_data.columns
+                else market_data['close']
+            )
+            if len(spy) < 60:
+                return 'unknown'
+
+            rets = spy.pct_change().dropna()
+            vol = rets.rolling(20).std().dropna()
+            aligned_rets = rets.reindex(vol.index)
+            X = np.column_stack([aligned_rets.values, vol.values])
+
+            model = _hmm_lib.GaussianHMM(
+                n_components=2, covariance_type='full',
+                n_iter=100, random_state=42
+            )
+            model.fit(X)
+            states = model.predict(X)
+
+            # Bull state = whichever component has the higher mean return
+            mean_returns = [X[states == s, 0].mean() for s in range(2)]
+            bull_state = int(np.argmax(mean_returns))
+            regime = 'bull' if states[-1] == bull_state else 'bear'
+
+            self._hmm_cache = (today_str, regime)
+            logger.info(f"HMM regime: {regime} (bull_state={bull_state}, "
+                        f"mean_rets=[{mean_returns[0]:.4f}, {mean_returns[1]:.4f}])")
+            return regime
+
+        except Exception as exc:
+            logger.warning(f"HMM regime detection failed: {exc}")
+            return 'unknown'
+
     def detect_trend_regime(self, market_data: pd.DataFrame) -> str:
         """
         Detect trend regime (trending vs choppy)
@@ -154,12 +212,17 @@ class RegimeDetector:
         Returns:
             Dict with adjusted parameters based on regime
         """
+        if vix is None:
+            vix = self.get_vix_level(market_data)
         vol_regime = self.detect_volatility_regime(vix, market_data)
         trend_regime = self.detect_trend_regime(market_data) if market_data is not None else 'weak_trend'
-        
+        hmm_regime = self.detect_hmm_regime(market_data) if market_data is not None else 'unknown'
+
         adjustments = {
+            'vix': round(vix, 1),
             'volatility_regime': vol_regime,
             'trend_regime': trend_regime,
+            'hmm_regime': hmm_regime,
             'max_portfolio_heat': 0.30,  # Default
             'enable_mean_reversion': True,
             'enable_breakout': True,
@@ -182,7 +245,13 @@ class RegimeDetector:
         if trend_regime == 'choppy':
             adjustments['enable_trend_following'] = False
             logger.info("Choppy regime: Disabling trend-following strategies")
-        
+
+        # HMM bear regime: gate RSI mean-reversion BUY signals (mean reversion fails in
+        # persistent downtrends; SELLs and other strategies are unaffected)
+        if hmm_regime == 'bear':
+            adjustments['enable_mean_reversion'] = False
+            logger.warning("HMM bear regime detected: RSI Mean Reversion BUY signals suppressed")
+
         return adjustments
     
     def should_enable_strategy(self, strategy_name: str, regime_adjustments: Dict) -> bool:
