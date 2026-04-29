@@ -6,6 +6,8 @@ Ensures data is always fresh for trading strategies
 """
 import os
 import sys
+import argparse
+from typing import List, Optional
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -30,14 +32,21 @@ from src.data.universe_provider import UniverseProvider
 class DailyDataUpdater:
     """Update training data with latest market data"""
     
-    def __init__(self, api_key: str = None):
+    def __init__(self, api_key: str = None, symbols: Optional[List[str]] = None):
         self.api_key = api_key or os.getenv('ALPHA_VANTAGE_API_KEY')
         if not self.api_key:
             raise ValueError("ALPHA_VANTAGE_API_KEY not set")
         
         self.base_url = "https://www.alphavantage.co/query"
         self.universe = UniverseProvider().get_universe()
-        logger.info(f"Initialized updater for {len(self.universe)} symbols")
+        self._subset_mode = False
+        if symbols:
+            allowed = {s.upper() for s in symbols}
+            self.universe = [s for s in self.universe if s.upper() in allowed]
+            self._subset_mode = True
+            logger.info(f"Initialized updater for {len(self.universe)} symbol(s): {self.universe}")
+        else:
+            logger.info(f"Initialized updater for {len(self.universe)} symbols")
     
     def fetch_latest_data(self, symbol: str, days: int = 5) -> pd.DataFrame:
         """
@@ -50,10 +59,11 @@ class DailyDataUpdater:
         Returns:
             DataFrame with latest OHLCV data
         """
+        outputsize = 'full' if days > 100 else 'compact'
         params = {
             'function': 'TIME_SERIES_DAILY_ADJUSTED',
             'symbol': symbol,
-            'outputsize': 'compact',  # Last 100 days
+            'outputsize': outputsize,  # compact ~100 days, full for deep backfills
             'apikey': self.api_key
         }
         
@@ -189,9 +199,10 @@ class DailyDataUpdater:
         
         return df
     
-    def update_training_data(self, data_file: str = 'data/training_data.csv'):
+    def update_training_data(self, data_file: str = 'data/training_data.csv', output_file: Optional[str] = None):
         """Update training data with latest market data"""
         data_path = Path(data_file)
+        output_path = Path(output_file) if output_file else data_path
         
         # Load existing data
         if data_path.exists():
@@ -206,12 +217,24 @@ class DailyDataUpdater:
             latest_date = None
         
         # Detect symbols that need a full backfill (new to universe or insufficient history)
-        _MIN_ROWS_FOR_INDICATORS = 50  # need ≥14 for RSI, 20 for ATR, etc.
+        # Use 350 rows to keep 200-day SMA valid inside the last 150-day window.
+        _MIN_ROWS_FOR_INDICATORS = 350
+        _MIN_RECENT_ROWS = int(os.getenv('MIN_HISTORY_DAYS', '60'))
         if existing_df is not None:
             rows_per_symbol = existing_df.groupby('symbol').size()
+            recent_cutoff = (latest_date - timedelta(days=150)) if latest_date is not None else None
+            if recent_cutoff is not None:
+                recent_counts = (
+                    existing_df[existing_df['date'] >= recent_cutoff]
+                    .groupby('symbol')
+                    .size()
+                )
+            else:
+                recent_counts = pd.Series(dtype=int)
             _backfill_symbols = {
                 s for s in self.universe
                 if rows_per_symbol.get(s, 0) < _MIN_ROWS_FOR_INDICATORS
+                or recent_counts.get(s, 0) < _MIN_RECENT_ROWS
             }
         else:
             _backfill_symbols = set(self.universe)
@@ -227,7 +250,7 @@ class DailyDataUpdater:
             logger.info("No existing data — fetching full compact window (100 days per symbol)")
 
         for i, symbol in enumerate(self.universe, 1):
-            days_to_fetch = 100 if symbol in _backfill_symbols else 5
+            days_to_fetch = 730 if symbol in _backfill_symbols else 5
             label = "backfill" if symbol in _backfill_symbols else "update"
             logger.info(f"[{i}/{len(self.universe)}] {symbol} ({label}, {days_to_fetch}d)")
 
@@ -259,9 +282,16 @@ class DailyDataUpdater:
         
         # Merge with existing data
         if existing_df is not None:
-            # Remove overlapping dates from existing data
-            existing_df = existing_df[existing_df['date'] < new_df['date'].min()]
-            
+            # Remove overlapping dates per symbol (avoid dropping recent history
+            # for symbols that are not being backfilled).
+            existing_df = existing_df.copy()
+            new_min_dates = new_df.groupby('symbol')['date'].min().to_dict()
+            overlap_mask = existing_df.apply(
+                lambda row: row['date'] >= new_min_dates.get(row['symbol'], row['date'] + pd.Timedelta(days=1)),
+                axis=1
+            )
+            existing_df = existing_df[~overlap_mask]
+
             # Combine
             combined_df = pd.concat([existing_df, new_df], ignore_index=True)
             combined_df = combined_df.sort_values(['date', 'symbol'])
@@ -277,35 +307,60 @@ class DailyDataUpdater:
         
         # Drop orphaned symbols not in the current universe — stale/removed symbols
         # accumulate NaN indicators and trigger EXCESSIVE_NAN / STALE_DATA blocks every run.
-        active_symbols = set(self.universe)
-        before_count = combined_df['symbol'].nunique()
-        combined_df = combined_df[combined_df['symbol'].isin(active_symbols)]
-        after_count = combined_df['symbol'].nunique()
-        if before_count != after_count:
-            logger.info(f"Pruned {before_count - after_count} orphaned symbol(s) not in current universe")
+        if not self._subset_mode:
+            active_symbols = set(self.universe)
+            before_count = combined_df['symbol'].nunique()
+            combined_df = combined_df[combined_df['symbol'].isin(active_symbols)]
+            after_count = combined_df['symbol'].nunique()
+            if before_count != after_count:
+                logger.info(f"Pruned {before_count - after_count} orphaned symbol(s) not in current universe")
 
         # Calculate indicators for the combined dataset
         logger.info("\nCalculating technical indicators...")
         combined_df = self.calculate_indicators(combined_df)
         
         # Save
-        data_path.parent.mkdir(exist_ok=True)
-        combined_df.to_csv(data_path, index=False)
-        logger.info(f"\n✅ Data saved to {data_path}")
-        logger.info(f"  File size: {data_path.stat().st_size / 1024 / 1024:.2f} MB")
+        output_path.parent.mkdir(exist_ok=True)
+        combined_df.to_csv(output_path, index=False)
+        logger.info(f"\n✅ Data saved to {output_path}")
+        logger.info(f"  File size: {output_path.stat().st_size / 1024 / 1024:.2f} MB")
         logger.info(f"  Total rows: {len(combined_df):,}")
         logger.info(f"  Latest date: {combined_df['date'].max().date()}")
         
         return True
 
+def _parse_symbols(value: Optional[str]) -> Optional[List[str]]:
+    if not value:
+        return None
+    symbols = [s.strip() for s in value.split(',') if s.strip()]
+    return symbols or None
+
+
 def main():
     """Main execution"""
+    parser = argparse.ArgumentParser(description="Update daily market data")
+    parser.add_argument(
+        "--symbols",
+        help="Comma-separated subset of symbols to update (overrides full universe)",
+        default=os.getenv('DATA_UPDATE_SYMBOLS')
+    )
+    parser.add_argument(
+        "--output",
+        help="Output CSV path (defaults to data/training_data.csv; subset runs default to data/training_data_subset.csv)",
+        default=os.getenv('DATA_UPDATE_OUTPUT')
+    )
+    args = parser.parse_args()
+    symbols = _parse_symbols(args.symbols)
+    output_path = args.output
+    if symbols and not output_path:
+        output_path = 'data/training_data_subset.csv'
+
     logger.info("="*80)
     logger.info("DAILY DATA UPDATE")
     logger.info("="*80)
     
-    updater = DailyDataUpdater()
-    success = updater.update_training_data()
+    updater = DailyDataUpdater(symbols=symbols)
+    success = updater.update_training_data(output_file=output_path)
     
     if success:
         logger.info("\n" + "="*80)

@@ -179,9 +179,9 @@ class DataQualityChecker:
         # Allow data from previous trading day (up to 3 days for weekends)
         age_days = (asof_date.date() - most_recent.date()).days
         
-        # More lenient threshold: allow up to 5 days (covers long weekends)
-        # This is reasonable since we fetch fresh data before trading
-        max_age_days = 5
+        # More lenient threshold: allow up to configured staleness window
+        # (covers long weekends). Default remains 72h -> 3 days.
+        max_age_days = max(1, int((self.staleness_threshold_hours + 23) // 24))
         
         if age_days > max_age_days:
             return True, f"Data age {age_days} days exceeds threshold {max_age_days} days"

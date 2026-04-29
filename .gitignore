@@ -39,6 +39,7 @@ data/*.pkl
 # NOT in git. Regenerate locally: python3 scripts/fetch_historical_data.py
 data/training_data.csv
 data/extended_historical_data.csv
+data/training_data_subset.csv
 
 # Artifacts directories (generated per run)
 artifacts/

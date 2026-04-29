@@ -50,8 +50,18 @@ def q1(db, sql, *args):
 
 # ── Queries ───────────────────────────────────────────────────────────────────
 def get_snapshot(db):
-    snap = q1(db, "SELECT portfolio_value, cash, reconciliation_status "
-                   "FROM broker_state ORDER BY created_at DESC LIMIT 1")
+    snap = q1(db, """
+        SELECT portfolio_value, cash, reconciliation_status
+        FROM broker_state
+        WHERE reconciliation_status IS NOT NULL
+          AND reconciliation_status != 'SKIPPED'
+          AND snapshot_type IN ('RECONCILIATION', 'RECONCILIATION_RETRY', 'END', 'SYNC')
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+    """)
+    if not snap:
+        snap = q1(db, "SELECT portfolio_value, cash, reconciliation_status "
+                       "FROM broker_state ORDER BY created_at DESC LIMIT 1")
     dd_row = q1(db, "SELECT value FROM system_state WHERE key='drawdown_stop_state'")
     dd = {}
     if dd_row.get('value'):
@@ -365,7 +375,7 @@ def td_s(val, align='left', bold=False, color=None, mono=False, small=False):
     return "<td style='" + s + "'>" + str(val) + "</td>"
 
 # ── Header ────────────────────────────────────────────────────────────────────
-def build_header(pv, cash, daily_pnl, daily_pct, dd, regime, recon, n_trades):
+def build_header(pv, cash, daily_pnl, daily_pct, dd, regime, recon, n_trades, data_missing=False):
     today = datetime.now().strftime('%a %b %-d, %Y')
     invested = pv - cash
     heat = invested / pv * 100 if pv > 0 else 0
@@ -378,11 +388,18 @@ def build_header(pv, cash, daily_pnl, daily_pct, dd, regime, recon, n_trades):
     pc = POS if daily_pnl >= 0 else NEG
 
     recon_ok = 'SYNCED' in recon.upper() or 'PASS' in recon.upper()
-    recon_chip = chip('Account Synced' if recon_ok else 'Out of Sync', POS if recon_ok else NEG)
+    if data_missing:
+        recon_chip = chip('Data Missing', '#b45309')
+    else:
+        recon_chip = chip('Account Synced' if recon_ok else 'Out of Sync', POS if recon_ok else NEG)
 
     regime_labels = {'NORMAL': 'Normal market', 'HIGH_VOL': 'Volatile market', 'CRISIS': 'Crisis mode', 'LOW_VOL': 'Calm market'}
-    regime_display = regime_labels.get(regime_str, regime_str.replace('_', ' ').title())
-    regime_col = {'NORMAL': POS, 'LOW_VOL': POS, 'HIGH_VOL': '#d97706', 'CRISIS': NEG}.get(regime_str, MUTED)
+    if data_missing:
+        regime_display = 'Unknown'
+        regime_col = MUTED
+    else:
+        regime_display = regime_labels.get(regime_str, regime_str.replace('_', ' ').title())
+        regime_col = {'NORMAL': POS, 'LOW_VOL': POS, 'HIGH_VOL': '#d97706', 'CRISIS': NEG}.get(regime_str, MUTED)
     dd_col = {'NORMAL': POS, 'RAMPUP': '#d97706', 'HALT': NEG, 'PANIC': '#7c3aed'}.get(dd_str, MUTED)
 
     return (
@@ -802,6 +819,7 @@ def build_all_time_perf(rows):
 
 # ── Strategy-by-strategy concerns ─────────────────────────────────────────────
 def build_strategy_concerns(health_data, rejection_rows, recent_rows):
+    min_trade_sample = 10
     # Index rejections and recent perf by strategy name
     rej_by_strat = {}
     for r in (rejection_rows or []):
@@ -846,7 +864,14 @@ def build_strategy_concerns(health_data, rejection_rows, recent_rows):
         concern_items = list(issues[:4])
         if r_pnl < 0:
             concern_items.append("Lost money over the last 30 days ({})".format(fmt_pnl(r_pnl)))
-        if r_trades > 0 and r_wins / r_trades < 0.4:
+        if 0 < r_trades < min_trade_sample:
+            concern_items.append(
+                "Only {} closed trade{} in the last 30 days — performance sample is too small for a strong conclusion".format(
+                    r_trades,
+                    's' if r_trades != 1 else '',
+                )
+            )
+        elif r_trades >= min_trade_sample and r_wins / r_trades < 0.4 and r_pnl <= 0:
             concern_items.append("Only {} of recent trades were profitable — this strategy is underperforming".format(r_wr))
         for rej in top_rej:
             cnt = rej.get('cnt', 0)
@@ -900,8 +925,9 @@ def generate_email_body(artifact_path=None, db_path='trading.db', include_visual
     rej_rows, recent_rows   = get_strategy_concerns_data(db)
     db.close()
 
-    pv    = snap.get('portfolio_value') or 100_000
-    cash  = snap.get('cash') or 0
+    data_missing = not snap or 'portfolio_value' not in snap
+    pv    = snap.get('portfolio_value') if not data_missing else 0
+    cash  = snap.get('cash') if not data_missing else 0
     recon = snap.get('reconciliation_status') or 'UNKNOWN'
 
     daily_pnl = daily_pct = pnl_30d = 0.0
@@ -915,8 +941,17 @@ def generate_email_body(artifact_path=None, db_path='trading.db', include_visual
     traded_symbols = list({t.get('symbol') for t in today_trades if t.get('symbol')})
     news_map = fetch_symbol_news(traded_symbols)
 
-    header      = build_header(pv, cash, daily_pnl, daily_pct, dd, regime, recon, len(today_trades))
+    header      = build_header(pv, cash, daily_pnl, daily_pct, dd, regime, recon, len(today_trades), data_missing=data_missing)
     summary     = build_summary(pv, cash, pnl_30d, rows_30d)
+    if data_missing:
+        summary = (
+            "<div style='margin:12px 0;padding:12px 14px;border:1px solid #b45309;"
+            "background:#fffbeb;color:#92400e;border-radius:10px;font-size:12px;'>"
+            "⚠️ Missing broker_state snapshot data for this run. The daily workflow did not "
+            "populate trading.db, so portfolio metrics are placeholders. Please check the "
+            "Daily Trading Execution logs for database initialization errors or missing artifacts." 
+            "</div>"
+        ) + summary
     health_data = get_health()
     guardrails  = get_guardrail_report()
 

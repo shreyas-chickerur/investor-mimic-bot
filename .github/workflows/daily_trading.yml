@@ -21,6 +21,10 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Set runtime date
+      id: runtime_date
+      run: echo "today=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
     
     - name: Install dependencies
       run: |
@@ -48,6 +52,10 @@ jobs:
           rm -f trading-db.zip
           echo "✅ Downloaded trading.db from artifact $ARTIFACT_ID"
           ls -la trading.db
+          if ! sqlite3 trading.db "SELECT name FROM sqlite_master WHERE type='table' AND name='broker_state';" | grep -q broker_state; then
+            echo "⚠️ trading.db artifact missing broker_state table — removing to force clean init"
+            rm -f trading.db
+          fi
         else
           echo "⚠️ No trading-database artifact found — will initialize fresh"
         fi
@@ -55,6 +63,17 @@ jobs:
     - name: Initialize database
       run: |
         python scripts/setup_database.py --db trading.db
+
+    - name: Verify database initialized
+      run: |
+        if [ ! -f trading.db ]; then
+          echo "❌ trading.db missing after initialization"
+          exit 1
+        fi
+        if ! sqlite3 trading.db "SELECT name FROM sqlite_master WHERE type='table' AND name='broker_state';" | grep -q broker_state; then
+          echo "❌ broker_state table missing in trading.db"
+          exit 1
+        fi
     
     - name: Create required directories
       run: |
@@ -135,11 +154,22 @@ jobs:
         ALPACA_LIVE_ENABLED: 'false'
         DRY_RUN: 'false'
         ENABLE_BROKER_RECONCILIATION: 'true'
-        DATA_VALIDATOR_MAX_AGE_HOURS: '288'
+        DATA_MAX_AGE_HOURS: '288'
         TRADING_DISABLED: 'false'
       run: |
         chmod +x scripts/run_trading.sh
         ./scripts/run_trading.sh
+
+    - name: Process notification outbox
+      if: always()
+      env:
+        SMTP_SERVER: smtp.gmail.com
+        SMTP_PORT: 587
+        SENDER_EMAIL: ${{ secrets.EMAIL_USERNAME }}
+        SENDER_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+        RECIPIENT_EMAIL: ${{ secrets.EMAIL_TO }}
+      run: |
+        python3 scripts/process_notification_outbox.py --db trading.db --limit 100
     
     - name: Check if trading executed
       id: check_execution
@@ -312,12 +342,39 @@ jobs:
       continue-on-error: true
       run: |
         python3 scripts/performance_tracker.py --db trading.db
-    
-    - name: Generate daily email digest
+
+    - name: Snapshot trading database
       if: always()
       run: |
-        # Export today's date for use in email subject lines
-        echo "TODAY_DATE=$(date +%Y-%m-%d)" >> $GITHUB_ENV
+        mkdir -p artifacts/db_snapshots
+        SNAPSHOT_NAME="trading_db_$(date +%Y%m%d).db"
+        if [ -f trading.db ]; then
+          cp trading.db "artifacts/db_snapshots/$SNAPSHOT_NAME"
+          echo "✅ Saved DB snapshot to artifacts/db_snapshots/$SNAPSHOT_NAME"
+        else
+          echo "⚠️ trading.db not found; skipping DB snapshot"
+        fi
+
+    - name: Validate email inputs
+      id: validate_email
+      if: always()
+      run: |
+        if [ ! -f trading.db ]; then
+          echo "email_ok=false" >> $GITHUB_OUTPUT
+          echo "reason=missing_db" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        BROKER_ROWS=$(sqlite3 trading.db "SELECT COUNT(*) FROM broker_state;" 2>/dev/null || echo "0")
+        if [ "$BROKER_ROWS" -eq "0" ]; then
+          echo "email_ok=false" >> $GITHUB_OUTPUT
+          echo "reason=missing_broker_state" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        echo "email_ok=true" >> $GITHUB_OUTPUT
+    
+    - name: Generate daily email digest
+      if: always() && steps.validate_email.outputs.email_ok == 'true'
+      run: |
         # Check if today is Mon/Wed/Fri for visual reports
         DAY_OF_WEEK=$(date +%u)  # 1=Mon, 3=Wed, 5=Fri
         if [ "$DAY_OF_WEEK" = "1" ] || [ "$DAY_OF_WEEK" = "3" ] || [ "$DAY_OF_WEEK" = "5" ]; then
@@ -332,6 +389,25 @@ jobs:
           echo "Email generation failed — writing minimal fallback HTML"
           python3 -c "import datetime; open('/tmp/daily_email.html','w').write('<html><body style=\"font-family:sans-serif;padding:24px\"><h2>Daily Trading Digest &mdash; generation failed</h2><p>Email generation script failed. Check workflow logs.</p><p>Date: '+datetime.date.today().isoformat()+'</p></body></html>')"
         fi
+
+    - name: Generate fallback email digest (missing data)
+      if: always() && steps.validate_email.outputs.email_ok != 'true'
+      run: |
+        echo "⚠️ Missing broker_state data; generating warning email"
+        python3 - <<'PY'
+        import datetime
+        reason = "${{ steps.validate_email.outputs.reason }}"
+        note = "Missing trading.db" if reason == "missing_db" else "broker_state table empty"
+        html = f"""<html><body style='font-family:sans-serif;padding:24px'>
+        <h2>Daily Trading Digest — data missing</h2>
+        <p>Trading database data was missing for today’s run ({note}).</p>
+        <p>Please check the Daily Trading Execution logs for database initialization or artifact download errors.</p>
+        <p>Date: {datetime.date.today().isoformat()}</p>
+        </body></html>"""
+        with open('/tmp/daily_email.html','w') as f:
+            f.write(html)
+        print("✅ Fallback email HTML generated: /tmp/daily_email.html")
+        PY
     
     - name: Send daily digest email
       if: always()
@@ -341,7 +417,7 @@ jobs:
         server_port: 587
         username: ${{ secrets.EMAIL_USERNAME }}
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: "📊 Daily Trading Digest - ${{ env.TODAY_DATE }}"
+        subject: "📊 Daily Trading Digest - ${{ steps.runtime_date.outputs.today }}"
         to: ${{ secrets.EMAIL_TO }}
         from: Trading System
         html_body: file:///tmp/daily_email.html
@@ -391,6 +467,48 @@ jobs:
         else
           echo "status=UNKNOWN" >> $GITHUB_OUTPUT
         fi
+
+    - name: Final health gate
+      if: always()
+      run: |
+        STATUS="${{ steps.check_status.outputs.status }}"
+        RECON="${{ steps.check_reconciliation.outputs.status }}"
+
+        if [ "$STATUS" = "PREFLIGHT_FAILED" ] || [ "$STATUS" = "EXECUTION_FAILED" ]; then
+          echo "❌ Health gate failed: run status is $STATUS"
+          exit 1
+        fi
+
+        if [ "$STATUS" = "MARKET_CLOSED" ]; then
+          echo "✅ Health gate: market closed is expected"
+          exit 0
+        fi
+
+        if [ "$RECON" = "FAIL" ]; then
+          echo "❌ Health gate failed: reconciliation status is FAIL"
+          exit 1
+        fi
+
+        if [ -f artifacts/diagnostics/post_run_guardrails.json ]; then
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('artifacts/diagnostics/post_run_guardrails.json')
+          report = json.loads(p.read_text())
+          crit = report.get('critical_failures', [])
+          if crit:
+              print('❌ Health gate failed: guardrail critical failures detected')
+              for item in crit:
+                  print(' -', item)
+              raise SystemExit(1)
+          print('✅ Health gate: guardrails clean')
+          PY
+        else
+          echo "⚠️ Guardrail report missing; treating as failure"
+          exit 1
+        fi
+
+        echo "✅ Final health gate passed"
     
     - name: Send market closed notification
       if: always() && steps.check_status.outputs.status == 'MARKET_CLOSED'
@@ -400,14 +518,14 @@ jobs:
         server_port: 587
         username: ${{ secrets.EMAIL_USERNAME }}
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: "⏸️ Trading Skipped - Market Closed (Expected) - ${{ env.TODAY_DATE }}"
+        subject: "⏸️ Trading Skipped - Market Closed (Expected) - ${{ steps.runtime_date.outputs.today }}"
         to: ${{ secrets.EMAIL_TO }}
         from: Trading System
         body: |
           Trading Run Skipped - Market Closed (Expected)
           
           Run: ${{ github.run_number }}
-          Date: ${{ env.TODAY_DATE }}
+          Date: ${{ steps.runtime_date.outputs.today }}
           Status: Market closed (weekend or holiday)
           
           This is expected behavior. The trading system automatically skips execution when:
@@ -426,14 +544,14 @@ jobs:
         server_port: 587
         username: ${{ secrets.EMAIL_USERNAME }}
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: "⚠️ Trading Reconciliation Warning - ${{ env.TODAY_DATE }}"
+        subject: "⚠️ Trading Reconciliation Warning - ${{ steps.runtime_date.outputs.today }}"
         to: ${{ secrets.EMAIL_TO }}
         from: Trading System
         body: |
           Trading Execution Completed - Reconciliation Discrepancies Detected
           
           Run: ${{ github.run_number }}
-          Date: ${{ env.TODAY_DATE }}
+          Date: ${{ steps.runtime_date.outputs.today }}
           Status: Execution successful, reconciliation has ${{ steps.check_reconciliation.outputs.discrepancies }} discrepancies
           
           The trading system executed successfully, but found differences between:
@@ -456,7 +574,7 @@ jobs:
         server_port: 587
         username: ${{ secrets.EMAIL_USERNAME }}
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: "❌ Daily Trading Workflow Failed (UNEXPECTED) - ${{ env.TODAY_DATE }}"
+        subject: "❌ Daily Trading Workflow Failed (UNEXPECTED) - ${{ steps.runtime_date.outputs.today }}"
         to: ${{ secrets.EMAIL_TO }}
         from: Trading System
         body: |
