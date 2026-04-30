@@ -490,19 +490,8 @@ jobs:
         fi
 
         if [ -f artifacts/diagnostics/post_run_guardrails.json ]; then
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-          p = Path('artifacts/diagnostics/post_run_guardrails.json')
-          report = json.loads(p.read_text())
-          crit = report.get('critical_failures', [])
-          if crit:
-              print('❌ Health gate failed: guardrail critical failures detected')
-              for item in crit:
-                  print(' -', item)
-              raise SystemExit(1)
-          print('✅ Health gate: guardrails clean')
-          PY
+          python3 -c "import json; from pathlib import Path; p=Path('artifacts/diagnostics/post_run_guardrails.json'); report=json.loads(p.read_text()); crit=report.get('critical_failures', []);\
+          _=([print('❌ Health gate failed: guardrail critical failures detected')] or [print(' -', item) for item in crit] or [(_ for _ in ()).throw(SystemExit(1))]) if crit else print('✅ Health gate: guardrails clean')"
         else
           echo "⚠️ Guardrail report missing; treating as failure"
           exit 1
