@@ -239,6 +239,10 @@ class NewsSignalFilter:
         """Pre-fetch sentiment for a list of symbols."""
         return self.provider.fetch_batch(symbols)
 
+    def get_usage_summary(self) -> Dict[str, int]:
+        """Return usage summary compatible with execution engine expectations."""
+        return {'provider': 'news_sentiment_http', 'requests': len(self.provider._cache)}
+
     def apply(self, signals: List[Dict], sentiment_map: Dict[str, Dict]) -> List[Dict]:
         """
         Modify signal confidences in-place based on sentiment.
