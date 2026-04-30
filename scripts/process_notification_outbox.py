@@ -29,7 +29,7 @@ def process_outbox(db_path: str, limit: int = 50) -> int:
         Number of successfully delivered notifications.
     """
     db = TradingDatabase(db_path=db_path)
-    notifier = EmailNotifier(outbox_writer=None)
+    notifier = EmailNotifier()
 
     queued = db.fetch_pending_notifications(limit=limit)
     if not queued:
