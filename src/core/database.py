@@ -153,7 +153,55 @@ class TradingDatabase:
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         ''')
-        
+
+        # Run state machine tracking
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS run_state (
+                run_id TEXT PRIMARY KEY,
+                stage TEXT NOT NULL,
+                status TEXT NOT NULL,
+                error_message TEXT,
+                metadata_json TEXT,
+                started_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                completed_at TEXT
+            )
+        ''')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_run_state_status ON run_state(status)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_run_state_updated_at ON run_state(updated_at)')
+
+        # Notification outbox (decouples runtime from delivery side effects)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS notification_outbox (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT,
+                channel TEXT NOT NULL,
+                category TEXT NOT NULL,
+                subject TEXT NOT NULL,
+                body TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'PENDING',
+                attempts INTEGER NOT NULL DEFAULT 0,
+                last_error TEXT,
+                created_at TEXT NOT NULL,
+                sent_at TEXT
+            )
+        ''')
+        cursor.execute(
+            'CREATE INDEX IF NOT EXISTS idx_notification_outbox_status ON notification_outbox(status)'
+        )
+        cursor.execute(
+            'CREATE INDEX IF NOT EXISTS idx_notification_outbox_run_id ON notification_outbox(run_id)'
+        )
+
+        # Per-run SLO metrics for observability
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS run_slo_metrics (
+                run_id TEXT PRIMARY KEY,
+                metrics_json TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        ''')
+
         # Signal funnel tracking (portfolio-level per run)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS signal_funnel (
@@ -308,6 +356,320 @@ class TradingDatabase:
             'CREATE INDEX IF NOT EXISTS idx_trade_pnl_exit ON trade_pnl_detail(exit_date)'
         )
 
+        conn.commit()
+        conn.close()
+
+    def upsert_run_state(self, stage: str, status: str,
+                         error_message: Optional[str] = None,
+                         metadata: Optional[Dict] = None,
+                         completed: bool = False) -> None:
+        """Create or update run-state machine row for the current run."""
+        now = datetime.now().isoformat()
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute('SELECT run_id FROM run_state WHERE run_id = ?', (self.run_id,))
+        exists = cursor.fetchone() is not None
+        metadata_json = json.dumps(metadata) if metadata else None
+
+        if exists:
+            cursor.execute(
+                '''
+                UPDATE run_state
+                SET stage = ?,
+                    status = ?,
+                    error_message = ?,
+                    metadata_json = ?,
+                    updated_at = ?,
+                    completed_at = CASE WHEN ? THEN ? ELSE completed_at END
+                WHERE run_id = ?
+                ''',
+                (stage, status, error_message, metadata_json, now, completed, now, self.run_id),
+            )
+        else:
+            cursor.execute(
+                '''
+                INSERT INTO run_state
+                (run_id, stage, status, error_message, metadata_json, started_at, updated_at, completed_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ''',
+                (
+                    self.run_id,
+                    stage,
+                    status,
+                    error_message,
+                    metadata_json,
+                    now,
+                    now,
+                    now if completed else None,
+                ),
+            )
+
+        conn.commit()
+        conn.close()
+
+    def enqueue_notification(self, channel: str, category: str, subject: str, body: str) -> int:
+        """Queue a notification for asynchronous delivery."""
+        now = datetime.now().isoformat()
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            '''
+            INSERT INTO notification_outbox
+            (run_id, channel, category, subject, body, status, attempts, created_at)
+            VALUES (?, ?, ?, ?, ?, 'PENDING', 0, ?)
+            ''',
+            (self.run_id, channel, category, subject, body, now),
+        )
+        notification_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        return notification_id
+
+    def fetch_pending_notifications(self, limit: int = 50) -> List[Dict]:
+        """Fetch pending/failed notifications for delivery workers."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(
+            '''
+            SELECT * FROM notification_outbox
+            WHERE status IN ('PENDING', 'FAILED')
+            ORDER BY created_at ASC
+            LIMIT ?
+            ''',
+            (limit,),
+        )
+        rows = [dict(r) for r in cursor.fetchall()]
+        conn.close()
+        return rows
+
+    def mark_notification_sent(self, notification_id: int) -> None:
+        """Mark outbox notification as sent."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            '''
+            UPDATE notification_outbox
+            SET status = 'SENT',
+                attempts = attempts + 1,
+                sent_at = ?
+            WHERE id = ?
+            ''',
+            (datetime.now().isoformat(), notification_id),
+        )
+        conn.commit()
+        conn.close()
+
+    def mark_notification_failed(self, notification_id: int, error_message: str) -> None:
+        """Mark outbox notification delivery failure."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            '''
+            UPDATE notification_outbox
+            SET status = 'FAILED',
+                attempts = attempts + 1,
+                last_error = ?
+            WHERE id = ?
+            ''',
+            (error_message[:1000], notification_id),
+        )
+        conn.commit()
+        conn.close()
+
+    def get_consecutive_failed_runs(self, max_lookback: int = 20) -> int:
+        """Return count of consecutive failed runs from most recent run backward."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            '''
+            SELECT status
+            FROM run_state
+            ORDER BY updated_at DESC
+            LIMIT ?
+            ''',
+            (max_lookback,),
+        )
+        rows = [str(r[0]).upper() for r in cursor.fetchall()]
+        conn.close()
+
+        failures = 0
+        for status in rows:
+            if status == 'FAILED':
+                failures += 1
+            else:
+                break
+        return failures
+
+    def save_run_slo_metrics(self, metrics: Dict) -> None:
+        """Persist per-run SLO metrics for observability dashboards and audits."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            '''
+            INSERT OR REPLACE INTO run_slo_metrics (run_id, metrics_json, created_at)
+            VALUES (?, ?, ?)
+            ''',
+            (self.run_id, json.dumps(metrics), datetime.now().isoformat()),
+        )
+        conn.commit()
+        conn.close()
+
+    def upsert_run_state(self, stage: str, status: str,
+                         error_message: Optional[str] = None,
+                         metadata: Optional[Dict] = None,
+                         completed: bool = False) -> None:
+        """Create or update run-state machine row for the current run."""
+        now = datetime.now().isoformat()
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute('SELECT run_id FROM run_state WHERE run_id = ?', (self.run_id,))
+        exists = cursor.fetchone() is not None
+        metadata_json = json.dumps(metadata) if metadata else None
+
+        if exists:
+            cursor.execute(
+                '''
+                UPDATE run_state
+                SET stage = ?,
+                    status = ?,
+                    error_message = ?,
+                    metadata_json = ?,
+                    updated_at = ?,
+                    completed_at = CASE WHEN ? THEN ? ELSE completed_at END
+                WHERE run_id = ?
+                ''',
+                (stage, status, error_message, metadata_json, now, completed, now, self.run_id),
+            )
+        else:
+            cursor.execute(
+                '''
+                INSERT INTO run_state
+                (run_id, stage, status, error_message, metadata_json, started_at, updated_at, completed_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ''',
+                (
+                    self.run_id,
+                    stage,
+                    status,
+                    error_message,
+                    metadata_json,
+                    now,
+                    now,
+                    now if completed else None,
+                ),
+            )
+
+        conn.commit()
+        conn.close()
+
+    def enqueue_notification(self, channel: str, category: str, subject: str, body: str) -> int:
+        """Queue a notification for asynchronous delivery."""
+        now = datetime.now().isoformat()
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            '''
+            INSERT INTO notification_outbox
+            (run_id, channel, category, subject, body, status, attempts, created_at)
+            VALUES (?, ?, ?, ?, ?, 'PENDING', 0, ?)
+            ''',
+            (self.run_id, channel, category, subject, body, now),
+        )
+        notification_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        return notification_id
+
+    def fetch_pending_notifications(self, limit: int = 50) -> List[Dict]:
+        """Fetch pending/failed notifications for delivery workers."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(
+            '''
+            SELECT * FROM notification_outbox
+            WHERE status IN ('PENDING', 'FAILED')
+            ORDER BY created_at ASC
+            LIMIT ?
+            ''',
+            (limit,),
+        )
+        rows = [dict(r) for r in cursor.fetchall()]
+        conn.close()
+        return rows
+
+    def mark_notification_sent(self, notification_id: int) -> None:
+        """Mark outbox notification as sent."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            '''
+            UPDATE notification_outbox
+            SET status = 'SENT',
+                attempts = attempts + 1,
+                sent_at = ?
+            WHERE id = ?
+            ''',
+            (datetime.now().isoformat(), notification_id),
+        )
+        conn.commit()
+        conn.close()
+
+    def mark_notification_failed(self, notification_id: int, error_message: str) -> None:
+        """Mark outbox notification delivery failure."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            '''
+            UPDATE notification_outbox
+            SET status = 'FAILED',
+                attempts = attempts + 1,
+                last_error = ?
+            WHERE id = ?
+            ''',
+            (error_message[:1000], notification_id),
+        )
+        conn.commit()
+        conn.close()
+
+    def get_consecutive_failed_runs(self, max_lookback: int = 20) -> int:
+        """Return count of consecutive failed runs from most recent run backward."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            '''
+            SELECT status
+            FROM run_state
+            ORDER BY updated_at DESC
+            LIMIT ?
+            ''',
+            (max_lookback,),
+        )
+        rows = [str(r[0]).upper() for r in cursor.fetchall()]
+        conn.close()
+
+        failures = 0
+        for status in rows:
+            if status == 'FAILED':
+                failures += 1
+            else:
+                break
+        return failures
+
+    def save_run_slo_metrics(self, metrics: Dict) -> None:
+        """Persist per-run SLO metrics for observability dashboards and audits."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            '''
+            INSERT OR REPLACE INTO run_slo_metrics (run_id, metrics_json, created_at)
+            VALUES (?, ?, ?)
+            ''',
+            (self.run_id, json.dumps(metrics), datetime.now().isoformat()),
+        )
         conn.commit()
         conn.close()
 
