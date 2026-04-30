@@ -210,7 +210,7 @@ jobs:
         echo "=== Checking Reconciliation from Database ==="
         
         # Query database directly for reconciliation status
-        RUN_ID=$(sqlite3 trading.db "SELECT run_id FROM broker_state ORDER BY created_at DESC LIMIT 1;" || echo "UNKNOWN")
+        RUN_ID=$(sqlite3 trading.db "SELECT run_id FROM broker_state WHERE snapshot_type != 'SYNC' AND run_id != 'AUTO_SYNC' ORDER BY created_at DESC LIMIT 1;" || echo "UNKNOWN")
         RECON_STATUS=$(sqlite3 trading.db "SELECT reconciliation_status FROM broker_state WHERE run_id='$RUN_ID' AND snapshot_type='RECONCILIATION';" || echo "UNKNOWN")
         
         echo "Run ID: $RUN_ID"
@@ -270,7 +270,7 @@ jobs:
       if: always()
       run: |
         echo "=== Run Metrics ==="
-        RUN_ID=$(sqlite3 trading.db "SELECT run_id FROM broker_state ORDER BY created_at DESC LIMIT 1;" || echo "UNKNOWN")
+        RUN_ID=$(sqlite3 trading.db "SELECT run_id FROM broker_state WHERE snapshot_type != 'SYNC' AND run_id != 'AUTO_SYNC' ORDER BY created_at DESC LIMIT 1;" || echo "UNKNOWN")
         echo "Run ID: $RUN_ID"
         
         if [ "$RUN_ID" != "UNKNOWN" ]; then
@@ -425,7 +425,7 @@ jobs:
     - name: Create GitHub summary
       if: always()
       run: |
-        RUN_ID=$(sqlite3 trading.db "SELECT run_id FROM broker_state ORDER BY created_at DESC LIMIT 1;" || echo "UNKNOWN")
+        RUN_ID=$(sqlite3 trading.db "SELECT run_id FROM broker_state WHERE snapshot_type != 'SYNC' AND run_id != 'AUTO_SYNC' ORDER BY created_at DESC LIMIT 1;" || echo "UNKNOWN")
         SIGNALS=$(sqlite3 trading.db "SELECT COUNT(*) FROM signals WHERE run_id='$RUN_ID';" || echo "0")
         TRADES=$(sqlite3 trading.db "SELECT COUNT(*) FROM trades WHERE run_id='$RUN_ID';" || echo "0")
         RECON_STATUS=$(sqlite3 trading.db "SELECT reconciliation_status FROM broker_state WHERE run_id='$RUN_ID' AND snapshot_type='RECONCILIATION';" || echo "UNKNOWN")
