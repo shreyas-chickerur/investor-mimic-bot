@@ -14,18 +14,20 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 import logging
+from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
 
 class EmailNotifier:
     """Handles email notifications for trading system"""
-    
-    def __init__(self):
+
+    def __init__(self, outbox_writer: Optional[Callable[[str, str, str, str], int]] = None):
         self.smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
         self.smtp_port = int(os.getenv('SMTP_PORT', '587'))
         self.sender_email = os.getenv('SENDER_EMAIL')
         self.sender_password = os.getenv('SENDER_PASSWORD')
         self.recipient_email = os.getenv('RECIPIENT_EMAIL')
+        self.outbox_writer = outbox_writer
         
         if not all([self.sender_email, self.sender_password, self.recipient_email]):
             logger.warning("Email credentials not configured - notifications disabled")
@@ -35,7 +37,11 @@ class EmailNotifier:
     
     def send_alert(self, subject: str, message: str):
         """Send critical alert email (for reconciliation failures, etc.)"""
-        
+        if self.outbox_writer:
+            self.outbox_writer('email', 'alert', subject, message)
+            logger.info("Queued alert notification to outbox")
+            return
+
         if not self.enabled:
             logger.warning("Email notifications disabled - alert not sent")
             return
@@ -45,7 +51,13 @@ class EmailNotifier:
     
     def send_error_alert(self, error_message: str, details: str = ""):
         """Send error alert email"""
-        
+        if self.outbox_writer:
+            subject = f"🚨 Trading System Error - {datetime.now().strftime('%Y-%m-%d')}"
+            body = f"{error_message}\n\n{details}" if details else error_message
+            self.outbox_writer('email', 'error', subject, body)
+            logger.info("Queued error notification to outbox")
+            return
+
         if not self.enabled:
             logger.error(f"Email disabled, error not sent: {error_message}")
             return
