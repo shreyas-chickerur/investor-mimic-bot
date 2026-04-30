@@ -18,7 +18,7 @@ sys.path.insert(0, str(project_root))
 from dotenv import load_dotenv
 load_dotenv()
 
-from src.core.db_factory import get_database
+from src.core.database import TradingDatabase
 from src.strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
 from src.strategies.strategy_ml_momentum import MLMomentumStrategy
 from src.strategies.strategy_earnings_drift import EarningsDriftStrategy
@@ -85,7 +85,7 @@ class MultiStrategyRunner:
         self.config = get_config()
         logger.info("Configuration loaded from YAML")
         
-        self.db = get_database(default_sqlite_path='trading.db')
+        self.db = TradingDatabase(db_path='trading.db')
         self.run_id = self.db.run_id
         self.asof_date = datetime.now().strftime('%Y-%m-%d')
         self.db.upsert_run_state(stage='INIT', status='RUNNING', metadata={'asof_date': self.asof_date})
