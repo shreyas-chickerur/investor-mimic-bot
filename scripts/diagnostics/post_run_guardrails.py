@@ -62,7 +62,14 @@ def main() -> int:
     stage(1, 4, "Loading latest run context")
     run_rows = query_rows(
         conn,
-        "select run_id, max(created_at) as last_seen from broker_state group by run_id order by last_seen desc limit 1",
+        """
+        select run_id, max(created_at) as last_seen
+        from broker_state
+        where snapshot_type != 'SYNC' and run_id != 'AUTO_SYNC'
+        group by run_id
+        order by last_seen desc
+        limit 1
+        """,
     )
     if not run_rows:
         report["critical_failures"].append("No broker_state rows found; trading run likely did not persist")
