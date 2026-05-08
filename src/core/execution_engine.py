@@ -367,6 +367,7 @@ class MultiStrategyRunner:
 
         for trade in self.executed_trades:
             order_id = trade.get('order_id')
+            order_id_str = str(order_id) if order_id is not None else None
             intent_id = trade.get('intent_id')
             if not order_id:
                 self.pending_orders.append({**trade, 'status': 'UNKNOWN'})
@@ -378,20 +379,20 @@ class MultiStrategyRunner:
                 if status == 'filled':
                     self.confirmed_fills.append(trade)
                     if intent_id:
-                        self.db.update_order_intent_status(intent_id, 'FILLED', broker_order_id=order_id)
+                        self.db.update_order_intent_status(intent_id, 'FILLED', broker_order_id=order_id_str)
                 elif status in {'canceled', 'rejected', 'expired'}:
                     self.rejected_orders.append({**trade, 'status': status})
                     if intent_id:
                         self.db.update_order_intent_status(
                             intent_id,
                             'FAILED',
-                            broker_order_id=order_id,
+                            broker_order_id=order_id_str,
                             error=status
                         )
                 else:
                     self.pending_orders.append({**trade, 'status': status})
                     if intent_id:
-                        self.db.update_order_intent_status(intent_id, 'ACKED', broker_order_id=order_id)
+                        self.db.update_order_intent_status(intent_id, 'ACKED', broker_order_id=order_id_str)
             except Exception as exc:
                 logger.error(f"Failed to verify order {order_id}: {exc}")
                 self.pending_orders.append({**trade, 'status': 'ERROR'})
@@ -399,7 +400,7 @@ class MultiStrategyRunner:
                     self.db.update_order_intent_status(
                         intent_id,
                         'FAILED',
-                        broker_order_id=order_id,
+                        broker_order_id=order_id_str,
                         error='status_check_failed'
                     )
 
