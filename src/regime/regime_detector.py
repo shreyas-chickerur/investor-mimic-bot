@@ -205,7 +205,12 @@ class RegimeDetector:
             return 'choppy'
         return 'weak_trend'
     
-    def get_regime_adjustments(self, vix: float = None, market_data: pd.DataFrame = None) -> Dict:
+    def get_regime_adjustments(
+        self,
+        vix: float = None,
+        market_data: pd.DataFrame = None,
+        base_max_heat: float = 0.30,
+    ) -> Dict:
         """
         Get regime-based adjustments for system parameters
         
@@ -223,7 +228,7 @@ class RegimeDetector:
             'volatility_regime': vol_regime,
             'trend_regime': trend_regime,
             'hmm_regime': hmm_regime,
-            'max_portfolio_heat': 0.30,  # Default
+            'max_portfolio_heat': base_max_heat,
             'enable_mean_reversion': True,
             'enable_breakout': True,
             'enable_trend_following': True,
@@ -232,15 +237,21 @@ class RegimeDetector:
         
         # Adjust based on volatility regime
         if vol_regime == 'low_volatility':
-            adjustments['max_portfolio_heat'] = 0.40  # Allow more exposure
+            adjustments['max_portfolio_heat'] = base_max_heat * 1.2
             adjustments['position_size_multiplier'] = 1.2  # Larger positions
-            logger.info("Low volatility: Increasing heat to 40%, position size +20%")
+            logger.info(
+                "Low volatility: Increasing heat to %.0f%%, position size +20%%",
+                adjustments['max_portfolio_heat'] * 100,
+            )
             
         elif vol_regime == 'high_volatility':
-            adjustments['max_portfolio_heat'] = 0.20  # Reduce exposure
+            adjustments['max_portfolio_heat'] = base_max_heat * 0.7
             adjustments['position_size_multiplier'] = 0.8  # Smaller positions
             adjustments['enable_breakout'] = False  # Disable breakout strategies
-            logger.info("High volatility: Reducing heat to 20%, position size -20%, disabling breakouts")
+            logger.info(
+                "High volatility: Reducing heat to %.0f%%, position size -20%%, disabling breakouts",
+                adjustments['max_portfolio_heat'] * 100,
+            )
 
         if trend_regime == 'choppy':
             adjustments['enable_trend_following'] = False

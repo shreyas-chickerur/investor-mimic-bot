@@ -367,6 +367,7 @@ class MultiStrategyRunner:
 
         for trade in self.executed_trades:
             order_id = trade.get('order_id')
+            intent_id = trade.get('intent_id')
             if not order_id:
                 self.pending_orders.append({**trade, 'status': 'UNKNOWN'})
                 continue
@@ -376,13 +377,31 @@ class MultiStrategyRunner:
                 status = str(getattr(order, 'status', 'UNKNOWN')).lower()
                 if status == 'filled':
                     self.confirmed_fills.append(trade)
+                    if intent_id:
+                        self.db.update_order_intent_status(intent_id, 'FILLED', broker_order_id=order_id)
                 elif status in {'canceled', 'rejected', 'expired'}:
                     self.rejected_orders.append({**trade, 'status': status})
+                    if intent_id:
+                        self.db.update_order_intent_status(
+                            intent_id,
+                            'FAILED',
+                            broker_order_id=order_id,
+                            error=status
+                        )
                 else:
                     self.pending_orders.append({**trade, 'status': status})
+                    if intent_id:
+                        self.db.update_order_intent_status(intent_id, 'ACKED', broker_order_id=order_id)
             except Exception as exc:
                 logger.error(f"Failed to verify order {order_id}: {exc}")
                 self.pending_orders.append({**trade, 'status': 'ERROR'})
+                if intent_id:
+                    self.db.update_order_intent_status(
+                        intent_id,
+                        'FAILED',
+                        broker_order_id=order_id,
+                        error='status_check_failed'
+                    )
 
         logger.info(
             "Confirmed fills: %s/%s",
@@ -750,6 +769,7 @@ class MultiStrategyRunner:
             logger.info("No stop losses triggered")
         logger.info("=" * 80)
         self.executed_signals = []
+        self.rejected_signals = []
         self.symbols_bought_this_run: set = set()
         self.symbols_sold_this_run: set = set()
         self.reconciliation_status = "SKIPPED"
@@ -796,7 +816,10 @@ class MultiStrategyRunner:
         self._apply_allocations(strategies, allocations, exposures)
         total_exposure = sum(exposures.values())
 
-        regime_adjustments = self.regime_detector.get_regime_adjustments(market_data=market_data)
+        regime_adjustments = self.regime_detector.get_regime_adjustments(
+            market_data=market_data,
+            base_max_heat=self.portfolio_risk.base_max_heat,
+        )
         self.portfolio_risk.max_portfolio_heat = regime_adjustments['max_portfolio_heat']
 
         # Persist regime so daily email shows the correct market status (not 'Unknown')
@@ -1225,17 +1248,41 @@ class MultiStrategyRunner:
                     # Wash trade prevention: skip if already sold this symbol this run
                     if symbol in self.symbols_sold_this_run:
                         logger.warning(f"Skipping BUY {symbol} - already sold this run (wash trade prevention)")
+                        self.rejected_signals.append({
+                            'strategy': strategy.name,
+                            'symbol': symbol,
+                            'action': action,
+                            'shares': shares,
+                            'price': price,
+                            'reason': 'wash_trade_guard'
+                        })
                         continue
 
                     # Pre-earnings guard: skip new entries for symbols reporting tomorrow
                     if symbol in getattr(self, '_reporting_tomorrow', set()):
                         logger.info(f"Skipping BUY {symbol} — reports earnings tomorrow (binary event protection)")
+                        self.rejected_signals.append({
+                            'strategy': strategy.name,
+                            'symbol': symbol,
+                            'action': action,
+                            'shares': shares,
+                            'price': price,
+                            'reason': 'pre_earnings_guard'
+                        })
                         continue
 
                     # ML risk-off guard: suppress BUY from non-ML strategies when ML detected
                     # broad bearish conditions (≥3 SELL signals across the universe)
                     if getattr(self, '_ml_risk_off', False) and 'ml' not in strategy.name.lower():
                         logger.info(f"Skipping BUY {symbol} ({strategy.name}) — ML risk-off active")
+                        self.rejected_signals.append({
+                            'strategy': strategy.name,
+                            'symbol': symbol,
+                            'action': action,
+                            'shares': shares,
+                            'price': price,
+                            'reason': 'ml_risk_off'
+                        })
                         continue
 
                     # Duplicate prevention: skip if we already hold this symbol for this strategy today
@@ -1244,6 +1291,14 @@ class MultiStrategyRunner:
                         entry_dt = existing_pos.get('entry_date', '')
                         if entry_dt and entry_dt[:10] == self.asof_date:
                             logger.warning(f"Skipping BUY {symbol} - position opened today (duplicate prevention)")
+                            self.rejected_signals.append({
+                                'strategy': strategy.name,
+                                'symbol': symbol,
+                                'action': action,
+                                'shares': shares,
+                                'price': price,
+                                'reason': 'duplicate_prevention'
+                            })
                             continue
 
                     # Apply size multiplier from correlation attenuation
@@ -1259,6 +1314,14 @@ class MultiStrategyRunner:
                     
                     if adjusted_shares == 0:
                         logger.info(f"Skipping {symbol} - size multiplier reduced shares to 0")
+                        self.rejected_signals.append({
+                            'strategy': strategy.name,
+                            'symbol': symbol,
+                            'action': action,
+                            'shares': shares,
+                            'price': price,
+                            'reason': 'size_reduced_to_zero'
+                        })
                         continue
                     
                     logger.info(f"Size adjustment for {symbol}: {shares} → {adjusted_shares} "
@@ -1272,9 +1335,25 @@ class MultiStrategyRunner:
                     
                     if not self.cash_manager.reserve_cash(strategy.strategy_id, trade_value):
                         logger.warning(f"Skipping {symbol} - insufficient cash for strategy {strategy.strategy_id}")
+                        self.rejected_signals.append({
+                            'strategy': strategy.name,
+                            'symbol': symbol,
+                            'action': action,
+                            'shares': adjusted_shares,
+                            'price': price,
+                            'reason': 'insufficient_cash'
+                        })
                         continue
                     if not self.portfolio_risk.can_add_position(trade_value, total_exposure, portfolio_value):
                         logger.warning(f"Skipping {symbol} - portfolio heat limit")
+                        self.rejected_signals.append({
+                            'strategy': strategy.name,
+                            'symbol': symbol,
+                            'action': action,
+                            'shares': adjusted_shares,
+                            'price': price,
+                            'reason': 'portfolio_heat'
+                        })
                         self.cash_manager.release_cash(strategy.strategy_id, trade_value)
                         continue
 
@@ -1316,6 +1395,30 @@ class MultiStrategyRunner:
                     
                     # Update intent status
                     self.db.update_order_intent_status(intent_id, 'SUBMITTED', str(order.id))
+
+                    trade_info = {
+                        'symbol': signal['symbol'],
+                        'action': signal['action'],
+                        'shares': adjusted_shares,
+                        'price': signal['price'],
+                        'order_id': order.id,
+                        'intent_id': intent_id
+                    }
+                    self.executed_trades.append(trade_info)
+                    executed.append({
+                        'strategy': strategy.name,
+                        'symbol': symbol,
+                        'shares': adjusted_shares,
+                        'price': price,
+                        'action': 'BUY'
+                    })
+                    self.executed_signals.append({
+                        'strategy': strategy.name,
+                        'symbol': symbol,
+                        'shares': adjusted_shares,
+                        'price': price,
+                        'action': 'BUY'
+                    })
                     
                     # Log to structured logger
                     self.structured_logger.log_order_submitted(
@@ -1353,10 +1456,21 @@ class MultiStrategyRunner:
                         if self.paper_mode:
                             fill_verified = True
                             logger.info(f"Paper trading mode - assuming fill despite verification error")
-                    
+
                     if not fill_verified:
-                        logger.error(f"Order {order.id} not filled - skipping database update to prevent sync issues")
-                        self.cash_manager.release_cash(strategy.strategy_id, trade_value)
+                        logger.info(f"Order {order.id} not filled yet - keeping order pending")
+                        self.db.update_order_intent_status(
+                            intent_id,
+                            'ACKED',
+                            broker_order_id=str(order.id)
+                        )
+                        self.pending_orders.append({
+                            'symbol': symbol,
+                            'side': 'BUY',
+                            'qty': adjusted_shares,
+                            'price': price,
+                            'status': 'pending'
+                        })
                         continue
                     
                     print(f"  ✅ BUY {actual_filled_qty} {symbol} @ ${actual_fill_price:.2f} (Order: {order.id}, Intent: {intent_id})")
@@ -1405,28 +1519,18 @@ class MultiStrategyRunner:
                         None  # pnl is None for open positions; set on SELL
                     )
                     
-                    # Track as executed (will verify fill status later)
-                    trade_info = {
-                        'symbol': signal['symbol'],
-                        'action': signal['action'],
-                        'shares': adjusted_shares,
-                        'price': signal['price'],
-                        'order_id': order.id,
-                        'intent_id': intent_id
-                    }
-                    self.executed_trades.append(trade_info)
-                    
-                    executed.append({
-                        'strategy': strategy.name,
-                        'symbol': symbol,
-                        'shares': shares,
-                        'price': price,
-                        'action': 'BUY'
-                    })
                     
                 except Exception as e:
                     logger.error(f"Failed to execute {symbol}: {e}")
                     print(f"  ❌ Failed {symbol}: {e}")
+                    try:
+                        self.db.update_order_intent_status(
+                            intent_id,
+                            'FAILED',
+                            error=str(e)
+                        )
+                    except Exception:
+                        logger.warning("Failed to update order intent status for %s", intent_id)
                     
             elif action == 'SELL' and shares > 0:
                 try:
@@ -1576,6 +1680,7 @@ class MultiStrategyRunner:
                     }
                     executed.append(trade_record)
                     self.executed_trades.append(trade_record)
+                    self.executed_signals.append(trade_record)
                     self.performance_metrics.add_trade('SELL', symbol, shares, exec_price, trade_value)
                 except Exception as e:
                     logger.error(f"Failed to execute {symbol}: {e}")
@@ -1719,10 +1824,11 @@ class MultiStrategyRunner:
 
     def _apply_allocations(self, strategies, allocations, exposures):
         """Apply capital allocations to strategies and cash manager"""
+        min_cash_pct = self.config.get('risk.min_cash_allocation_pct', 0.05)
         for strategy in strategies:
             allocation = allocations.get(strategy.strategy_id, strategy.capital)
             strategy.capital = max(allocation - exposures.get(strategy.strategy_id, 0), 0)
-        self.cash_manager.set_allocations(allocations, exposures)
+        self.cash_manager.set_allocations(allocations, exposures, min_cash_pct=min_cash_pct)
 
     def _format_signal_flowchart(self, strategy_name, signal):
         """Build a flowchart-style reasoning chain for a signal."""
@@ -1935,6 +2041,15 @@ def main():
                 }
                 for trade in runner.executed_trades
             ]
+            fallback_fills = [
+                {
+                    'symbol': trade['symbol'],
+                    'side': trade['action'],
+                    'qty': trade['shares'],
+                    'price': trade['price']
+                }
+                for trade in runner.executed_trades
+            ]
             open_positions = [
                 {
                     'symbol': pos['symbol'],
@@ -1952,10 +2067,10 @@ def main():
                 vix=regime.get('vix', 0),
                 regime_classification=regime.get('volatility_regime', 'UNKNOWN'),
                 raw_signals=runner.raw_signals_by_strategy,
-                rejected_signals=[],
+                rejected_signals=runner.rejected_signals,
                 executed_signals=runner.executed_signals,
                 placed_orders=placed_orders,
-                filled_orders=runner.confirmed_fills,
+                filled_orders=runner.confirmed_fills or fallback_fills,
                 rejected_orders=runner.rejected_orders,
                 portfolio_heat=portfolio_heat,
                 daily_pnl=pnl_metrics['daily_pnl'],

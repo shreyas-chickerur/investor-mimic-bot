@@ -53,7 +53,12 @@ class CashManager:
         self.reserved_cash -= amount
         logger.info(f"Released ${amount:.2f} to strategy {strategy_id}, new balance: ${self.allocated_cash[strategy_id]:.2f}")
 
-    def set_allocations(self, allocations: Dict[int, float], exposures: Dict[int, float] = None):
+    def set_allocations(
+        self,
+        allocations: Dict[int, float],
+        exposures: Dict[int, float] = None,
+        min_cash_pct: float = 0.0,
+    ):
         """
         Update cash allocations per strategy.
 
@@ -68,9 +73,10 @@ class CashManager:
         exposures = exposures or {}
         for strategy_id, allocation in allocations.items():
             exposure = exposures.get(strategy_id, 0)
-            available = max(allocation - exposure, 0)
+            min_cash = max(allocation * min_cash_pct, 0)
+            available = max(allocation - exposure, min_cash)
             self.allocated_cash[strategy_id] = available
-            self.reserved_cash += max(exposure, 0)
+            self.reserved_cash += max(exposure, allocation - available)
 
         logger.info("Updated cash allocations per strategy")
     
