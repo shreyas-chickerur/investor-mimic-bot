@@ -165,7 +165,11 @@ class MultiStrategyRunner:
         logger.info(f"Correlation Filter: window={corr_window}, short={corr_short_window}, max={max_corr}")
         
         self.regime_detector = RegimeDetector()
-        self.dynamic_allocator = DynamicAllocator(total_capital)
+        self.dynamic_allocator = DynamicAllocator(
+            total_capital,
+            max_allocation_pct=self.config.get('risk.dynamic_max_allocation_pct', 0.35),
+            min_allocation_pct=self.config.get('risk.dynamic_min_allocation_pct', 0.10),
+        )
         slippage_bps = self.config.get('execution.slippage_bps', 5)
         commission = self.config.get('execution.commission_per_share', 0.0)
         self.cost_model = ExecutionCostModel(slippage_bps=slippage_bps, commission_per_share=commission)
@@ -821,6 +825,8 @@ class MultiStrategyRunner:
             logger.info(f"Refreshed current prices for {refreshed} open positions")
 
         self.dynamic_allocator.total_capital = max(self.portfolio_value, self.buying_power)
+        self.dynamic_allocator.max_allocation = self.config.get('risk.dynamic_max_allocation_pct', 0.35)
+        self.dynamic_allocator.min_allocation = self.config.get('risk.dynamic_min_allocation_pct', 0.10)
         allocations = self._calculate_dynamic_allocations(strategies)
         exposures = self._calculate_strategy_exposures(strategies, current_prices)
         self._apply_allocations(strategies, allocations, exposures)

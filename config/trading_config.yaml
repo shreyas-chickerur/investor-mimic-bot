@@ -4,10 +4,12 @@
 # Risk Management
 risk:
   # Portfolio-level risk limits
-  max_portfolio_heat: 1.50  # Maximum 150% of portfolio at risk (margin-aware)
+  max_portfolio_heat: 1.75  # Maximum 175% of portfolio at risk (margin-aware)
   max_daily_loss_pct: 0.05  # Maximum 5% daily loss before halt
   max_position_size_pct: 0.10  # Maximum 10% per position
-  min_cash_allocation_pct: 0.15  # Minimum 15% per-strategy cash buffer
+  min_cash_allocation_pct: 0.20  # Minimum 20% per-strategy cash buffer
+  dynamic_max_allocation_pct: 0.50  # Max strategy allocation (dynamic allocator)
+  dynamic_min_allocation_pct: 0.05  # Min strategy allocation (dynamic allocator)
   
   # Drawdown stops
   drawdown_halt_threshold: 0.10  # 10% drawdown triggers halt
