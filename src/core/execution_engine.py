@@ -128,13 +128,20 @@ class MultiStrategyRunner:
         account = self.trading_client.get_account()
         self.portfolio_value = float(account.portfolio_value)
         self.cash_available = float(account.cash)
+        self.buying_power = float(getattr(account, 'buying_power', self.cash_available))
         
-        logger.info(f"Portfolio: ${self.portfolio_value:.2f}, Cash: ${self.cash_available:.2f}")
+        logger.info(
+            "Portfolio: $%.2f, Cash: $%.2f, Buying Power: $%.2f",
+            self.portfolio_value,
+            self.cash_available,
+            self.buying_power,
+        )
         
         # Initialize professional-grade modules with config
         self.email_notifier = EmailNotifier(outbox_writer=self.db.enqueue_notification)
         self.data_validator = DataValidator()
-        self.cash_manager = CashManager(self.portfolio_value, num_strategies=4)
+        total_capital = max(self.portfolio_value, self.buying_power)
+        self.cash_manager = CashManager(total_capital, num_strategies=4)
         
         # Portfolio risk manager - load from config
         max_heat = self.config.get('risk.max_portfolio_heat', 0.30)
@@ -158,7 +165,7 @@ class MultiStrategyRunner:
         logger.info(f"Correlation Filter: window={corr_window}, short={corr_short_window}, max={max_corr}")
         
         self.regime_detector = RegimeDetector()
-        self.dynamic_allocator = DynamicAllocator(self.portfolio_value)
+        self.dynamic_allocator = DynamicAllocator(total_capital)
         slippage_bps = self.config.get('execution.slippage_bps', 5)
         commission = self.config.get('execution.commission_per_share', 0.0)
         self.cost_model = ExecutionCostModel(slippage_bps=slippage_bps, commission_per_share=commission)
@@ -288,6 +295,7 @@ class MultiStrategyRunner:
         account = self.trading_client.get_account()
         self.portfolio_value = float(account.portfolio_value)
         self.cash_available = float(account.cash)
+        self.buying_power = float(getattr(account, 'buying_power', self.cash_available))
         return account
     
     def _refresh_account_state(self):
@@ -812,6 +820,7 @@ class MultiStrategyRunner:
         if refreshed:
             logger.info(f"Refreshed current prices for {refreshed} open positions")
 
+        self.dynamic_allocator.total_capital = max(self.portfolio_value, self.buying_power)
         allocations = self._calculate_dynamic_allocations(strategies)
         exposures = self._calculate_strategy_exposures(strategies, current_prices)
         self._apply_allocations(strategies, allocations, exposures)
