@@ -46,3 +46,4 @@ artifacts/
 
 # Backtest output (regenerated per run)
 backtest_results/
+tmp/

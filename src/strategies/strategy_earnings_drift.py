@@ -48,16 +48,20 @@ class EarningsDriftStrategy(TradingStrategy):
             name="Earnings Drift",
             capital=capital,
         )
-        self.volume_spike_threshold = 2.0
+        from src.utils.config_loader import get_config as _gc
+        _cfg = _gc()
+        self.volume_spike_threshold = _cfg.get('strategies.earnings_drift.volume_spike_threshold', 1.3)
         self.return_threshold_mult = 2.0
-        self.drift_hold_days = 40
-        self.min_surprise_return = 0.02
-        self.profit_target_pct = 0.20
-        self.stop_loss_pct = 0.10
+        self.drift_hold_days = _cfg.get('strategies.earnings_drift.drift_hold_days', 40)
+        self.min_surprise_return = _cfg.get('strategies.earnings_drift.min_surprise_return', 0.02)
+        self.profit_target_pct = _cfg.get('strategies.earnings_drift.profit_target_pct', 0.20)
+        self.stop_loss_pct = _cfg.get('strategies.earnings_drift.stop_loss_pct', 0.10)
         self.entry_dates = {}
         self.event_returns = {}
         # Entry window: buy up to N trading days after the earnings date
-        self.calendar_entry_window_days = 3
+        self.calendar_entry_window_days = _cfg.get(
+            'strategies.earnings_drift.calendar_entry_window_days', 5
+        )
 
     def _load_earnings_calendar(self) -> pd.DataFrame:
         """Load earnings calendar from disk. Returns empty DataFrame if unavailable."""
