@@ -239,9 +239,52 @@ jobs:
         ALPACA_PAPER: true
       run: |
         echo "🔄 Reconciliation failed - Auto-syncing database with broker..."
-        python scripts/sync_broker_state.py
-        echo "✅ Database auto-synced successfully"
-        echo "synced=true" >> $GITHUB_OUTPUT
+        if python scripts/sync_broker_state.py; then
+          echo "✅ Database auto-synced successfully"
+          echo "synced=true"  >> $GITHUB_OUTPUT
+          echo "sync_ok=true" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Auto-sync FAILED — manual intervention needed"
+          echo "synced=true"   >> $GITHUB_OUTPUT
+          echo "sync_ok=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Verify reconciliation after auto-sync
+      id: verify_sync
+      if: always() && steps.auto_sync.outputs.synced == 'true'
+      env:
+        ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+        ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+        ALPACA_PAPER: true
+      continue-on-error: true
+      run: |
+        echo "=== Re-verifying reconciliation post-sync ==="
+        python3 - <<'PY'
+        import json, sys, sqlite3
+        from src.risk.broker_reconciler import BrokerReconciler
+        r = BrokerReconciler()
+        broker = r.get_broker_state()
+        con = sqlite3.connect('trading.db'); con.row_factory = sqlite3.Row
+        rows = con.execute(
+            "SELECT symbol, SUM(shares) qty FROM positions "
+            "WHERE shares > 0 GROUP BY symbol"
+        ).fetchall()
+        local = {r['symbol']: {'qty': float(r['qty']), 'avg_price': 0.0} for r in rows}
+        ok, disc = r.reconcile_daily(local, float(broker.get('cash', 0)))
+        print(json.dumps({'ok': ok, 'discrepancies': disc}, indent=2))
+        with open('verify_sync.json', 'w') as f:
+            json.dump({'ok': ok, 'discrepancies': disc}, f)
+        sys.exit(0 if ok else 1)
+        PY
+        if [ -f verify_sync.json ]; then
+          RESOLVED=$(python3 -c "import json; print('true' if json.load(open('verify_sync.json'))['ok'] else 'false')")
+          echo "resolved=$RESOLVED" >> $GITHUB_OUTPUT
+          DISC_COUNT=$(python3 -c "import json; print(len(json.load(open('verify_sync.json'))['discrepancies']))")
+          echo "remaining=$DISC_COUNT" >> $GITHUB_OUTPUT
+        else
+          echo "resolved=false" >> $GITHUB_OUTPUT
+          echo "remaining=0"    >> $GITHUB_OUTPUT
+        fi
     
     - name: Re-upload synced database
       if: always() && steps.auto_sync.outputs.synced == 'true'
@@ -484,9 +527,14 @@ jobs:
           exit 0
         fi
 
-        if [ "$RECON" = "FAIL" ]; then
-          echo "❌ Health gate failed: reconciliation status is FAIL"
+        # If reconciliation failed but auto-sync resolved it, treat as healthy.
+        # Only fail the gate if drift remained after the post-sync verification.
+        RESOLVED="${{ steps.verify_sync.outputs.resolved }}"
+        if [ "$RECON" = "FAIL" ] && [ "$RESOLVED" != "true" ]; then
+          echo "❌ Health gate failed: reconciliation drift remains after auto-sync"
           exit 1
+        elif [ "$RECON" = "FAIL" ]; then
+          echo "✅ Health gate: reconciliation drift was auto-resolved"
         fi
 
         if [ -f artifacts/diagnostics/post_run_guardrails.json ]; then
@@ -524,35 +572,82 @@ jobs:
           
           Next scheduled run: Monday-Friday at 4:15 PM ET
     
+    # Only escalate to the user when auto-sync did NOT resolve the drift.
+    # If sync succeeded and the post-sync verification passes, stay silent
+    # — the daily summary email already shows reconciliation status.
     - name: Send reconciliation warning
-      if: always() && steps.check_reconciliation.outputs.status == 'FAIL' && steps.check_reconciliation.outputs.discrepancies != '0'
+      if: always() && steps.check_reconciliation.outputs.status == 'FAIL'
+             && steps.check_reconciliation.outputs.discrepancies != '0'
+             && steps.verify_sync.outputs.resolved != 'true'
       uses: dawidd6/action-send-mail@v3
       with:
         server_address: smtp.gmail.com
         server_port: 587
         username: ${{ secrets.EMAIL_USERNAME }}
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: "⚠️ Trading Reconciliation Warning - ${{ steps.runtime_date.outputs.today }}"
+        subject: "Trading · Manual sync needed (${{ steps.runtime_date.outputs.today }})"
         to: ${{ secrets.EMAIL_TO }}
         from: Trading System
-        body: |
-          Trading Execution Completed - Reconciliation Discrepancies Detected
-          
-          Run: ${{ github.run_number }}
-          Date: ${{ steps.runtime_date.outputs.today }}
-          Status: Execution successful, reconciliation has ${{ steps.check_reconciliation.outputs.discrepancies }} discrepancies
-          
-          The trading system executed successfully, but found differences between:
-          - System's internal state (what it thinks it owns)
-          - Broker's actual state (what Alpaca reports)
-          
-          This is common in paper trading and usually not a concern. Review the artifacts to see details.
-          
-          Artifacts available:
-          - Database: trading-database
-          - Daily artifacts: daily-artifacts-${{ github.run_number }}
-          
-          View run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        html_body: |
+          <!DOCTYPE html><html><body style="margin:0;padding:0;background:#f5f5f0;
+                font-family:-apple-system,'SF Pro Display','Helvetica Neue',Arial,sans-serif;
+                color:#111;">
+          <div style="max-width:560px;margin:0 auto;padding:32px 28px;">
+            <div style="font-size:11px;font-weight:700;letter-spacing:0.22em;
+                        color:#9a9a9a;text-transform:uppercase;margin-bottom:10px;">
+              ${{ steps.runtime_date.outputs.today }} · Reconciliation
+            </div>
+            <div style="font-size:26px;font-weight:800;letter-spacing:-0.02em;
+                        color:#111;line-height:1.2;margin-bottom:18px;">
+              Auto-sync didn't fully resolve drift.
+            </div>
+            <div style="display:inline-block;background:#ffe1e1;border:1px solid #d63031;
+                        color:#7a1a1a;font-size:11px;font-weight:800;letter-spacing:0.18em;
+                        padding:5px 10px;border-radius:6px;margin-bottom:18px;">
+              MANUAL ACTION SUGGESTED
+            </div>
+            <p style="font-size:14px;line-height:1.55;color:#333;margin:0 0 14px;">
+              The trading run executed cleanly, but our local DB still differs from
+              Alpaca after the automatic sync attempt.
+              <strong>${{ steps.verify_sync.outputs.remaining }} discrepancy(ies)</strong>
+              remain after auto-sync.
+            </p>
+            <div style="background:#fff;border:1px solid #e6e6e0;border-radius:14px;
+                        padding:18px 20px;margin:18px 0;">
+              <div style="font-size:10px;font-weight:700;letter-spacing:0.18em;
+                          color:#9a9a9a;text-transform:uppercase;margin-bottom:10px;">
+                What this usually means
+              </div>
+              <div style="font-size:13px;line-height:1.6;color:#333;">
+                Most often a market-on-close fill from yesterday landed at Alpaca
+                after our verification poll timed out, so the broker has a position
+                we didn't record. Auto-sync normally patches it; when it doesn't,
+                run the sync manually.
+              </div>
+            </div>
+            <div style="background:#fff;border:1px solid #e6e6e0;border-radius:14px;
+                        padding:18px 20px;margin:18px 0;">
+              <div style="font-size:10px;font-weight:700;letter-spacing:0.18em;
+                          color:#9a9a9a;text-transform:uppercase;margin-bottom:10px;">
+                Fix in one command
+              </div>
+              <pre style="font-family:'SF Mono',Menlo,monospace;font-size:12px;
+                          background:#f0f0eb;padding:10px 12px;border-radius:8px;
+                          margin:0;color:#111;overflow:auto;">python3 scripts/sync_broker_state.py</pre>
+              <div style="font-size:11px;color:#5e5e5e;margin-top:10px;">
+                Or trigger the <em>Sync Database</em> workflow from the Actions tab.
+              </div>
+            </div>
+            <p style="font-size:12px;color:#5e5e5e;margin:18px 0 6px;">
+              Run #${{ github.run_number }} ·
+              <a href="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                 style="color:#76b900;text-decoration:none;">view logs</a>
+            </p>
+            <p style="font-size:11px;color:#9a9a9a;margin:0;">
+              Trading itself is unaffected and will continue on the next run.
+            </p>
+          </div>
+          </body></html>
     
     - name: Send failure notification
       if: failure() && steps.check_status.outputs.status != 'MARKET_CLOSED'

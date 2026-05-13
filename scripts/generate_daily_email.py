@@ -328,44 +328,62 @@ def pnl_color(v: Optional[float]) -> str:
 # ── Section builders ──────────────────────────────────────────────────────────
 def build_header(pv: float, today_pnl: float, today_pct: float,
                   date_str: str) -> str:
-    sign = '+' if today_pnl >= 0 else '−'
-    col = VOLT if today_pnl >= 0 else LOSS
+    """Hero card: date pill, portfolio value, today's change pill."""
+    is_up = today_pnl >= 0
+    col       = VOLT if is_up else LOSS
+    chip_bg   = VOLT_SOFT if is_up else LOSS_SOFT
+    chip_fg   = '#1a3300' if is_up else '#7a1a1a'
+    arrow     = '▲' if is_up else '▼'
     return f"""
-<div style="padding:36px 32px 24px;background:{BG};">
-  <div style="font-family:{FONT};font-size:11px;font-weight:700;
-              letter-spacing:0.2em;color:{TEXT_MUTE};
-              text-transform:uppercase;margin-bottom:14px;">
-    {html_lib.escape(date_str)}
-  </div>
-  <div style="font-family:{FONT};font-size:13px;color:{TEXT_DIM};
-              margin-bottom:6px;">Portfolio</div>
-  <div style="font-family:{FONT};font-size:52px;font-weight:800;
-              letter-spacing:-0.025em;color:{TEXT};line-height:1;">
-    ${pv:,.2f}
-  </div>
-  <div style="font-family:{FONT};font-size:18px;font-weight:700;
-              color:{col};margin-top:10px;letter-spacing:-0.01em;">
-    {sign}${abs(today_pnl):,.2f} <span style="color:{TEXT_DIM};font-weight:500;">today</span>
-    <span style="color:{col};margin-left:6px;">({sign}{abs(today_pct):.2f}%)</span>
+<div style="padding:24px 22px 4px;">
+  <div style="background:{CARD};border:1px solid {BORDER};border-radius:18px;
+              padding:30px 32px;position:relative;overflow:hidden;">
+    <!-- accent rail -->
+    <div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:{col};"></div>
+    <div style="font-family:{FONT};font-size:11px;font-weight:700;
+                letter-spacing:0.22em;color:{TEXT_MUTE};
+                text-transform:uppercase;margin-bottom:18px;">
+      {html_lib.escape(date_str)} · Portfolio
+    </div>
+    <div style="font-family:{FONT};font-size:54px;font-weight:800;
+                letter-spacing:-0.03em;color:{TEXT};line-height:1;">
+      ${pv:,.2f}
+    </div>
+    <div style="margin-top:14px;">
+      <span style="display:inline-block;background:{chip_bg};color:{chip_fg};
+                   border:1px solid {col};
+                   font-family:{FONT};font-size:13px;font-weight:700;
+                   padding:6px 12px;border-radius:999px;letter-spacing:-0.01em;">
+        {arrow} ${abs(today_pnl):,.2f}
+        <span style="opacity:0.7;font-weight:600;margin-left:4px;">
+          {today_pct:+.2f}%
+        </span>
+      </span>
+      <span style="font-family:{FONT};font-size:12px;color:{TEXT_DIM};
+                   margin-left:10px;letter-spacing:0.04em;">today</span>
+    </div>
   </div>
 </div>
 """
 
 
-def _kpi_card(label: str, value: str, value_color: str, sub: str = '') -> str:
+def _kpi_card(label: str, value: str, value_color: str, sub: str = '',
+              accent: bool = False) -> str:
     sub_html = (
         f'<div style="font-family:{FONT};font-size:11px;color:{TEXT_MUTE};'
-        f'margin-top:4px;letter-spacing:0.05em;">{sub}</div>'
+        f'margin-top:6px;letter-spacing:0.04em;font-weight:500;">{sub}</div>'
         if sub else ''
     )
+    bg = VOLT_SOFT if accent else CARD
+    border_col = VOLT if accent else BORDER
     return f"""
-<td style="padding:18px 16px;background:{CARD};border:1px solid {BORDER};
+<td style="padding:20px 18px;background:{bg};border:1px solid {border_col};
            border-radius:14px;vertical-align:top;width:25%;">
   <div style="font-family:{FONT};font-size:10px;font-weight:700;
-              letter-spacing:0.18em;color:{TEXT_MUTE};
-              text-transform:uppercase;margin-bottom:8px;">{label}</div>
-  <div style="font-family:{FONT};font-size:24px;font-weight:800;
-              letter-spacing:-0.02em;color:{value_color};">{value}</div>
+              letter-spacing:0.2em;color:{TEXT_MUTE};
+              text-transform:uppercase;margin-bottom:10px;">{label}</div>
+  <div style="font-family:{FONT};font-size:26px;font-weight:800;
+              letter-spacing:-0.025em;color:{value_color};line-height:1;">{value}</div>
   {sub_html}
 </td>
 """
@@ -374,18 +392,20 @@ def _kpi_card(label: str, value: str, value_color: str, sub: str = '') -> str:
 def build_kpi_strip(today_realized: float, total_pnl: float,
                      win_rate: Optional[float], wins: int, losses: int,
                      open_positions: int) -> str:
-    wr_str = f"{int(win_rate * 100)}%" if win_rate is not None else "—"
+    wr_str = f"{int(round(win_rate * 100))}%" if win_rate is not None else "—"
     wr_col = VOLT if win_rate and win_rate >= 0.5 else (
-        LOSS if win_rate and win_rate < 0.4 else TEXT_DIM)
+        LOSS if win_rate and win_rate < 0.4 else TEXT)
+    wr_sub = f"{wins}W · {losses}L" if win_rate is not None else "no closed trades"
+    total_accent = total_pnl > 0
     return f"""
-<div style="padding:0 22px 8px;">
+<div style="padding:14px 22px 4px;">
   <table style="width:100%;border-collapse:separate;border-spacing:10px 0;">
     <tr>
-      {_kpi_card("Today realized", fmt_money(today_realized, sign=True),
-                pnl_color(today_realized))}
+      {_kpi_card("Today", fmt_money(today_realized, sign=True),
+                pnl_color(today_realized), "realized")}
       {_kpi_card("Total P&amp;L", fmt_money(total_pnl, sign=True),
-                pnl_color(total_pnl))}
-      {_kpi_card("Win rate", wr_str, wr_col, f"{wins}W / {losses}L")}
+                pnl_color(total_pnl), "all-time", accent=total_accent)}
+      {_kpi_card("Win rate", wr_str, wr_col, wr_sub)}
       {_kpi_card("Open", str(open_positions), TEXT, "positions")}
     </tr>
   </table>
@@ -394,18 +414,18 @@ def build_kpi_strip(today_realized: float, total_pnl: float,
 
 
 def _section_title(text: str, count: Optional[int] = None) -> str:
+    """Bold black section heading with optional volt counter pill."""
     badge = ''
-    if count is not None:
-        badge = (f'<span style="margin-left:10px;font-family:{FONT};'
-                 f'font-size:11px;font-weight:700;color:#1a3300;background:{VOLT_SOFT};'
-                 f'border:1px solid {VOLT};'
-                 f'padding:3px 9px;border-radius:999px;letter-spacing:0.05em;">'
-                 f'{count}</span>')
+    if count is not None and count > 0:
+        badge = (f'<span style="margin-left:10px;display:inline-block;'
+                 f'font-family:{FONT};font-size:12px;font-weight:700;'
+                 f'color:#1a3300;background:{VOLT_SOFT};border:1px solid {VOLT};'
+                 f'padding:2px 10px;border-radius:999px;letter-spacing:0;'
+                 f'vertical-align:middle;">{count}</span>')
     return f"""
-<div style="padding:32px 32px 14px;">
-  <div style="font-family:{FONT};font-size:11px;font-weight:700;
-              letter-spacing:0.22em;color:{TEXT_MUTE};
-              text-transform:uppercase;">
+<div style="padding:34px 32px 12px;">
+  <div style="font-family:{FONT};font-size:20px;font-weight:800;
+              letter-spacing:-0.02em;color:{TEXT};">
     {html_lib.escape(text)}{badge}
   </div>
 </div>
@@ -416,8 +436,14 @@ def build_today_trades(trades: List[dict],
                         sig_map: Dict[Tuple[str, str], dict]) -> str:
     if not trades:
         return f"""
-<div style="padding:0 32px 4px;font-family:{FONT};font-size:13px;color:{TEXT_DIM};">
-  No trades today.
+<div style="padding:0 22px 4px;">
+  <div style="background:{CARD};border:1px dashed {BORDER};border-radius:14px;
+              padding:22px 24px;text-align:center;">
+    <div style="font-family:{FONT};font-size:14px;font-weight:700;color:{TEXT};
+                letter-spacing:-0.01em;">Quiet day — no trades</div>
+    <div style="font-family:{FONT};font-size:12px;color:{TEXT_DIM};
+                margin-top:4px;">Holding existing positions.</div>
+  </div>
 </div>
 """
     rows = ''
@@ -523,37 +549,45 @@ def build_positions(positions: List[dict]) -> str:
             if chart_b64 else
             f'<div style="height:60px;background:{CARD_ALT};border-radius:8px;"></div>'
         )
+        # Color-coded left rail makes up/down instantly scannable
+        rail_col = VOLT if unr > 0 else (LOSS if unr < 0 else BORDER)
         cards_list.append(f"""
 <td style="padding:6px;width:50%;vertical-align:top;">
-  <div style="background:{CARD};border:1px solid {BORDER};border-radius:14px;padding:18px;">
+  <div style="background:{CARD};border:1px solid {BORDER};border-radius:14px;
+              padding:16px 16px 14px 18px;position:relative;overflow:hidden;">
+    <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:{rail_col};"></div>
     <table style="width:100%;border-collapse:collapse;">
       <tr>
         <td style="vertical-align:top;">
-          <div style="font-family:{FONT};font-size:18px;font-weight:800;color:{TEXT};
-                      letter-spacing:-0.02em;">{html_lib.escape(sym)}</div>
+          <div style="font-family:{FONT};font-size:19px;font-weight:800;color:{TEXT};
+                      letter-spacing:-0.025em;line-height:1;">{html_lib.escape(sym)}</div>
           <div style="font-family:{FONT};font-size:11px;color:{TEXT_MUTE};
-                      letter-spacing:0.04em;margin-top:2px;">
+                      letter-spacing:0.02em;margin-top:5px;font-weight:500;">
             {int(shares)} sh · {html_lib.escape(_short_strategy(p.get('strat') or ''))}{f" · {days}d" if days is not None else ""}
           </div>
         </td>
         <td style="text-align:right;vertical-align:top;">
-          <div style="font-family:{MONO};font-size:16px;font-weight:700;color:{col};
-                      letter-spacing:-0.01em;">{fmt_money(unr, sign=True)}</div>
-          <div style="font-family:{FONT};font-size:11px;color:{col};margin-top:2px;">
+          <div style="font-family:{MONO};font-size:15px;font-weight:700;color:{col};
+                      letter-spacing:-0.01em;line-height:1;">{fmt_money(unr, sign=True)}</div>
+          <div style="font-family:{FONT};font-size:11px;color:{col};margin-top:4px;
+                      font-weight:600;">
             {fmt_pct(ret_pct)}
           </div>
         </td>
       </tr>
     </table>
-    <div style="margin-top:14px;">{chart_html}</div>
-    <table style="width:100%;border-collapse:collapse;margin-top:10px;">
+    <div style="margin-top:12px;">{chart_html}</div>
+    <table style="width:100%;border-collapse:collapse;margin-top:8px;">
       <tr>
-        <td style="font-family:{FONT};font-size:10px;color:{TEXT_MUTE};letter-spacing:0.1em;">ENTRY</td>
-        <td style="font-family:{FONT};font-size:10px;color:{TEXT_MUTE};letter-spacing:0.1em;text-align:right;">NOW</td>
-      </tr>
-      <tr>
-        <td style="font-family:{MONO};font-size:13px;color:{TEXT_DIM};">${entry:,.2f}</td>
-        <td style="font-family:{MONO};font-size:13px;color:{TEXT};text-align:right;font-weight:600;">${curr:,.2f}</td>
+        <td style="font-family:{FONT};font-size:10px;color:{TEXT_MUTE};
+                   letter-spacing:0.12em;font-weight:600;">ENTRY</td>
+        <td style="font-family:{MONO};font-size:12px;color:{TEXT_DIM};
+                   text-align:right;">${entry:,.2f}</td>
+        <td style="font-family:{FONT};font-size:10px;color:{TEXT_MUTE};
+                   letter-spacing:0.12em;font-weight:600;text-align:right;
+                   padding-left:14px;">NOW</td>
+        <td style="font-family:{MONO};font-size:12px;color:{TEXT};
+                   text-align:right;font-weight:700;padding-left:6px;">${curr:,.2f}</td>
       </tr>
     </table>
   </div>
