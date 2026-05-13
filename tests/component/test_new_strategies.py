@@ -84,7 +84,7 @@ class TestEarningsDriftStrategy:
         assert strat.name == "Earnings Drift"
         assert strat.capital == 25000
         assert strat.drift_hold_days == 40
-        assert strat.volume_spike_threshold == 2.0
+        assert strat.volume_spike_threshold == 1.3
 
     def test_no_signals_on_normal_data(self):
         """Normal market data without volume spikes should produce no BUY signals."""

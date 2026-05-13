@@ -179,9 +179,20 @@ class MultiStrategyRunner:
         
         # Initialize stop loss manager - load from config
         stop_loss_multiplier = self.config.get('risk.stop_loss_atr_multiplier', 2.5)
+        breakeven_atr = self.config.get('risk.trailing_breakeven_atr', 1.0)
+        lock_atr = self.config.get('risk.trailing_lock_atr', 2.0)
         from src.risk.stop_loss_manager import StopLossManager
-        self.stop_loss_manager = StopLossManager(atr_multiplier=stop_loss_multiplier)
-        logger.info(f"Stop Loss Manager initialized: {stop_loss_multiplier}x ATR catastrophe stops enabled")
+        self.stop_loss_manager = StopLossManager(
+            atr_multiplier=stop_loss_multiplier,
+            breakeven_atr=breakeven_atr,
+            lock_atr=lock_atr,
+        )
+        # Cached current regime-adjusted multiplier (refreshed per run)
+        self._current_stop_multiplier = stop_loss_multiplier
+        logger.info(
+            f"Stop Loss Manager initialized: {stop_loss_multiplier}x ATR base, "
+            f"ratchet at +{breakeven_atr}×ATR → entry, +{lock_atr}×ATR → entry+1×ATR"
+        )
         
         # Initialize production-readiness modules
         self.kill_switch = KillSwitchService(self.db, self.email_notifier)
@@ -488,7 +499,10 @@ class MultiStrategyRunner:
                     # Fallback: use 3% of price as ATR proxy
                     atr = avg_price * 0.03
                     logger.warning(f"  No ATR stored for {symbol}, using 3% fallback for stop loss")
-                self.stop_loss_manager.set_stop_loss(symbol, avg_price, atr)
+                self.stop_loss_manager.set_stop_loss(
+                    symbol, avg_price, atr,
+                    multiplier=getattr(self, '_current_stop_multiplier', None),
+                )
                 logger.info(f"  Re-initialized stop loss for carried position {symbol}")
         except Exception as e:
             strategy_name = getattr(strategy, 'name', 'Unknown')
@@ -603,10 +617,12 @@ class MultiStrategyRunner:
             
             current_price = current_prices[symbol]
 
-            # Ratchet trailing stop upward before checking — stop only moves up, never down
+            # Ratchet trailing stop upward before checking — stops only move up, never down.
+            # Tiered: +1×ATR profit → stop to entry; +2×ATR → stop to entry +1×ATR;
+            # then chandelier extends further as the winner runs.
             atr = float(position.get('atr') or 0)
             if atr > 0:
-                self.stop_loss_manager.update_trailing_stop(symbol, current_price, atr)
+                self.stop_loss_manager.update_ratchet_stop(symbol, current_price, atr)
 
             # Check if stop loss is hit
             if self.stop_loss_manager.check_stop_loss(symbol, current_price):
@@ -837,6 +853,19 @@ class MultiStrategyRunner:
             base_max_heat=self.portfolio_risk.base_max_heat,
         )
         self.portfolio_risk.max_portfolio_heat = regime_adjustments['max_portfolio_heat']
+
+        # Regime-adaptive stop-loss multiplier: wider in low-vol (avoid noise stop-outs),
+        # tighter in high-vol (protect against fast moves)
+        vol_regime = regime_adjustments.get('volatility_regime', 'normal')
+        if vol_regime == 'low_volatility':
+            mult = self.config.get('risk.stop_loss_atr_multiplier_low_vol', 3.0)
+        elif vol_regime == 'high_volatility':
+            mult = self.config.get('risk.stop_loss_atr_multiplier_high_vol', 2.0)
+        else:
+            mult = self.config.get('risk.stop_loss_atr_multiplier', 2.5)
+        self._current_stop_multiplier = mult
+        self.stop_loss_manager.atr_multiplier = mult
+        logger.info(f"Regime-adjusted stop multiplier: {mult:.1f}×ATR ({vol_regime})")
 
         # Persist regime so daily email shows the correct market status (not 'Unknown')
         _VOL_TO_CLASSIFICATION = {
@@ -1513,9 +1542,12 @@ class MultiStrategyRunner:
                         entry_date=entry_date_str, atr=atr if atr > 0 else None,
                     )
 
-                    # CRITICAL: Set stop loss for new position
+                    # CRITICAL: Set stop loss for new position (regime-aware multiplier)
                     if atr > 0:
-                        self.stop_loss_manager.set_stop_loss(symbol, actual_fill_price, atr)
+                        self.stop_loss_manager.set_stop_loss(
+                            symbol, actual_fill_price, atr,
+                            multiplier=getattr(self, '_current_stop_multiplier', None),
+                        )
                     else:
                         logger.warning(f"No ATR available for {symbol}, stop loss not set")
 
