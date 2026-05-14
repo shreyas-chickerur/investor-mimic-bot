@@ -1,0 +1,324 @@
+#!/usr/bin/env python3
+"""
+Pre-flight check for automated morning runs.
+
+Checks:
+1. Market is open today (not weekend/holiday)
+2. Data is reasonably fresh OR can be updated
+3. All safety systems operational
+4. Database accessible
+
+Returns exit code 0 if safe to proceed, 1 if should skip.
+"""
+from __future__ import annotations
+
+import os
+import sys
+import traceback
+from datetime import datetime
+from pathlib import Path
+
+import pandas as pd
+
+# Add project root to path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
+from src.core.database import TradingDatabase  # noqa: E402
+
+
+def check_market_open() -> bool:
+    """Check if market is open today.
+
+    Returns:
+        bool: True if market is open, False otherwise
+    """
+    try:
+        # Use US Eastern Time (market time) instead of UTC
+        import pytz  # type: ignore[import-untyped]
+
+        eastern = pytz.timezone("America/New_York")
+        now = datetime.now(eastern)
+        weekday = now.weekday()
+
+        # Weekend check
+        if weekday >= 5:  # Saturday=5, Sunday=6
+            print(f"⏸️  Market closed: Weekend ({now.strftime('%A')})")
+            return False
+
+        # Basic holiday check (major US market holidays 2025-2028)
+        us_market_holidays = {
+            # 2025
+            "2025-01-01",
+            "2025-01-20",
+            "2025-02-17",
+            "2025-04-18",
+            "2025-05-26",
+            "2025-07-04",
+            "2025-09-01",
+            "2025-11-27",
+            "2025-12-25",
+            # 2026
+            "2026-01-01",
+            "2026-01-19",
+            "2026-02-16",
+            "2026-04-03",
+            "2026-05-25",
+            "2026-07-03",
+            "2026-09-07",
+            "2026-11-26",
+            "2026-12-25",
+            # 2027
+            "2027-01-01",
+            "2027-01-18",
+            "2027-02-15",
+            "2027-04-02",
+            "2027-05-31",
+            "2027-07-05",
+            "2027-09-06",
+            "2027-11-25",
+            "2027-12-27",
+            # 2028
+            "2028-01-17",
+            "2028-02-21",
+            "2028-04-14",
+            "2028-05-29",
+            "2028-07-04",
+            "2028-09-04",
+            "2028-11-23",
+            "2028-12-25",
+        }
+
+        today = now.strftime("%Y-%m-%d")
+        if today in us_market_holidays:
+            print(f"⏸️  Market closed: Holiday ({today})")
+            return False
+
+        print(f"✅ Market open: {now.strftime('%A, %B %d, %Y')}")
+        return True
+    except Exception as e:
+        print(f"❌ Error checking market status: {e}")
+        traceback.print_exc()
+        return False
+
+
+def check_data_freshness() -> bool:
+    """Check if market data is fresh enough.
+
+    Returns:
+        bool: True if data is fresh or successfully updated, False otherwise
+    """
+    try:
+        data_path = project_root / "data" / "training_data.csv"
+        if not data_path.exists():
+            print("❌ Data file not found")
+            return False
+
+        df = pd.read_csv(data_path)
+        df["date"] = pd.to_datetime(df["date"])
+        latest_date = df["date"].max()
+
+        now = datetime.now()
+        age_hours = (now - latest_date).total_seconds() / 3600
+        age_days = age_hours / 24
+
+        # Get threshold from environment (default 288 hours = 12 days to handle holiday periods)
+        max_age_hours = int(os.getenv("DATA_VALIDATOR_MAX_AGE_HOURS", "288"))
+
+        if age_hours <= max_age_hours:
+            print(
+                f"✅ Data fresh: {age_days:.1f} days old (latest: {latest_date.strftime('%Y-%m-%d')})"
+            )
+            return True
+        else:
+            print(
+                f"⚠️  Data stale: {age_days:.1f} days old (latest: {latest_date.strftime('%Y-%m-%d')})"
+            )
+            print("   Attempting to update...")
+
+            # Try to update data
+            try:
+                import subprocess
+
+                result = subprocess.run(
+                    ["python3", "scripts/update_daily_data.py"],
+                    capture_output=True,
+                    text=True,
+                    timeout=300,
+                )
+                if result.returncode != 0:
+                    raise Exception(f"Update failed: {result.stderr}")
+
+                # Check if update succeeded
+                df_new = pd.read_csv(data_path)
+                df_new["date"] = pd.to_datetime(df_new["date"])
+                new_latest = df_new["date"].max()
+
+                if new_latest > latest_date:
+                    print(f"✅ Data updated successfully (now: {new_latest.strftime('%Y-%m-%d')})")
+                    return True
+                else:
+                    print("⚠️  Data update did not fetch newer data")
+                    # Still allow if within configured threshold
+                    if age_hours <= max_age_hours:
+                        print(f"   Proceeding with {age_days:.1f} day old data")
+                        return True
+                    else:
+                        print("❌ Data too stale to proceed safely")
+                        return False
+
+            except Exception as e:
+                print(f"❌ Data update failed: {e}")
+                # Allow if within configured threshold even if update fails
+                if age_hours <= max_age_hours:
+                    print(f"   Proceeding with {age_days:.1f} day old data (update failed)")
+                    return True
+                else:
+                    return False
+
+    except Exception as e:
+        print(f"❌ Error checking data: {e}")
+        traceback.print_exc()
+        return False
+
+
+def check_database() -> bool:
+    """Check database is accessible.
+
+    Returns:
+        bool: True if database is accessible, False otherwise
+    """
+    try:
+        db = TradingDatabase()
+        # Try a simple query
+        strategies = db.get_all_strategies()
+        print(f"✅ Database accessible ({len(strategies)} strategies)")
+        return True
+    except Exception as e:
+        print(f"❌ Database error: {e}")
+        traceback.print_exc()
+        return False
+
+
+def check_safety_systems() -> bool:
+    """Check safety systems are configured.
+
+    Returns:
+        bool: True if all safety systems pass, False otherwise
+    """
+    checks = []
+
+    # Check DRY_RUN mode
+    dry_run = os.getenv("DRY_RUN", "false").lower()
+    if dry_run == "true":
+        print("ℹ️  DRY_RUN mode: ENABLED (no broker writes)")
+        checks.append(True)
+    else:
+        print("⚠️  DRY_RUN mode: DISABLED (live trading)")
+        checks.append(True)
+
+    # Check paper trading
+    paper = os.getenv("ALPACA_PAPER", "true").lower()
+    if paper == "true":
+        print("✅ Paper trading: ENABLED")
+        checks.append(True)
+    else:
+        print("⚠️  Paper trading: DISABLED (LIVE CAPITAL)")
+        checks.append(True)
+
+    # Check kill switches
+    trading_disabled = os.getenv("TRADING_DISABLED", "false").lower()
+    if trading_disabled == "true":
+        print("⏸️  Global kill switch: ACTIVE (trading disabled)")
+        checks.append(False)
+    else:
+        print("✅ Global kill switch: INACTIVE")
+        checks.append(True)
+
+    return all(checks)
+
+
+def main() -> int:
+    """Run all pre-flight checks.
+
+    Returns:
+        int: Exit code (0 for success, 1 for failure)
+    """
+    try:
+        print("=" * 80)
+        print("PRE-FLIGHT CHECK - Automated Trading Run")
+        print("=" * 80)
+        print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S %Z')}")
+        print()
+
+        # Check market first to distinguish expected vs unexpected failures
+        print("[1/4] Checking market status...")
+        market_open = check_market_open()
+        print()
+
+        print("[2/4] Checking data freshness...")
+        data_fresh = check_data_freshness()
+        print()
+
+        print("[3/4] Checking database...")
+        database_ok = check_database()
+        print()
+
+        print("[4/4] Checking safety systems...")
+        safety_ok = check_safety_systems()
+        print()
+
+        checks = {
+            "Market Open": market_open,
+            "Data Fresh": data_fresh,
+            "Database": database_ok,
+            "Safety Systems": safety_ok,
+        }
+
+        print()
+        print("=" * 80)
+        print("SUMMARY")
+        print("=" * 80)
+
+        for name, passed in checks.items():
+            status = "✅ PASS" if passed else "❌ FAIL"
+            print(f"{name:20s} {status}")
+
+        all_passed = all(checks.values())
+
+        print()
+        if all_passed:
+            print("✅ ALL CHECKS PASSED - Safe to proceed with trading run")
+            print("=" * 80)
+            return 0
+        elif not market_open and all(v for k, v in checks.items() if k != "Market Open"):
+            # Market closed but all other checks passed - this is EXPECTED
+            print("⏸️  MARKET CLOSED - Skipping trading run (expected)")
+            print("=" * 80)
+            return 0  # Exit with success - this is expected behavior
+        else:
+            print("❌ CHECKS FAILED - Skipping trading run (unexpected failure)")
+            print("=" * 80)
+            return 1
+
+    except Exception as e:
+        print()
+        print("=" * 80)
+        print("❌ CRITICAL ERROR IN PRE-FLIGHT CHECK")
+        print("=" * 80)
+        print(f"Error: {e}")
+        print()
+        print("Full traceback:")
+        traceback.print_exc()
+        print("=" * 80)
+        return 1
+
+
+if __name__ == "__main__":
+    try:
+        exit_code = main()
+        sys.exit(exit_code)
+    except Exception as e:
+        print(f"\n❌ FATAL ERROR: {e}")
+        traceback.print_exc()
+        sys.exit(1)
