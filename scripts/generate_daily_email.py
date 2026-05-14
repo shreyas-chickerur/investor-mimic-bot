@@ -255,6 +255,53 @@ def render_sparkline(symbol: str, entry_price: float | None = None) -> str:
     return b64
 
 
+def render_equity_sparkline(equity: list[dict]) -> str:
+    """
+    Render a wide sparkline of portfolio value over the equity curve window.
+
+    Used inside the hero card. Returns a base64 PNG, or empty string on any
+    failure (chart rendering is non-critical and must never block the email).
+    """
+    cache_key = f"__equity__:{len(equity)}:{equity[-1]['total'] if equity else 0}"
+    if cache_key in _CHART_CACHE:
+        return _CHART_CACHE[cache_key]
+    values = [float(p.get("total") or 0) for p in equity if p.get("total") is not None]
+    if len(values) < 3:
+        _CHART_CACHE[cache_key] = ""
+        return ""
+    try:
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except Exception:
+        _CHART_CACHE[cache_key] = ""
+        return ""
+
+    is_up = values[-1] >= values[0]
+    line_color = VOLT if is_up else LOSS
+
+    fig, ax = plt.subplots(figsize=(7.2, 1.4), dpi=140)
+    fig.patch.set_facecolor(CARD)
+    ax.set_facecolor(CARD)
+    ax.plot(range(len(values)), values, color=line_color, linewidth=2.0)
+    ax.fill_between(range(len(values)), values, min(values), color=line_color, alpha=0.14)
+    # baseline of starting value to anchor the eye
+    ax.axhline(values[0], color=TEXT_DIM, linewidth=0.6, linestyle=(0, (2, 3)))
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.margins(x=0.005, y=0.18)
+    plt.tight_layout(pad=0.05)
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", facecolor=CARD, edgecolor="none")
+    plt.close(fig)
+    b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+    _CHART_CACHE[cache_key] = b64
+    return b64
+
+
 # ── Reason inference (computed, not guessed) ─────────────────────────────────
 def _short_strategy(name: str) -> str:
     return {
@@ -362,13 +409,46 @@ def pnl_color(v: float | None) -> str:
 
 
 # ── Section builders ──────────────────────────────────────────────────────────
-def build_header(pv: float, today_pnl: float, today_pct: float, date_str: str) -> str:
-    """Hero card: date pill, portfolio value, today's change pill."""
+def build_header(
+    pv: float,
+    today_pnl: float,
+    today_pct: float,
+    date_str: str,
+    equity: list[dict] | None = None,
+) -> str:
+    """Hero card: date pill, portfolio value, today's change pill, equity sparkline."""
     is_up = today_pnl >= 0
     col = VOLT if is_up else LOSS
     chip_bg = VOLT_SOFT if is_up else LOSS_SOFT
     chip_fg = "#1a3300" if is_up else "#7a1a1a"
     arrow = "▲" if is_up else "▼"
+
+    chart_html = ""
+    if equity:
+        b64 = render_equity_sparkline(equity)
+        if b64:
+            window = len(equity)
+            first = float(equity[0].get("total") or 0)
+            last = float(equity[-1].get("total") or 0)
+            window_pnl = last - first
+            window_pct = (window_pnl / first * 100) if first else 0.0
+            window_col = VOLT if window_pnl >= 0 else LOSS
+            chart_html = f"""
+    <div style="margin-top:22px;">
+      <img src="data:image/png;base64,{b64}"
+           style="display:block;width:100%;height:auto;border-radius:8px;" />
+      <div style="display:flex;justify-content:space-between;
+                  margin-top:8px;font-family:{FONT};font-size:11px;
+                  color:{TEXT_MUTE};letter-spacing:0.04em;font-weight:600;">
+        <span>{window}-session window</span>
+        <span style="color:{window_col};font-weight:700;">
+          {'+' if window_pnl >= 0 else '−'}${abs(window_pnl):,.2f} ·
+          {window_pct:+.2f}%
+        </span>
+      </div>
+    </div>
+"""
+
     return f"""
 <div style="padding:24px 22px 4px;">
   <div style="background:{CARD};border:1px solid {BORDER};border-radius:18px;
@@ -397,6 +477,7 @@ def build_header(pv: float, today_pnl: float, today_pct: float, date_str: str) -
       <span style="font-family:{FONT};font-size:12px;color:{TEXT_DIM};
                    margin-left:10px;letter-spacing:0.04em;">today</span>
     </div>
+    {chart_html}
   </div>
 </div>
 """
@@ -565,6 +646,91 @@ def build_today_trades(trades: list[dict], sig_map: dict[tuple[str, str], dict])
   <table style="width:100%;border-collapse:collapse;background:{CARD};
                 border:1px solid {BORDER};border-radius:14px;overflow:hidden;">
     {rows}
+  </table>
+</div>
+"""
+
+
+def build_movers(positions: list[dict], top_n: int = 3) -> str:
+    """
+    Two-column split: top winners and top losers by unrealized P&L.
+
+    Lives between Open Positions header and the position grid, so the most
+    interesting holdings are visible without scrolling through 14+ cards.
+    Returns "" if there are fewer than 2 positions (split is meaningless).
+    """
+    if not positions or len(positions) < 2:
+        return ""
+
+    def _pnl(p: dict) -> float:
+        return float(p.get("unrealized_pnl") or 0)
+
+    sorted_pos = sorted(positions, key=_pnl, reverse=True)
+    winners = [p for p in sorted_pos if _pnl(p) > 0][:top_n]
+    losers = list(reversed([p for p in sorted_pos if _pnl(p) < 0][-top_n:]))
+
+    def _row(p: dict, side: str) -> str:
+        sym = p.get("symbol") or ""
+        unr = _pnl(p)
+        entry = float(p.get("entry_price") or p.get("avg_price") or 0)
+        curr = float(p.get("current_price") or entry)
+        pct = ((curr - entry) / entry * 100) if entry else 0.0
+        c = VOLT if side == "win" else LOSS
+        return f"""
+<tr>
+  <td style="padding:9px 0;font-family:{FONT};font-size:14px;font-weight:700;
+             color:{TEXT};letter-spacing:-0.01em;">{html_lib.escape(sym)}</td>
+  <td style="padding:9px 0;text-align:right;font-family:{MONO};font-size:13px;
+             font-weight:700;color:{c};letter-spacing:-0.01em;">
+    {fmt_money(unr, sign=True)}
+  </td>
+  <td style="padding:9px 0 9px 10px;text-align:right;font-family:{FONT};
+             font-size:11px;font-weight:600;color:{c};white-space:nowrap;">
+    {fmt_pct(pct)}
+  </td>
+</tr>
+"""
+
+    def _column(title: str, items: list[dict], side: str, accent: str, bg: str) -> str:
+        if not items:
+            empty = "No winners yet" if side == "win" else "No losers — clean sheet"
+            inner = (
+                f'<div style="padding:18px 0;font-family:{FONT};font-size:12px;'
+                f'color:{TEXT_MUTE};text-align:center;">{empty}</div>'
+            )
+        else:
+            inner = (
+                '<table style="width:100%;border-collapse:collapse;">'
+                + "".join(_row(p, side) for p in items)
+                + "</table>"
+            )
+        chip = (
+            f'<span style="display:inline-block;background:{bg};color:{accent};'
+            f"border:1px solid {accent};font-size:9px;font-weight:800;"
+            f"letter-spacing:0.16em;padding:2px 7px;border-radius:4px;"
+            f'vertical-align:middle;margin-left:8px;">{len(items)}</span>'
+        )
+        return f"""
+<td style="padding:6px;width:50%;vertical-align:top;">
+  <div style="background:{CARD};border:1px solid {BORDER};border-radius:14px;
+              padding:18px 20px 6px;">
+    <div style="font-family:{FONT};font-size:11px;font-weight:700;
+                letter-spacing:0.18em;color:{TEXT_MUTE};
+                text-transform:uppercase;margin-bottom:10px;">
+      {title}{chip}
+    </div>
+    {inner}
+  </div>
+</td>
+"""
+
+    return f"""
+<div style="padding:0 22px 4px;">
+  <table style="width:100%;border-collapse:separate;border-spacing:0;">
+    <tr>
+      {_column("Top winners", winners, "win", "#1a3300", VOLT_SOFT)}
+      {_column("Top losers", losers, "loss", "#7a1a1a", LOSS_SOFT)}
+    </tr>
   </table>
 </div>
 """
@@ -926,10 +1092,12 @@ def generate_email_body(db_path: str = "trading.db", include_visuals: bool = Tru
     date_str = datetime.now().strftime("%A, %b %-d")
 
     body = (
-        build_header(pv, today_pnl, today_pct, date_str)
+        build_header(pv, today_pnl, today_pct, date_str, equity=equity)
         + build_kpi_strip(today_real, total_pnl, win_rate, wins, losses, len(positions))
         + _section_title("Today's Trades", count=len(trades_today))
         + build_today_trades(trades_today, sig_map)
+        + _section_title("Movers")
+        + build_movers(positions)
         + _section_title("Open Positions", count=len(positions))
         + build_positions(positions)
         + _section_title("In the news")
