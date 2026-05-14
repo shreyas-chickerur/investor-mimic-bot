@@ -44,11 +44,19 @@ VOLT = "#76b900"  # Nike-volt deep — readable on white
 VOLT_SOFT = "#e8ffd4"  # volt tint for badge backgrounds
 LOSS = "#d63031"  # warm red for losses
 LOSS_SOFT = "#ffe1e1"
+GOLD = "#d97706"  # amber-600 readable on white (win-rate accent)
+GOLD_SOFT = "#fff3d4"
+INDIGO = "#4f46e5"  # indigo-600 (open positions / informational)
+INDIGO_SOFT = "#e8e6ff"
+GRAPE = "#7c3aed"  # violet-600 (news digest accent)
+GRAPE_SOFT = "#f3e8ff"
 
+# Sans for body, serif display for big numbers / headlines (magazine feel)
 FONT = (
     'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, '
     '"Helvetica Neue", Arial, sans-serif'
 )
+DISPLAY = 'Fraunces, "DM Serif Display", "Playfair Display", Georgia, ' '"Times New Roman", serif'
 MONO = '"SF Mono", "JetBrains Mono", "Roboto Mono", Menlo, Consolas, monospace'
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -419,9 +427,25 @@ def build_header(
     """Hero card: date pill, portfolio value, today's change pill, equity sparkline."""
     is_up = today_pnl >= 0
     col = VOLT if is_up else LOSS
-    chip_bg = VOLT_SOFT if is_up else LOSS_SOFT
     chip_fg = "#1a3300" if is_up else "#7a1a1a"
     arrow = "▲" if is_up else "▼"
+
+    # Editorial "vibe" strap — sets the tone before any number is read
+    if today_pct >= 1.0:
+        vibe = "Solid green day."
+    elif today_pct >= 0.2:
+        vibe = "Quietly in the green."
+    elif today_pct > -0.2:
+        vibe = "Choppy, mostly flat."
+    elif today_pct > -1.0:
+        vibe = "Tape leaned heavy."
+    else:
+        vibe = "Tough day at the office."
+
+    # Tinted hero background — soft volt or soft red wash, not plain white,
+    # so the email has color the moment it's opened.
+    hero_bg = VOLT_SOFT if is_up else LOSS_SOFT
+    hero_grad = f"linear-gradient(135deg, {hero_bg} 0%, {CARD} 65%)"
 
     chart_html = ""
     if equity:
@@ -451,31 +475,39 @@ def build_header(
 
     return f"""
 <div style="padding:24px 22px 4px;">
-  <div style="background:{CARD};border:1px solid {BORDER};border-radius:18px;
-              padding:30px 32px;position:relative;overflow:hidden;">
-    <!-- accent rail -->
-    <div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:{col};"></div>
-    <div style="font-family:{FONT};font-size:11px;font-weight:700;
-                letter-spacing:0.22em;color:{TEXT_MUTE};
-                text-transform:uppercase;margin-bottom:18px;">
-      {html_lib.escape(date_str)} · Portfolio
+  <div style="background:{hero_bg};
+              background-image:{hero_grad};
+              border:1px solid {col};border-radius:20px;
+              padding:32px 34px;position:relative;overflow:hidden;">
+    <!-- thick accent rail -->
+    <div style="position:absolute;left:0;top:0;bottom:0;width:6px;background:{col};"></div>
+    <div style="font-family:{FONT};font-size:11px;font-weight:800;
+                letter-spacing:0.24em;color:{col};
+                text-transform:uppercase;margin-bottom:8px;">
+      {html_lib.escape(date_str)} · Daily
     </div>
-    <div style="font-family:{FONT};font-size:54px;font-weight:800;
-                letter-spacing:-0.03em;color:{TEXT};line-height:1;">
+    <div style="font-family:{DISPLAY};font-style:italic;
+                font-size:22px;font-weight:500;color:{TEXT};
+                letter-spacing:-0.01em;line-height:1.15;margin-bottom:18px;">
+      {vibe}
+    </div>
+    <div style="font-family:{DISPLAY};font-size:60px;font-weight:900;
+                letter-spacing:-0.035em;color:{TEXT};line-height:1;">
       ${pv:,.2f}
     </div>
     <div style="margin-top:14px;">
-      <span style="display:inline-block;background:{chip_bg};color:{chip_fg};
-                   border:1px solid {col};
-                   font-family:{FONT};font-size:13px;font-weight:700;
-                   padding:6px 12px;border-radius:999px;letter-spacing:-0.01em;">
+      <span style="display:inline-block;background:{CARD};color:{chip_fg};
+                   border:2px solid {col};
+                   font-family:{FONT};font-size:14px;font-weight:800;
+                   padding:7px 14px;border-radius:999px;letter-spacing:-0.01em;">
         {arrow} ${abs(today_pnl):,.2f}
-        <span style="opacity:0.7;font-weight:600;margin-left:4px;">
+        <span style="opacity:0.75;font-weight:700;margin-left:6px;">
           {today_pct:+.2f}%
         </span>
       </span>
-      <span style="font-family:{FONT};font-size:12px;color:{TEXT_DIM};
-                   margin-left:10px;letter-spacing:0.04em;">today</span>
+      <span style="font-family:{FONT};font-size:12px;font-weight:600;
+                   color:{TEXT_DIM};margin-left:10px;
+                   letter-spacing:0.06em;text-transform:uppercase;">today</span>
     </div>
     {chart_html}
   </div>
@@ -483,23 +515,31 @@ def build_header(
 """
 
 
-def _kpi_card(label: str, value: str, value_color: str, sub: str = "", accent: bool = False) -> str:
+def _kpi_card(
+    label: str,
+    value: str,
+    value_color: str,
+    sub: str = "",
+    bg: str = CARD,
+    border_col: str = BORDER,
+    label_col: str | None = None,
+) -> str:
+    """One KPI card. bg/border_col let each card carry its own pastel tone."""
+    label_color = label_col or TEXT_MUTE
     sub_html = (
-        f'<div style="font-family:{FONT};font-size:11px;color:{TEXT_MUTE};'
-        f'margin-top:6px;letter-spacing:0.04em;font-weight:500;">{sub}</div>'
+        f'<div style="font-family:{FONT};font-size:11px;color:{TEXT_DIM};'
+        f'margin-top:6px;letter-spacing:0.04em;font-weight:600;">{sub}</div>'
         if sub
         else ""
     )
-    bg = VOLT_SOFT if accent else CARD
-    border_col = VOLT if accent else BORDER
     return f"""
 <td style="padding:20px 18px;background:{bg};border:1px solid {border_col};
-           border-radius:14px;vertical-align:top;width:25%;">
-  <div style="font-family:{FONT};font-size:10px;font-weight:700;
-              letter-spacing:0.2em;color:{TEXT_MUTE};
+           border-radius:16px;vertical-align:top;width:25%;">
+  <div style="font-family:{FONT};font-size:10px;font-weight:800;
+              letter-spacing:0.2em;color:{label_color};
               text-transform:uppercase;margin-bottom:10px;">{label}</div>
-  <div style="font-family:{FONT};font-size:26px;font-weight:800;
-              letter-spacing:-0.025em;color:{value_color};line-height:1;">{value}</div>
+  <div style="font-family:{DISPLAY};font-size:30px;font-weight:900;
+              letter-spacing:-0.03em;color:{value_color};line-height:1;">{value}</div>
   {sub_html}
 </td>
 """
@@ -514,44 +554,72 @@ def build_kpi_strip(
     open_positions: int,
 ) -> str:
     wr_str = f"{int(round(win_rate * 100))}%" if win_rate is not None else "—"
-    wr_col = (
-        VOLT if win_rate and win_rate >= 0.5 else (LOSS if win_rate and win_rate < 0.4 else TEXT)
-    )
     wr_sub = f"{wins}W · {losses}L" if win_rate is not None else "no closed trades"
-    total_accent = total_pnl > 0
+
+    # Each KPI gets its own pastel tone so the row reads like a magazine
+    # contents block instead of four cloned white squares.
+    today_bg, today_border, today_label = (
+        (VOLT_SOFT, VOLT, "#1a3300")
+        if today_realized > 0
+        else (LOSS_SOFT, LOSS, "#7a1a1a")
+        if today_realized < 0
+        else (CARD, BORDER, TEXT_MUTE)
+    )
+    total_bg, total_border, total_label = (
+        (VOLT_SOFT, VOLT, "#1a3300")
+        if total_pnl > 0
+        else (LOSS_SOFT, LOSS, "#7a1a1a")
+        if total_pnl < 0
+        else (CARD, BORDER, TEXT_MUTE)
+    )
+    wr_col = (
+        VOLT if win_rate and win_rate >= 0.5 else (LOSS if win_rate and win_rate < 0.4 else GOLD)
+    )
+
     return f"""
 <div style="padding:14px 22px 4px;">
   <table style="width:100%;border-collapse:separate;border-spacing:10px 0;">
     <tr>
       {_kpi_card("Today", fmt_money(today_realized, sign=True),
-                pnl_color(today_realized), "realized")}
+                pnl_color(today_realized), "realized",
+                bg=today_bg, border_col=today_border, label_col=today_label)}
       {_kpi_card("Total P&amp;L", fmt_money(total_pnl, sign=True),
-                pnl_color(total_pnl), "all-time", accent=total_accent)}
-      {_kpi_card("Win rate", wr_str, wr_col, wr_sub)}
-      {_kpi_card("Open", str(open_positions), TEXT, "positions")}
+                pnl_color(total_pnl), "all-time",
+                bg=total_bg, border_col=total_border, label_col=total_label)}
+      {_kpi_card("Win rate", wr_str, wr_col, wr_sub,
+                bg=GOLD_SOFT, border_col=GOLD, label_col="#7a4a00")}
+      {_kpi_card("Open", str(open_positions), INDIGO, "positions",
+                bg=INDIGO_SOFT, border_col=INDIGO, label_col="#1e1b6e")}
     </tr>
   </table>
 </div>
 """
 
 
-def _section_title(text: str, count: int | None = None) -> str:
-    """Bold black section heading with optional volt counter pill."""
+def _section_title(text: str, count: int | None = None, accent: str = TEXT) -> str:
+    """Magazine-style section heading: serif italic display + volt counter pill.
+
+    `accent` lets a section signal its own tone (e.g., volt for Movers,
+    grape for News, indigo for Open Positions) via a tinted underline bar.
+    """
     badge = ""
     if count is not None and count > 0:
         badge = (
-            f'<span style="margin-left:10px;display:inline-block;'
-            f"font-family:{FONT};font-size:12px;font-weight:700;"
+            f'<span style="margin-left:12px;display:inline-block;'
+            f"font-family:{FONT};font-size:12px;font-weight:800;"
             f"color:#1a3300;background:{VOLT_SOFT};border:1px solid {VOLT};"
-            f"padding:2px 10px;border-radius:999px;letter-spacing:0;"
+            f"padding:3px 11px;border-radius:999px;letter-spacing:0;"
             f'vertical-align:middle;">{count}</span>'
         )
     return f"""
-<div style="padding:34px 32px 12px;">
-  <div style="font-family:{FONT};font-size:20px;font-weight:800;
-              letter-spacing:-0.02em;color:{TEXT};">
+<div style="padding:34px 32px 14px;">
+  <div style="font-family:{DISPLAY};font-size:30px;font-weight:900;
+              font-style:italic;letter-spacing:-0.025em;color:{TEXT};
+              line-height:1.05;">
     {html_lib.escape(text)}{badge}
   </div>
+  <div style="margin-top:10px;width:48px;height:3px;background:{accent};
+              border-radius:3px;"></div>
 </div>
 """
 
@@ -691,12 +759,12 @@ def build_movers(positions: list[dict], top_n: int = 3) -> str:
 </tr>
 """
 
-    def _column(title: str, items: list[dict], side: str, accent: str, bg: str) -> str:
+    def _column(title: str, items: list[dict], side: str, accent: str, soft: str) -> str:
         if not items:
             empty = "No winners yet" if side == "win" else "No losers — clean sheet"
             inner = (
-                f'<div style="padding:18px 0;font-family:{FONT};font-size:12px;'
-                f'color:{TEXT_MUTE};text-align:center;">{empty}</div>'
+                f'<div style="padding:18px 0;font-family:{FONT};font-size:13px;'
+                f'font-weight:600;color:{TEXT_DIM};text-align:center;">{empty}</div>'
             )
         else:
             inner = (
@@ -704,20 +772,23 @@ def build_movers(positions: list[dict], top_n: int = 3) -> str:
                 + "".join(_row(p, side) for p in items)
                 + "</table>"
             )
+        chip_fg = "#1a3300" if side == "win" else "#7a1a1a"
         chip = (
-            f'<span style="display:inline-block;background:{bg};color:{accent};'
-            f"border:1px solid {accent};font-size:9px;font-weight:800;"
-            f"letter-spacing:0.16em;padding:2px 7px;border-radius:4px;"
-            f'vertical-align:middle;margin-left:8px;">{len(items)}</span>'
+            f'<span style="display:inline-block;background:{CARD};color:{chip_fg};'
+            f"border:1.5px solid {accent};font-family:{FONT};"
+            f"font-size:10px;font-weight:800;letter-spacing:0.14em;"
+            f"padding:2px 8px;border-radius:999px;vertical-align:middle;"
+            f'margin-left:10px;">{len(items)}</span>'
         )
+        emoji = "📈" if side == "win" else "📉"
         return f"""
 <td style="padding:6px;width:50%;vertical-align:top;">
-  <div style="background:{CARD};border:1px solid {BORDER};border-radius:14px;
-              padding:18px 20px 6px;">
-    <div style="font-family:{FONT};font-size:11px;font-weight:700;
-                letter-spacing:0.18em;color:{TEXT_MUTE};
-                text-transform:uppercase;margin-bottom:10px;">
-      {title}{chip}
+  <div style="background:{soft};border:1px solid {accent};border-radius:16px;
+              padding:18px 20px 8px;">
+    <div style="font-family:{DISPLAY};font-size:18px;font-weight:900;
+                font-style:italic;letter-spacing:-0.02em;color:{chip_fg};
+                margin-bottom:12px;">
+      {emoji} {title}{chip}
     </div>
     {inner}
   </div>
@@ -726,10 +797,10 @@ def build_movers(positions: list[dict], top_n: int = 3) -> str:
 
     return f"""
 <div style="padding:0 22px 4px;">
-  <table style="width:100%;border-collapse:separate;border-spacing:0;">
+  <table style="width:100%;border-collapse:separate;border-spacing:10px 0;">
     <tr>
-      {_column("Top winners", winners, "win", "#1a3300", VOLT_SOFT)}
-      {_column("Top losers", losers, "loss", "#7a1a1a", LOSS_SOFT)}
+      {_column("Top winners", winners, "win", VOLT, VOLT_SOFT)}
+      {_column("Top losers", losers, "loss", LOSS, LOSS_SOFT)}
     </tr>
   </table>
 </div>
@@ -943,15 +1014,20 @@ def build_news_digest(positions: list[dict], max_stories: int = 6) -> str:
 
         blocks.append(
             f"""
-<div style="padding:18px 22px;border-bottom:1px solid {BORDER};">
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-    <span style="font-family:{FONT};font-size:13px;font-weight:800;color:{TEXT};
-                 letter-spacing:0.02em;">{html_lib.escape(sym)}</span>
-    <span style="margin-left:8px;">{chip}</span>
+<div style="padding:20px 24px;border-bottom:1px solid {GRAPE_SOFT};
+            background:{CARD};">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+    <span style="font-family:{FONT};font-size:11px;font-weight:800;
+                 color:{GRAPE};background:{GRAPE_SOFT};
+                 border:1px solid {GRAPE};padding:2px 9px;border-radius:999px;
+                 letter-spacing:0.08em;">{html_lib.escape(sym)}</span>
+    <span style="margin-left:4px;">{chip}</span>
   </div>
-  <div style="font-family:{FONT};font-size:15px;font-weight:600;color:{TEXT};
-              line-height:1.45;letter-spacing:-0.01em;">
-    {html_lib.escape(lead)}
+  <div style="font-family:{DISPLAY};font-size:18px;font-weight:700;
+              color:{TEXT};line-height:1.3;letter-spacing:-0.015em;">
+    <span style="color:{GRAPE};font-family:{DISPLAY};font-size:28px;
+                 font-weight:900;line-height:0;vertical-align:-6px;
+                 margin-right:4px;">“</span>{html_lib.escape(lead)}
   </div>
   {secondary_html}
 </div>
@@ -960,12 +1036,13 @@ def build_news_digest(positions: list[dict], max_stories: int = 6) -> str:
 
     return f"""
 <div style="padding:0 22px 4px;">
-  <div style="background:{CARD};border:1px solid {BORDER};border-radius:14px;
-              overflow:hidden;">
+  <div style="background:{CARD};border:1px solid {GRAPE};border-radius:18px;
+              overflow:hidden;box-shadow:0 1px 0 {GRAPE_SOFT};">
     {''.join(blocks)}
-    <div style="padding:12px 22px;background:{CARD_ALT};font-size:11px;
-                color:{TEXT_MUTE};letter-spacing:0.04em;">
-      Headlines via Google News · ranked by sentiment intensity
+    <div style="padding:12px 22px;background:{GRAPE_SOFT};font-size:11px;
+                color:{GRAPE};letter-spacing:0.06em;font-weight:700;
+                text-transform:uppercase;">
+      The Wire · headlines via Google News, ranked by sentiment
     </div>
   </div>
 </div>
@@ -1094,15 +1171,15 @@ def generate_email_body(db_path: str = "trading.db", include_visuals: bool = Tru
     body = (
         build_header(pv, today_pnl, today_pct, date_str, equity=equity)
         + build_kpi_strip(today_real, total_pnl, win_rate, wins, losses, len(positions))
-        + _section_title("Today's Trades", count=len(trades_today))
+        + _section_title("Today's tape", count=len(trades_today), accent=GOLD)
         + build_today_trades(trades_today, sig_map)
-        + _section_title("Movers")
+        + _section_title("Movers & shakers", accent=VOLT)
         + build_movers(positions)
-        + _section_title("Open Positions", count=len(positions))
+        + _section_title("The book", count=len(positions), accent=INDIGO)
         + build_positions(positions)
-        + _section_title("In the news")
+        + _section_title("On the wire", accent=GRAPE)
         + build_news_digest(positions)
-        + _section_title("Live-Trading Readiness")
+        + _section_title("Live readiness", accent=TEXT)
         + build_readiness(db_path)
         + build_footer(recon)
     )
@@ -1111,8 +1188,10 @@ def generate_email_body(db_path: str = "trading.db", include_visuals: bool = Tru
 <html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Daily</title>
-<!-- Inter for clients that allow web fonts; safe fallback otherwise -->
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- Inter (sans) + Fraunces (serif display) for clients that allow web fonts; safe fallback otherwise -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&display=swap" rel="stylesheet">
 <style>
   body, table, td, div, p, span {{
     font-family: {FONT};
