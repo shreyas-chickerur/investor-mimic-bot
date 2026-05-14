@@ -34,3 +34,7 @@ plotly==5.18.0
 pytz==2024.1
 python-dateutil==2.8.2
 vaderSentiment==3.3.2
+# Optional: enables LLM-summarized news digest. Falls back to heuristic
+# summarizer if OPENAI_API_KEY is unset, so this dep is safe to install
+# even on environments without an API key.
+openai>=1.40.0,<2.0.0

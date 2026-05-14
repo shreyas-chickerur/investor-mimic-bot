@@ -417,6 +417,12 @@ jobs:
 
     - name: Generate daily email digest
       if: always() && steps.validate_email.outputs.email_ok == 'true'
+      env:
+        # Optional: enables LLM-summarized "why it matters" lines in the
+        # news digest. If unset, the email gracefully falls back to a
+        # heuristic summary built from headlines + position context.
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        NEWS_SUMMARY_MODEL: gpt-4o-mini
       run: |
         # Check if today is Mon/Wed/Fri for visual reports
         DAY_OF_WEEK=$(date +%u)  # 1=Mon, 3=Wed, 5=Fri
