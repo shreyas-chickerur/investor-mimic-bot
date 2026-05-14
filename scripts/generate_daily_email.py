@@ -29,7 +29,6 @@ import sqlite3
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 # ── Palette (Apple Activity light / Nike volt) ───────────────────────────────
 # Light theme: every email client renders this consistently. Dark email
@@ -181,7 +180,7 @@ def get_aggregate_pnl(db) -> dict:
 _CHART_CACHE: dict[str, str] = {}
 
 
-def _load_price_history() -> Optional[dict[str, list[tuple[str, float]]]]:
+def _load_price_history() -> dict[str, list[tuple[str, float]]] | None:
     """Load close-price history per symbol from data/training_data.csv."""
     csv_path = PROJECT_ROOT / "data" / "training_data.csv"
     if not csv_path.exists():
@@ -200,7 +199,7 @@ def _load_price_history() -> Optional[dict[str, list[tuple[str, float]]]]:
     return by_sym
 
 
-_PRICE_HISTORY: Optional[dict[str, list[tuple[str, float]]]] = None
+_PRICE_HISTORY: dict[str, list[tuple[str, float]]] | None = None
 
 
 def _sym_history(symbol: str) -> list[tuple[str, float]]:
@@ -210,7 +209,7 @@ def _sym_history(symbol: str) -> list[tuple[str, float]]:
     return _PRICE_HISTORY.get(symbol, [])
 
 
-def render_sparkline(symbol: str, entry_price: Optional[float] = None) -> str:
+def render_sparkline(symbol: str, entry_price: float | None = None) -> str:
     """Return a base64 PNG sparkline for the given symbol. Empty string if unavailable."""
     cache_key = f"{symbol}:{entry_price}"
     if cache_key in _CHART_CACHE:
@@ -300,9 +299,9 @@ def _infer_buy_reason(strategy: str, signal_reasoning: str) -> str:
 def _infer_sell_reason(
     strategy: str,
     signal_reasoning: str,
-    pnl: Optional[float],
-    pnl_pct: Optional[float],
-    days_held: Optional[int],
+    pnl: float | None,
+    pnl_pct: float | None,
+    days_held: int | None,
 ) -> str:
     """Always specific — pulls from numbers if signal reasoning is generic."""
     r = (signal_reasoning or "").lower()
@@ -342,21 +341,21 @@ def _infer_sell_reason(
 
 
 # ── Formatting helpers ────────────────────────────────────────────────────────
-def fmt_money(v: Optional[float], sign: bool = False) -> str:
+def fmt_money(v: float | None, sign: bool = False) -> str:
     if v is None:
         return "—"
     s = "+" if (sign and v >= 0) else ""
     return f"{s}${abs(v):,.2f}" if v < 0 and not sign else f"{s}${v:,.2f}"
 
 
-def fmt_pct(v: Optional[float], digits: int = 1) -> str:
+def fmt_pct(v: float | None, digits: int = 1) -> str:
     if v is None:
         return "—"
     sign = "+" if v >= 0 else ""
     return f"{sign}{v:.{digits}f}%"
 
 
-def pnl_color(v: Optional[float]) -> str:
+def pnl_color(v: float | None) -> str:
     if v is None or v == 0:
         return TEXT_DIM
     return VOLT if v > 0 else LOSS
@@ -428,7 +427,7 @@ def _kpi_card(label: str, value: str, value_color: str, sub: str = "", accent: b
 def build_kpi_strip(
     today_realized: float,
     total_pnl: float,
-    win_rate: Optional[float],
+    win_rate: float | None,
     wins: int,
     losses: int,
     open_positions: int,
@@ -455,7 +454,7 @@ def build_kpi_strip(
 """
 
 
-def _section_title(text: str, count: Optional[int] = None) -> str:
+def _section_title(text: str, count: int | None = None) -> str:
     """Bold black section heading with optional volt counter pill."""
     badge = ""
     if count is not None and count > 0:
@@ -661,7 +660,7 @@ def build_positions(positions: list[dict]) -> str:
 _NEWS_CACHE_PATH = Path("/tmp/imb_news_cache.json")
 
 
-def _load_news_cache() -> Dict:
+def _load_news_cache() -> dict[str, dict]:
     if not _NEWS_CACHE_PATH.exists():
         return {}
     try:
@@ -669,13 +668,14 @@ def _load_news_cache() -> Dict:
 
         data = _json.loads(_NEWS_CACHE_PATH.read_text())
         if data.get("date") == datetime.now().strftime("%Y-%m-%d"):
-            return data.get("symbols", {})
+            symbols = data.get("symbols") or {}
+            return {str(k): dict(v) for k, v in symbols.items()}
     except Exception:
         pass
     return {}
 
 
-def _save_news_cache(symbols: Dict[str, Dict]) -> None:
+def _save_news_cache(symbols: dict[str, dict]) -> None:
     try:
         import json as _json
 
@@ -689,7 +689,7 @@ def _save_news_cache(symbols: Dict[str, Dict]) -> None:
         pass
 
 
-def _fetch_position_news(symbols: List[str]) -> Dict[str, Dict]:
+def _fetch_position_news(symbols: list[str]) -> dict[str, dict]:
     """Return {symbol: {headlines: [...], score: float}} with one-day disk cache."""
     cache = _load_news_cache()
     missing = [s for s in symbols if s not in cache]
@@ -723,7 +723,7 @@ def _tone_chip(score: float) -> str:
     )
 
 
-def build_news_digest(positions: List[dict], max_stories: int = 6) -> str:
+def build_news_digest(positions: list[dict], max_stories: int = 6) -> str:
     """
     Morning Brew–style digest of why our holdings are in the news today.
 
@@ -761,7 +761,7 @@ def build_news_digest(positions: List[dict], max_stories: int = 6) -> str:
     blocks = []
     for sym in ranked:
         ctx = news_map[sym]
-        headlines: List[str] = ctx.get("headlines") or []
+        headlines: list[str] = ctx.get("headlines") or []
         if not headlines:
             continue
         lead = headlines[0]
@@ -902,7 +902,7 @@ def generate_email_body(db_path: str = "trading.db", include_visuals: bool = Tru
         trades_today = get_today_trades(db)
         positions = get_open_positions(db)
         agg = get_aggregate_pnl(db)
-        symbols = list({t.get("symbol") for t in trades_today if t.get("symbol")})
+        symbols: list[str] = list({str(s) for t in trades_today if (s := t.get("symbol"))})
         sig_map = get_signal_reasons(db, symbols)
     finally:
         db.close()
