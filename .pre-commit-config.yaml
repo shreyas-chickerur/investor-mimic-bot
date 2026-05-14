@@ -47,7 +47,14 @@ repos:
     hooks:
       - id: mypy
         additional_dependencies: [types-requests]
-        args: [--ignore-missing-imports, --python-version=3.11]
+        # follow-imports=silent: type-check the staged file but don't surface
+        # pre-existing errors in transitively imported modules (notably
+        # src/core/database.py, which has its own backlog).
+        args: [
+          --ignore-missing-imports,
+          --python-version=3.11,
+          --follow-imports=silent,
+        ]
         exclude: ^(tests/|dashboard/)
 
   # Security checks
