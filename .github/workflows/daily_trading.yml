@@ -12,11 +12,11 @@ env:
 jobs:
   daily-execution:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -25,7 +25,7 @@ jobs:
     - name: Set runtime date
       id: runtime_date
       run: echo "today=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
-    
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
@@ -34,7 +34,7 @@ jobs:
     - name: Import check
       run: |
         python3 scripts/import_check.py
-    
+
     - name: Download previous database (if exists)
       continue-on-error: true
       env:
@@ -44,7 +44,7 @@ jobs:
         # List recent artifacts named trading-database, get the most recent one
         ARTIFACT_ID=$(gh api repos/${{ github.repository }}/actions/artifacts \
           --jq '.artifacts | map(select(.name == "trading-database" and .expired == false)) | sort_by(.created_at) | reverse | .[0].id // empty')
-        
+
         if [ -n "$ARTIFACT_ID" ]; then
           echo "Found artifact ID: $ARTIFACT_ID"
           gh api repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip > trading-db.zip
@@ -59,7 +59,7 @@ jobs:
         else
           echo "⚠️ No trading-database artifact found — will initialize fresh"
         fi
-    
+
     - name: Initialize database
       run: |
         python scripts/setup_database.py --db trading.db
@@ -74,7 +74,7 @@ jobs:
           echo "❌ broker_state table missing in trading.db"
           exit 1
         fi
-    
+
     - name: Create required directories
       run: |
         mkdir -p artifacts/json artifacts/markdown artifacts/funnel artifacts/data_quality artifacts/drawdown artifacts/health logs data
@@ -116,7 +116,7 @@ jobs:
       run: |
         echo "=== Fetching Latest Market Data ==="
         python3 scripts/update_daily_data.py || echo "⚠️  Market data update failed — pre-flight will enforce staleness threshold"
-    
+
     - name: Update earnings calendar
       continue-on-error: true
       env:
@@ -144,7 +144,7 @@ jobs:
       run: |
         echo "=== Signal Generation Health Check ==="
         python3 scripts/monitor_signal_health.py || echo "Health check completed with warnings"
-    
+
     - name: Run trading with pre-flight checks
       env:
         ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
@@ -170,7 +170,7 @@ jobs:
         RECIPIENT_EMAIL: ${{ secrets.EMAIL_TO }}
       run: |
         python3 scripts/process_notification_outbox.py --db trading.db --limit 100
-    
+
     - name: Check if trading executed
       id: check_execution
       if: always()
@@ -194,7 +194,7 @@ jobs:
           --db trading.db \
           --status-file /tmp/run_status.txt \
           --out artifacts/diagnostics/post_run_guardrails.json
-    
+
     - name: Paper trading validation report
       if: always()
       continue-on-error: true
@@ -208,17 +208,17 @@ jobs:
       continue-on-error: true
       run: |
         echo "=== Checking Reconciliation from Database ==="
-        
+
         # Query database directly for reconciliation status
         RUN_ID=$(sqlite3 trading.db "SELECT run_id FROM broker_state WHERE snapshot_type != 'SYNC' AND run_id != 'AUTO_SYNC' ORDER BY created_at DESC LIMIT 1;" || echo "UNKNOWN")
         RECON_STATUS=$(sqlite3 trading.db "SELECT reconciliation_status FROM broker_state WHERE run_id='$RUN_ID' AND snapshot_type IN ('RECONCILIATION', 'RECONCILIATION_RETRY') ORDER BY created_at DESC, id DESC LIMIT 1;" || echo "UNKNOWN")
-        
+
         echo "Run ID: $RUN_ID"
         echo "Reconciliation Status: $RECON_STATUS"
-        
+
         # Set outputs for downstream steps
         echo "status=$RECON_STATUS" >> $GITHUB_OUTPUT
-        
+
         if [ "$RECON_STATUS" = "FAIL" ]; then
           echo "discrepancies=1" >> $GITHUB_OUTPUT
           echo "⚠️  Reconciliation FAILED - will trigger auto-sync"
@@ -226,10 +226,10 @@ jobs:
           echo "discrepancies=0" >> $GITHUB_OUTPUT
           echo "✅ Reconciliation status: $RECON_STATUS"
         fi
-        
+
         # Ensure outputs are set even on edge cases
         echo "recon_done=true" >> $GITHUB_OUTPUT
-    
+
     - name: Auto-sync database on reconciliation failure
       id: auto_sync
       if: always() && steps.check_reconciliation.outputs.status == 'FAIL' && steps.check_reconciliation.outputs.discrepancies != '0'
@@ -285,7 +285,7 @@ jobs:
           echo "resolved=false" >> $GITHUB_OUTPUT
           echo "remaining=0"    >> $GITHUB_OUTPUT
         fi
-    
+
     - name: Re-upload synced database
       if: always() && steps.auto_sync.outputs.synced == 'true'
       uses: actions/upload-artifact@v4
@@ -294,46 +294,46 @@ jobs:
         path: trading.db
         retention-days: 90
         overwrite: true
-    
+
     - name: Validate system invariants
       if: steps.check_execution.outputs.executed == 'true'
       continue-on-error: true
       run: |
         echo "=== Validating System ==="
         python3 scripts/validate_system.py --latest
-    
+
     - name: Verify execution criteria
       if: steps.check_execution.outputs.executed == 'true'
       continue-on-error: true
       run: |
         echo "=== Verifying Execution ==="
         python3 scripts/verify_execution.py
-    
+
     - name: Extract run metrics
       if: always()
       run: |
         echo "=== Run Metrics ==="
         RUN_ID=$(sqlite3 trading.db "SELECT run_id FROM broker_state WHERE snapshot_type != 'SYNC' AND run_id != 'AUTO_SYNC' ORDER BY created_at DESC LIMIT 1;" || echo "UNKNOWN")
         echo "Run ID: $RUN_ID"
-        
+
         if [ "$RUN_ID" != "UNKNOWN" ]; then
           echo ""
           echo "Broker Snapshots:"
           sqlite3 trading.db "SELECT snapshot_type, reconciliation_status FROM broker_state WHERE run_id='$RUN_ID' ORDER BY created_at;"
-          
+
           echo ""
           echo "Signal Termination:"
           sqlite3 trading.db "SELECT COUNT(*) AS total, SUM(CASE WHEN terminal_state IS NOT NULL THEN 1 ELSE 0 END) AS terminalized FROM signals WHERE run_id='$RUN_ID';"
-          
+
           echo ""
           echo "Terminal States:"
           sqlite3 trading.db "SELECT terminal_state, terminal_reason, COUNT(*) FROM signals WHERE run_id='$RUN_ID' GROUP BY terminal_state, terminal_reason;"
-          
+
           echo ""
           echo "Trades:"
           sqlite3 trading.db "SELECT COUNT(*) FROM trades WHERE run_id='$RUN_ID';"
         fi
-    
+
     - name: Upload trading database
       if: always() && steps.auto_sync.outputs.synced != 'true'
       uses: actions/upload-artifact@v4
@@ -361,25 +361,25 @@ jobs:
           artifacts/
           logs/
         retention-days: 90
-    
+
     - name: Generate strategy performance report
       if: always() && steps.check_execution.outputs.executed == 'true'
       continue-on-error: true
       run: |
         python3 scripts/generate_strategy_performance.py --days 30
-    
+
     - name: Generate strategy performance chart
       if: always() && steps.check_execution.outputs.executed == 'true'
       continue-on-error: true
       run: |
         python3 scripts/generate_strategy_chart.py --days 7
-    
+
     - name: Generate performance chart
       if: always() && steps.check_execution.outputs.executed == 'true'
       continue-on-error: true
       run: |
         python3 scripts/generate_email_chart.py
-    
+
     - name: Run live performance tracker
       if: always()
       continue-on-error: true
@@ -414,7 +414,7 @@ jobs:
           exit 0
         fi
         echo "email_ok=true" >> $GITHUB_OUTPUT
-    
+
     - name: Generate daily email digest
       if: always() && steps.validate_email.outputs.email_ok == 'true'
       run: |
@@ -451,7 +451,7 @@ jobs:
             f.write(html)
         print("✅ Fallback email HTML generated: /tmp/daily_email.html")
         PY
-    
+
     - name: Send daily digest email
       if: always()
       uses: dawidd6/action-send-mail@v3
@@ -464,7 +464,7 @@ jobs:
         to: ${{ secrets.EMAIL_TO }}
         from: Trading System
         html_body: file:///tmp/daily_email.html
-    
+
     - name: Create GitHub summary
       if: always()
       run: |
@@ -472,34 +472,34 @@ jobs:
         SIGNALS=$(sqlite3 trading.db "SELECT COUNT(*) FROM signals WHERE run_id='$RUN_ID';" || echo "0")
         TRADES=$(sqlite3 trading.db "SELECT COUNT(*) FROM trades WHERE run_id='$RUN_ID';" || echo "0")
         RECON_STATUS=$(sqlite3 trading.db "SELECT reconciliation_status FROM broker_state WHERE run_id='$RUN_ID' AND snapshot_type IN ('RECONCILIATION', 'RECONCILIATION_RETRY') ORDER BY created_at DESC, id DESC LIMIT 1;" || echo "UNKNOWN")
-        
+
         cat > $GITHUB_STEP_SUMMARY << EOF
         # Daily Trading Execution - $(date +%Y-%m-%d)
-        
-        **Run ID:** \`$RUN_ID\`  
-        **Signals:** $SIGNALS  
-        **Trades:** $TRADES  
-        **Reconciliation:** $RECON_STATUS  
+
+        **Run ID:** \`$RUN_ID\`
+        **Signals:** $SIGNALS
+        **Trades:** $TRADES
+        **Reconciliation:** $RECON_STATUS
         **Status:** ${{ job.status }}
-        
+
         ## Validation Checks
         - ✅ Safety: Paper trading mode verified
         - ✅ System Invariants: Validated
         - ✅ Execution Criteria: Verified
         - ✅ Database: Uploaded (90 day retention)
         - ✅ Artifacts: Uploaded (90 day retention)
-        
+
         ## Environment
         - ALPACA_PAPER: true
         - PHASE5_SIGNAL_INJECTION: false
         - ENABLE_BROKER_RECONCILIATION: true
         - DATA_MAX_AGE_HOURS: 72
-        
+
         ## Artifacts
         - Database: \`trading-database\`
         - Daily artifacts: \`daily-artifacts-${{ github.run_number }}\`
         EOF
-    
+
     - name: Check run status
       id: check_status
       if: always()
@@ -545,7 +545,7 @@ jobs:
         fi
 
         echo "✅ Final health gate passed"
-    
+
     - name: Send market closed notification
       if: always() && steps.check_status.outputs.status == 'MARKET_CLOSED'
       uses: dawidd6/action-send-mail@v3
@@ -559,19 +559,19 @@ jobs:
         from: Trading System
         body: |
           Trading Run Skipped - Market Closed (Expected)
-          
+
           Run: ${{ github.run_number }}
           Date: ${{ steps.runtime_date.outputs.today }}
           Status: Market closed (weekend or holiday)
-          
+
           This is expected behavior. The trading system automatically skips execution when:
           - Market is closed (weekends)
           - Market holidays
-          
+
           No action required. The system will resume automatically on the next trading day.
-          
+
           Next scheduled run: Monday-Friday at 4:15 PM ET
-    
+
     # Only escalate to the user when auto-sync did NOT resolve the drift.
     # If sync succeeded and the post-sync verification passes, stay silent
     # — the daily summary email already shows reconciliation status.
@@ -648,7 +648,7 @@ jobs:
             </p>
           </div>
           </body></html>
-    
+
     - name: Send failure notification
       if: failure() && steps.check_status.outputs.status != 'MARKET_CLOSED'
       uses: dawidd6/action-send-mail@v3
@@ -662,17 +662,17 @@ jobs:
         from: Trading System
         body: |
           ⚠️ UNEXPECTED FAILURE - Daily Trading Execution Failed
-          
+
           Run: ${{ github.run_number }}
           Date: ${{ github.event.repository.updated_at }}
           Workflow: ${{ github.workflow }}
           Status: ${{ steps.check_status.outputs.status }}
-          
+
           This is an UNEXPECTED failure that requires attention.
-          
+
           Failed Step: Check the logs at:
           https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          
+
           Please review the failure and take corrective action.
-          
+
           Artifacts (if any): daily-artifacts-${{ github.run_number }}

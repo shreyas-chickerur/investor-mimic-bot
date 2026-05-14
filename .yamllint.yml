@@ -7,6 +7,11 @@ rules:
     level: warning
   indentation:
     spaces: 2
+    # GitHub Actions workflows mix sequence indent styles (some `- name:`
+    # at the same column as `steps:`, some nested deeper inside multiline
+    # blocks). Disable the sequence-indent check rather than rewrite all
+    # workflows; the scalar indent rule still enforces 2-space consistency.
+    indent-sequences: whatever
   comments:
     min-spaces-from-content: 1
   truthy:

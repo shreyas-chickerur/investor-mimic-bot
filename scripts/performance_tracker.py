@@ -13,16 +13,15 @@ import argparse
 import json
 import math
 import sqlite3
-from datetime import datetime, date
+from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
-
 
 # ---------------------------------------------------------------------------
 # DB helpers
 # ---------------------------------------------------------------------------
 
-def _q(conn: sqlite3.Connection, sql: str, params: tuple = ()) -> List[dict]:
+
+def _q(conn: sqlite3.Connection, sql: str, params: tuple = ()) -> list[dict]:
     """Run a query on an already-open connection."""
     rows = conn.execute(sql, params).fetchall()
     return [dict(r) for r in rows]
@@ -32,7 +31,8 @@ def _q(conn: sqlite3.Connection, sql: str, params: tuple = ()) -> List[dict]:
 # Core metric calculations
 # ---------------------------------------------------------------------------
 
-def _sharpe(daily_rets: List[float], risk_free_daily: float = 0.0) -> Optional[float]:
+
+def _sharpe(daily_rets: list[float], risk_free_daily: float = 0.0) -> float | None:
     if len(daily_rets) < 10:
         return None
     n = len(daily_rets)
@@ -44,7 +44,7 @@ def _sharpe(daily_rets: List[float], risk_free_daily: float = 0.0) -> Optional[f
     return round((mean - risk_free_daily) / std * math.sqrt(252), 3)
 
 
-def _sortino(daily_rets: List[float], risk_free_daily: float = 0.0) -> Optional[float]:
+def _sortino(daily_rets: list[float], risk_free_daily: float = 0.0) -> float | None:
     if len(daily_rets) < 10:
         return None
     mean = sum(daily_rets) / len(daily_rets)
@@ -58,7 +58,7 @@ def _sortino(daily_rets: List[float], risk_free_daily: float = 0.0) -> Optional[
     return round((mean - risk_free_daily) / down_std * math.sqrt(252), 3)
 
 
-def _max_drawdown(equity_curve: List[float]) -> Tuple[float, int]:
+def _max_drawdown(equity_curve: list[float]) -> tuple[float, int]:
     """Returns (max_drawdown_pct, drawdown_duration_days)."""
     if len(equity_curve) < 2:
         return 0.0, 0
@@ -79,42 +79,50 @@ def _max_drawdown(equity_curve: List[float]) -> Tuple[float, int]:
     return round(max_dd, 4), max_dd_duration
 
 
-def _cagr(start_val: float, end_val: float, trading_days: int) -> Optional[float]:
+def _cagr(start_val: float, end_val: float, trading_days: int) -> float | None:
     if start_val <= 0 or end_val <= 0 or trading_days < 5:
         return None
     years = trading_days / 252
-    return round((end_val / start_val) ** (1.0 / years) - 1, 4)
+    return float(round((end_val / start_val) ** (1.0 / years) - 1, 4))
 
 
 # ---------------------------------------------------------------------------
 # Data loading
 # ---------------------------------------------------------------------------
 
-def load_trades(conn: sqlite3.Connection) -> List[dict]:
-    return _q(conn, """
+
+def load_trades(conn: sqlite3.Connection) -> list[dict]:
+    return _q(
+        conn,
+        """
         SELECT t.*, s.name strategy_name
         FROM trades t
         LEFT JOIN strategies s ON t.strategy_id = s.id
         WHERE s.name != 'BROKER_SYNC' OR s.name IS NULL
         ORDER BY t.executed_at
-    """)
+    """,
+    )
 
 
-def load_portfolio_snapshots(conn: sqlite3.Connection) -> List[dict]:
+def load_portfolio_snapshots(conn: sqlite3.Connection) -> list[dict]:
     """Load daily START snapshots for portfolio equity curve."""
-    return _q(conn, """
+    return _q(
+        conn,
+        """
         SELECT snapshot_date, portfolio_value, cash
         FROM broker_state
         WHERE snapshot_type = 'START'
         ORDER BY snapshot_date
-    """)
+    """,
+    )
 
 
 # ---------------------------------------------------------------------------
 # Portfolio-level metrics
 # ---------------------------------------------------------------------------
 
-def compute_portfolio_metrics(db_path: str) -> Dict:
+
+def compute_portfolio_metrics(db_path: str) -> dict:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
@@ -123,56 +131,56 @@ def compute_portfolio_metrics(db_path: str) -> Dict:
     finally:
         conn.close()
 
-    result: Dict = {
-        'computed_at': datetime.now().isoformat(),
-        'data_since': None,
-        'trading_days': 0,
-        'total_trades': len([t for t in trades if t.get('pnl') is not None]),
-        'wins': 0,
-        'losses': 0,
-        'win_rate': None,
-        'total_pnl': 0.0,
-        'avg_win': None,
-        'avg_loss': None,
-        'profit_factor': None,
-        'cagr': None,
-        'sharpe': None,
-        'sortino': None,
-        'max_drawdown': None,
-        'max_drawdown_days': None,
-        'portfolio_start': None,
-        'portfolio_current': None,
-        'total_return_pct': None,
-        'strategy_breakdown': {},
+    result: dict = {
+        "computed_at": datetime.now().isoformat(),
+        "data_since": None,
+        "trading_days": 0,
+        "total_trades": len([t for t in trades if t.get("pnl") is not None]),
+        "wins": 0,
+        "losses": 0,
+        "win_rate": None,
+        "total_pnl": 0.0,
+        "avg_win": None,
+        "avg_loss": None,
+        "profit_factor": None,
+        "cagr": None,
+        "sharpe": None,
+        "sortino": None,
+        "max_drawdown": None,
+        "max_drawdown_days": None,
+        "portfolio_start": None,
+        "portfolio_current": None,
+        "total_return_pct": None,
+        "strategy_breakdown": {},
     }
 
     # --- Trade-level metrics ---
-    closed = [t for t in trades if t.get('pnl') is not None]
+    closed = [t for t in trades if t.get("pnl") is not None]
     if closed:
-        wins = [t['pnl'] for t in closed if t['pnl'] > 0]
-        losses = [t['pnl'] for t in closed if t['pnl'] <= 0]
-        result['wins'] = len(wins)
-        result['losses'] = len(losses)
-        result['win_rate'] = round(len(wins) / len(closed), 4) if closed else None
-        result['total_pnl'] = round(sum(t['pnl'] for t in closed), 2)
-        result['avg_win'] = round(sum(wins) / len(wins), 2) if wins else None
-        result['avg_loss'] = round(sum(losses) / len(losses), 2) if losses else None
+        wins = [t["pnl"] for t in closed if t["pnl"] > 0]
+        losses = [t["pnl"] for t in closed if t["pnl"] <= 0]
+        result["wins"] = len(wins)
+        result["losses"] = len(losses)
+        result["win_rate"] = round(len(wins) / len(closed), 4) if closed else None
+        result["total_pnl"] = round(sum(t["pnl"] for t in closed), 2)
+        result["avg_win"] = round(sum(wins) / len(wins), 2) if wins else None
+        result["avg_loss"] = round(sum(losses) / len(losses), 2) if losses else None
         gross_profit = sum(wins)
         gross_loss = abs(sum(losses))
-        result['profit_factor'] = round(gross_profit / gross_loss, 3) if gross_loss > 0 else None
+        result["profit_factor"] = round(gross_profit / gross_loss, 3) if gross_loss > 0 else None
 
     # --- Portfolio equity curve metrics ---
     if len(snapshots) >= 2:
-        values = [s['portfolio_value'] for s in snapshots if s['portfolio_value']]
+        values = [s["portfolio_value"] for s in snapshots if s["portfolio_value"]]
         if len(values) >= 2:
-            result['portfolio_start'] = round(values[0], 2)
-            result['portfolio_current'] = round(values[-1], 2)
-            result['data_since'] = snapshots[0]['snapshot_date']
-            result['trading_days'] = len(values)
-            result['total_return_pct'] = round(
-                (values[-1] - values[0]) / values[0] * 100, 3
-            ) if values[0] > 0 else None
-            result['cagr'] = _cagr(values[0], values[-1], len(values))
+            result["portfolio_start"] = round(values[0], 2)
+            result["portfolio_current"] = round(values[-1], 2)
+            result["data_since"] = snapshots[0]["snapshot_date"]
+            result["trading_days"] = len(values)
+            result["total_return_pct"] = (
+                round((values[-1] - values[0]) / values[0] * 100, 3) if values[0] > 0 else None
+            )
+            result["cagr"] = _cagr(values[0], values[-1], len(values))
 
             # Daily returns for Sharpe/Sortino
             daily_rets = [
@@ -180,25 +188,25 @@ def compute_portfolio_metrics(db_path: str) -> Dict:
                 for i in range(1, len(values))
                 if values[i - 1] > 0
             ]
-            result['sharpe'] = _sharpe(daily_rets)
-            result['sortino'] = _sortino(daily_rets)
+            result["sharpe"] = _sharpe(daily_rets)
+            result["sortino"] = _sortino(daily_rets)
             dd, dd_days = _max_drawdown(values)
-            result['max_drawdown'] = round(dd * 100, 2)
-            result['max_drawdown_days'] = dd_days
+            result["max_drawdown"] = round(dd * 100, 2)
+            result["max_drawdown_days"] = dd_days
 
     # --- Per-strategy breakdown ---
-    by_strat: Dict[str, Dict] = {}
+    by_strat: dict[str, dict] = {}
     for t in closed:
-        sname = t.get('strategy_name') or 'Unknown'
+        sname = t.get("strategy_name") or "Unknown"
         if sname not in by_strat:
-            by_strat[sname] = {'trades': 0, 'wins': 0, 'pnl': 0.0}
-        by_strat[sname]['trades'] += 1
-        by_strat[sname]['pnl'] = round(by_strat[sname]['pnl'] + t['pnl'], 2)
-        if t['pnl'] > 0:
-            by_strat[sname]['wins'] += 1
-    for sname, d in by_strat.items():
-        d['win_rate'] = round(d['wins'] / d['trades'], 3) if d['trades'] > 0 else None
-    result['strategy_breakdown'] = by_strat
+            by_strat[sname] = {"trades": 0, "wins": 0, "pnl": 0.0}
+        by_strat[sname]["trades"] += 1
+        by_strat[sname]["pnl"] = round(by_strat[sname]["pnl"] + t["pnl"], 2)
+        if t["pnl"] > 0:
+            by_strat[sname]["wins"] += 1
+    for d in by_strat.values():
+        d["win_rate"] = round(d["wins"] / d["trades"], 3) if d["trades"] > 0 else None
+    result["strategy_breakdown"] = by_strat
 
     return result
 
@@ -207,7 +215,8 @@ def compute_portfolio_metrics(db_path: str) -> Dict:
 # Pretty-print report
 # ---------------------------------------------------------------------------
 
-def print_report(metrics: Dict) -> None:
+
+def print_report(metrics: dict) -> None:
     def _pct(v, decimals=1):
         return f"{v:.{decimals}f}%" if v is not None else "N/A"
 
@@ -217,8 +226,8 @@ def print_report(metrics: Dict) -> None:
     def _f(v, decimals=3):
         return f"{v:.{decimals}f}" if v is not None else "N/A"
 
-    since = metrics.get('data_since') or 'N/A'
-    days = metrics.get('trading_days') or 0
+    since = metrics.get("data_since") or "N/A"
+    days = metrics.get("trading_days") or 0
     print(f"\n{'='*54}")
     print(f"  LIVE PERFORMANCE REPORT  (since {since}, {days}d)")
     print(f"{'='*54}")
@@ -228,8 +237,10 @@ def print_report(metrics: Dict) -> None:
     print(f"  CAGR            : {_pct((metrics.get('cagr') or 0) * 100, 2)}")
     print(f"  Sharpe (ann.)   : {_f(metrics.get('sharpe'))}")
     print(f"  Sortino (ann.)  : {_f(metrics.get('sortino'))}")
-    print(f"  Max drawdown    : {_pct(metrics.get('max_drawdown'))} "
-          f"({metrics.get('max_drawdown_days') or 0}d)")
+    print(
+        f"  Max drawdown    : {_pct(metrics.get('max_drawdown'))} "
+        f"({metrics.get('max_drawdown_days') or 0}d)"
+    )
     print(f"\n  Trades total    : {metrics.get('total_trades')}")
     print(f"  Win rate        : {_pct((metrics.get('win_rate') or 0) * 100)}")
     print(f"  Avg win         : {_val(metrics.get('avg_win'))}")
@@ -237,13 +248,12 @@ def print_report(metrics: Dict) -> None:
     print(f"  Profit factor   : {_f(metrics.get('profit_factor'))}")
     print(f"  Total P&L       : {_val(metrics.get('total_pnl'))}")
 
-    breakdown = metrics.get('strategy_breakdown') or {}
+    breakdown = metrics.get("strategy_breakdown") or {}
     if breakdown:
-        print(f"\n  Per-strategy:")
-        for sname, d in sorted(breakdown.items(), key=lambda x: -x[1]['pnl']):
-            wr = f"{d['win_rate']*100:.0f}%" if d['win_rate'] is not None else "N/A"
-            print(f"    {sname:<26} {d['trades']:>3} trades  "
-                  f"WR={wr}  P&L={_val(d['pnl'])}")
+        print("\n  Per-strategy:")
+        for sname, d in sorted(breakdown.items(), key=lambda x: -x[1]["pnl"]):
+            wr = f"{d['win_rate']*100:.0f}%" if d["win_rate"] is not None else "N/A"
+            print(f"    {sname:<26} {d['trades']:>3} trades  " f"WR={wr}  P&L={_val(d['pnl'])}")
     print(f"{'='*54}\n")
 
 
@@ -251,10 +261,11 @@ def print_report(metrics: Dict) -> None:
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def main():
     parser = argparse.ArgumentParser(description="Live trading performance tracker")
-    parser.add_argument('--db', default='trading.db', help='Path to trading.db')
-    parser.add_argument('--json', action='store_true', help='Output raw JSON')
+    parser.add_argument("--db", default="trading.db", help="Path to trading.db")
+    parser.add_argument("--json", action="store_true", help="Output raw JSON")
     args = parser.parse_args()
 
     db_path = str(Path(args.db).resolve())
@@ -270,5 +281,5 @@ def main():
         print_report(metrics)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
