@@ -7,10 +7,10 @@ Usage:
 
 Outputs results to console and saves to artifacts/backtest/
 """
-import sys
-import os
 import argparse
 import logging
+import os
+import sys
 from pathlib import Path
 
 # Project root
@@ -19,10 +19,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import pandas as pd
 
 from src.integration.portfolio_backtester import PortfolioBacktester
-from src.strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
-from src.strategies.strategy_ml_momentum import MLMomentumStrategy
 from src.strategies.strategy_earnings_drift import EarningsDriftStrategy
 from src.strategies.strategy_factor_momentum import FactorMomentumStrategy
+from src.strategies.strategy_ml_momentum import MLMomentumStrategy
+from src.strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
 
 logging.basicConfig(
     level=logging.WARNING,
@@ -47,10 +47,21 @@ def load_market_data(data_path: str = "data/training_data.csv") -> pd.DataFrame:
 def main():
     parser = argparse.ArgumentParser(description="Walk-forward portfolio backtest")
     parser.add_argument("--years", type=int, default=5, help="Years of test data (default 5)")
-    parser.add_argument("--capital", type=float, default=100000, help="Initial capital (default 100000)")
-    parser.add_argument("--train-days", type=int, default=504, help="Training window in trading days (default 504 ~2yr)")
-    parser.add_argument("--test-days", type=int, default=126, help="Test window in trading days (default 126 ~6mo)")
-    parser.add_argument("--step-days", type=int, default=126, help="Step size in trading days (default 126 ~6mo)")
+    parser.add_argument(
+        "--capital", type=float, default=100000, help="Initial capital (default 100000)"
+    )
+    parser.add_argument(
+        "--train-days",
+        type=int,
+        default=252,
+        help="Training window in trading days (default 252 ~1yr)",
+    )
+    parser.add_argument(
+        "--test-days", type=int, default=63, help="Test window in trading days (default 63 ~3mo)"
+    )
+    parser.add_argument(
+        "--step-days", type=int, default=63, help="Step size in trading days (default 63 ~3mo)"
+    )
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
     args = parser.parse_args()
 
@@ -60,11 +71,14 @@ def main():
     # Load data
     df = load_market_data()
 
-    # Trim to requested years (from end of data)
+    # Trim to requested years (from end of data). No extra offset — use all available
+    # data within the window so training periods can actually fit.
     if args.years:
-        cutoff = df.index.max() - pd.DateOffset(years=args.years + 2)  # +2 for training window
+        cutoff = df.index.max() - pd.DateOffset(years=args.years)
         df = df[df.index >= cutoff]
-        print(f"  Trimmed to {args.years}+2yr window: {df.index.min().date()} to {df.index.max().date()}")
+        print(
+            f"  Trimmed to {args.years}yr window: {df.index.min().date()} to {df.index.max().date()}"
+        )
 
     # Strategy classes to test
     # New mix: drop NewsSentiment (no API key) and MACrossover (weakest signal)
@@ -78,7 +92,9 @@ def main():
 
     print(f"\nStrategies: {[c.__name__ for c in strategy_classes]}")
     print(f"Capital: ${args.capital:,.0f}")
-    print(f"Walk-forward: {args.train_days}d train / {args.test_days}d test / {args.step_days}d step")
+    print(
+        f"Walk-forward: {args.train_days}d train / {args.test_days}d test / {args.step_days}d step"
+    )
     print()
 
     # Run backtest
@@ -108,32 +124,41 @@ def main():
     out_path = "artifacts/backtest/walk_forward_results.json"
 
     # Save summary (exclude DataFrames)
-    summary = {k: v for k, v in results.items() if not isinstance(v, pd.DataFrame) and k != 'windows'}
-    summary['windows'] = []
-    for w in results.get('windows', []):
-        summary['windows'].append({
-            'window_id': w['window_id'],
-            'train_period': w['train_period'],
-            'test_period': w['test_period'],
-            'final_value': w['final_value'],
-            'num_trades': len(w.get('trades', [])),
-        })
+    summary = {
+        k: v for k, v in results.items() if not isinstance(v, pd.DataFrame) and k != "windows"
+    }
+    summary["windows"] = []
+    for w in results.get("windows", []):
+        summary["windows"].append(
+            {
+                "window_id": w["window_id"],
+                "train_period": w["train_period"],
+                "test_period": w["test_period"],
+                "final_value": w["final_value"],
+                "num_trades": len(w.get("trades", [])),
+            }
+        )
 
     import json
-    with open(out_path, 'w') as f:
+
+    with open(out_path, "w") as f:
         json.dump(summary, f, indent=2, default=str)
     print(f"\nResults saved to {out_path}")
 
     # Save equity curve CSV
     eq_path = "artifacts/backtest/equity_curve.csv"
-    if 'equity_curve' in results and isinstance(results['equity_curve'], pd.DataFrame):
-        results['equity_curve'].to_csv(eq_path, index=False)
+    if "equity_curve" in results and isinstance(results["equity_curve"], pd.DataFrame):
+        results["equity_curve"].to_csv(eq_path, index=False)
         print(f"Equity curve saved to {eq_path}")
 
     # Save trades CSV
     trades_path = "artifacts/backtest/all_trades.csv"
-    if 'all_trades' in results and isinstance(results['all_trades'], pd.DataFrame) and len(results['all_trades']) > 0:
-        results['all_trades'].to_csv(trades_path, index=False)
+    if (
+        "all_trades" in results
+        and isinstance(results["all_trades"], pd.DataFrame)
+        and len(results["all_trades"]) > 0
+    ):
+        results["all_trades"].to_csv(trades_path, index=False)
         print(f"Trades saved to {trades_path}")
 
 
