@@ -734,6 +734,19 @@ class MultiStrategyRunner:
                 symbol = position["symbol"]
                 shares = abs(position["shares"])
 
+                # Short-prevention guard: a double-exit (stop-loss fired twice, or race
+                # between stop-loss and strategy exit) would submit a SELL with 0 broker
+                # shares and create a short position. Verify the DB still shows shares > 0.
+                local_pos = self.db.get_position(position["strategy_id"], symbol)
+                local_shares = float(local_pos["shares"]) if local_pos else 0.0
+                if local_shares <= 0:
+                    logger.warning(
+                        f"Skipping stop-loss SELL {symbol} - DB shows {local_shares} shares "
+                        "(already exited or double-exit prevented)"
+                    )
+                    self.stop_loss_manager.remove_stop_loss(symbol)
+                    continue
+
                 logger.info(f"Executing stop loss exit: SELL {shares} {symbol}")
 
                 # Create market order to close position
@@ -885,6 +898,9 @@ class MultiStrategyRunner:
         self.symbols_bought_this_run: set = set()
         self.symbols_sold_this_run: set = set()
         self.reconciliation_status = "SKIPPED"
+        # Snapshot of all held symbols at run start — used by cross-strategy dedup guard.
+        # Updated in-memory as BUYs execute so subsequent strategies see fresh state.
+        self._held_symbols: set = {p["symbol"] for p in self.db.get_all_open_positions()}
 
         # Pre-fetch news sentiment once per run for all signal symbols
         self._news_filter = NewsSignalFilter()
@@ -1463,6 +1479,26 @@ class MultiStrategyRunner:
                         )
                         continue
 
+                    # Cross-strategy dedup: block if symbol already held by any strategy.
+                    # Each strategy's generate_signals() blocks re-entry for its own
+                    # positions, but a second strategy can independently signal the same
+                    # symbol, creating unintended double-concentration.
+                    if symbol in self._held_symbols:
+                        logger.info(
+                            f"Skipping BUY {symbol} ({strategy.name}) - already held by another strategy"
+                        )
+                        self.rejected_signals.append(
+                            {
+                                "strategy": strategy.name,
+                                "symbol": symbol,
+                                "action": action,
+                                "shares": shares,
+                                "price": price,
+                                "reason": "cross_strategy_dedup",
+                            }
+                        )
+                        continue
+
                     # Wash trade prevention: skip if already sold this symbol this run
                     if symbol in self.symbols_sold_this_run:
                         logger.warning(
@@ -1740,6 +1776,7 @@ class MultiStrategyRunner:
                         f"  ✅ BUY {actual_filled_qty} {symbol} @ ${actual_fill_price:.2f} (Order: {order.id}, Intent: {intent_id})"
                     )
                     self.symbols_bought_this_run.add(symbol)
+                    self._held_symbols.add(symbol)  # keep cross-strategy dedup current
 
                     # Update in-memory state with actual filled quantities
                     strategy.add_position(symbol, actual_filled_qty)
@@ -1810,6 +1847,20 @@ class MultiStrategyRunner:
                         logger.warning(
                             f"Skipping SELL {symbol} - already bought this run (wash trade prevention)"
                         )
+                        continue
+
+                    # Short-prevention guard: verify this strategy actually holds shares.
+                    # A SELL on a zero-share position creates a short, which was observed
+                    # when double-exits fired (e.g. stop-loss + strategy exit same day).
+                    local_pos = self.db.get_position(strategy.strategy_id, symbol)
+                    local_shares = float(local_pos["shares"]) if local_pos else 0.0
+                    if local_shares <= 0:
+                        logger.warning(
+                            f"Skipping SELL {symbol} ({strategy.name}) - "
+                            f"DB shows {local_shares} shares; selling would create a short"
+                        )
+                        # Clean up stale in-memory state to match DB reality
+                        strategy.positions.pop(symbol, None)
                         continue
 
                     (

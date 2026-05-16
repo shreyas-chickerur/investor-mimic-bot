@@ -6,42 +6,54 @@ Corrective sync: adjusts existing strategy positions to match broker totals.
 Does NOT wipe positions — preserves strategy-level tracking and entry dates.
 Only creates BROKER_SYNC entries for truly untracked positions.
 """
-import sys
-import os
 import sqlite3
+import sys
 from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from dotenv import load_dotenv
-load_dotenv(Path(__file__).parent.parent / '.env')
 
-from src.risk.broker_reconciler import BrokerReconciler
+load_dotenv(Path(__file__).parent.parent / ".env")
+
 import logging
 
-logging.basicConfig(level=logging.INFO, format='%(message)s')
+from src.risk.broker_reconciler import BrokerReconciler
+
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
 
 
 def _get_local_positions(cursor):
-    """Get all local positions grouped by symbol, with strategy breakdown."""
-    cursor.execute("""
+    """Get all local positions grouped by symbol, with strategy breakdown.
+
+    Includes shorts (shares < 0). Filtering with `shares > 0` silently
+    dropped shorts from the verification view, so this script's own
+    post-sync verify step would always report local=0 vs broker=-N even
+    after the negative-share row had just been inserted (see run
+    25943767585: NFLX short of -24 shares).
+    """
+    cursor.execute(
+        """
         SELECT p.strategy_id, s.name as strategy_name, p.symbol, p.shares, p.avg_price
         FROM positions p
         JOIN strategies s ON p.strategy_id = s.id
-        WHERE p.shares > 0
+        WHERE p.shares != 0
         ORDER BY p.symbol, s.name
-    """)
+    """
+    )
     rows = cursor.fetchall()
 
     # Build per-symbol aggregation and per-strategy detail
-    by_symbol = {}  # {symbol: {'total': float, 'strategies': [(strategy_id, name, shares, avg_price)]}}
+    by_symbol = (
+        {}
+    )  # {symbol: {'total': float, 'strategies': [(strategy_id, name, shares, avg_price)]}}
     for strategy_id, strategy_name, symbol, shares, avg_price in rows:
         if symbol not in by_symbol:
-            by_symbol[symbol] = {'total': 0.0, 'strategies': []}
-        by_symbol[symbol]['total'] += shares
-        by_symbol[symbol]['strategies'].append((strategy_id, strategy_name, shares, avg_price))
+            by_symbol[symbol] = {"total": 0.0, "strategies": []}
+        by_symbol[symbol]["total"] += shares
+        by_symbol[symbol]["strategies"].append((strategy_id, strategy_name, shares, avg_price))
 
     return by_symbol
 
@@ -53,16 +65,19 @@ def _get_or_create_broker_sync_strategy(cursor, portfolio_value):
     if result:
         return result[0]
 
-    cursor.execute("""
+    cursor.execute(
+        """
         INSERT INTO strategies (name, description, capital_allocation, initial_capital, status)
         VALUES ('BROKER_SYNC', 'Positions synced from broker', 0.0, ?, 'active')
-    """, (portfolio_value,))
+    """,
+        (portfolio_value,),
+    )
     strategy_id = cursor.lastrowid
     logger.info(f"  Created BROKER_SYNC strategy (id={strategy_id})")
     return strategy_id
 
 
-def sync_broker_to_database(db_path='trading.db'):
+def sync_broker_to_database(db_path="trading.db"):
     """
     Corrective sync: compare local positions against broker and fix discrepancies.
 
@@ -87,17 +102,19 @@ def sync_broker_to_database(db_path='trading.db'):
         logger.error("❌ Failed to fetch broker state")
         return False
 
-    broker_positions = broker_state['positions']
-    logger.info(f"\nBroker: {len(broker_positions)} positions, "
-                f"Cash: ${broker_state['cash']:,.2f}, "
-                f"Portfolio: ${broker_state['portfolio_value']:,.2f}")
+    broker_positions = broker_state["positions"]
+    logger.info(
+        f"\nBroker: {len(broker_positions)} positions, "
+        f"Cash: ${broker_state['cash']:,.2f}, "
+        f"Portfolio: ${broker_state['portfolio_value']:,.2f}"
+    )
 
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     try:
         local = _get_local_positions(cursor)
-        sync_id = _get_or_create_broker_sync_strategy(cursor, broker_state['portfolio_value'])
+        sync_id = _get_or_create_broker_sync_strategy(cursor, broker_state["portfolio_value"])
         changes = 0
 
         logger.info(f"\nLocal: {len(local)} symbols tracked")
@@ -105,10 +122,10 @@ def sync_broker_to_database(db_path='trading.db'):
 
         # --- Reconcile each broker position ---
         for symbol, pos_data in broker_positions.items():
-            broker_qty = float(pos_data['qty'])
-            broker_avg = float(pos_data['avg_price'])
+            broker_qty = float(pos_data["qty"])
+            broker_avg = float(pos_data["avg_price"])
             local_info = local.get(symbol)
-            local_total = local_info['total'] if local_info else 0.0
+            local_total = local_info["total"] if local_info else 0.0
 
             diff = broker_qty - local_total
 
@@ -119,8 +136,9 @@ def sync_broker_to_database(db_path='trading.db'):
             if local_total == 0:
                 # Entirely new position — add under BROKER_SYNC.
                 # Use today as entry_date fallback so time-based exits can fire.
-                today = datetime.now().strftime('%Y-%m-%d')
-                cursor.execute("""
+                today = datetime.now().strftime("%Y-%m-%d")
+                cursor.execute(
+                    """
                     INSERT INTO positions
                         (strategy_id, symbol, shares, avg_price, current_price,
                          market_value, unrealized_pnl, entry_date, last_updated)
@@ -133,36 +151,50 @@ def sync_broker_to_database(db_path='trading.db'):
                         unrealized_pnl = excluded.unrealized_pnl,
                         entry_date = COALESCE(positions.entry_date, excluded.entry_date),
                         last_updated = excluded.last_updated
-                """, (
-                    sync_id, symbol, broker_qty, broker_avg, broker_avg,
-                    broker_qty * broker_avg, 0.0, today, datetime.now().isoformat()
-                ))
+                """,
+                    (
+                        sync_id,
+                        symbol,
+                        broker_qty,
+                        broker_avg,
+                        broker_avg,
+                        broker_qty * broker_avg,
+                        0.0,
+                        today,
+                        datetime.now().isoformat(),
+                    ),
+                )
                 logger.info(f"  🆕 {symbol}: added {broker_qty} shares under BROKER_SYNC")
                 changes += 1
 
             elif diff > 0:
                 # Local has fewer shares than broker — add the difference
                 # Add to the strategy that already holds the most shares
-                strats = sorted(local_info['strategies'], key=lambda x: x[2], reverse=True)
+                strats = sorted(local_info["strategies"], key=lambda x: x[2], reverse=True)
                 target_sid, target_name, target_shares, target_avg = strats[0]
                 new_shares = target_shares + diff
                 # Weighted average price
                 new_avg = (target_avg * target_shares + broker_avg * diff) / new_shares
 
-                cursor.execute("""
+                cursor.execute(
+                    """
                     UPDATE positions SET shares = ?, avg_price = ?, last_updated = ?
                     WHERE strategy_id = ? AND symbol = ?
-                """, (new_shares, new_avg, datetime.now().isoformat(), target_sid, symbol))
-                logger.info(f"  📈 {symbol}: added {diff:.0f} shares to {target_name} "
-                            f"({target_shares:.0f} → {new_shares:.0f})")
+                """,
+                    (new_shares, new_avg, datetime.now().isoformat(), target_sid, symbol),
+                )
+                logger.info(
+                    f"  📈 {symbol}: added {diff:.0f} shares to {target_name} "
+                    f"({target_shares:.0f} → {new_shares:.0f})"
+                )
                 changes += 1
 
             else:
                 # Local has more shares than broker — reduce
                 excess = abs(diff)
-                strats = sorted(local_info['strategies'], key=lambda x: x[2], reverse=True)
+                strats = sorted(local_info["strategies"], key=lambda x: x[2], reverse=True)
 
-                for sid, sname, sshares, savg in strats:
+                for sid, sname, sshares, _ in strats:
                     if excess <= 0:
                         break
                     reduce = min(sshares, excess)
@@ -170,44 +202,55 @@ def sync_broker_to_database(db_path='trading.db'):
                     excess -= reduce
 
                     if new_shares <= 0:
-                        cursor.execute("DELETE FROM positions WHERE strategy_id = ? AND symbol = ?",
-                                       (sid, symbol))
+                        cursor.execute(
+                            "DELETE FROM positions WHERE strategy_id = ? AND symbol = ?",
+                            (sid, symbol),
+                        )
                         logger.info(f"  📉 {symbol}: removed from {sname} (was {sshares:.0f})")
                     else:
-                        cursor.execute("""
+                        cursor.execute(
+                            """
                             UPDATE positions SET shares = ?, last_updated = ?
                             WHERE strategy_id = ? AND symbol = ?
-                        """, (new_shares, datetime.now().isoformat(), sid, symbol))
-                        logger.info(f"  📉 {symbol}: reduced in {sname} "
-                                    f"({sshares:.0f} → {new_shares:.0f})")
+                        """,
+                            (new_shares, datetime.now().isoformat(), sid, symbol),
+                        )
+                        logger.info(
+                            f"  📉 {symbol}: reduced in {sname} "
+                            f"({sshares:.0f} → {new_shares:.0f})"
+                        )
                     changes += 1
 
         # --- Remove local positions not in broker ---
         for symbol, local_info in local.items():
             if symbol not in broker_positions:
-                for sid, sname, sshares, _ in local_info['strategies']:
-                    cursor.execute("DELETE FROM positions WHERE strategy_id = ? AND symbol = ?",
-                                   (sid, symbol))
+                for sid, sname, _, _ in local_info["strategies"]:
+                    cursor.execute(
+                        "DELETE FROM positions WHERE strategy_id = ? AND symbol = ?", (sid, symbol)
+                    )
                     logger.info(f"  🗑️  {symbol}: removed from {sname} (not in broker)")
                     changes += 1
 
         # --- Record sync event ---
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO broker_state (
                 run_id, snapshot_date, snapshot_type, cash, portfolio_value,
                 buying_power, positions_json, reconciliation_status, created_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            'AUTO_SYNC',
-            datetime.now().strftime('%Y-%m-%d'),
-            'SYNC',
-            broker_state['cash'],
-            broker_state['portfolio_value'],
-            broker_state['buying_power'],
-            str(broker_positions),
-            'SYNCED',
-            datetime.now().isoformat()
-        ))
+        """,
+            (
+                "AUTO_SYNC",
+                datetime.now().strftime("%Y-%m-%d"),
+                "SYNC",
+                broker_state["cash"],
+                broker_state["portfolio_value"],
+                broker_state["buying_power"],
+                str(broker_positions),
+                "SYNCED",
+                datetime.now().isoformat(),
+            ),
+        )
 
         conn.commit()
 
@@ -215,8 +258,8 @@ def sync_broker_to_database(db_path='trading.db'):
         updated_local = _get_local_positions(cursor)
         all_match = True
         for symbol, pos_data in broker_positions.items():
-            broker_qty = float(pos_data['qty'])
-            local_total = updated_local.get(symbol, {}).get('total', 0.0)
+            broker_qty = float(pos_data["qty"])
+            local_total = updated_local.get(symbol, {}).get("total", 0.0)
             if abs(local_total - broker_qty) > 0.001:
                 logger.error(f"  ❌ {symbol}: local={local_total}, broker={broker_qty}")
                 all_match = False
@@ -227,15 +270,16 @@ def sync_broker_to_database(db_path='trading.db'):
         logger.info(f"  Portfolio: ${broker_state['portfolio_value']:,.2f}")
 
         if all_match:
-            logger.info(f"\n✅ VERIFICATION PASSED — all positions in sync")
+            logger.info("\n✅ VERIFICATION PASSED — all positions in sync")
         else:
-            logger.error(f"\n❌ VERIFICATION FAILED — discrepancies remain")
+            logger.error("\n❌ VERIFICATION FAILED — discrepancies remain")
 
         return all_match
 
     except Exception as e:
         logger.error(f"\n❌ Sync failed: {e}")
         import traceback
+
         traceback.print_exc()
         conn.rollback()
         return False

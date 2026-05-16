@@ -751,3 +751,168 @@ class TestMLMomentumConfidenceFloor:
         val = cfg.get("strategies.ml_momentum.buy_quantile_threshold")
         assert val is not None, "strategies.ml_momentum.buy_quantile_threshold missing from config"
         assert 0.5 <= val <= 0.9, f"buy_quantile_threshold={val} outside [0.5, 0.9]"
+
+
+# ===========================================================================
+# 17. Let-winners-run: RSI and Factor strategies extend hold for profitable positions
+# ===========================================================================
+
+
+class TestLetWinnersRun:
+    """RSI and Factor Momentum must skip the time-based exit when the position
+    is profitable and RSI/momentum conditions are still healthy."""
+
+    def _rsi_strategy(self):
+        from src.strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
+
+        s = RSIMeanReversionStrategy.__new__(RSIMeanReversionStrategy)
+        s.positions = {}
+        s.entry_prices = {}
+        s.entry_dates = {}
+        s.rsi_threshold = 35
+        s.rsi_exit = 55
+        s.hold_days = 20
+        s.max_hold_days = 40
+        s.profit_target_pct = 0.05
+        s.stop_loss_pct = 0.07
+        s.let_winners_run_pct = 0.03
+        s.volume_spike_threshold = 1.5
+        s.capital = 10_000
+        s.strategy_id = 1
+        return s
+
+    def _make_rsi_data(self, rsi, rsi_prev, price, sma_100=None, entry_date_offset=25):
+        """Build a market_data DataFrame for the RSI strategy."""
+        n = 150
+        dates = pd.date_range("2024-01-01", periods=n, freq="B")
+        rows = []
+        for _ in dates:
+            rows.append(
+                {
+                    "symbol": "AAPL",
+                    "close": float(price),
+                    "rsi": float(rsi),
+                    "sma_100": float(sma_100) if sma_100 is not None else None,
+                    "volume_ratio": 1.0,
+                    "atr_20": 2.0,
+                }
+            )
+        df = pd.DataFrame(rows, index=dates)
+        df.loc[dates[-2], "rsi"] = float(rsi_prev)
+        df["symbol"] = "AAPL"
+        return df, dates
+
+    def test_rsi_time_exit_fires_when_losing(self):
+        """Time exit fires normally when position is not profitable."""
+        strat = self._rsi_strategy()
+        # Build data first so we can anchor entry_date relative to dates[-1]
+        df, dates = self._make_rsi_data(rsi=50.0, rsi_prev=48.0, price=100.0, sma_100=90.0)
+        # Entry 20 business days ago → ~28 calendar days → between hold_days (20) and max_hold (40)
+        strat.positions = {"AAPL": 10}
+        strat.entry_prices = {"AAPL": 102.0}  # -2% loss — below stop-loss threshold (7%)
+        strat.entry_dates = {"AAPL": dates[-20].strftime("%Y-%m-%d")}
+        signals = strat.generate_signals(df)
+        sells = [s for s in signals if s["action"] == "SELL"]
+        # -2% loss → profit < let_winners_run_pct (3%) → let-winners-run doesn't apply → time exit fires
+        assert len(sells) == 1
+        assert "time-based exit" in sells[0]["reasoning"]
+
+    def test_rsi_time_exit_skipped_when_profitable(self):
+        """Time exit is suppressed when position is ≥3% profitable and RSI < rsi_exit."""
+        strat = self._rsi_strategy()
+        df, dates = self._make_rsi_data(rsi=48.0, rsi_prev=45.0, price=100.0, sma_100=90.0)
+        # Entry ~20 bdays ago → ~28 calendar days → between hold_days (20) and max_hold (40)
+        strat.positions = {"AAPL": 10}
+        strat.entry_prices = {
+            "AAPL": 97.0
+        }  # +3.09% profit — above let_winners_run (3%), below profit target (5%)
+        strat.entry_dates = {"AAPL": dates[-20].strftime("%Y-%m-%d")}
+        signals = strat.generate_signals(df)
+        sells = [s for s in signals if s["action"] == "SELL"]
+        # RSI 48 < rsi_exit 55, +3.09% ≥ 3%, days held < max_hold (40) → time exit suppressed
+        assert (
+            len(sells) == 0
+        ), "Time exit should be suppressed for profitable position with healthy RSI"
+
+    def test_rsi_max_hold_enforced(self):
+        """Absolute max_hold_days forces exit even if profitable."""
+        strat = self._rsi_strategy()
+        df, dates = self._make_rsi_data(rsi=48.0, rsi_prev=45.0, price=100.0, sma_100=90.0)
+        # Entry ~32 bdays ago → ~45 calendar days → exceeds max_hold_days (40)
+        strat.positions = {"AAPL": 10}
+        strat.entry_prices = {"AAPL": 97.0}  # +3.09% — above let_winners_run, below profit target
+        strat.entry_dates = {"AAPL": dates[-32].strftime("%Y-%m-%d")}
+        signals = strat.generate_signals(df)
+        sells = [s for s in signals if s["action"] == "SELL"]
+        # days_held ~45 > max_hold_days=40 → let-winners-run `days_held < max_hold` check fails → time exit fires
+        assert len(sells) == 1
+        assert "time-based exit" in sells[0]["reasoning"]
+
+    def test_rsi_let_winners_attributes_exist(self):
+        """RSIMeanReversionStrategy must expose max_hold_days and let_winners_run_pct."""
+        from src.strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
+
+        s = RSIMeanReversionStrategy(strategy_id=1, capital=10_000)
+        assert hasattr(s, "max_hold_days"), "max_hold_days missing"
+        assert hasattr(s, "let_winners_run_pct"), "let_winners_run_pct missing"
+        assert s.max_hold_days > s.hold_days, "max_hold_days must be > hold_days"
+        assert 0 < s.let_winners_run_pct < s.profit_target_pct
+
+
+# ===========================================================================
+# 18. Cross-strategy symbol dedup: same symbol can't be bought by two strategies
+# ===========================================================================
+
+
+class TestCrossStrategyDedup:
+    def test_held_symbols_set_initialized_in_run(self):
+        """_held_symbols must be set during run_all_strategies initialization."""
+        src = Path("src/core/execution_engine.py").read_text()
+        assert "_held_symbols" in src, "_held_symbols cache missing from execution_engine.py"
+
+    def test_cross_strategy_dedup_guard_present(self):
+        """execution_engine.py must contain the cross_strategy_dedup rejection reason."""
+        src = Path("src/core/execution_engine.py").read_text()
+        assert "cross_strategy_dedup" in src, (
+            "cross_strategy_dedup guard missing — two strategies can buy the same symbol "
+            "creating unintended double-concentration"
+        )
+
+    def test_held_symbols_updated_on_buy(self):
+        """_held_symbols must be updated when a BUY fills so subsequent strategies see it."""
+        src = Path("src/core/execution_engine.py").read_text()
+        assert "_held_symbols.add(symbol)" in src, (
+            "_held_symbols not updated after BUY — cross-strategy dedup won't catch "
+            "symbols bought earlier in the same run"
+        )
+
+
+# ===========================================================================
+# 19. Short-prevention: SELL guards verify shares > 0 before submitting
+# ===========================================================================
+
+
+class TestShortPrevention:
+    def test_short_prevention_in_strategy_sell(self):
+        """Strategy SELL path must check DB shares > 0 before submitting."""
+        src = Path("src/core/execution_engine.py").read_text()
+        assert "selling would create a short" in src, (
+            "Short-prevention guard missing from strategy SELL path — "
+            "a double-exit can submit SELL on a zero-share position, creating a short"
+        )
+
+    def test_short_prevention_in_stop_loss_sell(self):
+        """Stop-loss SELL path must check DB shares > 0 before submitting."""
+        src = Path("src/core/execution_engine.py").read_text()
+        assert "double-exit prevented" in src, (
+            "Short-prevention guard missing from stop-loss SELL path — "
+            "if stop-loss fires twice it would short the position"
+        )
+
+    def test_short_prevention_cleans_stale_memory(self):
+        """When short-prevention blocks a SELL, it must also clean the in-memory position."""
+        src = Path("src/core/execution_engine.py").read_text()
+        assert "strategy.positions.pop(symbol, None)" in src, (
+            "Short-prevention guard doesn't clean stale in-memory state — "
+            "the strategy will keep trying to sell a position that doesn't exist"
+        )

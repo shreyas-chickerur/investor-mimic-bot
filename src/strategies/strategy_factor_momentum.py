@@ -25,39 +25,66 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.core.strategy_base import TradingStrategy
-from typing import List, Dict, Optional
-import pandas as pd
-import numpy as np
 import logging
+
+import numpy as np
+import pandas as pd
+
+from src.core.strategy_base import TradingStrategy
 
 logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = Path(__file__).parent.parent.parent
-_FUNDAMENTALS_PATH = _PROJECT_ROOT / 'data' / 'fundamentals.json'
+_FUNDAMENTALS_PATH = _PROJECT_ROOT / "data" / "fundamentals.json"
 
 # Stock → sector ETF mapping
-_SECTOR_MAP: Dict[str, str] = {
+_SECTOR_MAP: dict[str, str] = {
     # Tech
-    'AAPL': 'XLK', 'MSFT': 'XLK', 'GOOGL': 'XLK', 'AMZN': 'XLK',
-    'META': 'XLK', 'NVDA': 'XLK', 'ADBE': 'XLK', 'AVGO': 'XLK',
-    'CRM': 'XLK', 'AMD': 'XLK', 'ACN': 'XLK',
+    "AAPL": "XLK",
+    "MSFT": "XLK",
+    "GOOGL": "XLK",
+    "AMZN": "XLK",
+    "META": "XLK",
+    "NVDA": "XLK",
+    "ADBE": "XLK",
+    "AVGO": "XLK",
+    "CRM": "XLK",
+    "AMD": "XLK",
+    "ACN": "XLK",
     # Consumer Discretionary
-    'TSLA': 'XLY', 'NFLX': 'XLY', 'COST': 'XLY', 'MCD': 'XLY',
-    'NKE': 'XLY', 'WMT': 'XLY', 'HD': 'XLY', 'DIS': 'XLY',
+    "TSLA": "XLY",
+    "NFLX": "XLY",
+    "COST": "XLY",
+    "MCD": "XLY",
+    "NKE": "XLY",
+    "WMT": "XLY",
+    "HD": "XLY",
+    "DIS": "XLY",
     # Healthcare
-    'JNJ': 'XLV', 'ABBV': 'XLV', 'MRK': 'XLV', 'TMO': 'XLV',
-    'DHR': 'XLV', 'ABT': 'XLV', 'UNH': 'XLV', 'LLY': 'XLV',
+    "JNJ": "XLV",
+    "ABBV": "XLV",
+    "MRK": "XLV",
+    "TMO": "XLV",
+    "DHR": "XLV",
+    "ABT": "XLV",
+    "UNH": "XLV",
+    "LLY": "XLV",
     # Financials
-    'MA': 'XLF', 'JPM': 'XLF', 'V': 'XLF',
+    "MA": "XLF",
+    "JPM": "XLF",
+    "V": "XLF",
     # Consumer Staples
-    'KO': 'XLP', 'PEP': 'XLP', 'PG': 'XLP',
+    "KO": "XLP",
+    "PEP": "XLP",
+    "PG": "XLP",
     # Energy
-    'XOM': 'XLE', 'CVX': 'XLE',
+    "XOM": "XLE",
+    "CVX": "XLE",
     # Telecom → use SPY as fallback
-    'VZ': 'SPY',
+    "VZ": "SPY",
 }
 
 
@@ -71,13 +98,15 @@ class FactorMomentumStrategy(TradingStrategy):
             capital=capital,
         )
         self.hold_days = 20
-        self.top_n = 5              # Buy top 5 stocks
-        self.profit_target_pct = 0.12   # Exit at 12% gain — lock in before mean-reversion
-        self.stop_loss_pct = 0.08       # Exit at 8% loss — factor momentum can trend hard
+        self.max_hold_days = 35  # absolute ceiling even for profitable positions
+        self.top_n = 5  # Buy top 5 stocks
+        self.profit_target_pct = 0.12  # Exit at 12% gain — lock in before mean-reversion
+        self.stop_loss_pct = 0.08  # Exit at 8% loss — factor momentum can trend hard
+        self.let_winners_run_pct = 0.05  # hold past time exit if ≥5% in profit
         self.entry_dates = {}
         self._last_rerank_date = None
 
-    def _load_fundamentals(self) -> Dict[str, Dict]:
+    def _load_fundamentals(self) -> dict[str, dict]:
         """Load fundamental data from data/fundamentals.json. Returns empty dict if absent."""
         try:
             if _FUNDAMENTALS_PATH.exists():
@@ -87,20 +116,24 @@ class FactorMomentumStrategy(TradingStrategy):
             logger.warning("Could not load fundamentals: %s", exc)
         return {}
 
-    def _sector_regime_multipliers(self, market_data: pd.DataFrame) -> Dict[str, float]:
+    def _sector_regime_multipliers(self, market_data: pd.DataFrame) -> dict[str, float]:
         """Return a score multiplier per sector ETF based on 20-day trend.
 
         Sector ETF above its 20-day SMA  → multiplier 1.10 (mild tailwind)
         Sector ETF below its 20-day SMA  → multiplier 0.80 (mild headwind)
         Insufficient data                → multiplier 1.00 (neutral)
         """
-        multipliers: Dict[str, float] = {}
+        multipliers: dict[str, float] = {}
         for etf in set(_SECTOR_MAP.values()):
-            rows = market_data[market_data['symbol'] == etf] if 'symbol' in market_data.columns else pd.DataFrame()
+            rows = (
+                market_data[market_data["symbol"] == etf]
+                if "symbol" in market_data.columns
+                else pd.DataFrame()
+            )
             if len(rows) < 20:
                 multipliers[etf] = 1.0
                 continue
-            prices = rows['close'].values
+            prices = rows["close"].values
             sma20 = float(np.mean(prices[-20:]))
             last_price = float(prices[-1])
             if last_price > sma20:
@@ -109,7 +142,7 @@ class FactorMomentumStrategy(TradingStrategy):
                 multipliers[etf] = 0.80
         return multipliers
 
-    def _compute_factor_scores(self, market_data: pd.DataFrame) -> Dict[str, float]:
+    def _compute_factor_scores(self, market_data: pd.DataFrame) -> dict[str, float]:
         """Compute composite factor score per symbol using cross-sectional percentile ranks.
 
         Factors:
@@ -122,16 +155,17 @@ class FactorMomentumStrategy(TradingStrategy):
           7. Fundamental quality (ROE/debt)       weight 0.10  (if available)
           8. Fundamental value (1/PE)             weight 0.05  (if available)
         """
-        counts = market_data.groupby('symbol').size()
+        counts = market_data.groupby("symbol").size()
         eligible = counts[counts >= 60].index
         if len(eligible) < 3:
             return {}
 
-        filtered = market_data[market_data['symbol'].isin(eligible)]
-        latest_df = filtered.groupby('symbol').last()
+        filtered = market_data[market_data["symbol"].isin(eligible)]
+        latest_df = filtered.groupby("symbol").last()
 
         # Exclude benchmark ETFs from scoring (they are data sources, not trading candidates)
         from src.data.universe_provider import UniverseProvider
+
         benchmarks = UniverseProvider.BENCHMARK_SYMBOLS
         tradeable = latest_df.index.difference(list(benchmarks))
         if len(tradeable) < 3:
@@ -139,42 +173,47 @@ class FactorMomentumStrategy(TradingStrategy):
         latest_df = latest_df.loc[tradeable]
 
         # --- Factor 1: 60d momentum ---
-        momentum = latest_df['returns_60d'].fillna(0.0).astype(float)
+        momentum = latest_df["returns_60d"].fillna(0.0).astype(float)
 
         # --- Factor 2: Quality proxy ---
-        vol_20d = latest_df['volatility_20d'].fillna(0.2).astype(float)
+        vol_20d = latest_df["volatility_20d"].fillna(0.2).astype(float)
         quality = -vol_20d + momentum.clip(lower=0) * 0.5
 
         # --- Factor 3: Mean-reversion (RSI 25-45 oversold) ---
-        rsi = latest_df['rsi'].fillna(50.0).astype(float)
+        rsi = latest_df["rsi"].fillna(50.0).astype(float)
         reversion_score = pd.Series(
             np.where((rsi >= 25) & (rsi <= 45), (45 - rsi) / 20, 0.0),
             index=latest_df.index,
         )
 
         # --- Factor 4: Volume confirmation ---
-        vol_ratio = latest_df['volume_ratio'].fillna(1.0).astype(float)
-        ret_5d = latest_df['returns_5d'].fillna(0.0).astype(float)
+        vol_ratio = latest_df["volume_ratio"].fillna(1.0).astype(float)
+        ret_5d = latest_df["returns_5d"].fillna(0.0).astype(float)
         volume_confirm = vol_ratio * ret_5d.clip(lower=0)
 
         # --- Factor 5: Excess momentum over SPY (alpha momentum) ---
         spy_ret = 0.0
-        if 'SPY' in filtered['symbol'].values or (
-                'symbol' in market_data.columns and 'SPY' in market_data['symbol'].values):
-            spy_rows = market_data[market_data['symbol'] == 'SPY']
+        if "SPY" in filtered["symbol"].values or (
+            "symbol" in market_data.columns and "SPY" in market_data["symbol"].values
+        ):
+            spy_rows = market_data[market_data["symbol"] == "SPY"]
             if not spy_rows.empty:
                 spy_last = spy_rows.iloc[-1]
-                spy_ret = float(spy_last.get('returns_60d', 0.0) or 0.0)
+                spy_ret = float(spy_last.get("returns_60d", 0.0) or 0.0)
         excess_momentum = momentum - spy_ret
 
         # --- Factor 6: Sector relative strength ---
         sector_excess = pd.Series(0.0, index=latest_df.index)
         for sym in latest_df.index:
-            sector_etf = _SECTOR_MAP.get(sym, 'SPY')
-            etf_rows = market_data[market_data['symbol'] == sector_etf] if 'symbol' in market_data.columns else pd.DataFrame()
+            sector_etf = _SECTOR_MAP.get(sym, "SPY")
+            etf_rows = (
+                market_data[market_data["symbol"] == sector_etf]
+                if "symbol" in market_data.columns
+                else pd.DataFrame()
+            )
             if not etf_rows.empty:
-                etf_ret = float(etf_rows.iloc[-1].get('returns_60d', 0.0) or 0.0)
-                sector_excess[sym] = float(latest_df.loc[sym, 'returns_60d'] or 0.0) - etf_ret
+                etf_ret = float(etf_rows.iloc[-1].get("returns_60d", 0.0) or 0.0)
+                sector_excess[sym] = float(latest_df.loc[sym, "returns_60d"] or 0.0) - etf_ret
 
         # --- Factors 7 & 8: Fundamental quality + value (optional) ---
         fundamentals = self._load_fundamentals()
@@ -184,62 +223,67 @@ class FactorMomentumStrategy(TradingStrategy):
         if has_fundamentals:
             for sym in latest_df.index:
                 f = fundamentals.get(sym, {})
-                roe = float(f.get('roe', 0.0) or 0.0)
-                debt_eq = float(f.get('debt_to_equity', 1.0) or 1.0)
-                pe = float(f.get('pe_ratio', 20.0) or 20.0)
+                roe = float(f.get("roe", 0.0) or 0.0)
+                debt_eq = float(f.get("debt_to_equity", 1.0) or 1.0)
+                pe = float(f.get("pe_ratio", 20.0) or 20.0)
                 fund_quality[sym] = roe / max(debt_eq, 0.1)
                 fund_value[sym] = 1.0 / max(pe, 1.0)
 
         # Assemble and cross-sectionally rank
-        factors = pd.DataFrame({
-            'momentum': momentum,
-            'quality': quality,
-            'reversion': reversion_score,
-            'volume': volume_confirm,
-            'excess_momentum': excess_momentum,
-            'sector_rs': sector_excess,
-            'fund_quality': fund_quality,
-            'fund_value': fund_value,
-        }, index=latest_df.index)
+        factors = pd.DataFrame(
+            {
+                "momentum": momentum,
+                "quality": quality,
+                "reversion": reversion_score,
+                "volume": volume_confirm,
+                "excess_momentum": excess_momentum,
+                "sector_rs": sector_excess,
+                "fund_quality": fund_quality,
+                "fund_value": fund_value,
+            },
+            index=latest_df.index,
+        )
 
         for col in factors.columns:
-            factors[f'{col}_pct'] = factors[col].rank(pct=True)
+            factors[f"{col}_pct"] = factors[col].rank(pct=True)
 
         if has_fundamentals:
-            factors['composite'] = (
-                0.25 * factors['momentum_pct'] +
-                0.15 * factors['quality_pct'] +
-                0.10 * factors['reversion_pct'] +
-                0.10 * factors['volume_pct'] +
-                0.15 * factors['excess_momentum_pct'] +
-                0.10 * factors['sector_rs_pct'] +
-                0.10 * factors['fund_quality_pct'] +
-                0.05 * factors['fund_value_pct']
+            factors["composite"] = (
+                0.25 * factors["momentum_pct"]
+                + 0.15 * factors["quality_pct"]
+                + 0.10 * factors["reversion_pct"]
+                + 0.10 * factors["volume_pct"]
+                + 0.15 * factors["excess_momentum_pct"]
+                + 0.10 * factors["sector_rs_pct"]
+                + 0.10 * factors["fund_quality_pct"]
+                + 0.05 * factors["fund_value_pct"]
             )
         else:
-            factors['composite'] = (
-                0.30 * factors['momentum_pct'] +
-                0.15 * factors['quality_pct'] +
-                0.10 * factors['reversion_pct'] +
-                0.10 * factors['volume_pct'] +
-                0.20 * factors['excess_momentum_pct'] +
-                0.15 * factors['sector_rs_pct']
+            factors["composite"] = (
+                0.30 * factors["momentum_pct"]
+                + 0.15 * factors["quality_pct"]
+                + 0.10 * factors["reversion_pct"]
+                + 0.10 * factors["volume_pct"]
+                + 0.20 * factors["excess_momentum_pct"]
+                + 0.15 * factors["sector_rs_pct"]
             )
             logger.debug("Fundamentals unavailable — using 6-factor model")
 
         # E2: Apply sector regime tilt — multiply composite by sector ETF trend multiplier
         sector_mults = self._sector_regime_multipliers(market_data)
-        tilted: Dict[str, float] = {}
-        for sym, score in factors['composite'].items():
-            etf = _SECTOR_MAP.get(sym, 'SPY')
+        tilted: dict[str, float] = {}
+        for sym, score in factors["composite"].items():
+            etf = _SECTOR_MAP.get(sym, "SPY")
             mult = sector_mults.get(etf, 1.0)
             tilted[sym] = score * mult
             if mult != 1.0:
-                logger.debug(f"Sector tilt {sym} ({etf}): {score:.3f} × {mult:.2f} = {tilted[sym]:.3f}")
+                logger.debug(
+                    f"Sector tilt {sym} ({etf}): {score:.3f} × {mult:.2f} = {tilted[sym]:.3f}"
+                )
 
         return tilted
 
-    def generate_signals(self, market_data: pd.DataFrame) -> List[Dict]:
+    def generate_signals(self, market_data: pd.DataFrame) -> list[dict]:
         """Generate signals by ranking stocks and buying top quintile."""
         signals = []
         latest_date = market_data.index[-1] if len(market_data) > 0 else None
@@ -247,7 +291,7 @@ class FactorMomentumStrategy(TradingStrategy):
             return signals
 
         # Pre-build symbol→DataFrame lookup once — avoids repeated boolean filter per position
-        sym_map = {sym: grp for sym, grp in market_data.groupby('symbol')}
+        sym_map = {sym: grp for sym, grp in market_data.groupby("symbol")}  # noqa: C416
 
         # Check SELL first — profit target, stop-loss, or time-based rebalance
         for symbol in list(self.positions.keys()):
@@ -255,34 +299,52 @@ class FactorMomentumStrategy(TradingStrategy):
             sym_data = sym_map.get(symbol)
             if sym_data is None or sym_data.empty:
                 continue
-            price = float(sym_data.iloc[-1]['close'])
+            price = float(sym_data.iloc[-1]["close"])
             shares = self.positions[symbol]
-            entry_price = getattr(self, 'entry_prices', {}).get(symbol)
+            entry_price = getattr(self, "entry_prices", {}).get(symbol)
 
             exit_reason = None
             if entry_price and entry_price > 0:
                 pnl_pct = (price - entry_price) / entry_price
                 if pnl_pct >= self.profit_target_pct:
-                    exit_reason = f'Profit target: {pnl_pct:.1%} gain (target {self.profit_target_pct:.0%})'
+                    exit_reason = (
+                        f"Profit target: {pnl_pct:.1%} gain (target {self.profit_target_pct:.0%})"
+                    )
                 elif pnl_pct <= -self.stop_loss_pct:
-                    exit_reason = f'Stop-loss: {pnl_pct:.1%} loss (limit -{self.stop_loss_pct:.0%})'
+                    exit_reason = f"Stop-loss: {pnl_pct:.1%} loss (limit -{self.stop_loss_pct:.0%})"
             if exit_reason is None and days_held >= self.hold_days:
-                exit_reason = f'Factor rebalance: held {days_held}d'
+                # Let winners run: if strongly profitable, hold past nominal rebalance
+                # up to max_hold_days so trending winners aren't cut prematurely.
+                if (
+                    entry_price
+                    and entry_price > 0
+                    and days_held < self.max_hold_days
+                    and (price - entry_price) / entry_price >= self.let_winners_run_pct
+                ):
+                    pass  # momentum still working — keep holding
+                else:
+                    exit_reason = f"Factor rebalance: held {days_held}d"
 
             if exit_reason:
-                signals.append({
-                    'symbol': symbol,
-                    'action': 'SELL',
-                    'shares': shares,
-                    'price': price,
-                    'value': shares * price,
-                    'confidence': 0.9 if 'Profit' in (exit_reason or '') or 'Stop' in (exit_reason or '') else 0.7,
-                    'reasoning': exit_reason,
-                })
+                signals.append(
+                    {
+                        "symbol": symbol,
+                        "action": "SELL",
+                        "shares": shares,
+                        "price": price,
+                        "value": shares * price,
+                        "confidence": 0.9
+                        if "Profit" in (exit_reason or "") or "Stop" in (exit_reason or "")
+                        else 0.7,
+                        "reasoning": exit_reason,
+                    }
+                )
 
         # Only generate new BUY signals if we have capacity
         current_positions = len(self.positions)
-        buy_capacity = self.top_n - current_positions + len([s for s in signals if s['action'] == 'SELL'])
+        buy_capacity = (
+            self.top_n - current_positions + len([s for s in signals if s["action"] == "SELL"])
+        )
 
         if buy_capacity <= 0:
             return signals
@@ -294,10 +356,9 @@ class FactorMomentumStrategy(TradingStrategy):
 
         # Rank and select top N (exclude already held)
         ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-        candidates = [
-            (sym, score) for sym, score in ranked
-            if sym not in self.positions
-        ][:buy_capacity]
+        candidates = [(sym, score) for sym, score in ranked if sym not in self.positions][
+            :buy_capacity
+        ]
 
         for symbol, score in candidates:
             sym_data = sym_map.get(symbol)
@@ -305,25 +366,29 @@ class FactorMomentumStrategy(TradingStrategy):
                 continue
 
             latest = sym_data.iloc[-1]
-            price = float(latest['close'])
-            atr = float(latest.get('atr_20', 0)) if not pd.isna(latest.get('atr_20', np.nan)) else 0
+            price = float(latest["close"])
+            atr = float(latest.get("atr_20", 0)) if not pd.isna(latest.get("atr_20", np.nan)) else 0
 
-            shares = self.calculate_position_size(price, atr=atr if atr > 0 else None, max_position_pct=0.08)
+            shares = self.calculate_position_size(
+                price, atr=atr if atr > 0 else None, max_position_pct=0.08
+            )
             if shares <= 0:
                 continue
 
             confidence = min(0.9, 0.4 + score)
 
-            signals.append({
-                'symbol': symbol,
-                'action': 'BUY',
-                'shares': shares,
-                'price': price,
-                'value': shares * price,
-                'confidence': confidence,
-                'reasoning': f'Factor rank score {score:.3f} (top {len(candidates)})',
-                'atr': atr if atr > 0 else None,
-            })
+            signals.append(
+                {
+                    "symbol": symbol,
+                    "action": "BUY",
+                    "shares": shares,
+                    "price": price,
+                    "value": shares * price,
+                    "confidence": confidence,
+                    "reasoning": f"Factor rank score {score:.3f} (top {len(candidates)})",
+                    "atr": atr if atr > 0 else None,
+                }
+            )
 
         return signals
 
