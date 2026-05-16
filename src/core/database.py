@@ -5,40 +5,41 @@ Single source of truth for paper trading operational validation
 """
 from __future__ import annotations
 
-import logging
-import sqlite3
-from typing import List, Dict, Optional, Tuple
-from datetime import datetime, timedelta
 import json
+import logging
 import random
+import sqlite3
 import string
+from datetime import datetime, timedelta
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 
 class TradingDatabase:
     """Database adapter for trading system with proper schema"""
-    
-    def __init__(self, db_path='trading.db', run_id=None):
+
+    def __init__(self, db_path="trading.db", run_id=None):
         self.db_path = db_path
         self.run_id = run_id or self._generate_run_id()
         self._init_database()
-    
+
     def _generate_run_id(self) -> str:
         """Generate unique run_id: YYYYMMDD_HHMMSS_<random_suffix>"""
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        suffix = ''.join(random.choices(string.ascii_lowercase + string.digits, k=4))
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        suffix = "".join(random.choices(string.ascii_lowercase + string.digits, k=4))
         return f"{timestamp}_{suffix}"
-    
+
     def _init_database(self):
         """Initialize trading database schema"""
         conn = sqlite3.connect(self.db_path)
-        conn.execute('PRAGMA journal_mode=WAL')   # concurrent readers don't block each other
-        conn.execute('PRAGMA synchronous=NORMAL') # safe + faster than FULL for WAL mode
+        conn.execute("PRAGMA journal_mode=WAL")  # concurrent readers don't block each other
+        conn.execute("PRAGMA synchronous=NORMAL")  # safe + faster than FULL for WAL mode
         cursor = conn.cursor()
-        
+
         # Strategies table
-        cursor.execute('''
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS strategies (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT UNIQUE NOT NULL,
@@ -48,10 +49,12 @@ class TradingDatabase:
                 status TEXT DEFAULT 'active',
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
-        ''')
-        
+        """
+        )
+
         # Signals table with asof_date and terminal state tracking
-        cursor.execute('''
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS signals (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 run_id TEXT NOT NULL,
@@ -67,17 +70,25 @@ class TradingDatabase:
                 terminal_at TEXT,
                 FOREIGN KEY (strategy_id) REFERENCES strategies(id)
             )
-        ''')
-        
+        """
+        )
+
         # Create indexes for common queries (Phase 3.1 optimization)
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_signals_run_id ON signals(run_id)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_signals_symbol ON signals(symbol)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_signals_terminal_state ON signals(terminal_state)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_signals_generated_at ON signals(generated_at)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_signals_strategy_date ON signals(strategy_id, generated_at)')
-        
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_signals_run_id ON signals(run_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_signals_symbol ON signals(symbol)")
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_signals_terminal_state ON signals(terminal_state)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_signals_generated_at ON signals(generated_at)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_signals_strategy_date ON signals(strategy_id, generated_at)"
+        )
+
         # Trades table with execution costs
-        cursor.execute('''
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS trades (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 run_id TEXT NOT NULL,
@@ -98,14 +109,18 @@ class TradingDatabase:
                 FOREIGN KEY (strategy_id) REFERENCES strategies(id),
                 FOREIGN KEY (signal_id) REFERENCES signals(id)
             )
-        ''')
-        
+        """
+        )
+
         # Indexes for trades: run_id lookups + strategy/date range queries (health scorer, performance report)
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_trades_run_id ON trades(run_id)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_trades_strategy_date ON trades(strategy_id, executed_at)')
-        
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_run_id ON trades(run_id)")
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_trades_strategy_date ON trades(strategy_id, executed_at)"
+        )
+
         # Positions table
-        cursor.execute('''
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS positions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 strategy_id INTEGER NOT NULL,
@@ -123,10 +138,12 @@ class TradingDatabase:
                 FOREIGN KEY (strategy_id) REFERENCES strategies(id),
                 UNIQUE(strategy_id, symbol)
             )
-        ''')
-        
+        """
+        )
+
         # Broker state snapshots
-        cursor.execute('''
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS broker_state (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 run_id TEXT NOT NULL,
@@ -140,22 +157,26 @@ class TradingDatabase:
                 discrepancies_json TEXT,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
-        ''')
-        
+        """
+        )
+
         # Add index on run_id for performance
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_broker_state_run_id ON broker_state(run_id)')
-        
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_broker_state_run_id ON broker_state(run_id)")
+
         # System state
-        cursor.execute('''
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS system_state (
                 key TEXT PRIMARY KEY,
                 value TEXT,
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
             )
-        ''')
+        """
+        )
 
         # Run state machine tracking
-        cursor.execute('''
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS run_state (
                 run_id TEXT PRIMARY KEY,
                 stage TEXT NOT NULL,
@@ -166,12 +187,16 @@ class TradingDatabase:
                 updated_at TEXT NOT NULL,
                 completed_at TEXT
             )
-        ''')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_run_state_status ON run_state(status)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_run_state_updated_at ON run_state(updated_at)')
+        """
+        )
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_run_state_status ON run_state(status)")
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_run_state_updated_at ON run_state(updated_at)"
+        )
 
         # Notification outbox (decouples runtime from delivery side effects)
-        cursor.execute('''
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS notification_outbox (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 run_id TEXT,
@@ -185,25 +210,29 @@ class TradingDatabase:
                 created_at TEXT NOT NULL,
                 sent_at TEXT
             )
-        ''')
-        cursor.execute(
-            'CREATE INDEX IF NOT EXISTS idx_notification_outbox_status ON notification_outbox(status)'
+        """
         )
         cursor.execute(
-            'CREATE INDEX IF NOT EXISTS idx_notification_outbox_run_id ON notification_outbox(run_id)'
+            "CREATE INDEX IF NOT EXISTS idx_notification_outbox_status ON notification_outbox(status)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_notification_outbox_run_id ON notification_outbox(run_id)"
         )
 
         # Per-run SLO metrics for observability
-        cursor.execute('''
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS run_slo_metrics (
                 run_id TEXT PRIMARY KEY,
                 metrics_json TEXT NOT NULL,
                 created_at TEXT NOT NULL
             )
-        ''')
+        """
+        )
 
         # Signal funnel tracking (portfolio-level per run)
-        cursor.execute('''
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS signal_funnel (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 run_id TEXT NOT NULL,
@@ -217,10 +246,12 @@ class TradingDatabase:
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (strategy_id) REFERENCES strategies(id)
             )
-        ''')
-        
+        """
+        )
+
         # Signal rejection reasons (per-signal detail)
-        cursor.execute('''
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS signal_rejections (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 run_id TEXT NOT NULL,
@@ -234,10 +265,12 @@ class TradingDatabase:
                 FOREIGN KEY (signal_id) REFERENCES signals(id),
                 FOREIGN KEY (strategy_id) REFERENCES strategies(id)
             )
-        ''')
-        
+        """
+        )
+
         # Order intents (idempotency tracking)
-        cursor.execute('''
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS order_intents (
                 intent_id TEXT PRIMARY KEY,
                 run_id TEXT NOT NULL,
@@ -255,18 +288,32 @@ class TradingDatabase:
                 filled_at TEXT,
                 FOREIGN KEY (strategy_id) REFERENCES strategies(id)
             )
-        ''')
-        
+        """
+        )
+
         # Add indexes for performance
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_signal_funnel_run_id ON signal_funnel(run_id)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_signal_rejections_run_id ON signal_rejections(run_id)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_signal_rejections_stage ON signal_rejections(stage)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_rejections_strategy_date ON signal_rejections(strategy_id, created_at)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_order_intents_run_id ON order_intents(run_id)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_order_intents_status ON order_intents(status)')
-        
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_signal_funnel_run_id ON signal_funnel(run_id)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_signal_rejections_run_id ON signal_rejections(run_id)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_signal_rejections_stage ON signal_rejections(stage)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_rejections_strategy_date ON signal_rejections(strategy_id, created_at)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_order_intents_run_id ON order_intents(run_id)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_order_intents_status ON order_intents(status)"
+        )
+
         # Per-strategy daily performance snapshots (feeds dynamic allocator)
-        cursor.execute('''
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS strategy_performance (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 run_id TEXT NOT NULL,
@@ -281,26 +328,28 @@ class TradingDatabase:
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (strategy_id) REFERENCES strategies(id)
             )
-        ''')
+        """
+        )
         # Schema migration: add snapshot_date if missing from a pre-existing DB.
         # Must run BEFORE the index creation below which references snapshot_date.
         cursor.execute("PRAGMA table_info(strategy_performance)")
         existing_cols = {row[1] for row in cursor.fetchall()}
-        if 'snapshot_date' not in existing_cols:
+        if "snapshot_date" not in existing_cols:
             cursor.execute(
                 "ALTER TABLE strategy_performance ADD COLUMN snapshot_date TEXT NOT NULL DEFAULT ''"
             )
             logger.info("Migrated strategy_performance: added snapshot_date column")
 
         cursor.execute(
-            'CREATE INDEX IF NOT EXISTS idx_strategy_perf_strat ON strategy_performance(strategy_id)'
+            "CREATE INDEX IF NOT EXISTS idx_strategy_perf_strat ON strategy_performance(strategy_id)"
         )
         cursor.execute(
-            'CREATE INDEX IF NOT EXISTS idx_strategy_perf_date ON strategy_performance(snapshot_date)'
+            "CREATE INDEX IF NOT EXISTS idx_strategy_perf_date ON strategy_performance(snapshot_date)"
         )
 
         # Paper trading validation: portfolio-level daily snapshot
-        cursor.execute('''
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS daily_portfolio_snapshot (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 run_id TEXT NOT NULL,
@@ -321,13 +370,15 @@ class TradingDatabase:
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(snapshot_date)
             )
-        ''')
+        """
+        )
         cursor.execute(
-            'CREATE INDEX IF NOT EXISTS idx_daily_snap_date ON daily_portfolio_snapshot(snapshot_date)'
+            "CREATE INDEX IF NOT EXISTS idx_daily_snap_date ON daily_portfolio_snapshot(snapshot_date)"
         )
 
         # Per-trade P&L detail: matched BUY→SELL for win rate and profit factor
-        cursor.execute('''
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS trade_pnl_detail (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 strategy_id INTEGER NOT NULL,
@@ -348,33 +399,38 @@ class TradingDatabase:
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (strategy_id) REFERENCES strategies(id)
             )
-        ''')
-        cursor.execute(
-            'CREATE INDEX IF NOT EXISTS idx_trade_pnl_strategy ON trade_pnl_detail(strategy_id)'
+        """
         )
         cursor.execute(
-            'CREATE INDEX IF NOT EXISTS idx_trade_pnl_exit ON trade_pnl_detail(exit_date)'
+            "CREATE INDEX IF NOT EXISTS idx_trade_pnl_strategy ON trade_pnl_detail(strategy_id)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_trade_pnl_exit ON trade_pnl_detail(exit_date)"
         )
 
         conn.commit()
         conn.close()
 
-    def upsert_run_state(self, stage: str, status: str,
-                         error_message: Optional[str] = None,
-                         metadata: Optional[Dict] = None,
-                         completed: bool = False) -> None:
+    def upsert_run_state(
+        self,
+        stage: str,
+        status: str,
+        error_message: Optional[str] = None,
+        metadata: Optional[dict] = None,
+        completed: bool = False,
+    ) -> None:
         """Create or update run-state machine row for the current run."""
         now = datetime.now().isoformat()
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute('SELECT run_id FROM run_state WHERE run_id = ?', (self.run_id,))
+        cursor.execute("SELECT run_id FROM run_state WHERE run_id = ?", (self.run_id,))
         exists = cursor.fetchone() is not None
         metadata_json = json.dumps(metadata) if metadata else None
 
         if exists:
             cursor.execute(
-                '''
+                """
                 UPDATE run_state
                 SET stage = ?,
                     status = ?,
@@ -383,16 +439,16 @@ class TradingDatabase:
                     updated_at = ?,
                     completed_at = CASE WHEN ? THEN ? ELSE completed_at END
                 WHERE run_id = ?
-                ''',
+                """,
                 (stage, status, error_message, metadata_json, now, completed, now, self.run_id),
             )
         else:
             cursor.execute(
-                '''
+                """
                 INSERT INTO run_state
                 (run_id, stage, status, error_message, metadata_json, started_at, updated_at, completed_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ''',
+                """,
                 (
                     self.run_id,
                     stage,
@@ -414,11 +470,11 @@ class TradingDatabase:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute(
-            '''
+            """
             INSERT INTO notification_outbox
             (run_id, channel, category, subject, body, status, attempts, created_at)
             VALUES (?, ?, ?, ?, ?, 'PENDING', 0, ?)
-            ''',
+            """,
             (self.run_id, channel, category, subject, body, now),
         )
         notification_id = cursor.lastrowid
@@ -426,18 +482,18 @@ class TradingDatabase:
         conn.close()
         return notification_id
 
-    def fetch_pending_notifications(self, limit: int = 50) -> List[Dict]:
+    def fetch_pending_notifications(self, limit: int = 50) -> list[dict]:
         """Fetch pending/failed notifications for delivery workers."""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute(
-            '''
+            """
             SELECT * FROM notification_outbox
             WHERE status IN ('PENDING', 'FAILED')
             ORDER BY created_at ASC
             LIMIT ?
-            ''',
+            """,
             (limit,),
         )
         rows = [dict(r) for r in cursor.fetchall()]
@@ -449,13 +505,13 @@ class TradingDatabase:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute(
-            '''
+            """
             UPDATE notification_outbox
             SET status = 'SENT',
                 attempts = attempts + 1,
                 sent_at = ?
             WHERE id = ?
-            ''',
+            """,
             (datetime.now().isoformat(), notification_id),
         )
         conn.commit()
@@ -466,13 +522,13 @@ class TradingDatabase:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute(
-            '''
+            """
             UPDATE notification_outbox
             SET status = 'FAILED',
                 attempts = attempts + 1,
                 last_error = ?
             WHERE id = ?
-            ''',
+            """,
             (error_message[:1000], notification_id),
         )
         conn.commit()
@@ -483,12 +539,12 @@ class TradingDatabase:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute(
-            '''
+            """
             SELECT status
             FROM run_state
             ORDER BY updated_at DESC
             LIMIT ?
-            ''',
+            """,
             (max_lookback,),
         )
         rows = [str(r[0]).upper() for r in cursor.fetchall()]
@@ -496,42 +552,46 @@ class TradingDatabase:
 
         failures = 0
         for status in rows:
-            if status == 'FAILED':
+            if status == "FAILED":
                 failures += 1
             else:
                 break
         return failures
 
-    def save_run_slo_metrics(self, metrics: Dict) -> None:
+    def save_run_slo_metrics(self, metrics: dict) -> None:
         """Persist per-run SLO metrics for observability dashboards and audits."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute(
-            '''
+            """
             INSERT OR REPLACE INTO run_slo_metrics (run_id, metrics_json, created_at)
             VALUES (?, ?, ?)
-            ''',
+            """,
             (self.run_id, json.dumps(metrics), datetime.now().isoformat()),
         )
         conn.commit()
         conn.close()
 
-    def upsert_run_state(self, stage: str, status: str,
-                         error_message: Optional[str] = None,
-                         metadata: Optional[Dict] = None,
-                         completed: bool = False) -> None:
+    def upsert_run_state(
+        self,
+        stage: str,
+        status: str,
+        error_message: Optional[str] = None,
+        metadata: Optional[dict] = None,
+        completed: bool = False,
+    ) -> None:
         """Create or update run-state machine row for the current run."""
         now = datetime.now().isoformat()
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute('SELECT run_id FROM run_state WHERE run_id = ?', (self.run_id,))
+        cursor.execute("SELECT run_id FROM run_state WHERE run_id = ?", (self.run_id,))
         exists = cursor.fetchone() is not None
         metadata_json = json.dumps(metadata) if metadata else None
 
         if exists:
             cursor.execute(
-                '''
+                """
                 UPDATE run_state
                 SET stage = ?,
                     status = ?,
@@ -540,16 +600,16 @@ class TradingDatabase:
                     updated_at = ?,
                     completed_at = CASE WHEN ? THEN ? ELSE completed_at END
                 WHERE run_id = ?
-                ''',
+                """,
                 (stage, status, error_message, metadata_json, now, completed, now, self.run_id),
             )
         else:
             cursor.execute(
-                '''
+                """
                 INSERT INTO run_state
                 (run_id, stage, status, error_message, metadata_json, started_at, updated_at, completed_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ''',
+                """,
                 (
                     self.run_id,
                     stage,
@@ -571,11 +631,11 @@ class TradingDatabase:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute(
-            '''
+            """
             INSERT INTO notification_outbox
             (run_id, channel, category, subject, body, status, attempts, created_at)
             VALUES (?, ?, ?, ?, ?, 'PENDING', 0, ?)
-            ''',
+            """,
             (self.run_id, channel, category, subject, body, now),
         )
         notification_id = cursor.lastrowid
@@ -583,18 +643,18 @@ class TradingDatabase:
         conn.close()
         return notification_id
 
-    def fetch_pending_notifications(self, limit: int = 50) -> List[Dict]:
+    def fetch_pending_notifications(self, limit: int = 50) -> list[dict]:
         """Fetch pending/failed notifications for delivery workers."""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute(
-            '''
+            """
             SELECT * FROM notification_outbox
             WHERE status IN ('PENDING', 'FAILED')
             ORDER BY created_at ASC
             LIMIT ?
-            ''',
+            """,
             (limit,),
         )
         rows = [dict(r) for r in cursor.fetchall()]
@@ -606,13 +666,13 @@ class TradingDatabase:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute(
-            '''
+            """
             UPDATE notification_outbox
             SET status = 'SENT',
                 attempts = attempts + 1,
                 sent_at = ?
             WHERE id = ?
-            ''',
+            """,
             (datetime.now().isoformat(), notification_id),
         )
         conn.commit()
@@ -623,13 +683,13 @@ class TradingDatabase:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute(
-            '''
+            """
             UPDATE notification_outbox
             SET status = 'FAILED',
                 attempts = attempts + 1,
                 last_error = ?
             WHERE id = ?
-            ''',
+            """,
             (error_message[:1000], notification_id),
         )
         conn.commit()
@@ -640,12 +700,12 @@ class TradingDatabase:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute(
-            '''
+            """
             SELECT status
             FROM run_state
             ORDER BY updated_at DESC
             LIMIT ?
-            ''',
+            """,
             (max_lookback,),
         )
         rows = [str(r[0]).upper() for r in cursor.fetchall()]
@@ -653,38 +713,45 @@ class TradingDatabase:
 
         failures = 0
         for status in rows:
-            if status == 'FAILED':
+            if status == "FAILED":
                 failures += 1
             else:
                 break
         return failures
 
-    def save_run_slo_metrics(self, metrics: Dict) -> None:
+    def save_run_slo_metrics(self, metrics: dict) -> None:
         """Persist per-run SLO metrics for observability dashboards and audits."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute(
-            '''
+            """
             INSERT OR REPLACE INTO run_slo_metrics (run_id, metrics_json, created_at)
             VALUES (?, ?, ?)
-            ''',
+            """,
             (self.run_id, json.dumps(metrics), datetime.now().isoformat()),
         )
         conn.commit()
         conn.close()
 
-    def log_daily_snapshot(self, run_id: str, portfolio_value: float, cash: float,
-                            positions_value: float, heat_pct: float = None,
-                            vix: float = None, regime: str = None,
-                            allocation_json: str = None):
+    def log_daily_snapshot(
+        self,
+        run_id: str,
+        portfolio_value: float,
+        cash: float,
+        positions_value: float,
+        heat_pct: float = None,
+        vix: float = None,
+        regime: str = None,
+        allocation_json: str = None,
+    ):
         """Record end-of-run portfolio state for paper trading validation tracking."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        today = datetime.now().strftime('%Y-%m-%d')
+        today = datetime.now().strftime("%Y-%m-%d")
 
         # Compute daily P&L vs yesterday's snapshot
         cursor.execute(
-            'SELECT portfolio_value, peak_value FROM daily_portfolio_snapshot ORDER BY snapshot_date DESC LIMIT 1'
+            "SELECT portfolio_value, peak_value FROM daily_portfolio_snapshot ORDER BY snapshot_date DESC LIMIT 1"
         )
         prev = cursor.fetchone()
         prev_value = prev[0] if prev else portfolio_value
@@ -702,7 +769,8 @@ class TradingDatabase:
 
         drawdown_pct = (portfolio_value - peak_value) / peak_value if peak_value else 0.0
 
-        cursor.execute('''
+        cursor.execute(
+            """
             INSERT INTO daily_portfolio_snapshot
             (run_id, snapshot_date, portfolio_value, cash, positions_value,
              heat_pct, daily_pnl, daily_pnl_pct, cumulative_pnl, drawdown_pct,
@@ -721,26 +789,52 @@ class TradingDatabase:
                 vix = excluded.vix,
                 regime = excluded.regime,
                 allocation_json = excluded.allocation_json
-        ''', (run_id, today, portfolio_value, cash, positions_value,
-              heat_pct, daily_pnl, daily_pnl_pct, cumulative_pnl, drawdown_pct,
-              peak_value, 0, vix, regime, allocation_json))
+        """,
+            (
+                run_id,
+                today,
+                portfolio_value,
+                cash,
+                positions_value,
+                heat_pct,
+                daily_pnl,
+                daily_pnl_pct,
+                cumulative_pnl,
+                drawdown_pct,
+                peak_value,
+                0,
+                vix,
+                regime,
+                allocation_json,
+            ),
+        )
         conn.commit()
         conn.close()
 
-    def log_trade_pnl(self, strategy_id: int, strategy_name: str, symbol: str,
-                       sell_run_id: str, entry_price: float, exit_price: float,
-                       shares: float, entry_date: str = None, exit_reason: str = None):
+    def log_trade_pnl(
+        self,
+        strategy_id: int,
+        strategy_name: str,
+        symbol: str,
+        sell_run_id: str,
+        entry_price: float,
+        exit_price: float,
+        shares: float,
+        entry_date: str = None,
+        exit_reason: str = None,
+    ):
         """Record matched buy→sell P&L for win-rate and profit-factor tracking."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
         gross_pnl = (exit_price - entry_price) * shares
         gross_pnl_pct = (exit_price - entry_price) / entry_price if entry_price else 0.0
-        exit_date = datetime.now().strftime('%Y-%m-%d')
+        exit_date = datetime.now().strftime("%Y-%m-%d")
         hold_days = None
         if entry_date:
             try:
                 from datetime import date
+
                 ed = date.fromisoformat(entry_date[:10])
                 hold_days = (date.today() - ed).days
             except Exception:
@@ -749,21 +843,37 @@ class TradingDatabase:
         # Look up buy_run_id from trades table
         cursor.execute(
             "SELECT run_id FROM trades WHERE strategy_id=? AND symbol=? AND action='BUY' ORDER BY executed_at DESC LIMIT 1",
-            (strategy_id, symbol)
+            (strategy_id, symbol),
         )
         buy_row = cursor.fetchone()
         buy_run_id = buy_row[0] if buy_row else None
 
-        cursor.execute('''
+        cursor.execute(
+            """
             INSERT INTO trade_pnl_detail
             (strategy_id, strategy_name, symbol, buy_run_id, sell_run_id,
              entry_date, exit_date, entry_price, exit_price, shares,
              gross_pnl, gross_pnl_pct, hold_days, exit_reason, is_winner)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (strategy_id, strategy_name, symbol, buy_run_id, sell_run_id,
-              entry_date, exit_date, entry_price, exit_price, shares,
-              gross_pnl, gross_pnl_pct, hold_days, exit_reason,
-              1 if gross_pnl > 0 else 0))
+        """,
+            (
+                strategy_id,
+                strategy_name,
+                symbol,
+                buy_run_id,
+                sell_run_id,
+                entry_date,
+                exit_date,
+                entry_price,
+                exit_price,
+                shares,
+                gross_pnl,
+                gross_pnl_pct,
+                hold_days,
+                exit_reason,
+                1 if gross_pnl > 0 else 0,
+            ),
+        )
         conn.commit()
         conn.close()
 
@@ -771,25 +881,36 @@ class TradingDatabase:
         """Return win rate, profit factor, avg hold days, and streak stats for the last N days."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        since = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+        since = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
 
-        cursor.execute('''
+        cursor.execute(
+            """
             SELECT gross_pnl, gross_pnl_pct, hold_days, is_winner, strategy_name
             FROM trade_pnl_detail WHERE exit_date >= ? ORDER BY exit_date
-        ''', (since,))
+        """,
+            (since,),
+        )
         rows = cursor.fetchall()
 
-        cursor.execute('''
+        cursor.execute(
+            """
             SELECT snapshot_date, portfolio_value, daily_pnl_pct, drawdown_pct, cumulative_pnl
             FROM daily_portfolio_snapshot WHERE snapshot_date >= ?
             ORDER BY snapshot_date
-        ''', (since,))
+        """,
+            (since,),
+        )
         snapshots = cursor.fetchall()
         conn.close()
 
         if not rows:
-            return {'trades': 0, 'win_rate': None, 'profit_factor': None,
-                    'avg_hold_days': None, 'snapshots': snapshots}
+            return {
+                "trades": 0,
+                "win_rate": None,
+                "profit_factor": None,
+                "avg_hold_days": None,
+                "snapshots": snapshots,
+            }
 
         wins = [r for r in rows if r[3] == 1]
         losses = [r for r in rows if r[3] == 0]
@@ -798,105 +919,156 @@ class TradingDatabase:
         hold_days_list = [r[2] for r in rows if r[2] is not None]
 
         return {
-            'trades': len(rows),
-            'wins': len(wins),
-            'losses': len(losses),
-            'win_rate': len(wins) / len(rows),
-            'profit_factor': gross_wins / gross_losses,
-            'avg_hold_days': sum(hold_days_list) / len(hold_days_list) if hold_days_list else None,
-            'total_pnl': sum(r[0] for r in rows),
-            'avg_win_pct': sum(r[1] for r in wins) / len(wins) if wins else 0,
-            'avg_loss_pct': sum(r[1] for r in losses) / len(losses) if losses else 0,
-            'snapshots': snapshots,
+            "trades": len(rows),
+            "wins": len(wins),
+            "losses": len(losses),
+            "win_rate": len(wins) / len(rows),
+            "profit_factor": gross_wins / gross_losses,
+            "avg_hold_days": sum(hold_days_list) / len(hold_days_list) if hold_days_list else None,
+            "total_pnl": sum(r[0] for r in rows),
+            "avg_win_pct": sum(r[1] for r in wins) / len(wins) if wins else 0,
+            "avg_loss_pct": sum(r[1] for r in losses) / len(losses) if losses else 0,
+            "snapshots": snapshots,
         }
 
     def create_strategy(self, name: str, description: str, capital: float) -> int:
         """Create or get strategy"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
         # Try to get existing
-        cursor.execute('SELECT id FROM strategies WHERE name = ?', (name,))
+        cursor.execute("SELECT id FROM strategies WHERE name = ?", (name,))
         row = cursor.fetchone()
-        
+
         if row:
             strategy_id = row[0]
         else:
-            cursor.execute('''
+            cursor.execute(
+                """
                 INSERT INTO strategies (name, description, capital_allocation, initial_capital)
                 VALUES (?, ?, ?, ?)
-            ''', (name, description, capital, capital))
+            """,
+                (name, description, capital, capital),
+            )
             strategy_id = cursor.lastrowid
             conn.commit()
-        
+
         conn.close()
         return strategy_id
-    
-    def log_signal(self, strategy_id: int, symbol: str, signal_type: str, 
-                   confidence: float, reasoning: str, asof_date: str) -> int:
+
+    def log_signal(
+        self,
+        strategy_id: int,
+        symbol: str,
+        signal_type: str,
+        confidence: float,
+        reasoning: str,
+        asof_date: str,
+    ) -> int:
         """Log a trading signal"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
-        cursor.execute('''
-            INSERT INTO signals 
+
+        cursor.execute(
+            """
+            INSERT INTO signals
             (run_id, strategy_id, symbol, signal_type, confidence, reasoning, asof_date)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (self.run_id, strategy_id, symbol, signal_type, confidence, reasoning, asof_date))
-        
+        """,
+            (self.run_id, strategy_id, symbol, signal_type, confidence, reasoning, asof_date),
+        )
+
         signal_id = cursor.lastrowid
         conn.commit()
         conn.close()
-        
+
         return signal_id
-    
+
     def update_signal_terminal_state(self, signal_id: int, terminal_state: str, reason: str):
         """Update signal with terminal state"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
-        cursor.execute('''
-            UPDATE signals 
+
+        cursor.execute(
+            """
+            UPDATE signals
             SET terminal_state = ?, terminal_reason = ?, terminal_at = ?
             WHERE id = ?
-        ''', (terminal_state, reason, datetime.now().isoformat(), signal_id))
-        
+        """,
+            (terminal_state, reason, datetime.now().isoformat(), signal_id),
+        )
+
         conn.commit()
         conn.close()
-    
-    def log_trade(self, strategy_id: int, signal_id: Optional[int], symbol: str, 
-                  action: str, shares: float, requested_price: float, exec_price: float,
-                  slippage_cost: float, commission_cost: float, order_id: str, pnl: Optional[float] = None) -> int:
+
+    def log_trade(
+        self,
+        strategy_id: int,
+        signal_id: Optional[int],
+        symbol: str,
+        action: str,
+        shares: float,
+        requested_price: float,
+        exec_price: float,
+        slippage_cost: float,
+        commission_cost: float,
+        order_id: str,
+        pnl: Optional[float] = None,
+    ) -> int:
         """Log a trade with execution costs and P&L"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
         total_cost = slippage_cost + commission_cost
-        
+
         # Calculate notional
-        if action == 'BUY':
+        if action == "BUY":
             notional = exec_price * shares + total_cost
         else:  # SELL
             notional = exec_price * shares - total_cost
-        
-        cursor.execute('''
-            INSERT INTO trades 
+
+        cursor.execute(
+            """
+            INSERT INTO trades
             (run_id, strategy_id, signal_id, symbol, action, shares, requested_price, exec_price,
              slippage_cost, commission_cost, total_cost, notional, order_id, executed_at, pnl)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (self.run_id, strategy_id, signal_id, symbol, action, shares, requested_price, exec_price,
-              slippage_cost, commission_cost, total_cost, notional, order_id,
-              datetime.now().isoformat(), pnl))
-        
+        """,
+            (
+                self.run_id,
+                strategy_id,
+                signal_id,
+                symbol,
+                action,
+                shares,
+                requested_price,
+                exec_price,
+                slippage_cost,
+                commission_cost,
+                total_cost,
+                notional,
+                order_id,
+                datetime.now().isoformat(),
+                pnl,
+            ),
+        )
+
         trade_id = cursor.lastrowid
         conn.commit()
         conn.close()
-        
+
         return trade_id
-    
-    def update_position(self, strategy_id: int, symbol: str, shares: float,
-                       avg_price: float, current_price: Optional[float] = None,
-                       entry_date: Optional[str] = None, atr: Optional[float] = None):
+
+    def update_position(
+        self,
+        strategy_id: int,
+        symbol: str,
+        shares: float,
+        avg_price: float,
+        current_price: Optional[float] = None,
+        entry_date: Optional[str] = None,
+        atr: Optional[float] = None,
+    ):
         """Update or create position. entry_date and atr are only written on the
         first insert; subsequent updates preserve the original values via COALESCE."""
         conn = sqlite3.connect(self.db_path)
@@ -905,7 +1077,8 @@ class TradingDatabase:
         market_value = shares * current_price if current_price else shares * avg_price
         unrealized_pnl = (current_price - avg_price) * shares if current_price else 0
 
-        cursor.execute('''
+        cursor.execute(
+            """
             INSERT INTO positions
             (strategy_id, symbol, shares, avg_price, entry_price, current_price, market_value,
              unrealized_pnl, entry_date, atr, last_updated)
@@ -920,12 +1093,25 @@ class TradingDatabase:
                 entry_date = COALESCE(positions.entry_date, excluded.entry_date),
                 atr = COALESCE(positions.atr, excluded.atr),
                 last_updated = excluded.last_updated
-        ''', (strategy_id, symbol, shares, avg_price, avg_price, current_price, market_value,
-              unrealized_pnl, entry_date, atr, datetime.now().isoformat()))
-        
+        """,
+            (
+                strategy_id,
+                symbol,
+                shares,
+                avg_price,
+                avg_price,
+                current_price,
+                market_value,
+                unrealized_pnl,
+                entry_date,
+                atr,
+                datetime.now().isoformat(),
+            ),
+        )
+
         conn.commit()
         conn.close()
-    
+
     def refresh_position_prices(self, price_map: dict) -> int:
         """Bulk-update current_price and unrealized_pnl for all open positions.
 
@@ -959,169 +1145,211 @@ class TradingDatabase:
         """Delete a position (when fully closed)"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
-        cursor.execute('DELETE FROM positions WHERE strategy_id = ? AND symbol = ?',
-                      (strategy_id, symbol))
-        
+
+        cursor.execute(
+            "DELETE FROM positions WHERE strategy_id = ? AND symbol = ?", (strategy_id, symbol)
+        )
+
         conn.commit()
         conn.close()
-    
-    def save_broker_state(self, snapshot_date: str, snapshot_type: str, cash: float, 
-                         portfolio_value: float, buying_power: float, positions: List[Dict],
-                         reconciliation_status: str, discrepancies: List[str]):
+
+    def save_broker_state(
+        self,
+        snapshot_date: str,
+        snapshot_type: str,
+        cash: float,
+        portfolio_value: float,
+        buying_power: float,
+        positions: list[dict],
+        reconciliation_status: str,
+        discrepancies: list[str],
+    ):
         """Save broker state snapshot
-        
+
         Args:
             snapshot_type: 'START', 'RECONCILIATION', or 'END'
         """
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
-        cursor.execute('''
-            INSERT INTO broker_state 
-            (run_id, snapshot_date, snapshot_type, cash, portfolio_value, buying_power, 
+
+        cursor.execute(
+            """
+            INSERT INTO broker_state
+            (run_id, snapshot_date, snapshot_type, cash, portfolio_value, buying_power,
              positions_json, reconciliation_status, discrepancies_json)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (self.run_id, snapshot_date, snapshot_type, cash, portfolio_value, buying_power,
-              json.dumps(positions), reconciliation_status, json.dumps(discrepancies)))
-        
+        """,
+            (
+                self.run_id,
+                snapshot_date,
+                snapshot_type,
+                cash,
+                portfolio_value,
+                buying_power,
+                json.dumps(positions),
+                reconciliation_status,
+                json.dumps(discrepancies),
+            ),
+        )
+
         conn.commit()
         conn.close()
-    
-    def get_all_strategies(self) -> List[Dict]:
+
+    def get_all_strategies(self) -> list[dict]:
         """Get all strategies"""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        
+
         cursor.execute('SELECT * FROM strategies WHERE status = "active" ORDER BY id')
         rows = cursor.fetchall()
         conn.close()
-        
+
         return [dict(row) for row in rows]
-    
-    def get_positions(self, strategy_id: Optional[int] = None) -> List[Dict]:
+
+    def get_positions(self, strategy_id: Optional[int] = None) -> list[dict]:
         """Get positions"""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        
+
         if strategy_id:
-            cursor.execute('SELECT * FROM positions WHERE strategy_id = ?', (strategy_id,))
+            cursor.execute("SELECT * FROM positions WHERE strategy_id = ?", (strategy_id,))
         else:
-            cursor.execute('SELECT * FROM positions')
-        
+            cursor.execute("SELECT * FROM positions")
+
         rows = cursor.fetchall()
         conn.close()
-        
+
         return [dict(row) for row in rows]
 
-    def get_position(self, strategy_id: int, symbol: str) -> Optional[Dict]:
+    def get_position(self, strategy_id: int, symbol: str) -> Optional[dict]:
         """Get a single position for a strategy and symbol."""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
         cursor.execute(
-            'SELECT * FROM positions WHERE strategy_id = ? AND symbol = ?',
-            (strategy_id, symbol)
+            "SELECT * FROM positions WHERE strategy_id = ? AND symbol = ?", (strategy_id, symbol)
         )
         row = cursor.fetchone()
         conn.close()
 
         return dict(row) if row else None
-    
-    def get_todays_trades(self, date: str) -> List[Dict]:
+
+    def get_all_open_positions(self) -> list[dict]:
+        """Return all open positions (shares > 0) across all strategies."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM positions WHERE shares > 0")
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
+
+    def get_todays_trades(self, date: str) -> list[dict]:
         """Get trades for a specific date"""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        
-        cursor.execute('''
+
+        cursor.execute(
+            """
             SELECT t.*, s.name as strategy_name
             FROM trades t
             JOIN strategies s ON t.strategy_id = s.id
             WHERE DATE(t.executed_at) = ?
             ORDER BY t.executed_at
-        ''', (date,))
-        
+        """,
+            (date,),
+        )
+
         rows = cursor.fetchall()
         conn.close()
-        
+
         return [dict(row) for row in rows]
-    
-    def get_signals_without_terminal_state(self, run_id: Optional[str] = None) -> List[Dict]:
+
+    def get_signals_without_terminal_state(self, run_id: Optional[str] = None) -> list[dict]:
         """Get signals that haven't reached terminal state for a run"""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        
+
         rid = run_id or self.run_id
-        cursor.execute('''
-            SELECT * FROM signals 
+        cursor.execute(
+            """
+            SELECT * FROM signals
             WHERE run_id = ? AND terminal_state IS NULL
-        ''', (rid,))
-        
+        """,
+            (rid,),
+        )
+
         rows = cursor.fetchall()
         conn.close()
-        
+
         return [dict(row) for row in rows]
-    
-    def verify_terminal_states(self, run_id: Optional[str] = None) -> Tuple[int, int]:
+
+    def verify_terminal_states(self, run_id: Optional[str] = None) -> tuple[int, int]:
         """Verify all signals have terminal states. Returns (total, with_terminal)"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
         rid = run_id or self.run_id
-        cursor.execute('SELECT COUNT(*) FROM signals WHERE run_id = ?', (rid,))
+        cursor.execute("SELECT COUNT(*) FROM signals WHERE run_id = ?", (rid,))
         total = cursor.fetchone()[0]
-        
-        cursor.execute('''
-            SELECT COUNT(*) FROM signals 
+
+        cursor.execute(
+            """
+            SELECT COUNT(*) FROM signals
             WHERE run_id = ? AND terminal_state IS NOT NULL
-        ''', (rid,))
+        """,
+            (rid,),
+        )
         with_terminal = cursor.fetchone()[0]
-        
+
         conn.close()
-        
+
         return (total, with_terminal)
-    
-    def get_strategy_trades(self, strategy_id: int) -> List[Dict]:
+
+    def get_strategy_trades(self, strategy_id: int) -> list[dict]:
         """Get all trades for a strategy"""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT * FROM trades 
+
+        cursor.execute(
+            """
+            SELECT * FROM trades
             WHERE strategy_id = ?
             ORDER BY executed_at DESC
-        ''', (strategy_id,))
-        
+        """,
+            (strategy_id,),
+        )
+
         rows = cursor.fetchall()
         conn.close()
 
         trades = [dict(row) for row in rows]
         for trade in trades:
-            if trade.get('price') is None:
-                trade['price'] = trade.get('exec_price') or trade.get('requested_price') or 0.0
+            if trade.get("price") is None:
+                trade["price"] = trade.get("exec_price") or trade.get("requested_price") or 0.0
 
         return trades
-    
-    def get_strategy_performance(self, strategy_id: int, days: int = 30) -> List[Dict]:
+
+    def get_strategy_performance(self, strategy_id: int, days: int = 30) -> list[dict]:
         """Get strategy performance history for dynamic allocation."""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         try:
             rows = conn.execute(
-                '''
+                """
                 SELECT snapshot_date, portfolio_value, total_return_pct
                 FROM strategy_performance
                 WHERE strategy_id = ?
                   AND snapshot_date >= date('now', ?)
                 ORDER BY snapshot_date ASC
-                ''',
-                (strategy_id, f'-{days} days')
+                """,
+                (strategy_id, f"-{days} days"),
             ).fetchall()
             return [dict(r) for r in rows]
         except Exception:
@@ -1129,48 +1357,48 @@ class TradingDatabase:
         finally:
             conn.close()
 
-    def get_latest_performance(self, strategy_id: int) -> Optional[Dict]:
+    def get_latest_performance(self, strategy_id: int) -> Optional[dict]:
         """Get the most recent performance snapshot for a strategy."""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         try:
             row = conn.execute(
-                '''
+                """
                 SELECT * FROM strategy_performance
                 WHERE strategy_id = ?
                 ORDER BY snapshot_date DESC, created_at DESC
                 LIMIT 1
-                ''',
-                (strategy_id,)
+                """,
+                (strategy_id,),
             ).fetchone()
             return dict(row) if row else None
         except Exception:
             return None
         finally:
             conn.close()
-    
+
     def record_daily_performance(self, strategy_id: int, **kwargs):
         """Record a daily performance snapshot for a strategy."""
         conn = sqlite3.connect(self.db_path)
         try:
             conn.execute(
-                '''
+                """
                 INSERT INTO strategy_performance
                     (run_id, strategy_id, snapshot_date, portfolio_value, cash,
                      positions_value, total_return_pct, num_positions, num_trades)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''',
+                """,
                 (
                     self.run_id,
                     strategy_id,
-                    datetime.now().strftime('%Y-%m-%d'),
-                    kwargs.get('portfolio_value', 0.0),
-                    kwargs.get('cash', 0.0),
-                    kwargs.get('positions_value', 0.0),
-                    kwargs.get('total_return_pct', 0.0),
-                    kwargs.get('num_positions', 0),
-                    kwargs.get('num_trades', 0),
-                )
+                    datetime.now().strftime("%Y-%m-%d"),
+                    kwargs.get("portfolio_value", 0.0),
+                    kwargs.get("cash", 0.0),
+                    kwargs.get("positions_value", 0.0),
+                    kwargs.get("total_return_pct", 0.0),
+                    kwargs.get("num_positions", 0),
+                    kwargs.get("num_trades", 0),
+                ),
             )
             conn.commit()
         except Exception as e:
@@ -1178,228 +1406,287 @@ class TradingDatabase:
         finally:
             conn.close()
 
-    def save_signal_funnel(self, strategy_id: int, strategy_name: str, 
-                           raw: int, regime: int, correlation: int, risk: int, executed: int):
+    def save_signal_funnel(
+        self,
+        strategy_id: int,
+        strategy_name: str,
+        raw: int,
+        regime: int,
+        correlation: int,
+        risk: int,
+        executed: int,
+    ):
         """Save signal funnel counts for a strategy"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO signal_funnel 
+        cursor.execute(
+            """
+            INSERT INTO signal_funnel
             (run_id, strategy_id, strategy_name, raw_signals_count, after_regime_count,
              after_correlation_count, after_risk_count, executed_count)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (self.run_id, strategy_id, strategy_name, raw, regime, correlation, risk, executed))
+        """,
+            (self.run_id, strategy_id, strategy_name, raw, regime, correlation, risk, executed),
+        )
         conn.commit()
         conn.close()
-    
-    def log_signal_rejection(self, strategy_id: int, symbol: str, stage: str, 
-                             reason_code: str, details: dict = None, signal_id: int = None):
+
+    def log_signal_rejection(
+        self,
+        strategy_id: int,
+        symbol: str,
+        stage: str,
+        reason_code: str,
+        details: dict = None,
+        signal_id: int = None,
+    ):
         """Log why a signal was rejected"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO signal_rejections 
+        cursor.execute(
+            """
+            INSERT INTO signal_rejections
             (run_id, signal_id, strategy_id, symbol, stage, reason_code, details_json)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (self.run_id, signal_id, strategy_id, symbol, stage, reason_code, 
-              json.dumps(details) if details else None))
+        """,
+            (
+                self.run_id,
+                signal_id,
+                strategy_id,
+                symbol,
+                stage,
+                reason_code,
+                json.dumps(details) if details else None,
+            ),
+        )
         conn.commit()
         conn.close()
-    
-    def create_order_intent(self, strategy_id: int, symbol: str, side: str, 
-                           target_qty: float) -> str:
+
+    def create_order_intent(
+        self, strategy_id: int, symbol: str, side: str, target_qty: float
+    ) -> str:
         """Create order intent with deterministic ID"""
         import hashlib
-        timestamp_bucket = datetime.now().strftime('%Y%m%d_%H')
-        intent_string = f"{self.run_id}_{strategy_id}_{symbol}_{side}_{target_qty}_{timestamp_bucket}"
+
+        timestamp_bucket = datetime.now().strftime("%Y%m%d_%H")
+        intent_string = (
+            f"{self.run_id}_{strategy_id}_{symbol}_{side}_{target_qty}_{timestamp_bucket}"
+        )
         intent_id = hashlib.sha256(intent_string.encode()).hexdigest()[:16]
-        
+
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
-        cursor.execute('SELECT intent_id, status FROM order_intents WHERE intent_id = ?', (intent_id,))
+
+        cursor.execute(
+            "SELECT intent_id, status FROM order_intents WHERE intent_id = ?", (intent_id,)
+        )
         existing = cursor.fetchone()
-        
+
         if existing:
             conn.close()
             return existing[0]
-        
-        cursor.execute('''
-            INSERT INTO order_intents 
+
+        cursor.execute(
+            """
+            INSERT INTO order_intents
             (intent_id, run_id, strategy_id, symbol, side, target_qty, status)
             VALUES (?, ?, ?, ?, ?, ?, 'CREATED')
-        ''', (intent_id, self.run_id, strategy_id, symbol, side, target_qty))
+        """,
+            (intent_id, self.run_id, strategy_id, symbol, side, target_qty),
+        )
         conn.commit()
         conn.close()
-        
+
         return intent_id
-    
-    def update_order_intent_status(self, intent_id: str, status: str, 
-                                   broker_order_id: str = None, error: str = None):
+
+    def update_order_intent_status(
+        self, intent_id: str, status: str, broker_order_id: str = None, error: str = None
+    ):
         """Update order intent status"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
         timestamp_field = {
-            'SUBMITTED': 'submitted_at',
-            'ACKED': 'acked_at',
-            'FILLED': 'filled_at'
+            "SUBMITTED": "submitted_at",
+            "ACKED": "acked_at",
+            "FILLED": "filled_at",
         }.get(status)
-        
+
         if timestamp_field:
-            cursor.execute(f'''
-                UPDATE order_intents 
+            cursor.execute(
+                f"""
+                UPDATE order_intents
                 SET status = ?, broker_order_id = ?, {timestamp_field} = ?
                 WHERE intent_id = ?
-            ''', (status, broker_order_id, datetime.now().isoformat(), intent_id))
+            """,
+                (status, broker_order_id, datetime.now().isoformat(), intent_id),
+            )
         else:
-            cursor.execute('''
-                UPDATE order_intents 
+            cursor.execute(
+                """
+                UPDATE order_intents
                 SET status = ?, broker_order_id = ?, error_message = ?
                 WHERE intent_id = ?
-            ''', (status, broker_order_id, error, intent_id))
-        
+            """,
+                (status, broker_order_id, error, intent_id),
+            )
+
         conn.commit()
         conn.close()
-    
-    def get_signal_funnel_summary(self, run_id: str = None) -> List[Dict]:
+
+    def get_signal_funnel_summary(self, run_id: str = None) -> list[dict]:
         """Get funnel summary for email reporting"""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        
+
         rid = run_id or self.run_id
-        cursor.execute('SELECT * FROM signal_funnel WHERE run_id = ?', (rid,))
+        cursor.execute("SELECT * FROM signal_funnel WHERE run_id = ?", (rid,))
         rows = cursor.fetchall()
         conn.close()
-        
+
         return [dict(row) for row in rows]
-    
-    def get_signal_rejections_summary(self, run_id: str = None, limit: int = 10) -> List[Dict]:
+
+    def get_signal_rejections_summary(self, run_id: str = None, limit: int = 10) -> list[dict]:
         """Get top rejection reasons for email reporting"""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        
+
         rid = run_id or self.run_id
-        cursor.execute('''
-            SELECT stage, reason_code, COUNT(*) as count, 
+        cursor.execute(
+            """
+            SELECT stage, reason_code, COUNT(*) as count,
                    GROUP_CONCAT(symbol, ', ') as symbols
-            FROM signal_rejections 
+            FROM signal_rejections
             WHERE run_id = ?
             GROUP BY stage, reason_code
             ORDER BY count DESC
             LIMIT ?
-        ''', (rid, limit))
+        """,
+            (rid, limit),
+        )
         rows = cursor.fetchall()
         conn.close()
-        
+
         return [dict(row) for row in rows]
-    
-    def get_order_intent_by_id(self, intent_id: str) -> Optional[Dict]:
+
+    def get_order_intent_by_id(self, intent_id: str) -> Optional[dict]:
         """Get order intent by ID"""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        
-        cursor.execute('SELECT * FROM order_intents WHERE intent_id = ?', (intent_id,))
+
+        cursor.execute("SELECT * FROM order_intents WHERE intent_id = ?", (intent_id,))
         row = cursor.fetchone()
         conn.close()
-        
+
         return dict(row) if row else None
-    
-    def check_duplicate_order_intent(self, strategy_id: int, symbol: str, 
-                                    side: str, target_qty: float) -> Optional[str]:
+
+    def check_duplicate_order_intent(
+        self, strategy_id: int, symbol: str, side: str, target_qty: float
+    ) -> Optional[str]:
         """
         Check if an order intent already exists for this exact order.
-        
+
         Returns intent_id if duplicate found, None otherwise.
         """
         intent_id = self.create_order_intent(strategy_id, symbol, side, target_qty)
-        
+
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
-        cursor.execute('''
+
+        cursor.execute(
+            """
             SELECT intent_id, status FROM order_intents
             WHERE intent_id = ?
-        ''', (intent_id,))
-        
+        """,
+            (intent_id,),
+        )
+
         result = cursor.fetchone()
         conn.close()
-        
-        if result and result[1] in ['SUBMITTED', 'ACKED', 'FILLED']:
+
+        if result and result[1] in ["SUBMITTED", "ACKED", "FILLED"]:
             return result[0]
-        
+
         return None
-    
+
     def count_duplicate_order_intents(self, hours: int = 24) -> int:
         """
         Count duplicate order intents in the last N hours.
-        
+
         Args:
             hours: Number of hours to look back
-        
+
         Returns:
             Count of duplicate intents
         """
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
         cutoff_time = (datetime.now() - timedelta(hours=hours)).isoformat()
-        
-        cursor.execute('''
+
+        cursor.execute(
+            """
             SELECT intent_id, COUNT(*) as count
             FROM order_intents
             WHERE created_at >= ?
             GROUP BY intent_id
             HAVING count > 1
-        ''', (cutoff_time,))
-        
+        """,
+            (cutoff_time,),
+        )
+
         duplicates = cursor.fetchall()
         conn.close()
-        
+
         return len(duplicates)
-    
+
     def get_system_state(self, key: str) -> Optional[str]:
         """
         Get system state value by key.
-        
+
         Args:
             key: State key
-        
+
         Returns:
             State value or None if not found
         """
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
-        cursor.execute('''
+
+        cursor.execute(
+            """
             SELECT value FROM system_state
             WHERE key = ?
-        ''', (key,))
-        
+        """,
+            (key,),
+        )
+
         result = cursor.fetchone()
         conn.close()
-        
+
         return result[0] if result else None
-    
+
     def set_system_state(self, key: str, value: str):
         """
         Set system state value.
-        
+
         Args:
             key: State key
             value: State value
         """
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
-        cursor.execute('''
+
+        cursor.execute(
+            """
             INSERT OR REPLACE INTO system_state (key, value, timestamp)
             VALUES (?, ?, CURRENT_TIMESTAMP)
-        ''', (key, value))
-        
+        """,
+            (key, value),
+        )
+
         conn.commit()
         conn.close()
-
