@@ -756,6 +756,8 @@ class MultiStrategyRunner:
 
                 order = self.trading_client.submit_order(order_data)
 
+                exit_price = position["current_price"]
+
                 # Record the trade
                 self.db.log_trade(
                     strategy_id=position["strategy_id"],
@@ -763,12 +765,17 @@ class MultiStrategyRunner:
                     symbol=symbol,
                     action="SELL",
                     shares=shares,
-                    requested_price=position["current_price"],
-                    exec_price=position["current_price"],
+                    requested_price=exit_price,
+                    exec_price=exit_price,
                     slippage_cost=0.0,
                     commission_cost=0.0,
                     order_id=str(order.id),
                 )
+
+                # CRITICAL: Zero out the local DB position so reconciliation sees
+                # broker=0 and DB=0 (previously this was missing, causing every
+                # stop-loss to produce a guaranteed reconciliation mismatch).
+                self._update_position_record(position["strategy_id"], symbol, -shares, exit_price)
 
                 # Remove stop loss tracking
                 self.stop_loss_manager.remove_stop_loss(symbol)
