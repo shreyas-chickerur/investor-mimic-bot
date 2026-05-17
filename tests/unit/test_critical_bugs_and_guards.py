@@ -611,22 +611,27 @@ class TestOrderTimingOPG:
             "must use OPG to execute at next market open."
         )
 
-    def test_limit_order_request_not_used(self):
-        """LimitOrderRequest with a 0.1% limit price would never fill across gaps.
+    def test_limit_order_uses_generous_buffer(self):
+        """BUY orders use LOO (Limit-On-Open) with a 1% buffer above typical price.
 
-        The old code set limit_price = price * 1.001 (0.1% above last close).
-        Any overnight gap of >0.1% meant the order was never filled.  All orders
-        must now be MarketOrderRequest so they always execute at open.
+        The previous bug used 0.1% which caused non-fills on any overnight gap.
+        The new design intentionally uses LimitOrderRequest with typical_price * 1.01
+        so we avoid chasing gap-ups while still filling on normal opens.
         """
         engine_src = Path("src/core/execution_engine.py").read_text()
-        # Allow import if still referenced, but the class must not be instantiated
         import re
 
+        # Must use LimitOrderRequest for BUY (the intentional new design)
         instantiations = re.findall(r"LimitOrderRequest\s*\(", engine_src)
-        assert len(instantiations) == 0, (
-            f"LimitOrderRequest is instantiated {len(instantiations)} time(s) — "
-            "switch to MarketOrderRequest + TimeInForce.OPG so orders fill at open."
-        )
+        assert (
+            len(instantiations) >= 1
+        ), "LimitOrderRequest should be used for BUY OPG orders (LOO) with a 1% typical-price buffer"
+
+        # The buffer must be 1% (1.01), NOT the old 0.1% (1.001) that caused non-fills
+        assert (
+            "1.001" not in engine_src
+        ), "Found old 0.1% limit buffer — use 1.01 (1%) so orders fill on normal opens"
+        assert "1.01" in engine_src, "Typical-price 1% buffer (1.01) must be present"
 
 
 # ===========================================================================

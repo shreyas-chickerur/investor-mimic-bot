@@ -7,28 +7,34 @@ Covers the four bugs that were preventing paper trading profitability:
   3. ML Momentum min_confidence=0.55 blocking all signals
   4. News sentiment filter graceful degradation
 """
-import pytest
-import pandas as pd
-import numpy as np
 import sys
+from datetime import timedelta
 from pathlib import Path
-from datetime import datetime, timedelta
+
+import numpy as np
+import pandas as pd
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
+from src.strategies.strategy_earnings_drift import EarningsDriftStrategy
 from src.strategies.strategy_factor_momentum import FactorMomentumStrategy
 from src.strategies.strategy_ml_momentum import MLMomentumStrategy
-from src.strategies.strategy_earnings_drift import EarningsDriftStrategy
-
+from src.strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
 # ---------------------------------------------------------------------------
 
-def _make_symbol_data(symbol: str, n: int = 100, base_price: float = 100.0,
-                      rsi_val: float = 50.0, vol_ratio: float = 1.0,
-                      momentum: float = 0.05) -> pd.DataFrame:
+
+def _make_symbol_data(
+    symbol: str,
+    n: int = 100,
+    base_price: float = 100.0,
+    rsi_val: float = 50.0,
+    vol_ratio: float = 1.0,
+    momentum: float = 0.05,
+) -> pd.DataFrame:
     """Create minimal OHLCV + indicator DataFrame for one symbol."""
     np.random.seed(42)
     dates = pd.date_range("2024-01-01", periods=n, freq="B")
@@ -38,30 +44,33 @@ def _make_symbol_data(symbol: str, n: int = 100, base_price: float = 100.0,
     rsi_series[-2] = rsi_val - 1.0  # slope = +1 on last bar by default
     # Alternate future returns so the ML model gets both classes
     future_rets = np.where(np.arange(n) % 2 == 0, 0.01, -0.01)
-    df = pd.DataFrame({
-        "symbol": symbol,
-        "open":   close * 0.99,
-        "high":   close * 1.01,
-        "low":    close * 0.99,
-        "close":  close,
-        # Add slight noise to volume so rolling std is never exactly 0
-        "volume": np.full(n, 1_000_000.0) + np.random.randn(n) * 1000,
-        "rsi":    rsi_series,
-        "atr_20": close * 0.015,
-        # Trailing 20-day VWAP — intentionally much lower than close to replicate
-        # the production data bug we fixed.
-        "vwap":   close * 0.70,
-        "volume_ratio":   np.full(n, vol_ratio),
-        "returns_5d":     np.full(n, momentum),
-        "returns_20d":    np.full(n, momentum * 2),
-        "returns_60d":    np.full(n, momentum * 4),
-        "volatility_20d": np.full(n, 0.15),
-        "volatility_60d": np.full(n, 0.15),
-        "price_to_sma20": np.full(n, 1.01),
-        "price_to_sma50": np.full(n, 1.02),
-        "adx":            np.full(n, 25.0),
-        "future_return_5d": future_rets,
-    }, index=dates)
+    df = pd.DataFrame(
+        {
+            "symbol": symbol,
+            "open": close * 0.99,
+            "high": close * 1.01,
+            "low": close * 0.99,
+            "close": close,
+            # Add slight noise to volume so rolling std is never exactly 0
+            "volume": np.full(n, 1_000_000.0) + np.random.randn(n) * 1000,
+            "rsi": rsi_series,
+            "atr_20": close * 0.015,
+            # Trailing 20-day VWAP — intentionally much lower than close to replicate
+            # the production data bug we fixed.
+            "vwap": close * 0.70,
+            "volume_ratio": np.full(n, vol_ratio),
+            "returns_5d": np.full(n, momentum),
+            "returns_20d": np.full(n, momentum * 2),
+            "returns_60d": np.full(n, momentum * 4),
+            "volatility_20d": np.full(n, 0.15),
+            "volatility_60d": np.full(n, 0.15),
+            "price_to_sma20": np.full(n, 1.01),
+            "price_to_sma50": np.full(n, 1.02),
+            "adx": np.full(n, 25.0),
+            "future_return_5d": future_rets,
+        },
+        index=dates,
+    )
     return df
 
 
@@ -71,7 +80,7 @@ def _multi_symbol_data(n_symbols: int = 10, n_bars: int = 100) -> pd.DataFrame:
     frames = []
     for i, sym in enumerate(symbols):
         # vary momentum to give a real spread for cross-sectional ranking
-        mom = -0.10 + i * 0.025   # spread from -0.10 to +0.15
+        mom = -0.10 + i * 0.025  # spread from -0.10 to +0.15
         frames.append(_make_symbol_data(sym, n=n_bars, base_price=50 + i * 5, momentum=mom))
     return pd.concat(frames)
 
@@ -80,8 +89,8 @@ def _multi_symbol_data(n_symbols: int = 10, n_bars: int = 100) -> pd.DataFrame:
 # 1. RSI Mean Reversion
 # ===========================================================================
 
-class TestRSIMeanReversionFixes:
 
+class TestRSIMeanReversionFixes:
     def test_rsi_threshold_is_35(self):
         s = RSIMeanReversionStrategy(1, 25_000)
         assert s.rsi_threshold == 35, "Entry threshold must be 35 (meaningfully oversold)"
@@ -131,8 +140,8 @@ class TestRSIMeanReversionFixes:
         s = RSIMeanReversionStrategy(1, 25_000)
         data = _make_symbol_data("AAPL", rsi_val=50.0, n=100)
         data["close"] = 100.0
-        data["vwap"]  = 70.0   # trailing 20d VWAP — always below close
-        data["rsi"]   = 50.0   # neutral RSI, below exit threshold of 55
+        data["vwap"] = 70.0  # trailing 20d VWAP — always below close
+        data["rsi"] = 50.0  # neutral RSI, below exit threshold of 55
 
         s.positions["AAPL"] = 10
         # Entry date is RECENT (5 calendar days ago) so time-exit (20d) doesn't fire
@@ -176,8 +185,8 @@ class TestRSIMeanReversionFixes:
 # 2. Factor Momentum — Cross-sectional ranking
 # ===========================================================================
 
-class TestFactorMomentumRanking:
 
+class TestFactorMomentumRanking:
     def test_scores_have_meaningful_spread(self):
         """
         With proper cross-sectional percentile ranking, top vs bottom stock
@@ -196,9 +205,10 @@ class TestFactorMomentumRanking:
             "Likely still using sigmoid normalization instead of percentile rank."
         )
 
-    def test_top_n_is_five(self):
+    def test_top_n_is_three(self):
+        # Reduced from 5 to 3 — higher conviction, lower overtrading cost drag.
         s = FactorMomentumStrategy(1, 25_000)
-        assert s.top_n == 5
+        assert s.top_n == 3
 
     def test_generates_buy_signals_for_top_symbols(self):
         s = FactorMomentumStrategy(1, 25_000)
@@ -214,15 +224,15 @@ class TestFactorMomentumRanking:
         s = FactorMomentumStrategy(1, 25_000)
         # Need >= 3 symbols for cross-sectional ranking (len(raw) < 3 guard)
         data_high = _make_symbol_data("HIGH", n=80, momentum=0.20)
-        data_low  = _make_symbol_data("LOW",  n=80, momentum=-0.15)
-        data_mid  = _make_symbol_data("MID",  n=80, momentum=0.00)
+        data_low = _make_symbol_data("LOW", n=80, momentum=-0.15)
+        data_mid = _make_symbol_data("MID", n=80, momentum=0.00)
         combined = pd.concat([data_high, data_low, data_mid])
 
         scores = s._compute_factor_scores(combined)
         assert len(scores) == 3, "All 3 symbols should be scored"
-        assert scores.get("HIGH", 0) > scores.get("LOW", 0), (
-            "HIGH momentum stock should rank above LOW momentum stock"
-        )
+        assert scores.get("HIGH", 0) > scores.get(
+            "LOW", 0
+        ), "HIGH momentum stock should rank above LOW momentum stock"
 
     def test_sell_after_hold_period(self):
         s = FactorMomentumStrategy(1, 25_000)
@@ -239,6 +249,7 @@ class TestFactorMomentumRanking:
 # 3. ML Momentum
 # ===========================================================================
 
+
 # Module-scoped: train once and reuse across all ML tests (GBM with 200
 # estimators is non-trivial; training 3 separate instances was the main slow
 # path in this file).
@@ -252,22 +263,26 @@ def ml_strategy_and_data():
 
 
 class TestMLMomentumFixes:
+    def test_min_confidence_is_0_60(self):
+        """Confirm threshold raised to 0.60 — GBM produces wider probability spreads.
 
-    def test_min_confidence_is_0_52(self):
-        """Confirm threshold was lowered from 0.55 → 0.52 in config default."""
+        GradientBoosting / LightGBM outputs are well-calibrated above 0.60 for
+        momentum signals; the lower 0.55 threshold was generating too many weak trades
+        whose execution costs ate into alpha.
+        """
         s = MLMomentumStrategy(1, 25_000)
-        assert s.min_confidence <= 0.52, (
-            f"min_confidence={s.min_confidence} is too high — logistic regression "
-            "on financial data rarely exceeds 0.55, killing all signals."
-        )
+        assert (
+            s.min_confidence == 0.60
+        ), f"min_confidence={s.min_confidence} — expected 0.60 (raised from 0.55 to cut overtrading)"
 
     def test_model_is_gradient_boosting_with_correct_params(self):
         """GBM replaced LogisticRegression; verify it is configured to prevent overfitting."""
         from sklearn.ensemble import GradientBoostingClassifier
+
         s = MLMomentumStrategy(1, 25_000)
-        assert isinstance(s.model, GradientBoostingClassifier), (
-            "MLMomentumStrategy.model must be GradientBoostingClassifier"
-        )
+        assert isinstance(
+            s.model, GradientBoostingClassifier
+        ), "MLMomentumStrategy.model must be GradientBoostingClassifier"
         assert s.model.n_estimators == 200, "n_estimators must be 200"
         assert s.model.max_depth == 3, "max_depth must be 3 to prevent overfitting"
         assert s.model.subsample == 0.8, "subsample must be 0.8 for stochastic GBM"
@@ -299,11 +314,11 @@ class TestMLMomentumFixes:
 # 4. Earnings Drift
 # ===========================================================================
 
-class TestEarningsDriftDetection:
 
-    def _make_earnings_data(self, symbol: str = "AAPL",
-                             event_return: float = 0.05,
-                             volume_spike: float = 3.0) -> pd.DataFrame:
+class TestEarningsDriftDetection:
+    def _make_earnings_data(
+        self, symbol: str = "AAPL", event_return: float = 0.05, volume_spike: float = 3.0
+    ) -> pd.DataFrame:
         """Make data with a synthetic earnings event 2 bars ago."""
         n = 60
         np.random.seed(1)
@@ -318,15 +333,18 @@ class TestEarningsDriftDetection:
         close[-2] = close[-3] * (1 + event_return)
         volume[-2] = 1_000_000.0 * volume_spike
 
-        df = pd.DataFrame({
-            "symbol": symbol,
-            "open": close * 0.99,
-            "high": close * 1.01,
-            "low":  close * 0.99,
-            "close": close,
-            "volume": volume,
-            "atr_20": close * 0.015,
-        }, index=dates)
+        df = pd.DataFrame(
+            {
+                "symbol": symbol,
+                "open": close * 0.99,
+                "high": close * 1.01,
+                "low": close * 0.99,
+                "close": close,
+                "volume": volume,
+                "atr_20": close * 0.015,
+            },
+            index=dates,
+        )
         return df
 
     def test_detects_positive_earnings_event(self):
@@ -369,6 +387,7 @@ class TestEarningsDriftDetection:
 # 5. News sentiment filter
 # ===========================================================================
 
+
 class TestNewsSignalFilter:
     """Tests for the news sentiment confidence modifier."""
 
@@ -382,12 +401,13 @@ class TestNewsSignalFilter:
 
     def _make_filter(self):
         from src.utils.news_sentiment import NewsSignalFilter
+
         return NewsSignalFilter()
 
     def test_empty_sentiment_map_passes_all_signals(self):
         nf = self._make_filter()
         signals = [
-            {"symbol": "AAPL", "action": "BUY",  "confidence": 0.6, "reasoning": "test"},
+            {"symbol": "AAPL", "action": "BUY", "confidence": 0.6, "reasoning": "test"},
             {"symbol": "MSFT", "action": "SELL", "confidence": 0.8, "reasoning": "test"},
         ]
         result = nf.apply(signals, {})
@@ -395,7 +415,9 @@ class TestNewsSignalFilter:
 
     def test_positive_news_boosts_confidence(self):
         nf = self._make_filter()
-        sentiment = {"AAPL": {"score": 0.80, "headlines": ["Apple beats earnings"], "article_count": 5}}
+        sentiment = {
+            "AAPL": {"score": 0.80, "headlines": ["Apple beats earnings"], "article_count": 5}
+        }
         signals = [{"symbol": "AAPL", "action": "BUY", "confidence": 0.60, "reasoning": "RSI"}]
         result = nf.apply(signals, sentiment)
         assert len(result) == 1
@@ -404,7 +426,9 @@ class TestNewsSignalFilter:
 
     def test_negative_news_suppresses_confidence(self):
         nf = self._make_filter()
-        sentiment = {"AAPL": {"score": 0.30, "headlines": ["Apple misses guidance"], "article_count": 5}}
+        sentiment = {
+            "AAPL": {"score": 0.30, "headlines": ["Apple misses guidance"], "article_count": 5}
+        }
         signals = [{"symbol": "AAPL", "action": "BUY", "confidence": 0.60, "reasoning": "RSI"}]
         result = nf.apply(signals, sentiment)
         assert len(result) == 1
@@ -412,7 +436,9 @@ class TestNewsSignalFilter:
 
     def test_very_negative_news_drops_buy_signal(self):
         nf = self._make_filter()
-        sentiment = {"AAPL": {"score": 0.15, "headlines": ["SEC fraud investigation"], "article_count": 5}}
+        sentiment = {
+            "AAPL": {"score": 0.15, "headlines": ["SEC fraud investigation"], "article_count": 5}
+        }
         signals = [{"symbol": "AAPL", "action": "BUY", "confidence": 0.60, "reasoning": "RSI"}]
         result = nf.apply(signals, sentiment)
         assert len(result) == 0, "Very negative news must drop BUY signal entirely"
@@ -421,7 +447,9 @@ class TestNewsSignalFilter:
         """Negative news should NOT drop SELL signals — we want to exit."""
         nf = self._make_filter()
         sentiment = {"AAPL": {"score": 0.10, "headlines": ["Major scandal"], "article_count": 5}}
-        signals = [{"symbol": "AAPL", "action": "SELL", "confidence": 0.80, "reasoning": "time exit"}]
+        signals = [
+            {"symbol": "AAPL", "action": "SELL", "confidence": 0.80, "reasoning": "time exit"}
+        ]
         result = nf.apply(signals, sentiment)
         assert len(result) == 1, "SELL signals must never be dropped by news filter"
 
@@ -429,7 +457,9 @@ class TestNewsSignalFilter:
         nf = self._make_filter()
         sentiment = {"AAPL": {"score": 0.50, "headlines": [], "article_count": 3}}
         original_conf = 0.65
-        signals = [{"symbol": "AAPL", "action": "BUY", "confidence": original_conf, "reasoning": "ML"}]
+        signals = [
+            {"symbol": "AAPL", "action": "BUY", "confidence": original_conf, "reasoning": "ML"}
+        ]
         result = nf.apply(signals, sentiment)
         assert len(result) == 1
         assert result[0]["confidence"] == original_conf

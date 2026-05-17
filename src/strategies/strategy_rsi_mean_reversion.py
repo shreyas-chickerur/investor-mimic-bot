@@ -119,24 +119,35 @@ class RSIMeanReversionStrategy(TradingStrategy):
                     }
                 )
 
-            # SELL: RSI recovered > 55  OR  5% profit target  OR  7% stop-loss  OR  20-day time exit
+            # SELL: RSI recovered > 55  OR  5% profit target (partial)  OR  20-day time exit
+            # Stop-losses are handled by StopLossManager (trailing ATR-based stops).
             elif symbol in self.positions:
                 days_held = self.get_days_held(symbol, latest_date)
                 shares = self.positions[symbol]
                 entry_price = getattr(self, "entry_prices", {}).get(symbol)
 
                 exit_reason = None
+                exit_shares = shares
+                partial_exit = False
+
                 if rsi > self.rsi_exit:
                     exit_reason = f"RSI {rsi:.1f} > {self.rsi_exit} (mean reversion complete)"
                 elif entry_price and entry_price > 0:
                     profit_pct = (price - entry_price) / entry_price
-                    if profit_pct >= self.profit_target_pct:
-                        exit_reason = f"Profit target hit: {profit_pct:.1%} gain vs {self.profit_target_pct:.0%} target"
-                    elif profit_pct <= -self.stop_loss_pct:
-                        exit_reason = f"Stop-loss hit: {profit_pct:.1%} loss (limit -{self.stop_loss_pct:.0%})"
+                    if (
+                        profit_pct >= self.profit_target_pct
+                        and symbol not in self._partial_exit_done
+                    ):
+                        # First tranche: sell 50% and let trailing stop manage the rest.
+                        exit_shares = max(1, shares // 2)
+                        exit_reason = (
+                            f"Partial profit target: {profit_pct:.1%} gain → selling 50% "
+                            f"({exit_shares} of {shares} shares)"
+                        )
+                        partial_exit = True
+
+                # Tax-aware time exit: extend hold by up to 5 days to cross the 1-year mark.
                 if exit_reason is None and days_held >= self.hold_days:
-                    # Let winners run: if profitable and RSI not yet extended, hold past the
-                    # nominal exit up to max_hold_days (avoids cutting a working trade short).
                     if (
                         entry_price
                         and entry_price > 0
@@ -145,6 +156,8 @@ class RSIMeanReversionStrategy(TradingStrategy):
                         and rsi < self.rsi_exit
                     ):
                         pass  # still healthy — keep holding
+                    elif 250 <= days_held < 255:
+                        pass  # extend hold to cross the 1-year long-term capital gains threshold
                     else:
                         exit_reason = f"Held {days_held}d >= {self.hold_days}d (time-based exit)"
 
@@ -153,14 +166,17 @@ class RSIMeanReversionStrategy(TradingStrategy):
                         {
                             "symbol": symbol,
                             "action": "SELL",
-                            "shares": shares,
+                            "shares": exit_shares,
                             "price": price,
-                            "value": shares * price,
+                            "value": exit_shares * price,
                             "confidence": 1.0,
                             "reasoning": exit_reason,
                             "asof_date": latest_date,
+                            "partial_exit": partial_exit,
                         }
                     )
+                    if partial_exit:
+                        self._partial_exit_done.add(symbol)
 
         return signals
 
