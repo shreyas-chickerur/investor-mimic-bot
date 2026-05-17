@@ -22,7 +22,7 @@ load_dotenv()
 import pandas as pd
 from alpaca.trading.client import TradingClient
 from alpaca.trading.enums import OrderSide, TimeInForce
-from alpaca.trading.requests import MarketOrderRequest
+from alpaca.trading.requests import LimitOrderRequest, MarketOrderRequest
 
 from src.core.database import TradingDatabase
 from src.data.data_quality_checker import DataQualityChecker
@@ -552,6 +552,13 @@ class MultiStrategyRunner:
             strategy.entry_prices = entry_prices
             logger.info(f"  Loaded {len(positions)} positions for {strategy.name}")
 
+            # Restore partial-exit state so cross-run tranche logic is consistent.
+            for sym in list(positions.keys()):
+                key = f"partial_exit_{strategy.strategy_id}_{sym}"
+                if self.db.get_system_state(key) == "1":
+                    strategy._partial_exit_done.add(sym)
+                    logger.debug("  Partial exit already done for %s (%s)", sym, strategy.name)
+
             # Re-initialize stop losses for carried positions — stop_levels is
             # in-memory only and is empty at every startup, so without this all
             # multi-day positions run with zero downside protection.
@@ -608,6 +615,73 @@ class MultiStrategyRunner:
                 logger.warning("Health scoring unavailable for %s: %s", strategy.name, exc)
                 health_by_strategy[strategy.name] = {}
         return health_by_strategy
+
+    def _compute_trailing_sharpe(self, strategies, window_days: int = 30) -> dict:
+        """Compute trailing annualized Sharpe ratio per strategy from recent performance records."""
+        import numpy as _np
+
+        sharpe_by_strategy = {}
+        for strategy in strategies:
+            try:
+                perf = self.db.get_strategy_performance(strategy.strategy_id, days=window_days)
+                if len(perf) < 5:
+                    continue
+                vals = [float(p["portfolio_value"]) for p in perf]
+                daily_returns = [(vals[i] - vals[i - 1]) / vals[i - 1] for i in range(1, len(vals))]
+                if not daily_returns:
+                    continue
+                mean_r = _np.mean(daily_returns)
+                std_r = _np.std(daily_returns, ddof=1)
+                if std_r > 0:
+                    sharpe = (mean_r / std_r) * (252**0.5)
+                    sharpe_by_strategy[strategy.name] = round(float(sharpe), 3)
+            except Exception as exc:
+                logger.debug("Trailing Sharpe unavailable for %s: %s", strategy.name, exc)
+        return sharpe_by_strategy
+
+    def _maybe_refresh_earnings_calendar(self):
+        """Auto-refresh the earnings calendar CSV if it is older than 7 days."""
+        cal_path = project_root / "data" / "earnings_calendar.csv"
+        if cal_path.exists():
+            age_days = (pd.Timestamp.now() - pd.Timestamp(cal_path.stat().st_mtime, unit="s")).days
+            if age_days <= 7:
+                return
+        logger.info("Earnings calendar is stale — auto-refreshing...")
+        try:
+            import subprocess
+
+            result = subprocess.run(
+                ["python3", str(project_root / "scripts" / "update_earnings_calendar.py")],
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+            if result.returncode == 0:
+                logger.info("Earnings calendar refreshed successfully")
+            else:
+                logger.warning("Earnings calendar refresh failed: %s", result.stderr[:300])
+        except Exception as exc:
+            logger.warning("Earnings calendar auto-refresh error: %s", exc)
+
+    def _submit_covered_calls(self, symbol: str, shares: int, current_price: float):
+        """Stub: submit a 30-day covered call on a long position (live trading only).
+
+        For each long equity position, this would sell a ~30-delta call with a strike
+        ~5% above current price.  Generates ~1% monthly income while the trade matures.
+
+        Not enabled in paper mode — options trading requires separate Alpaca approval
+        and a different order endpoint (OptionOrderRequest).  Uncomment and wire in once
+        live options permissions are confirmed.
+        """
+        if self.paper_mode:
+            return
+        logger.info(
+            "Covered call opportunity: %s (%d shares @ $%.2f) — "
+            "enable options trading in Alpaca to activate",
+            symbol,
+            shares,
+            current_price,
+        )
 
     def load_market_data(self):
         """Load market data from CSV"""
@@ -947,6 +1021,17 @@ class MultiStrategyRunner:
 
         current_prices = market_data.groupby("symbol")["close"].last().to_dict()
 
+        # Pre-compute typical prices (H+L+C)/3 for VWAP-proxy OPG limit orders.
+        # Stocks that gap up past this level at the open won't fill — we avoid chasing gap-ups.
+        if "high" in market_data.columns and "low" in market_data.columns:
+            _last = market_data.groupby("symbol")[["high", "low", "close"]].last()
+            self._typical_prices = ((_last["high"] + _last["low"] + _last["close"]) / 3).to_dict()
+        else:
+            self._typical_prices = dict(current_prices)
+
+        # Auto-refresh earnings calendar if stale (> 7 days old).
+        self._maybe_refresh_earnings_calendar()
+
         # Refresh open position prices so unrealized P&L is current in the email
         refreshed = self.db.refresh_position_prices(current_prices)
         if refreshed:
@@ -1017,10 +1102,17 @@ class MultiStrategyRunner:
             logger.warning("Could not persist regime to system_state: %s", _exc)
 
         health_by_strategy = self._collect_strategy_health(strategies)
+        trailing_sharpe = self._compute_trailing_sharpe(strategies)
+        if trailing_sharpe:
+            logger.info(
+                "Trailing 30d Sharpe: %s",
+                ", ".join(f"{k}={v:.2f}" for k, v in trailing_sharpe.items()),
+            )
         self.strategy_weights = compute_strategy_weights(
             strategy_names=[s.name for s in strategies],
             regime_adjustments=regime_adjustments,
             health_by_strategy=health_by_strategy,
+            trailing_sharpe_by_strategy=trailing_sharpe,
         )
         logger.info(
             "Daily strategy weights: %s",
@@ -1670,12 +1762,17 @@ class MultiStrategyRunner:
                         intent_id, strategy.strategy_id, symbol, "BUY", adjusted_shares
                     )
 
-                    # Market-on-open: signals generated after close, execute at next day's open
-                    order_data = MarketOrderRequest(
+                    # Limit-on-open: use previous day's typical price (H+L+C)/3 as the cap.
+                    # Orders only fill if the open is at or below this limit — avoids chasing
+                    # overnight gap-ups.  A 1% buffer keeps fill rates high on normal opens.
+                    _typical = getattr(self, "_typical_prices", {}).get(symbol, price)
+                    _limit_price = round(_typical * 1.01, 2)
+                    order_data = LimitOrderRequest(
                         symbol=symbol,
                         qty=adjusted_shares,
                         side=OrderSide.BUY,
                         time_in_force=TimeInForce.OPG,
+                        limit_price=_limit_price,
                     )
 
                     # Wrap with DRY_RUN protection
@@ -1822,6 +1919,9 @@ class MultiStrategyRunner:
                         )
                     else:
                         logger.warning(f"No ATR available for {symbol}, stop loss not set")
+
+                    # Covered call opportunity (live trading only; no-op in paper mode).
+                    self._submit_covered_calls(symbol, actual_filled_qty, actual_fill_price)
 
                     # BUY opens a position — realized P&L is None until the position is sold
                     signal_id = signal.get("signal_id")
@@ -2000,6 +2100,21 @@ class MultiStrategyRunner:
                             self.stop_loss_manager.remove_stop_loss(symbol)
                             logger.info(f"Stop loss removed for {symbol} (position closed)")
                             total_exposure = max(total_exposure - trade_value, 0)
+                            # Clear partial-exit DB flag now that position is gone
+                            self.db.set_system_state(
+                                f"partial_exit_{strategy.strategy_id}_{symbol}", "0"
+                            )
+                            strategy._partial_exit_done.discard(symbol)
+                        elif signal.get("partial_exit"):
+                            # First tranche sold — persist flag so next run skips profit-target exit
+                            self.db.set_system_state(
+                                f"partial_exit_{strategy.strategy_id}_{symbol}", "1"
+                            )
+                            logger.info(
+                                "Partial exit persisted for %s (%s) — trailing stop now active",
+                                symbol,
+                                strategy.name,
+                            )
 
                     # Record matched buy→sell P&L for paper trading metrics
                     if entry_price_for_pnl and entry_price_for_pnl > 0:

@@ -6,8 +6,6 @@ and recent strategy health, then applies those multipliers to signal confidence.
 
 from __future__ import annotations
 
-from typing import Dict, List
-
 CANONICAL_STRATEGY_NAMES = (
     "RSI Mean Reversion",
     "ML Momentum",
@@ -21,16 +19,17 @@ def _clamp(value: float, lo: float, hi: float) -> float:
 
 
 def compute_strategy_weights(
-    strategy_names: List[str],
-    regime_adjustments: Dict,
-    health_by_strategy: Dict[str, Dict],
-) -> Dict[str, float]:
+    strategy_names: list[str],
+    regime_adjustments: dict,
+    health_by_strategy: dict[str, dict],
+    trailing_sharpe_by_strategy: dict[str, float] | None = None,
+) -> dict[str, float]:
     """Return a normalized weight for each strategy in [0.5, 1.5]."""
     vol_regime = (regime_adjustments or {}).get("volatility_regime", "normal")
     trend_regime = (regime_adjustments or {}).get("trend_regime", "weak_trend")
     hmm_regime = (regime_adjustments or {}).get("hmm_regime", "unknown")
 
-    weights: Dict[str, float] = {}
+    weights: dict[str, float] = {}
     for name in strategy_names:
         w = 1.0
 
@@ -87,6 +86,21 @@ def compute_strategy_weights(
         if isinstance(rejection_rate_30d, (int, float)) and rejection_rate_30d > 0.80:
             w -= 0.10
 
+        # Trailing 30-day Sharpe ratio adjustment (portfolio-level conviction weighting).
+        # Strategies with strong recent risk-adjusted returns get more capital; cold
+        # streaks get less. Clamped so no strategy is ever fully cut or over-leveraged.
+        if trailing_sharpe_by_strategy:
+            sharpe = trailing_sharpe_by_strategy.get(name)
+            if isinstance(sharpe, (int, float)) and not (sharpe != sharpe):  # not NaN
+                if sharpe > 1.0:
+                    w += 0.15
+                elif sharpe > 0.5:
+                    w += 0.05
+                elif sharpe < 0.0:
+                    w -= 0.20
+                elif sharpe < 0.5:
+                    w -= 0.10
+
         weights[name] = _clamp(round(w, 3), 0.5, 1.5)
 
     return weights
@@ -94,13 +108,13 @@ def compute_strategy_weights(
 
 def apply_strategy_weight_to_signals(
     strategy_name: str,
-    signals: List[Dict],
-    strategy_weights: Dict[str, float],
+    signals: list[dict],
+    strategy_weights: dict[str, float],
     min_buy_confidence: float = 0.45,
-) -> List[Dict]:
+) -> list[dict]:
     """Apply strategy weight to confidence and drop weak BUYs when strategy is de-prioritized."""
     weight = float(strategy_weights.get(strategy_name, 1.0))
-    adjusted: List[Dict] = []
+    adjusted: list[dict] = []
 
     for sig in signals or []:
         clone = dict(sig)

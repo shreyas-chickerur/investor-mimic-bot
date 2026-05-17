@@ -95,10 +95,13 @@ strategies:
 
   ml_momentum:
     lookback_days: 60
-    min_confidence: 0.55  # Minimum: 0.51 was barely above random, adding noise not signal
+    min_confidence: 0.60  # Raised from 0.55 — cuts trade count, improves conviction per trade
     feature_count: 12
     max_new_positions_per_day: 3
     buy_quantile_threshold: 0.65
+
+  factor_momentum:
+    top_n: 3  # Reduced from 5 — higher conviction, lower overtrading cost drag
 
   earnings_drift:
     volume_spike_threshold: 1.3  # Volume must be ≥1.3× 20-day avg (relaxed from 2.0)

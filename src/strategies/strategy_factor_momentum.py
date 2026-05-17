@@ -99,9 +99,9 @@ class FactorMomentumStrategy(TradingStrategy):
         )
         self.hold_days = 20
         self.max_hold_days = 35  # absolute ceiling even for profitable positions
-        self.top_n = 5  # Buy top 5 stocks
+        self.top_n = 3  # Buy top 3 stocks (reduced from 5 — higher conviction, lower cost drag)
         self.profit_target_pct = 0.12  # Exit at 12% gain — lock in before mean-reversion
-        self.stop_loss_pct = 0.08  # Exit at 8% loss — factor momentum can trend hard
+        self.stop_loss_pct = 0.08  # retained for reference; exits now via StopLossManager
         self.let_winners_run_pct = 0.05  # hold past time exit if ≥5% in profit
         self.entry_dates = {}
         self._last_rerank_date = None
@@ -304,17 +304,23 @@ class FactorMomentumStrategy(TradingStrategy):
             entry_price = getattr(self, "entry_prices", {}).get(symbol)
 
             exit_reason = None
+            exit_shares = shares
+            partial_exit = False
+
             if entry_price and entry_price > 0:
                 pnl_pct = (price - entry_price) / entry_price
-                if pnl_pct >= self.profit_target_pct:
+                if pnl_pct >= self.profit_target_pct and symbol not in self._partial_exit_done:
+                    # First tranche: sell 50%; trailing ATR stop manages the remainder.
+                    exit_shares = max(1, shares // 2)
                     exit_reason = (
-                        f"Profit target: {pnl_pct:.1%} gain (target {self.profit_target_pct:.0%})"
+                        f"Partial profit target: {pnl_pct:.1%} gain → selling 50% "
+                        f"({exit_shares} of {shares} shares)"
                     )
-                elif pnl_pct <= -self.stop_loss_pct:
-                    exit_reason = f"Stop-loss: {pnl_pct:.1%} loss (limit -{self.stop_loss_pct:.0%})"
+                    partial_exit = True
+            # Stop-losses handled by StopLossManager (trailing ATR ratchet); no fixed pct here.
+
             if exit_reason is None and days_held >= self.hold_days:
-                # Let winners run: if strongly profitable, hold past nominal rebalance
-                # up to max_hold_days so trending winners aren't cut prematurely.
+                # Let winners run; also respect 1-year tax threshold.
                 if (
                     entry_price
                     and entry_price > 0
@@ -322,6 +328,8 @@ class FactorMomentumStrategy(TradingStrategy):
                     and (price - entry_price) / entry_price >= self.let_winners_run_pct
                 ):
                     pass  # momentum still working — keep holding
+                elif 250 <= days_held < 255:
+                    pass  # extend hold to cross the 1-year long-term capital gains threshold
                 else:
                     exit_reason = f"Factor rebalance: held {days_held}d"
 
@@ -330,15 +338,16 @@ class FactorMomentumStrategy(TradingStrategy):
                     {
                         "symbol": symbol,
                         "action": "SELL",
-                        "shares": shares,
+                        "shares": exit_shares,
                         "price": price,
-                        "value": shares * price,
-                        "confidence": 0.9
-                        if "Profit" in (exit_reason or "") or "Stop" in (exit_reason or "")
-                        else 0.7,
+                        "value": exit_shares * price,
+                        "confidence": 0.9 if partial_exit else 0.7,
                         "reasoning": exit_reason,
+                        "partial_exit": partial_exit,
                     }
                 )
+                if partial_exit:
+                    self._partial_exit_done.add(symbol)
 
         # Only generate new BUY signals if we have capacity
         current_positions = len(self.positions)
