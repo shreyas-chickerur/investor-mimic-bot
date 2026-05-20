@@ -12,10 +12,10 @@ Covers:
 from __future__ import annotations
 
 import os
-import pytest
-import pandas as pd
 import sys
 from pathlib import Path
+
+import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 # ---------------------------------------------------------------------------
 # 1. Stop-loss None formatting — regression for TypeError in check_stop_losses
 # ---------------------------------------------------------------------------
+
 
 class TestStopLossNoneFormatting:
     """
@@ -73,19 +74,20 @@ class TestStopLossNoneFormatting:
         exists with value None — the default=0 is NOT used in that case.
         The fix uses `position.get('entry_price') or 0` instead.
         """
-        position = {'entry_price': None, 'shares': 10}
+        position = {"entry_price": None, "shares": 10}
         # Old (broken): would return None, not 0
-        old_result = position.get('entry_price', 0)
+        old_result = position.get("entry_price", 0)
         assert old_result is None, "dict.get default not used when key exists with None"
 
         # New (fixed): `or 0` converts None → 0
-        new_result = position.get('entry_price') or 0
+        new_result = position.get("entry_price") or 0
         assert new_result == 0
 
 
 # ---------------------------------------------------------------------------
 # 2. fetch_historical_data — ALPHA_VANTAGE_PREMIUM env var
 # ---------------------------------------------------------------------------
+
 
 class TestFetchHistoricalDataTierDetection:
     """
@@ -123,6 +125,7 @@ class TestFetchHistoricalDataTierDetection:
         """ExtendedDataFetcher uses _fetch_parallel when premium=True."""
         monkeypatch.setenv("ALPHA_VANTAGE_API_KEY", "FAKE_KEY_FOR_TEST")
         from scripts.fetch_historical_data import ExtendedDataFetcher
+
         fetcher_free = ExtendedDataFetcher(years=1, premium=False)
         fetcher_prem = ExtendedDataFetcher(years=1, premium=True)
         assert fetcher_free.premium is False
@@ -132,6 +135,7 @@ class TestFetchHistoricalDataTierDetection:
 # ---------------------------------------------------------------------------
 # 3. update_daily_data — cold-start fetches 100 days instead of 5
 # ---------------------------------------------------------------------------
+
 
 class TestUpdateDailyDataColdStart:
     """
@@ -153,10 +157,13 @@ class TestUpdateDailyDataColdStart:
         days_to_fetch = 5 if existing_df is not None else 100
         assert days_to_fetch == 5
 
-    def test_updater_class_sets_100_days_on_cold_start(self, tmp_path, monkeypatch):
+    def test_updater_class_sets_730_days_on_cold_start(self, tmp_path, monkeypatch):
         """
-        Verify the actual DailyDataUpdater sets days_to_fetch=100 when the
-        training data file is absent (no network call is made).
+        Verify the actual DailyDataUpdater sets days_to_fetch=730 when the
+        training data file is absent (cold start full backfill for indicators).
+
+        730 days is required: SMA-100 needs 100 rows inside the training window,
+        so the system must backfill ~2 years to have enough history for all indicators.
         """
         monkeypatch.setenv("ALPHA_VANTAGE_API_KEY", "FAKE_KEY_FOR_TEST")
         import scripts.update_daily_data as _udm
@@ -180,6 +187,6 @@ class TestUpdateDailyDataColdStart:
         updater.update_training_data(data_file=str(data_file))
 
         assert len(captured_days) > 0, "fetch_latest_data should have been called"
-        assert all(d == 100 for d in captured_days), (
-            f"Cold start must request 100 days, got: {set(captured_days)}"
-        )
+        assert all(
+            d == 730 for d in captured_days
+        ), f"Cold start must request 730 days (full backfill), got: {set(captured_days)}"

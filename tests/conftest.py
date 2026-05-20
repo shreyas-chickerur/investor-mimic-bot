@@ -4,21 +4,48 @@ Shared pytest fixtures for all tests.
 All market-data fixtures use the same column schema as training_data.csv so
 that strategies work against them without KeyError exceptions.
 """
+import logging
 import os
 import tempfile
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
 import pytest
-from datetime import datetime, timedelta
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _isolate_file_handlers():
+    """Remove FileHandlers from all loggers before the test session runs.
+
+    Modules like update_daily_data and execution_engine call logging.basicConfig()
+    at import time, which can attach FileHandlers that write to the production
+    multi_strategy.log or api.log. Removing them prevents test runs from
+    contaminating production log files.
+    """
+    root = logging.getLogger()
+    file_handlers = [h for h in root.handlers if isinstance(h, logging.FileHandler)]
+    for h in file_handlers:
+        root.removeHandler(h)
+        h.close()
+    # Also scrub any named loggers that already have file handlers
+    for _name, logger in logging.Logger.manager.loggerDict.items():
+        if isinstance(logger, logging.Logger):
+            fhs = [h for h in logger.handlers if isinstance(h, logging.FileHandler)]
+            for h in fhs:
+                logger.removeHandler(h)
+                h.close()
+    yield
 
 
 # ---------------------------------------------------------------------------
 # Market data helpers
 # ---------------------------------------------------------------------------
 
-def _make_ohlcv(symbol: str, n: int = 100, base_price: float = 150.0,
-                rsi_val: float = 50.0) -> pd.DataFrame:
+
+def _make_ohlcv(
+    symbol: str, n: int = 100, base_price: float = 150.0, rsi_val: float = 50.0
+) -> pd.DataFrame:
     """
     Build a minimal but realistic market DataFrame matching the
     training_data.csv schema (same columns production strategies read).
@@ -34,40 +61,44 @@ def _make_ohlcv(symbol: str, n: int = 100, base_price: float = 150.0,
     # Alternate future returns so ML model gets both classes
     future_rets = np.where(np.arange(n) % 2 == 0, 0.01, -0.01)
 
-    return pd.DataFrame({
-        "symbol":           symbol,
-        "open":             close * 0.99,
-        "high":             close * 1.01,
-        "low":              close * 0.99,
-        "close":            close,
-        "volume":           np.full(n, 1_500_000.0) + np.random.randn(n) * 2000,
-        "rsi":              rsi_series,
-        "rsi_slope":        np.zeros(n),
-        "atr_20":           close * 0.015,
-        # Trailing 20-day VWAP — always below close in uptrends.
-        # Do NOT use price >= vwap as an exit condition (this was the core bug).
-        "vwap":             close * 0.70,
-        "volume_ratio":     np.full(n, 1.0),
-        "returns_1d":       np.full(n, 0.001),
-        "returns_5d":       np.full(n, 0.01),
-        "returns_20d":      np.full(n, 0.02),
-        "returns_60d":      np.full(n, 0.05),
-        "volatility_20d":   np.full(n, 0.15),
-        "volatility_60d":   np.full(n, 0.15),
-        "price_to_sma20":   np.full(n, 1.01),
-        "price_to_sma50":   np.full(n, 1.02),
-        "price_to_sma200":  np.full(n, 1.05),
-        "sma_20":           close * 0.99,
-        "sma_50":           close * 0.98,
-        "adx":              np.full(n, 25.0),
-        "future_return_5d": future_rets,
-        "future_return_20d": future_rets * 2,
-    }, index=dates)
+    return pd.DataFrame(
+        {
+            "symbol": symbol,
+            "open": close * 0.99,
+            "high": close * 1.01,
+            "low": close * 0.99,
+            "close": close,
+            "volume": np.full(n, 1_500_000.0) + np.random.randn(n) * 2000,
+            "rsi": rsi_series,
+            "rsi_slope": np.zeros(n),
+            "atr_20": close * 0.015,
+            # Trailing 20-day VWAP — always below close in uptrends.
+            # Do NOT use price >= vwap as an exit condition (this was the core bug).
+            "vwap": close * 0.70,
+            "volume_ratio": np.full(n, 1.0),
+            "returns_1d": np.full(n, 0.001),
+            "returns_5d": np.full(n, 0.01),
+            "returns_20d": np.full(n, 0.02),
+            "returns_60d": np.full(n, 0.05),
+            "volatility_20d": np.full(n, 0.15),
+            "volatility_60d": np.full(n, 0.15),
+            "price_to_sma20": np.full(n, 1.01),
+            "price_to_sma50": np.full(n, 1.02),
+            "price_to_sma200": np.full(n, 1.05),
+            "sma_20": close * 0.99,
+            "sma_50": close * 0.98,
+            "adx": np.full(n, 25.0),
+            "future_return_5d": future_rets,
+            "future_return_20d": future_rets * 2,
+        },
+        index=dates,
+    )
 
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def mock_market_data():
@@ -107,7 +138,7 @@ def mock_portfolio():
         "portfolio_value": 100_000,
         "positions": [
             {"symbol": "AAPL", "shares": 100, "avg_price": 150},
-            {"symbol": "MSFT", "shares": 50,  "avg_price": 300},
+            {"symbol": "MSFT", "shares": 50, "avg_price": 300},
         ],
     }
 
