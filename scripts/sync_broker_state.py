@@ -133,6 +133,31 @@ def sync_broker_to_database(db_path="trading.db"):
                 logger.info(f"  ✅ {symbol}: {broker_qty} shares — in sync")
                 continue
 
+            # Sign-flip: local is LONG but broker is SHORT (or vice versa).
+            # The simple diff-based logic can't bridge opposite-direction positions
+            # cleanly — it would delete the local long but not insert the broker short,
+            # leaving local=0 vs broker=-N after the loop.  Clear the local side first
+            # and then fall through to the local_total==0 insertion below.
+            sign_flip = (
+                local_info is not None
+                and local_total != 0
+                and broker_qty != 0
+                and (local_total > 0) != (broker_qty > 0)
+            )
+            if sign_flip:
+                for sid, sname, sshares, _ in local_info["strategies"]:
+                    cursor.execute(
+                        "DELETE FROM positions WHERE strategy_id = ? AND symbol = ?",
+                        (sid, symbol),
+                    )
+                    logger.info(
+                        f"  ♻️  {symbol}: cleared {sshares:.0f} shares from {sname} "
+                        f"(sign-flip: local={local_total:+.0f} → broker={broker_qty:+.0f})"
+                    )
+                    changes += 1
+                local_total = 0.0
+                local_info = None
+
             if local_total == 0:
                 # Entirely new position — add under BROKER_SYNC.
                 # Use today as entry_date fallback so time-based exits can fire.

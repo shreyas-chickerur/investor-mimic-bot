@@ -159,7 +159,9 @@ class MLMomentumStrategy(TradingStrategy):
         y_train = []
         use_precomputed = "future_return_5d" in market_data.columns
 
-        sym_map = dict(market_data.groupby("symbol"))
+        sym_map: dict = {}
+        for _sym_key, _sym_grp in market_data.groupby("symbol"):
+            sym_map[_sym_key] = _sym_grp
 
         for _symbol, sym in sym_map.items():
             if len(sym) < 60:
@@ -241,7 +243,9 @@ class MLMomentumStrategy(TradingStrategy):
         # Market regime gate: suppress all BUY signals when SPY is below its 50-day SMA.
         market_uptrend = self._spy_above_sma50(market_data)
 
-        sym_map = dict(market_data.groupby("symbol"))
+        sym_map: dict = {}
+        for _sg_key, _sg_grp in market_data.groupby("symbol"):
+            sym_map[_sg_key] = _sg_grp
 
         for symbol, symbol_data in sym_map.items():
             if len(symbol_data) < 20:

@@ -6,8 +6,6 @@ import argparse
 import json
 import sqlite3
 from pathlib import Path
-from typing import Dict, List
-
 
 CANONICAL_STRATEGIES = [
     "RSI Mean Reversion",
@@ -30,7 +28,7 @@ def read_status(status_file: Path) -> str:
     return status_file.read_text().strip()
 
 
-def query_rows(conn: sqlite3.Connection, sql: str, params=()) -> List[Dict]:
+def query_rows(conn: sqlite3.Connection, sql: str, params=()) -> list[dict]:
     cur = conn.cursor()
     cur.execute(sql, params)
     cols = [d[0] for d in cur.description]
@@ -52,7 +50,7 @@ def main() -> int:
 
     conn = sqlite3.connect(args.db)
 
-    report: Dict = {
+    report: dict = {
         "status": status,
         "critical_failures": [],
         "warnings": [],
@@ -72,7 +70,9 @@ def main() -> int:
         """,
     )
     if not run_rows:
-        report["critical_failures"].append("No broker_state rows found; trading run likely did not persist")
+        report["critical_failures"].append(
+            "No broker_state rows found; trading run likely did not persist"
+        )
     else:
         report["latest_run_id"] = run_rows[0]["run_id"]
 
@@ -90,9 +90,31 @@ def main() -> int:
         by_name = {r["strategy_name"]: r for r in funnel_rows}
         missing = [s for s in CANONICAL_STRATEGIES if s not in by_name]
         if missing:
-            report["critical_failures"].append(
-                f"Missing signal_funnel rows for canonical strategies: {missing}"
+            # If reconciliation failed for this run, trading was blocked before
+            # strategies could run.  The execution engine now writes zero-count
+            # funnel rows in that case, but guard against the window where old
+            # code produced no rows at all by downgrading to a warning instead
+            # of a critical failure when reconciliation is the known blocker.
+            recon_rows = query_rows(
+                conn,
+                """
+                select reconciliation_status from broker_state
+                where run_id = ?
+                  and snapshot_type in ('RECONCILIATION', 'RECONCILIATION_RETRY')
+                order by created_at desc, id desc
+                limit 1
+                """,
+                (report["latest_run_id"],),
             )
+            recon_failed = recon_rows and recon_rows[0]["reconciliation_status"] == "FAIL"
+            if recon_failed:
+                report["warnings"].append(
+                    f"signal_funnel rows missing for {missing} — trading was blocked by reconciliation failure"
+                )
+            else:
+                report["critical_failures"].append(
+                    f"Missing signal_funnel rows for canonical strategies: {missing}"
+                )
         report["funnel_rows"] = funnel_rows
 
     stage(3, 4, "Validating funnel monotonic invariants")

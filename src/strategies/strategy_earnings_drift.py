@@ -187,7 +187,9 @@ class EarningsDriftStrategy(TradingStrategy):
     def generate_signals(self, market_data: pd.DataFrame) -> list[dict]:
         """Generate signals based on actual earnings calendar (primary) or volume proxy (fallback)."""
         signals = []
-        sym_map = dict(market_data.groupby("symbol"))
+        sym_map: dict = {}
+        for _ed_key, _ed_grp in market_data.groupby("symbol"):
+            sym_map[_ed_key] = _ed_grp
         latest_date = market_data.index.max()
         market_uptrend = self._spy_above_sma50(market_data)
 

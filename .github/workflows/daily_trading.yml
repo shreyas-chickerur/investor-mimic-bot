@@ -563,20 +563,40 @@ jobs:
         subject: "⏸️ Trading Skipped - Market Closed (Expected) - ${{ steps.runtime_date.outputs.today }}"
         to: ${{ secrets.EMAIL_TO }}
         from: Trading System
-        body: |
-          Trading Run Skipped - Market Closed (Expected)
-
-          Run: ${{ github.run_number }}
-          Date: ${{ steps.runtime_date.outputs.today }}
-          Status: Market closed (weekend or holiday)
-
-          This is expected behavior. The trading system automatically skips execution when:
-          - Market is closed (weekends)
-          - Market holidays
-
-          No action required. The system will resume automatically on the next trading day.
-
-          Next scheduled run: Monday-Friday at 4:15 PM ET
+        html_body: |
+          <!DOCTYPE html><html><body style="margin:0;padding:0;background:#f5f5f0;
+              font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;color:#111;">
+          <div style="max-width:520px;margin:0 auto;padding:32px 24px;">
+            <div style="font-size:11px;font-weight:700;letter-spacing:0.2em;color:#9a9a9a;
+                        text-transform:uppercase;margin-bottom:10px;">
+              ${{ steps.runtime_date.outputs.today }} · Market Status
+            </div>
+            <div style="font-size:24px;font-weight:800;letter-spacing:-0.02em;
+                        color:#111;line-height:1.25;margin-bottom:14px;">
+              Market closed — trading skipped.
+            </div>
+            <div style="display:inline-block;background:#e8f5e9;border:1px solid #66bb6a;
+                        color:#1b5e20;font-size:11px;font-weight:700;letter-spacing:0.15em;
+                        padding:4px 10px;border-radius:6px;margin-bottom:18px;">
+              EXPECTED · NO ACTION NEEDED
+            </div>
+            <p style="font-size:14px;line-height:1.6;color:#333;margin:0 0 16px;">
+              The trading system automatically skips execution on weekends and
+              market holidays. No orders were placed.
+            </p>
+            <div style="background:#fff;border:1px solid #e0e0d8;border-radius:12px;
+                        padding:14px 18px;margin-bottom:18px;">
+              <table style="border-collapse:collapse;width:100%;font-size:13px;color:#333">
+                <tr><td style="padding:4px 0;color:#888;width:90px">Run</td>
+                    <td style="padding:4px 0">#${{ github.run_number }}</td></tr>
+                <tr><td style="padding:4px 0;color:#888">Date</td>
+                    <td style="padding:4px 0">${{ steps.runtime_date.outputs.today }}</td></tr>
+                <tr><td style="padding:4px 0;color:#888">Next run</td>
+                    <td style="padding:4px 0">Monday–Friday at 4:15 PM ET</td></tr>
+              </table>
+            </div>
+          </div>
+          </body></html>
 
     # Only escalate to the user when auto-sync did NOT resolve the drift.
     # If sync succeeded and the post-sync verification passes, stay silent
@@ -666,19 +686,49 @@ jobs:
         subject: "❌ Daily Trading Workflow Failed (UNEXPECTED) - ${{ steps.runtime_date.outputs.today }}"
         to: ${{ secrets.EMAIL_TO }}
         from: Trading System
-        body: |
-          ⚠️ UNEXPECTED FAILURE - Daily Trading Execution Failed
-
-          Run: ${{ github.run_number }}
-          Date: ${{ github.event.repository.updated_at }}
-          Workflow: ${{ github.workflow }}
-          Status: ${{ steps.check_status.outputs.status }}
-
-          This is an UNEXPECTED failure that requires attention.
-
-          Failed Step: Check the logs at:
-          https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-          Please review the failure and take corrective action.
-
-          Artifacts (if any): daily-artifacts-${{ github.run_number }}
+        html_body: |
+          <!DOCTYPE html><html><body style="margin:0;padding:0;background:#f5f5f0;
+              font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;color:#111;">
+          <div style="max-width:520px;margin:0 auto;padding:32px 24px;">
+            <div style="font-size:11px;font-weight:700;letter-spacing:0.2em;color:#9a9a9a;
+                        text-transform:uppercase;margin-bottom:10px;">
+              ${{ steps.runtime_date.outputs.today }} · Workflow Failure
+            </div>
+            <div style="font-size:24px;font-weight:800;letter-spacing:-0.02em;
+                        color:#c0392b;line-height:1.25;margin-bottom:14px;">
+              Daily trading workflow failed.
+            </div>
+            <div style="display:inline-block;background:#ffe1e1;border:1px solid #d63031;
+                        color:#7a1a1a;font-size:11px;font-weight:700;letter-spacing:0.15em;
+                        padding:4px 10px;border-radius:6px;margin-bottom:18px;">
+              ACTION REQUIRED
+            </div>
+            <p style="font-size:14px;line-height:1.6;color:#333;margin:0 0 16px;">
+              An unexpected error stopped the trading workflow. No orders may have been placed.
+              Review the logs to determine the root cause.
+            </p>
+            <div style="background:#fff;border:1px solid #e0e0d8;border-radius:12px;
+                        padding:14px 18px;margin-bottom:18px;">
+              <table style="border-collapse:collapse;width:100%;font-size:13px;color:#333">
+                <tr><td style="padding:4px 0;color:#888;width:90px">Run</td>
+                    <td style="padding:4px 0">#${{ github.run_number }}</td></tr>
+                <tr><td style="padding:4px 0;color:#888">Date</td>
+                    <td style="padding:4px 0">${{ steps.runtime_date.outputs.today }}</td></tr>
+                <tr><td style="padding:4px 0;color:#888">Workflow</td>
+                    <td style="padding:4px 0">${{ github.workflow }}</td></tr>
+                <tr><td style="padding:4px 0;color:#888">Status</td>
+                    <td style="padding:4px 0;color:#c0392b;font-weight:600">
+                      ${{ steps.check_status.outputs.status }}</td></tr>
+              </table>
+            </div>
+            <a href="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+               style="display:inline-block;background:#111;color:#fff;text-decoration:none;
+                      font-size:13px;font-weight:600;padding:10px 20px;border-radius:8px;
+                      margin-bottom:16px;">
+              View Logs →
+            </a>
+            <p style="font-size:12px;color:#888;margin:12px 0 0">
+              Artifacts (if any): daily-artifacts-${{ github.run_number }}
+            </p>
+          </div>
+          </body></html>

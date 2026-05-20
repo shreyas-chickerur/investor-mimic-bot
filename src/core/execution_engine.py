@@ -1230,11 +1230,34 @@ class MultiStrategyRunner:
 
                 self.errors.extend(discrepancies)
 
+                # Write zero-count signal funnel rows for every strategy so the
+                # post-run guardrail doesn't flag "missing funnel rows" when trading
+                # is legitimately blocked rather than silently skipped.
+                for strategy in strategies:
+                    self.funnel_tracker.record_raw_signals(strategy.strategy_id, 0)
+                    self.funnel_tracker.record_after_regime(strategy.strategy_id, 0)
+                    self.funnel_tracker.record_after_correlation(strategy.strategy_id, 0)
+                    self.funnel_tracker.record_after_risk(strategy.strategy_id, 0)
+                    self.funnel_tracker.record_executed(strategy.strategy_id, 0)
+                    self.funnel_tracker.save_to_database(strategy.strategy_id, strategy.name)
+
                 # Send critical alert
+                disc_html = "".join(f"<li>{d}</li>" for d in discrepancies)
                 self.email_notifier.send_alert(
                     "Reconciliation Failure - Trading Blocked",
-                    "Broker/DB mismatch detected:\n\n"
-                    + "\n".join(f"  • {d}" for d in discrepancies),
+                    f"<html><body style='font-family:sans-serif;max-width:600px;margin:0 auto'>"
+                    f"<div style='background:#dc3545;color:#fff;padding:16px 20px;border-radius:8px 8px 0 0'>"
+                    f"<h2 style='margin:0'>🛑 Reconciliation Failure — Trading Blocked</h2></div>"
+                    f"<div style='padding:20px;border:1px solid #dee2e6;border-top:none'>"
+                    f"<p>The trading run was halted because the local database does not match "
+                    f"the Alpaca broker state. No orders were submitted.</p>"
+                    f"<h3 style='color:#dc3545'>Discrepancies ({len(discrepancies)})</h3>"
+                    f"<ul style='color:#333;line-height:1.6'>{disc_html}</ul>"
+                    f"<hr style='border:none;border-top:1px solid #eee'>"
+                    f"<p style='color:#666;font-size:13px'>"
+                    f"Run the sync workflow or <code>python3 scripts/sync_broker_state.py</code> "
+                    f"to resolve the drift, then re-run the daily workflow.</p>"
+                    f"</div></body></html>",
                 )
 
                 # Log to structured logger
