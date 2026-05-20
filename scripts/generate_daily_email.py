@@ -168,6 +168,63 @@ def get_signal_reasons(db, symbols: list[str]) -> dict[tuple[str, str], dict]:
     return out
 
 
+def get_latest_run_id(db) -> str | None:
+    rows = _q(
+        db,
+        """
+        SELECT run_id FROM broker_state
+        WHERE snapshot_type != 'SYNC' AND run_id != 'AUTO_SYNC'
+        ORDER BY created_at DESC LIMIT 1
+        """,
+    )
+    return rows[0]["run_id"] if rows else None
+
+
+def get_rejection_summary(db, run_id: str | None) -> list[dict]:
+    """Top rejection reasons for the current run (stage + reason_code + count)."""
+    if not run_id:
+        return []
+    return _q(
+        db,
+        """
+        SELECT stage, reason_code, COUNT(*) AS cnt
+        FROM signal_rejections
+        WHERE run_id = ?
+        GROUP BY stage, reason_code
+        ORDER BY cnt DESC
+        LIMIT 5
+        """,
+        run_id,
+    )
+
+
+def get_zero_trade_streak(db) -> int:
+    """Return number of consecutive recent trading days with zero executed trades."""
+    rows = _q(
+        db,
+        """
+        SELECT DATE(snapshot_date) AS day,
+               (SELECT COUNT(*) FROM trades t
+                WHERE DATE(t.executed_at) = DATE(bs.snapshot_date)
+                  AND t.strategy_id IN (SELECT id FROM strategies WHERE name != 'BROKER_SYNC')
+               ) AS trade_count
+        FROM broker_state bs
+        WHERE snapshot_type IN ('RECONCILIATION', 'RECONCILIATION_RETRY', 'EXECUTION')
+          AND run_id != 'AUTO_SYNC'
+        GROUP BY DATE(snapshot_date)
+        ORDER BY day DESC
+        LIMIT 10
+        """,
+    )
+    streak = 0
+    for r in rows:
+        if int(r.get("trade_count") or 0) == 0:
+            streak += 1
+        else:
+            break
+    return streak
+
+
 def get_aggregate_pnl(db) -> dict:
     row = _q1(
         db,
@@ -624,8 +681,36 @@ def _section_title(text: str, count: int | None = None, accent: str = TEXT) -> s
 """
 
 
-def build_today_trades(trades: list[dict], sig_map: dict[tuple[str, str], dict]) -> str:
+def build_today_trades(
+    trades: list[dict],
+    sig_map: dict[tuple[str, str], dict],
+    rejections: list[dict] | None = None,
+    zero_trade_streak: int = 0,
+) -> str:
     if not trades:
+        streak_note = ""
+        if zero_trade_streak >= 3:
+            streak_note = (
+                f'<div style="font-family:{FONT};font-size:11px;color:#c97a00;'
+                f'margin-top:6px;font-weight:600;">'
+                f"⚠️ {zero_trade_streak} consecutive trading days with no executions</div>"
+            )
+        rej_html = ""
+        if rejections:
+            rej_rows = "".join(
+                f'<tr><td style="font-family:{FONT};font-size:11px;color:{TEXT_DIM};'
+                f'padding:2px 8px 2px 0;">{html_lib.escape(r.get("stage",""))}'
+                f'&thinsp;·&thinsp;{html_lib.escape(r.get("reason_code",""))}</td>'
+                f'<td style="font-family:{FONT};font-size:11px;color:{TEXT_DIM};'
+                f'text-align:right;">{r.get("cnt","")}</td></tr>'
+                for r in rejections
+            )
+            rej_html = (
+                f'<div style="margin-top:12px;text-align:left;">'
+                f'<div style="font-family:{FONT};font-size:11px;font-weight:600;'
+                f'color:{TEXT_DIM};letter-spacing:0.06em;margin-bottom:6px;">WHY NO TRADES</div>'
+                f"<table width='100%'>{rej_rows}</table></div>"
+            )
         return f"""
 <div style="padding:0 22px 4px;">
   <div style="background:{CARD};border:1px dashed {BORDER};border-radius:14px;
@@ -634,6 +719,7 @@ def build_today_trades(trades: list[dict], sig_map: dict[tuple[str, str], dict])
                 letter-spacing:-0.01em;">Quiet day — no trades</div>
     <div style="font-family:{FONT};font-size:12px;color:{TEXT_DIM};
                 margin-top:4px;">Holding existing positions.</div>
+    {streak_note}{rej_html}
   </div>
 </div>
 """
@@ -1255,6 +1341,9 @@ def generate_email_body(db_path: str = "trading.db", include_visuals: bool = Tru
         agg = get_aggregate_pnl(db)
         symbols: list[str] = list({str(s) for t in trades_today if (s := t.get("symbol"))})
         sig_map = get_signal_reasons(db, symbols)
+        run_id = get_latest_run_id(db)
+        rejections = get_rejection_summary(db, run_id) if not trades_today else []
+        zero_streak = get_zero_trade_streak(db) if not trades_today else 0
     finally:
         db.close()
 
@@ -1280,7 +1369,9 @@ def generate_email_body(db_path: str = "trading.db", include_visuals: bool = Tru
         build_header(pv, today_pnl, today_pct, date_str, equity=equity)
         + build_kpi_strip(today_real, total_pnl, win_rate, wins, losses, len(positions))
         + _section_title("Today's tape", count=len(trades_today), accent=GOLD)
-        + build_today_trades(trades_today, sig_map)
+        + build_today_trades(
+            trades_today, sig_map, rejections=rejections, zero_trade_streak=zero_streak
+        )
         + _section_title("Movers & shakers", accent=VOLT)
         + build_movers(positions)
         + _section_title("The book", count=len(positions), accent=INDIGO)
