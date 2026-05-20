@@ -36,6 +36,7 @@ jobs:
         python3 scripts/import_check.py
 
     - name: Download previous database (if exists)
+      id: download_db
       continue-on-error: true
       env:
         GH_TOKEN: ${{ github.token }}
@@ -55,9 +56,13 @@ jobs:
           if ! sqlite3 trading.db "SELECT name FROM sqlite_master WHERE type='table' AND name='broker_state';" | grep -q broker_state; then
             echo "⚠️ trading.db artifact missing broker_state table — removing to force clean init"
             rm -f trading.db
+            echo "cold_start=true" >> $GITHUB_OUTPUT
+          else
+            echo "cold_start=false" >> $GITHUB_OUTPUT
           fi
         else
           echo "⚠️ No trading-database artifact found — will initialize fresh"
+          echo "cold_start=true" >> $GITHUB_OUTPUT
         fi
 
     - name: Initialize database
@@ -78,6 +83,17 @@ jobs:
     - name: Create required directories
       run: |
         mkdir -p artifacts/json artifacts/markdown artifacts/funnel artifacts/data_quality artifacts/drawdown artifacts/health logs data
+
+    - name: Pre-execution broker sync (cold start only)
+      if: steps.download_db.outputs.cold_start == 'true'
+      continue-on-error: true
+      env:
+        ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+        ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+        ALPACA_PAPER: 'true'
+      run: |
+        echo "=== Cold start detected — pre-syncing broker positions into fresh DB ==="
+        python scripts/sync_broker_state.py && echo "✅ Pre-sync complete" || echo "⚠️ Pre-sync failed (broker may have no positions)"
 
     - name: Download previous training data (if exists)
       continue-on-error: true

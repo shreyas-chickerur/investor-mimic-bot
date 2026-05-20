@@ -6,12 +6,17 @@ Fetches real VIX data from Yahoo Finance or Alpha Vantage
 from __future__ import annotations
 
 import logging
+import time
 from datetime import datetime, timedelta
 
 import pandas as pd
 import requests
 
 logger = logging.getLogger(__name__)
+
+_YAHOO_VIX_URL = "https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX"
+_CACHE_TTL_SECONDS = 3600
+_DEFAULT_VIX = 18.0
 
 
 class VIXDataFetcher:
@@ -22,11 +27,12 @@ class VIXDataFetcher:
         Initialize VIX data fetcher
 
         Args:
-            source: Data source ('yahoo' or 'alphavantage')
+            source: Preferred data source ('yahoo' or 'alphavantage').
+                    Yahoo is always tried first; Alpha Vantage is the fallback.
         """
         self.source = source
-        self.cache = {}
-        self.cache_time = None
+        self.cache: dict = {}
+        self.cache_time: datetime | None = None
 
     def get_current_vix(self) -> float:
         """
@@ -36,56 +42,68 @@ class VIXDataFetcher:
             Current VIX value
         """
         # Check cache (refresh every hour)
-        if self.cache_time and (datetime.now() - self.cache_time).seconds < 3600:
+        if (
+            self.cache_time
+            and (datetime.now() - self.cache_time).total_seconds() < _CACHE_TTL_SECONDS
+        ):
             if "vix" in self.cache:
                 return self.cache["vix"]
 
+        vix: float | None = None
+
+        # Always try Yahoo first; fall back to Alpha Vantage regardless of source setting
         try:
-            if self.source == "yahoo":
-                vix = self._fetch_from_yahoo()
-            else:
-                vix = self._fetch_from_alphavantage()
-
-            # Update cache
-            self.cache["vix"] = vix
-            self.cache_time = datetime.now()
-
-            logger.info(f"VIX fetched: {vix:.2f}")
-            return vix
-
+            vix = self._fetch_from_yahoo()
         except Exception as e:
-            logger.error(f"Error fetching VIX: {e}")
-            # Return default moderate volatility
-            return 18.0
+            logger.warning(f"Yahoo VIX fetch failed, trying Alpha Vantage fallback: {e}")
+
+        if vix is None:
+            try:
+                vix = self._fetch_from_alphavantage()
+            except Exception as e:
+                logger.error(f"Alpha Vantage VIX fetch also failed: {e}")
+
+        if vix is None:
+            logger.warning(f"All VIX sources failed; using default {_DEFAULT_VIX}")
+            vix = _DEFAULT_VIX
+
+        self.cache["vix"] = vix
+        self.cache_time = datetime.now()
+        logger.info(f"VIX fetched: {vix:.2f}")
+        return vix
 
     def _fetch_from_yahoo(self) -> float:
         """
-        Fetch VIX from Yahoo Finance
-
-        Uses yfinance-style API endpoint
+        Fetch VIX from Yahoo Finance with retry on rate-limit (429).
         """
-        try:
-            # Yahoo Finance API endpoint for ^VIX
-            url = "https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX"
-            params = {"interval": "1d", "range": "1d"}
-            headers = {"User-Agent": "Mozilla/5.0 (compatible; TradingBot/1.0)"}
-            response = requests.get(url, params=params, headers=headers, timeout=10)
-            response.raise_for_status()
+        params = {"interval": "1d", "range": "1d"}
+        headers = {"User-Agent": "Mozilla/5.0 (compatible; TradingBot/1.0)"}
 
-            data = response.json()
+        for attempt, backoff in enumerate([0, 2, 4], start=1):
+            if backoff:
+                time.sleep(backoff)
+            try:
+                response = requests.get(_YAHOO_VIX_URL, params=params, headers=headers, timeout=10)
+                if response.status_code == 429:
+                    logger.warning(f"Yahoo VIX rate-limited (attempt {attempt}/3)")
+                    continue
+                response.raise_for_status()
 
-            # Extract current price
-            if "chart" in data and "result" in data["chart"]:
-                result = data["chart"]["result"][0]
-                if "meta" in result and "regularMarketPrice" in result["meta"]:
-                    vix = result["meta"]["regularMarketPrice"]
-                    return float(vix)
+                data = response.json()
+                if "chart" in data and "result" in data["chart"]:
+                    result = data["chart"]["result"][0]
+                    if "meta" in result and "regularMarketPrice" in result["meta"]:
+                        return float(result["meta"]["regularMarketPrice"])
 
-            raise ValueError("Could not parse VIX data from Yahoo")
+                raise ValueError("Could not parse VIX data from Yahoo")
 
-        except Exception as e:
-            logger.error(f"Yahoo VIX fetch failed: {e}")
-            raise
+            except requests.exceptions.HTTPError as e:
+                if attempt < 3:
+                    logger.warning(f"Yahoo VIX HTTP error on attempt {attempt}: {e}")
+                    continue
+                raise
+
+        raise RuntimeError("Yahoo VIX fetch failed after 3 attempts (rate-limited)")
 
     def _fetch_from_alphavantage(self) -> float:
         """
