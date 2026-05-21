@@ -2,8 +2,11 @@ name: Daily Trading Execution
 
 on:
   schedule:
-    # Runs at 1:15 PM PST (4:15 PM EST / 21:15 UTC) after market close, Monday-Friday
-    - cron: '15 21 * * 1-5'
+    # Runs at midnight UTC (8 PM ET / 7 PM ET winter) after market close, Mon-Fri evenings.
+    # Alpaca OPG orders require submission after 7:00 PM ET; midnight UTC guarantees we are
+    # inside that window even with GitHub Actions queue delays (~1-2 h).
+    # Day-of-week 2-6 (Tue-Sat UTC) = Mon-Fri evening US Eastern time.
+    - cron: '0 0 * * 2-6'
   workflow_dispatch:  # Allow manual trigger
 
 env:

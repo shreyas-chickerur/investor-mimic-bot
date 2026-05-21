@@ -261,7 +261,7 @@ class TestImprovement3PartialExitPersistence:
 
 
 # ===========================================================================
-# 4. Reduced position count — top_n=3, min_confidence=0.60
+# 4. Reduced position count — top_n=3, min_confidence=0.65
 # ===========================================================================
 
 
@@ -270,9 +270,9 @@ class TestImprovement4ReducedPositions:
         s = FactorMomentumStrategy(1, 25_000)
         assert s.top_n == 3, f"Factor top_n should be 3, got {s.top_n}"
 
-    def test_ml_min_confidence_is_0_60(self):
+    def test_ml_min_confidence_is_0_65(self):
         s = MLMomentumStrategy(1, 25_000)
-        assert s.min_confidence == 0.60, f"ML min_confidence should be 0.60, got {s.min_confidence}"
+        assert s.min_confidence == 0.65, f"ML min_confidence should be 0.65, got {s.min_confidence}"
 
     def test_factor_generates_at_most_three_buys(self):
         """With top_n=3, Factor Momentum must never return more than 3 BUY signals."""

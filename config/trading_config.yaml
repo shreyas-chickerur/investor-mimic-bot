@@ -95,10 +95,10 @@ strategies:
 
   ml_momentum:
     lookback_days: 60
-    min_confidence: 0.60  # Raised from 0.55 — cuts trade count, improves conviction per trade
+    min_confidence: 0.65  # Raised from 0.60 — live 25% win rate required higher bar
     feature_count: 12
-    max_new_positions_per_day: 3
-    buy_quantile_threshold: 0.65
+    max_new_positions_per_day: 2  # Reduced from 3 — fewer but higher-conviction entries
+    buy_quantile_threshold: 0.70  # Raised from 0.65 — only top-decile ML signals
 
   factor_momentum:
     top_n: 3  # Reduced from 5 — higher conviction, lower overtrading cost drag

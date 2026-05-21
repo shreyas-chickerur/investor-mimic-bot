@@ -617,23 +617,30 @@ class MultiStrategyRunner:
         return health_by_strategy
 
     def _compute_trailing_sharpe(self, strategies, window_days: int = 30) -> dict:
-        """Compute trailing annualized Sharpe ratio per strategy from recent performance records."""
+        """Compute trailing Sharpe per strategy from realized trade-level P&L.
+
+        Uses trade_pnl_detail (matched buy→sell gross_pnl_pct) rather than
+        portfolio snapshots.  Snapshots are equal-capital for all strategies
+        when no fills occur, producing an identical and meaningless Sharpe for
+        every strategy.  Trade returns are zero for strategies with no closed
+        trades (correctly yielding no entry) and reflect actual win/loss mix
+        otherwise.
+        """
         import numpy as _np
 
         sharpe_by_strategy = {}
         for strategy in strategies:
             try:
-                perf = self.db.get_strategy_performance(strategy.strategy_id, days=window_days)
-                if len(perf) < 5:
+                returns = self.db.get_strategy_trade_returns(strategy.strategy_id, days=window_days)
+                if len(returns) < 3:
                     continue
-                vals = [float(p["portfolio_value"]) for p in perf]
-                daily_returns = [(vals[i] - vals[i - 1]) / vals[i - 1] for i in range(1, len(vals))]
-                if not daily_returns:
-                    continue
-                mean_r = _np.mean(daily_returns)
-                std_r = _np.std(daily_returns, ddof=1)
+                arr = _np.array(returns)
+                mean_r = _np.mean(arr)
+                std_r = _np.std(arr, ddof=1)
                 if std_r > 0:
-                    sharpe = (mean_r / std_r) * (252**0.5)
+                    # Annualise assuming ~252 trading days; trade returns are
+                    # per-trade not per-day but this preserves the relative ranking.
+                    sharpe = (mean_r / std_r) * (_np.sqrt(252))
                     sharpe_by_strategy[strategy.name] = round(float(sharpe), 3)
             except Exception as exc:
                 logger.debug("Trailing Sharpe unavailable for %s: %s", strategy.name, exc)
