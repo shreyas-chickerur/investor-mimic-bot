@@ -83,8 +83,19 @@ strategies:
   # Dynamic allocation
   enable_dynamic_allocation: true
   rebalance_frequency_days: 30  # Rebalance every 30 days
-  min_allocation_pct: 0.10  # Minimum 10% per strategy
-  max_allocation_pct: 0.35  # Maximum 35% per strategy
+  min_allocation_pct: 0.05   # Minimum 5% per strategy
+  max_allocation_pct: 0.35   # Default maximum 35% per strategy
+
+  # Per-strategy allocation caps (override global max_allocation_pct)
+  # Based on backtest edge analysis: RSI p=0.019, Earnings Drift p=0.001,
+  # ML Momentum edge only at >0.65 confidence, Factor Momentum p=0.575 (no edge)
+  allocation_overrides:
+    rsi_mean_reversion: 0.40   # Proven edge — allow up to 40%
+    earnings_drift: 0.35       # Proven edge — allow up to 35%
+    ml_momentum: 0.20          # Edge at high-conf only — cap at 20%
+    factor_momentum: 0.05      # No demonstrated edge — pin to minimum
+    ma_crossover: 0.15         # Unvalidated — moderate cap
+    volatility_breakout: 0.15  # Unvalidated — moderate cap
 
   # Strategy-specific parameters
   rsi_mean_reversion:
