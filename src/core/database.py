@@ -408,6 +408,25 @@ class TradingDatabase:
             "CREATE INDEX IF NOT EXISTS idx_trade_pnl_exit ON trade_pnl_detail(exit_date)"
         )
 
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS fill_quality (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL,
+                strategy_id INTEGER NOT NULL,
+                symbol TEXT NOT NULL,
+                action TEXT NOT NULL,
+                expected_price REAL NOT NULL,
+                fill_price REAL NOT NULL,
+                shares REAL NOT NULL,
+                deviation_bps INTEGER NOT NULL,
+                recorded_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (strategy_id) REFERENCES strategies(id)
+            )
+        """
+        )
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_fill_quality_run ON fill_quality(run_id)")
+
         conn.commit()
         conn.close()
 
@@ -1058,6 +1077,39 @@ class TradingDatabase:
         conn.close()
 
         return trade_id
+
+    def log_fill_quality(
+        self,
+        strategy_id: int,
+        symbol: str,
+        action: str,
+        expected_price: float,
+        fill_price: float,
+        shares: float,
+        deviation_bps: int,
+    ) -> None:
+        """Record fill price vs expected price for slippage monitoring."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO fill_quality
+            (run_id, strategy_id, symbol, action, expected_price, fill_price, shares, deviation_bps)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                self.run_id,
+                strategy_id,
+                symbol,
+                action,
+                expected_price,
+                fill_price,
+                shares,
+                deviation_bps,
+            ),
+        )
+        conn.commit()
+        conn.close()
 
     def update_position(
         self,

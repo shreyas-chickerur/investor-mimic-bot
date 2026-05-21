@@ -162,11 +162,20 @@ class PortfolioRiskManager:
         portfolio_value: float,
         sector_map: dict,
         max_sector_pct: float = 0.30,
+        strategy_name: str = "",
     ) -> tuple:
-        """Return (allowed, reason). Blocks if adding symbol would push sector > max_sector_pct."""
+        """Return (allowed, reason). Blocks if adding symbol would push sector > max_sector_pct.
+
+        Earnings Drift gets a looser 40% cap because earnings events cluster by sector and the
+        signal is event-driven rather than directional — the edge depends on acting when events fire.
+        """
         target_sector = sector_map.get(symbol)
         if not target_sector or portfolio_value <= 0:
             return True, ""
+
+        # Looser cap for Earnings Drift: sector events cluster naturally; blocking them
+        # would eliminate the strategy's edge during peak earnings weeks.
+        effective_max = 0.40 if "earnings" in strategy_name.lower() else max_sector_pct
 
         sector_current = sum(
             mv for sym, mv in current_positions.items() if sector_map.get(sym) == target_sector
@@ -174,10 +183,10 @@ class PortfolioRiskManager:
         sector_after = sector_current + position_value
         sector_pct = sector_after / portfolio_value
 
-        if sector_pct > max_sector_pct:
+        if sector_pct > effective_max:
             return (
                 False,
-                f"Sector {target_sector} at {sector_pct*100:.1f}% would exceed {max_sector_pct*100:.0f}% limit",
+                f"Sector {target_sector} at {sector_pct*100:.1f}% would exceed {effective_max*100:.0f}% limit",
             )
         return True, ""
 
