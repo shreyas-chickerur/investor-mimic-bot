@@ -1197,7 +1197,7 @@ class MultiStrategyRunner:
                     (
                         retry_success,
                         retry_discrepancies,
-                    ) = self._attempt_auto_sync_and_reconciliation_retry()
+                    ) = self._attempt_auto_sync_and_reconciliation_retry(strategies=strategies)
                     if retry_success:
                         self.reconciliation_status = "PASS"
                         self.reconciliation_discrepancies = []
@@ -2242,8 +2242,14 @@ class MultiStrategyRunner:
             combined["avg_price"] = total_cost / combined["qty"] if combined["qty"] else 0.0
         return local_positions
 
-    def _attempt_auto_sync_and_reconciliation_retry(self):
-        """Attempt corrective DB sync to broker and retry reconciliation once."""
+    def _attempt_auto_sync_and_reconciliation_retry(self, strategies=None):
+        """Attempt corrective DB sync to broker and retry reconciliation once.
+
+        Pass `strategies` so that in-memory positions are reloaded from the
+        just-synced DB.  Without this, strategy.positions still contains phantom
+        symbols (e.g. unfilled OPG BUY positions) even after the DB row is
+        deleted, causing spurious SELL attempts and misleading allocation math.
+        """
         try:
             from scripts.sync_broker_state import sync_broker_to_database
         except Exception as exc:
@@ -2254,6 +2260,11 @@ class MultiStrategyRunner:
             synced = sync_broker_to_database(self.db.db_path)
             if not synced:
                 return False, ["Auto-sync completed with unresolved discrepancies"]
+
+            # Reload in-memory positions so strategy logic reflects the cleaned DB.
+            if strategies:
+                for strategy in strategies:
+                    self._load_strategy_positions(strategy)
 
             self._refresh_account_state()
             local_positions = self._build_local_positions()
