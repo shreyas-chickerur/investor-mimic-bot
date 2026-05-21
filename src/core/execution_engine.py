@@ -2426,8 +2426,21 @@ class MultiStrategyRunner:
                 performance_data[strategy.strategy_id] = returns
             else:
                 performance_data[strategy.strategy_id] = []
+
+        # Build per-strategy max allocation from config overrides
+        raw_overrides = self.config.get("strategies.allocation_overrides", {}) or {}
+        config_key_map = {s.name.lower().replace(" ", "_"): s.strategy_id for s in strategies}
+        per_strategy_max: dict[int, float] = {}
+        for config_key, max_pct in raw_overrides.items():
+            sid = config_key_map.get(config_key)
+            if sid is not None:
+                per_strategy_max[sid] = float(max_pct)
+                logger.info(f"Allocation cap override: {config_key} → {max_pct*100:.0f}%")
+
         strategy_ids = [strategy.strategy_id for strategy in strategies]
-        return self.dynamic_allocator.calculate_allocations(strategy_ids, performance_data)
+        return self.dynamic_allocator.calculate_allocations(
+            strategy_ids, performance_data, per_strategy_max=per_strategy_max
+        )
 
     def _calculate_strategy_exposures(self, strategies, current_prices):
         """Calculate current exposure per strategy"""
