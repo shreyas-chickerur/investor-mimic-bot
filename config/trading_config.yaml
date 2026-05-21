@@ -30,6 +30,12 @@ risk:
   trailing_breakeven_atr: 1.0  # +1×ATR open profit → ratchet stop to entry
   trailing_lock_atr: 2.0       # +2×ATR open profit → ratchet stop to entry +1×ATR
 
+  # Sector concentration limit
+  max_sector_pct: 0.30  # No single sector may exceed 30% of portfolio
+
+  # Per-strategy loss limit
+  max_strategy_loss_pct: 0.20  # 20% loss from initial capital triggers strategy freeze
+
   # Correlation filter
   correlation_window: 60  # 60-day rolling correlation
   correlation_short_window: 20  # 20-day short window for regime shifts

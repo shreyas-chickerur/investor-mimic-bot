@@ -52,7 +52,7 @@ _FEATURE_NAMES = [
 
 
 class MLMomentumStrategy(TradingStrategy):
-    """Gradient Boosting classifier predicting 5-day positive return."""
+    """Gradient Boosting classifier predicting 5-day outperformance vs SPY."""
 
     def __init__(self, strategy_id: int, capital: float):
         super().__init__(
@@ -94,6 +94,9 @@ class MLMomentumStrategy(TradingStrategy):
             )
         self.is_trained = False
         self._train_date: str = ""  # track when model was last trained
+        self.last_feature_importances: dict = {}
+        self.last_oos_accuracy: float | None = None
+        self.last_train_accuracy: float | None = None
 
     # ------------------------------------------------------------------
     # Feature extraction
@@ -153,17 +156,42 @@ class MLMomentumStrategy(TradingStrategy):
     # ------------------------------------------------------------------
     # Training
     # ------------------------------------------------------------------
+    def _build_spy_return_index(self, market_data: pd.DataFrame) -> dict:
+        """Build a date -> 5-day SPY return lookup for beta-adjusted labeling."""
+        spy_rows = (
+            market_data[market_data["symbol"] == "SPY"]
+            if "symbol" in market_data.columns
+            else pd.DataFrame()
+        )
+        if len(spy_rows) < 6:
+            return {}
+        spy_close = spy_rows["close"].sort_index()
+        spy_ret_idx = {}
+        arr = spy_close.values
+        dates = spy_close.index
+        for i in range(len(arr) - 5):
+            if arr[i] > 0:
+                spy_ret_idx[dates[i]] = (arr[i + 5] - arr[i]) / arr[i]
+        return spy_ret_idx
+
     def _train_model(self, market_data: pd.DataFrame):
         """Train on historical data using pre-computed future_return_5d when available."""
         X_train = []
         y_train = []
         use_precomputed = "future_return_5d" in market_data.columns
 
+        spy_ret_idx = self._build_spy_return_index(market_data)
+        spy_available = len(spy_ret_idx) > 0
+        if not spy_available:
+            logger.warning("ML: SPY data unavailable — falling back to raw return label")
+
         sym_map: dict = {}
         for _sym_key, _sym_grp in market_data.groupby("symbol"):
             sym_map[_sym_key] = _sym_grp
 
         for _symbol, sym in sym_map.items():
+            if _symbol == "SPY":
+                continue
             if len(sym) < 60:
                 continue
 
@@ -185,10 +213,15 @@ class MLMomentumStrategy(TradingStrategy):
                 if any(np.isnan(f) or np.isinf(f) for f in feats):
                     continue
 
+                row_date = sym.index[i]
+                if spy_available and row_date in spy_ret_idx:
+                    spy_ret = spy_ret_idx[row_date]
+                    label = 1 if future_ret > spy_ret else 0
+                else:
+                    label = 1 if future_ret > 0.005 else 0
+
                 X_train.append(feats)
-                y_train.append(
-                    1 if future_ret > 0.005 else 0
-                )  # 0.5% threshold (lower = more positives)
+                y_train.append(label)
 
         if len(X_train) < 100:
             logger.warning("ML: insufficient training samples (%d), skipping", len(X_train))
@@ -200,11 +233,130 @@ class MLMomentumStrategy(TradingStrategy):
         self.is_trained = True
         pos_rate = y_arr.mean()
         logger.info(
-            "ML trained on %d samples (%.1f%% positive, precomputed=%s)",
+            "ML trained on %d samples (%.1f%% positive, precomputed=%s, beta_adjusted=%s)",
             len(y_arr),
             pos_rate * 100,
             use_precomputed,
+            spy_available,
         )
+
+        if hasattr(self.model, "feature_importances_"):
+            importances = self.model.feature_importances_
+            self.last_feature_importances = dict(
+                sorted(
+                    zip(_FEATURE_NAMES, importances),
+                    key=lambda kv: kv[1],
+                    reverse=True,
+                )
+            )
+            logger.info(
+                "ML feature importances: %s",
+                ", ".join(f"{k}={v:.4f}" for k, v in self.last_feature_importances.items()),
+            )
+
+    def _compute_walk_forward_accuracy(self, market_data: pd.DataFrame) -> None:
+        """Estimate out-of-sample accuracy via a single walk-forward split."""
+        try:
+            spy_ret_idx = self._build_spy_return_index(market_data)
+            spy_available = len(spy_ret_idx) > 0
+            use_precomputed = "future_return_5d" in market_data.columns
+
+            all_rows: list[tuple] = []  # (date, features, label)
+
+            sym_map: dict = {}
+            for _sym_key, _sym_grp in market_data.groupby("symbol"):
+                sym_map[_sym_key] = _sym_grp
+
+            for _symbol, sym in sym_map.items():
+                if _symbol == "SPY":
+                    continue
+                if len(sym) < 60:
+                    continue
+
+                for i in range(50, len(sym) - 5):
+                    row = sym.iloc[i]
+                    history = sym.iloc[max(0, i - 50) : i + 1]
+
+                    if use_precomputed:
+                        future_ret = row.get("future_return_5d", np.nan)
+                        if pd.isna(future_ret):
+                            continue
+                        future_ret = float(future_ret)
+                    else:
+                        future_ret = (sym.iloc[i + 5]["close"] - sym.iloc[i]["close"]) / sym.iloc[
+                            i
+                        ]["close"]
+
+                    feats = self._extract_row_features(row, history)
+                    if any(np.isnan(f) or np.isinf(f) for f in feats):
+                        continue
+
+                    row_date = sym.index[i]
+                    if spy_available and row_date in spy_ret_idx:
+                        label = 1 if future_ret > spy_ret_idx[row_date] else 0
+                    else:
+                        label = 1 if future_ret > 0.005 else 0
+
+                    all_rows.append((row_date, feats, label))
+
+            if len(all_rows) < 200:
+                logger.debug("ML walk-forward skipped: only %d samples", len(all_rows))
+                return
+
+            all_rows.sort(key=lambda r: r[0])
+            split = int(len(all_rows) * 2 / 3)
+
+            train_rows = all_rows[:split]
+            val_rows = all_rows[split:]
+
+            X_tr = np.array([r[1] for r in train_rows])
+            y_tr = np.array([r[2] for r in train_rows])
+            X_val = np.array([r[1] for r in val_rows])
+            y_val = np.array([r[2] for r in val_rows])
+
+            if _LGBM_AVAILABLE:
+                fold_model = lgb.LGBMClassifier(
+                    n_estimators=500,
+                    learning_rate=0.03,
+                    num_leaves=15,
+                    min_child_samples=20,
+                    subsample=0.8,
+                    colsample_bytree=0.8,
+                    class_weight="balanced",
+                    random_state=42,
+                    verbose=-1,
+                )
+            else:
+                fold_model = _FallbackGBT(
+                    n_estimators=200,
+                    max_depth=3,
+                    learning_rate=0.05,
+                    subsample=0.8,
+                    min_samples_leaf=10,
+                    random_state=42,
+                )
+
+            fold_model.fit(X_tr, y_tr)
+            train_preds = fold_model.predict(X_tr)
+            val_preds = fold_model.predict(X_val)
+
+            self.last_train_accuracy = float(np.mean(train_preds == y_tr)) * 100
+            self.last_oos_accuracy = float(np.mean(val_preds == y_val)) * 100
+
+            logger.info(
+                "ML walk-forward OOS accuracy: %.1f%% (train: %.1f%%) — %d samples validated",
+                self.last_oos_accuracy,
+                self.last_train_accuracy,
+                len(val_rows),
+            )
+
+            if self.last_oos_accuracy < 52.0:
+                logger.warning("ML model near-random on OOS data — signals unreliable")
+
+        except Exception as exc:
+            logger.warning("ML walk-forward accuracy computation failed: %s", exc)
+            self.last_oos_accuracy = None
+            self.last_train_accuracy = None
 
     # ------------------------------------------------------------------
     # Signal generation
@@ -235,6 +387,16 @@ class MLMomentumStrategy(TradingStrategy):
         # Retrain daily (model is cheap and data changes each day)
         today = str(market_data.index.max().date()) if len(market_data) > 0 else ""
         if not self.is_trained or today != self._train_date:
+            # Run walk-forward accuracy check before committing to new signals
+            all_sym_rows = sum(
+                max(0, len(g) - 55)
+                for sym, g in market_data.groupby("symbol")
+                if sym != "SPY" and len(g) >= 60
+            )
+            if all_sym_rows >= 200:
+                self._compute_walk_forward_accuracy(market_data)
+            else:
+                logger.debug("ML walk-forward skipped: estimated %d samples < 200", all_sym_rows)
             self._train_model(market_data)
             self._train_date = today
         if not self.is_trained:
