@@ -1357,6 +1357,26 @@ class TradingDatabase:
         finally:
             conn.close()
 
+    def get_strategy_trade_returns(self, strategy_id: int, days: int = 30) -> list:
+        """Return per-trade gross_pnl_pct values from trade_pnl_detail for Sharpe computation."""
+        conn = sqlite3.connect(self.db_path)
+        try:
+            rows = conn.execute(
+                """
+                SELECT gross_pnl_pct
+                FROM trade_pnl_detail
+                WHERE strategy_id = ?
+                  AND exit_date >= date('now', ?)
+                ORDER BY exit_date ASC
+                """,
+                (strategy_id, f"-{days} days"),
+            ).fetchall()
+            return [float(r[0]) for r in rows]
+        except Exception:
+            return []
+        finally:
+            conn.close()
+
     def get_latest_performance(self, strategy_id: int) -> Optional[dict]:
         """Get the most recent performance snapshot for a strategy."""
         conn = sqlite3.connect(self.db_path)

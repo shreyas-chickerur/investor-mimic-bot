@@ -263,17 +263,18 @@ def ml_strategy_and_data():
 
 
 class TestMLMomentumFixes:
-    def test_min_confidence_is_0_60(self):
-        """Confirm threshold raised to 0.60 — GBM produces wider probability spreads.
+    def test_min_confidence_is_0_65(self):
+        """Confirm threshold raised to 0.65 — live 25% win rate required a higher bar.
 
-        GradientBoosting / LightGBM outputs are well-calibrated above 0.60 for
-        momentum signals; the lower 0.55 threshold was generating too many weak trades
-        whose execution costs ate into alpha.
+        Further raised from 0.60 after the first month of live trading showed ML Momentum
+        producing 42 trades at only 25% win rate and negative P&L.  Top-decile signals
+        (>=0.65 confidence, >=0.70 quantile threshold) are the only ones with positive
+        expected value in live conditions.
         """
         s = MLMomentumStrategy(1, 25_000)
         assert (
-            s.min_confidence == 0.60
-        ), f"min_confidence={s.min_confidence} — expected 0.60 (raised from 0.55 to cut overtrading)"
+            s.min_confidence == 0.65
+        ), f"min_confidence={s.min_confidence} — expected 0.65 (raised from 0.60 to cut overtrading)"
 
     def test_model_is_gradient_boosting_with_correct_params(self):
         """GBM replaced LogisticRegression; verify it is configured to prevent overfitting."""
