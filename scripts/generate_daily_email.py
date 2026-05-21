@@ -1,20 +1,13 @@
 #!/usr/bin/env python3
 """
-Daily Email Digest — minimal, Apple-Watch-Activity / Nike inspired.
+Daily Trading Digest — premium, editorial, beginner-friendly evening read.
 
-Design philosophy:
-    * Pure black background, volt-green accent, big condensed numerals.
-    * No jargon, no walls of text, no unverifiable narratives.
-    * Shows ONLY what matters: today's P&L, total P&L, win rate, open
-      positions, today's trades with concrete reasons, and a small price
-      chart per stock we touched.
-
-Removed from previous version:
-    * "News → noticed → decided" 3-box flowchart — we cannot prove
-      causality between headlines and price moves, so we don't claim it.
-    * Generic "we held this position for the planned duration" string —
-      every exit reason is now computed from real trade math.
-    * Strategy concerns wall, regime chrome, redundant metrics.
+Design goals:
+  * Feels like Morning Brew or The Hustle, not a brokerage dashboard.
+  * Every technical term has a plain-English explainer nearby.
+  * Strategy status is front-and-center — beginner investors need context.
+  * Warnings and alerts are unmissable.
+  * Rich visual hierarchy: big numbers, color-coded sections, sparklines.
 
 Usage:
     python3 scripts/generate_daily_email.py [--include-visuals] [--send]
@@ -30,37 +23,84 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-# ── Palette (Apple Activity light / Nike volt) ───────────────────────────────
-# Light theme: every email client renders this consistently. Dark email
-# templates get inverted or stripped by Gmail/Outlook, leading to invisible text.
-BG = "#f5f5f0"  # soft warm off-white (page background)
-CARD = "#ffffff"  # cards on top of BG
-CARD_ALT = "#f0f0eb"  # subtle alt fill
-BORDER = "#e6e6e0"  # soft hairline
-TEXT = "#111111"  # primary copy
-TEXT_DIM = "#5e5e5e"  # secondary copy
-TEXT_MUTE = "#9a9a9a"  # tertiary / labels
-VOLT = "#76b900"  # Nike-volt deep — readable on white
-VOLT_SOFT = "#e8ffd4"  # volt tint for badge backgrounds
-LOSS = "#d63031"  # warm red for losses
-LOSS_SOFT = "#ffe1e1"
-GOLD = "#d97706"  # amber-600 readable on white (win-rate accent)
-GOLD_SOFT = "#fff3d4"
-INDIGO = "#4f46e5"  # indigo-600 (open positions / informational)
-INDIGO_SOFT = "#e8e6ff"
-GRAPE = "#7c3aed"  # violet-600 (news digest accent)
-GRAPE_SOFT = "#f3e8ff"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
-# Sans for body, serif display for big numbers / headlines (magazine feel)
+# ── Palette ───────────────────────────────────────────────────────────────────
+# Light theme only — dark email templates get inverted by Gmail/Outlook.
+PAGE_BG = "#f4f6fb"  # Cool off-white page background
+CARD = "#ffffff"  # White card surface
+CARD_ALT = "#f0f4fb"  # Subtle alternate fill
+BORDER = "#e2e8f4"  # Cool blue-gray hairline
+BORDER_MED = "#c8d4e8"  # Stronger border for emphasis
+
+INK = "#0d1117"  # Primary near-black
+INK_DIM = "#4a5568"  # Secondary text
+INK_MUTE = "#94a3b8"  # Muted / labels
+
+# Semantic colors — each with bg tint, border, foreground
+GREEN = "#059669"
+GREEN_BG = "#ecfdf5"
+GREEN_BORDER = "#6ee7b7"
+GREEN_DARK = "#065f46"
+
+RED = "#dc2626"
+RED_BG = "#fef2f2"
+RED_BORDER = "#fca5a5"
+RED_DARK = "#7f1d1d"
+
+AMBER = "#d97706"
+AMBER_BG = "#fffbeb"
+AMBER_BORDER = "#fcd34d"
+AMBER_DARK = "#78350f"
+
+BLUE = "#2563eb"
+BLUE_BG = "#eff6ff"
+BLUE_BORDER = "#93c5fd"
+BLUE_DARK = "#1e3a8a"
+
+PURPLE = "#7c3aed"
+PURPLE_BG = "#f5f3ff"
+PURPLE_BORDER = "#c4b5fd"
+PURPLE_DARK = "#4c1d95"
+
+SLATE = "#64748b"
+SLATE_BG = "#f8fafc"
+SLATE_BORDER = "#cbd5e1"
+
+# Strategy brand colors (ink, bg, border)
+STRAT_BRAND: dict[str, tuple[str, str, str]] = {
+    "RSI Mean Reversion": ("#0369a1", "#e0f2fe", "#7dd3fc"),
+    "ML Momentum": ("#7c3aed", "#f5f3ff", "#c4b5fd"),
+    "Earnings Drift": ("#d97706", "#fffbeb", "#fcd34d"),
+    "Factor Momentum": ("#64748b", "#f8fafc", "#cbd5e1"),
+}
+
 FONT = (
     'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, '
     '"Helvetica Neue", Arial, sans-serif'
 )
-DISPLAY = 'Fraunces, "DM Serif Display", "Playfair Display", Georgia, ' '"Times New Roman", serif'
+DISPLAY = 'Fraunces, "DM Serif Display", "Playfair Display", Georgia, serif'
 MONO = '"SF Mono", "JetBrains Mono", "Roboto Mono", Menlo, Consolas, monospace'
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
+STRATEGY_EXPLAINERS: dict[str, str] = {
+    "RSI Mean Reversion": (
+        "Buys stocks that have fallen sharply and look 'oversold' — like a rubber band "
+        "stretched too far. RSI below 30 signals it may snap back up."
+    ),
+    "ML Momentum": (
+        "A machine-learning model trained on 12 price and volume signals predicts "
+        "which stocks are likely to rise over the next 5 days. Only acts on high-confidence signals."
+    ),
+    "Earnings Drift": (
+        "After a company reports better-than-expected earnings, its stock often keeps "
+        "drifting higher for weeks. This strategy rides that momentum."
+    ),
+    "Factor Momentum": (
+        "Ranks every stock by a mix of momentum and quality scores, then buys the top-ranked. "
+        "Currently paused — our backtests didn't find a reliable edge here."
+    ),
+}
 
 
 # ── DB helpers ────────────────────────────────────────────────────────────────
@@ -84,17 +124,15 @@ def _q1(db: sqlite3.Connection, sql: str, *args) -> dict:
 
 # ── Data fetchers ─────────────────────────────────────────────────────────────
 def get_latest_snapshot(db) -> dict:
-    snap = _q1(
+    return _q1(
         db,
         """
         SELECT portfolio_value, cash, reconciliation_status, snapshot_date
         FROM broker_state
-        WHERE snapshot_type IN ('RECONCILIATION', 'RECONCILIATION_RETRY',
-                                'END', 'SYNC', 'START')
+        WHERE snapshot_type IN ('RECONCILIATION','RECONCILIATION_RETRY','END','SYNC','START')
         ORDER BY created_at DESC, id DESC LIMIT 1
-    """,
+        """,
     )
-    return snap or {}
 
 
 def get_equity_curve(db, days: int = 30) -> list[dict]:
@@ -103,11 +141,11 @@ def get_equity_curve(db, days: int = 30) -> list[dict]:
         """
         SELECT snapshot_date AS date, MAX(portfolio_value) AS total
         FROM broker_state
-        WHERE snapshot_type IN ('START', 'END')
+        WHERE snapshot_type IN ('START','END')
           AND snapshot_date >= date('now', ?)
         GROUP BY snapshot_date
         ORDER BY snapshot_date
-    """,
+        """,
         f"-{days} days",
     )
 
@@ -121,7 +159,7 @@ def get_today_trades(db) -> list[dict]:
         FROM trades t JOIN strategies s ON t.strategy_id = s.id
         WHERE DATE(t.executed_at) = DATE('now') AND s.name != 'BROKER_SYNC'
         ORDER BY t.executed_at
-    """,
+        """,
     )
 
 
@@ -137,12 +175,11 @@ def get_open_positions(db) -> list[dict]:
         FROM positions p JOIN strategies s ON p.strategy_id = s.id
         WHERE p.shares > 0 AND s.name != 'BROKER_SYNC'
         ORDER BY p.unrealized_pnl DESC
-    """,
+        """,
     )
 
 
 def get_signal_reasons(db, symbols: list[str]) -> dict[tuple[str, str], dict]:
-    """Most-recent executed signal per (symbol, signal_type), today only."""
     if not symbols:
         return {}
     placeholders = ",".join("?" for _ in symbols)
@@ -155,7 +192,7 @@ def get_signal_reasons(db, symbols: list[str]) -> dict[tuple[str, str], dict]:
         WHERE sg.symbol IN ({placeholders})
           AND sg.generated_at >= datetime('now', '-2 days')
         ORDER BY sg.generated_at DESC
-    """,
+        """,
         *symbols,
     )
     out: dict[tuple[str, str], dict] = {}
@@ -181,25 +218,21 @@ def get_latest_run_id(db) -> str | None:
 
 
 def get_rejection_summary(db, run_id: str | None) -> list[dict]:
-    """Top rejection reasons for the current run (stage + reason_code + count)."""
     if not run_id:
         return []
     return _q(
         db,
         """
         SELECT stage, reason_code, COUNT(*) AS cnt
-        FROM signal_rejections
-        WHERE run_id = ?
+        FROM signal_rejections WHERE run_id = ?
         GROUP BY stage, reason_code
-        ORDER BY cnt DESC
-        LIMIT 5
+        ORDER BY cnt DESC LIMIT 5
         """,
         run_id,
     )
 
 
 def get_zero_trade_streak(db) -> int:
-    """Return number of consecutive recent trading days with zero executed trades."""
     rows = _q(
         db,
         """
@@ -209,11 +242,10 @@ def get_zero_trade_streak(db) -> int:
                   AND t.strategy_id IN (SELECT id FROM strategies WHERE name != 'BROKER_SYNC')
                ) AS trade_count
         FROM broker_state bs
-        WHERE snapshot_type IN ('RECONCILIATION', 'RECONCILIATION_RETRY', 'EXECUTION')
+        WHERE snapshot_type IN ('RECONCILIATION','RECONCILIATION_RETRY','EXECUTION')
           AND run_id != 'AUTO_SYNC'
         GROUP BY DATE(snapshot_date)
-        ORDER BY day DESC
-        LIMIT 10
+        ORDER BY day DESC LIMIT 10
         """,
     )
     streak = 0
@@ -226,27 +258,90 @@ def get_zero_trade_streak(db) -> int:
 
 
 def get_aggregate_pnl(db) -> dict:
-    row = _q1(
+    return _q1(
         db,
         """
-        SELECT COUNT(*)                                     AS closed,
-               SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END)     AS wins,
-               SUM(COALESCE(pnl, 0))                        AS total_pnl,
+        SELECT COUNT(*)                                    AS closed,
+               SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END)  AS wins,
+               SUM(COALESCE(pnl,0))                       AS total_pnl,
                SUM(CASE WHEN DATE(executed_at)=DATE('now')
-                        THEN COALESCE(pnl,0) ELSE 0 END)    AS today_realized
-        FROM trades
-        WHERE pnl IS NOT NULL
-    """,
+                        THEN COALESCE(pnl,0) ELSE 0 END)  AS today_realized
+        FROM trades WHERE pnl IS NOT NULL
+        """,
     )
-    return row or {}
 
 
-# ── Per-symbol price chart (matplotlib → base64 PNG) ─────────────────────────
+def get_strategy_statuses(db) -> list[dict]:
+    return _q(
+        db,
+        """
+        SELECT id, name, status, capital_allocation,
+               (SELECT COUNT(*) FROM positions p
+                WHERE p.strategy_id = strategies.id AND p.shares > 0) AS open_count,
+               (SELECT COALESCE(SUM(unrealized_pnl),0) FROM positions p
+                WHERE p.strategy_id = strategies.id AND p.shares > 0) AS unrealized_total
+        FROM strategies
+        WHERE name != 'BROKER_SYNC'
+        ORDER BY id
+        """,
+    )
+
+
+def get_system_alerts(db, recon_status: str, zero_streak: int) -> list[dict]:
+    alerts = []
+    # Frozen / non-active strategies
+    strats = _q(db, "SELECT name, status FROM strategies WHERE name != 'BROKER_SYNC'")
+    for s in strats:
+        if (s.get("status") or "active").lower() not in ("active", ""):
+            alerts.append(
+                {
+                    "level": "warning",
+                    "icon": "⏸",
+                    "msg": f"{s['name']} strategy is {s['status']}",
+                }
+            )
+    # Reconciliation issues
+    recon_upper = (recon_status or "").upper()
+    if "FAIL" in recon_upper or "MISMATCH" in recon_upper or "ERROR" in recon_upper:
+        alerts.append(
+            {
+                "level": "critical",
+                "icon": "⚠️",
+                "msg": f"Account sync issue detected — {recon_status}. System will retry automatically.",
+            }
+        )
+    # Long zero-trade streak
+    if zero_streak >= 5:
+        alerts.append(
+            {
+                "level": "info",
+                "icon": "💤",
+                "msg": f"{zero_streak} days in a row with no trades. Markets may be range-bound; "
+                "the system is being selective.",
+            }
+        )
+    # Disabled Factor Momentum (always note it so user understands)
+    # Factor Momentum is noted in strategy dashboard, not as an alert
+    return alerts
+
+
+def get_fill_quality_summary(db) -> dict:
+    return _q1(
+        db,
+        """
+        SELECT AVG(ABS(deviation_bps)) AS avg_dev,
+               MAX(ABS(deviation_bps)) AS max_dev,
+               COUNT(*) AS fill_count
+        FROM fill_quality WHERE DATE(recorded_at) = DATE('now')
+        """,
+    )
+
+
+# ── Price chart helpers ───────────────────────────────────────────────────────
 _CHART_CACHE: dict[str, str] = {}
 
 
 def _load_price_history() -> dict[str, list[tuple[str, float]]] | None:
-    """Load close-price history per symbol from data/training_data.csv."""
     csv_path = PROJECT_ROOT / "data" / "training_data.csv"
     if not csv_path.exists():
         return None
@@ -275,16 +370,13 @@ def _sym_history(symbol: str) -> list[tuple[str, float]]:
 
 
 def render_sparkline(symbol: str, entry_price: float | None = None) -> str:
-    """Return a base64 PNG sparkline for the given symbol. Empty string if unavailable."""
     cache_key = f"{symbol}:{entry_price}"
     if cache_key in _CHART_CACHE:
         return _CHART_CACHE[cache_key]
-
     history = _sym_history(symbol)
     if len(history) < 5:
         _CHART_CACHE[cache_key] = ""
         return ""
-
     try:
         import matplotlib
 
@@ -293,25 +385,22 @@ def render_sparkline(symbol: str, entry_price: float | None = None) -> str:
     except Exception:
         _CHART_CACHE[cache_key] = ""
         return ""
-
     closes = [c for _, c in history]
     is_up = closes[-1] >= closes[0]
-    line_color = VOLT if is_up else LOSS
-
-    fig, ax = plt.subplots(figsize=(3.4, 0.9), dpi=140)
+    line_color = GREEN if is_up else RED
+    fig, ax = plt.subplots(figsize=(3.6, 1.0), dpi=140)
     fig.patch.set_facecolor(CARD)
     ax.set_facecolor(CARD)
-    ax.plot(range(len(closes)), closes, color=line_color, linewidth=1.6)
-    ax.fill_between(range(len(closes)), closes, min(closes), color=line_color, alpha=0.12)
+    ax.plot(range(len(closes)), closes, color=line_color, linewidth=1.8)
+    ax.fill_between(range(len(closes)), closes, min(closes), color=line_color, alpha=0.10)
     if entry_price and min(closes) <= entry_price <= max(closes):
-        ax.axhline(entry_price, color=TEXT_DIM, linewidth=0.6, linestyle=(0, (2, 3)))
+        ax.axhline(entry_price, color=INK_DIM, linewidth=0.8, linestyle=(0, (3, 4)))
     for spine in ax.spines.values():
         spine.set_visible(False)
     ax.set_xticks([])
     ax.set_yticks([])
-    ax.margins(x=0.01, y=0.15)
+    ax.margins(x=0.01, y=0.18)
     plt.tight_layout(pad=0.1)
-
     buf = io.BytesIO()
     fig.savefig(buf, format="png", facecolor=CARD, edgecolor="none")
     plt.close(fig)
@@ -321,12 +410,6 @@ def render_sparkline(symbol: str, entry_price: float | None = None) -> str:
 
 
 def render_equity_sparkline(equity: list[dict]) -> str:
-    """
-    Render a wide sparkline of portfolio value over the equity curve window.
-
-    Used inside the hero card. Returns a base64 PNG, or empty string on any
-    failure (chart rendering is non-critical and must never block the email).
-    """
     cache_key = f"__equity__:{len(equity)}:{equity[-1]['total'] if equity else 0}"
     if cache_key in _CHART_CACHE:
         return _CHART_CACHE[cache_key]
@@ -342,69 +425,60 @@ def render_equity_sparkline(equity: list[dict]) -> str:
     except Exception:
         _CHART_CACHE[cache_key] = ""
         return ""
-
     is_up = values[-1] >= values[0]
-    line_color = VOLT if is_up else LOSS
+    line_color = GREEN if is_up else RED
 
-    fig, ax = plt.subplots(figsize=(7.2, 1.4), dpi=140)
-    fig.patch.set_facecolor(CARD)
-    ax.set_facecolor(CARD)
-    ax.plot(range(len(values)), values, color=line_color, linewidth=2.0)
-    ax.fill_between(range(len(values)), values, min(values), color=line_color, alpha=0.14)
-    # baseline of starting value to anchor the eye
-    ax.axhline(values[0], color=TEXT_DIM, linewidth=0.6, linestyle=(0, (2, 3)))
+    fig, ax = plt.subplots(figsize=(7.2, 1.6), dpi=140)
+    fig.patch.set_facecolor("#e8f4fd")
+    ax.set_facecolor("#e8f4fd")
+    ax.plot(range(len(values)), values, color=line_color, linewidth=2.2)
+    ax.fill_between(range(len(values)), values, min(values), color=line_color, alpha=0.15)
+    ax.axhline(values[0], color=INK_DIM, linewidth=0.8, linestyle=(0, (4, 5)))
     for spine in ax.spines.values():
         spine.set_visible(False)
     ax.set_xticks([])
     ax.set_yticks([])
-    ax.margins(x=0.005, y=0.18)
+    ax.margins(x=0.005, y=0.20)
     plt.tight_layout(pad=0.05)
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", facecolor=CARD, edgecolor="none")
+    fig.savefig(buf, format="png", facecolor="#e8f4fd", edgecolor="none")
     plt.close(fig)
     b64 = base64.b64encode(buf.getvalue()).decode("ascii")
     _CHART_CACHE[cache_key] = b64
     return b64
 
 
-# ── Reason inference (computed, not guessed) ─────────────────────────────────
+# ── Reason inference ──────────────────────────────────────────────────────────
 def _short_strategy(name: str) -> str:
     return {
-        "RSI Mean Reversion": "Bounce",
+        "RSI Mean Reversion": "RSI Bounce",
         "ML Momentum": "AI Model",
-        "Earnings Drift": "Earnings",
-        "Factor Momentum": "Top Rank",
+        "Earnings Drift": "Earnings Play",
+        "Factor Momentum": "Factor Rank",
     }.get(name or "", name or "")
 
 
 def _infer_buy_reason(strategy: str, signal_reasoning: str) -> str:
-    """Concrete, signal-driven entry rationale. No generic fallbacks where avoidable."""
-    r = (signal_reasoning or "").lower()
     import re
 
+    r = (signal_reasoning or "").lower()
     m = re.search(r"rsi[^a-z0-9]?(\d{1,2}(?:\.\d+)?)", r)
     if "rsi" in r and m:
-        return f"RSI at {m.group(1)} — oversold, turning up"
+        return f"RSI hit {m.group(1)} — stock is oversold and may bounce"
     if "rsi" in r:
-        return "RSI signaled oversold reversal"
-
+        return "RSI signaled the stock is oversold — potential reversal"
     m = re.search(r"p\(up\)\s*[=:]?\s*([\d.]+)", r)
     if m:
-        return f"AI: {int(float(m.group(1)) * 100)}% probability up next 5d"
+        return f"AI model: {int(float(m.group(1)) * 100)}% probability of rising next 5 days"
     m = re.search(r"confidence[^0-9]*([\d.]+)", r)
     if m and float(m.group(1)) <= 1.0:
-        return f"AI confidence {int(float(m.group(1)) * 100)}%"
-
+        return f"AI confidence score: {int(float(m.group(1)) * 100)}%"
     m = re.search(r"volume[_\s]*ratio[=:\s]*([\d.]+)", r)
     if m:
-        return f"Volume {float(m.group(1)):.1f}× normal — earnings move"
-
+        return f"Volume spiked {float(m.group(1)):.1f}× above average — post-earnings momentum"
     m = re.search(r"top\s*(\d+)\s*/\s*(\d+)", r)
     if m:
-        return f"Ranked #{m.group(1)} of {m.group(2)} on momentum+quality"
-    if "factor" in r or "composite" in r:
-        return "Top-tier composite score across momentum+quality"
-
+        return f"Ranked #{m.group(1)} of {m.group(2)} stocks by momentum + quality score"
     return f"{_short_strategy(strategy)} entry triggered"
 
 
@@ -415,40 +489,36 @@ def _infer_sell_reason(
     pnl_pct: float | None,
     days_held: int | None,
 ) -> str:
-    """Always specific — pulls from numbers if signal reasoning is generic."""
     r = (signal_reasoning or "").lower()
     pct_str = f"{pnl_pct:+.1f}%" if pnl_pct is not None else None
-    d = days_held if days_held is not None else None
-
+    d = days_held
     if "stop" in r and "loss" in r:
-        return f"Stop-loss hit ({pct_str} in {d}d)" if pct_str else "Stop-loss hit"
-    if "profit target" in r or ("profit" in r and "target" in r):
-        return f"Profit target hit ({pct_str} in {d}d)" if pct_str else "Profit target hit"
-    if "rsi" in r and (">" in r or "recovery" in r or "reversion" in r or "complete" in r):
         return (
-            f"RSI recovered — reversion complete ({pct_str})"
+            f"Stop-loss triggered — exited to limit downside ({pct_str} in {d}d)"
+            if pct_str
+            else "Stop-loss triggered"
+        )
+    if "profit target" in r or ("profit" in r and "target" in r):
+        return (
+            f"Hit our profit target — locked in gains ({pct_str} in {d}d)"
+            if pct_str
+            else "Profit target reached"
+        )
+    if "rsi" in r and any(w in r for w in [">", "recovery", "reversion", "complete"]):
+        return (
+            f"RSI recovered — stock bounced as expected ({pct_str})"
             if pct_str
             else "RSI recovered — reversion complete"
         )
-    if "negative" in r and ("surprise" in r or "sentiment" in r):
-        return (
-            f"Negative signal — exited early ({pct_str})"
-            if pct_str
-            else "Negative signal — exited early"
-        )
-
-    # Time-based / planned exits — show numbers, not generic platitudes
-    if any(w in r for w in ("rebalance", "held", "expired", "window", "drift")):
+    if any(w in r for w in ["rebalance", "held", "expired", "window", "drift"]):
         if pct_str and d is not None:
-            return f"Planned {d}-day exit closed {pct_str}"
+            return f"Planned {d}-day hold completed — closed at {pct_str}"
         if pct_str:
-            return f"Planned exit closed {pct_str}"
-
-    # Fall back to pure trade math
+            return f"Planned exit — closed at {pct_str}"
     if pct_str and d is not None:
-        return f"Closed {pct_str} after {d}d"
+        return f"Closed after {d} days at {pct_str}"
     if pct_str:
-        return f"Closed {pct_str}"
+        return f"Closed at {pct_str}"
     return f"{_short_strategy(strategy)} exit"
 
 
@@ -469,43 +539,40 @@ def fmt_pct(v: float | None, digits: int = 1) -> str:
 
 def pnl_color(v: float | None) -> str:
     if v is None or v == 0:
-        return TEXT_DIM
-    return VOLT if v > 0 else LOSS
+        return INK_DIM
+    return GREEN if v > 0 else RED
 
 
-# ── Section builders ──────────────────────────────────────────────────────────
-def build_header(
+def pnl_bg(v: float | None) -> str:
+    if v is None or v == 0:
+        return CARD_ALT
+    return GREEN_BG if v > 0 else RED_BG
+
+
+# ── Section: Hero ─────────────────────────────────────────────────────────────
+def build_hero(
     pv: float,
     today_pnl: float,
     today_pct: float,
     date_str: str,
     equity: list[dict] | None = None,
 ) -> str:
-    """Hero card: date pill, portfolio value, today's change pill, equity sparkline."""
     is_up = today_pnl >= 0
-    col = VOLT if is_up else LOSS
-    chip_fg = "#1a3300" if is_up else "#7a1a1a"
     arrow = "▲" if is_up else "▼"
 
-    # Editorial "vibe" strap — sets the tone before any number is read
-    if today_pct >= 1.0:
-        vibe = "Solid green day."
-    elif today_pct >= 0.2:
-        vibe = "Quietly in the green."
-    elif today_pct > -0.2:
-        vibe = "Choppy, mostly flat."
-    elif today_pct > -1.0:
-        vibe = "Tape leaned heavy."
+    if today_pct >= 1.5:
+        vibe = "Strong green day — the system delivered."
+    elif today_pct >= 0.3:
+        vibe = "Quiet gains. Slow and steady."
+    elif today_pct > -0.3:
+        vibe = "Flat tape. Markets were indecisive."
+    elif today_pct > -1.5:
+        vibe = "Tape leaned heavy today."
     else:
-        vibe = "Tough day at the office."
-
-    # Tinted hero background — soft volt or soft red wash, not plain white,
-    # so the email has color the moment it's opened.
-    hero_bg = VOLT_SOFT if is_up else LOSS_SOFT
-    hero_grad = f"linear-gradient(135deg, {hero_bg} 0%, {CARD} 65%)"
+        vibe = "Rough session — losses taken in stride."
 
     chart_html = ""
-    if equity:
+    if equity and len(equity) >= 3:
         b64 = render_equity_sparkline(equity)
         if b64:
             window = len(equity)
@@ -513,174 +580,297 @@ def build_header(
             last = float(equity[-1].get("total") or 0)
             window_pnl = last - first
             window_pct = (window_pnl / first * 100) if first else 0.0
-            window_col = VOLT if window_pnl >= 0 else LOSS
+            wcol = GREEN if window_pnl >= 0 else RED
             chart_html = f"""
-    <div style="margin-top:22px;">
-      <img src="data:image/png;base64,{b64}"
-           style="display:block;width:100%;height:auto;border-radius:8px;" />
-      <div style="display:flex;justify-content:space-between;
-                  margin-top:8px;font-family:{FONT};font-size:11px;
-                  color:{TEXT_MUTE};letter-spacing:0.04em;font-weight:600;">
-        <span>{window}-session window</span>
-        <span style="color:{window_col};font-weight:700;">
-          {'+' if window_pnl >= 0 else '−'}${abs(window_pnl):,.2f} ·
-          {window_pct:+.2f}%
-        </span>
-      </div>
-    </div>
-"""
+      <div style="margin-top:20px;background:#e8f4fd;border-radius:10px;padding:4px 0 0;">
+        <img src="data:image/png;base64,{b64}"
+             style="display:block;width:100%;height:auto;border-radius:10px;" />
+        <div style="display:flex;justify-content:space-between;
+                    padding:8px 12px 10px;font-family:{FONT};
+                    font-size:11px;color:#4a6580;font-weight:600;letter-spacing:0.03em;">
+          <span>{window}-session window</span>
+          <span style="color:{wcol};font-weight:700;">
+            {'▲' if window_pnl >= 0 else '▼'} ${abs(window_pnl):,.2f} &nbsp;
+            {window_pct:+.2f}%
+          </span>
+        </div>
+      </div>"""
 
     return f"""
-<div style="padding:24px 22px 4px;">
-  <div style="background:{hero_bg};
-              background-image:{hero_grad};
-              border:1px solid {col};border-radius:20px;
-              padding:32px 34px;position:relative;overflow:hidden;">
-    <!-- thick accent rail -->
-    <div style="position:absolute;left:0;top:0;bottom:0;width:6px;background:{col};"></div>
-    <div style="font-family:{FONT};font-size:11px;font-weight:800;
-                letter-spacing:0.24em;color:{col};
-                text-transform:uppercase;margin-bottom:8px;">
-      {html_lib.escape(date_str)} · Daily
-    </div>
-    <div style="font-family:{DISPLAY};font-style:italic;
-                font-size:22px;font-weight:500;color:{TEXT};
-                letter-spacing:-0.01em;line-height:1.15;margin-bottom:18px;">
-      {vibe}
-    </div>
-    <div style="font-family:{DISPLAY};font-size:60px;font-weight:900;
-                letter-spacing:-0.035em;color:{TEXT};line-height:1;">
-      ${pv:,.2f}
-    </div>
-    <div style="margin-top:14px;">
-      <span style="display:inline-block;background:{CARD};color:{chip_fg};
-                   border:2px solid {col};
-                   font-family:{FONT};font-size:14px;font-weight:800;
-                   padding:7px 14px;border-radius:999px;letter-spacing:-0.01em;">
-        {arrow} ${abs(today_pnl):,.2f}
-        <span style="opacity:0.75;font-weight:700;margin-left:6px;">
-          {today_pct:+.2f}%
-        </span>
-      </span>
-      <span style="font-family:{FONT};font-size:12px;font-weight:600;
-                   color:{TEXT_DIM};margin-left:10px;
-                   letter-spacing:0.06em;text-transform:uppercase;">today</span>
-    </div>
-    {chart_html}
+<div style="background:linear-gradient(160deg,#1e3a5f 0%,#0d2340 60%,#162b45 100%);
+            padding:36px 32px 32px;border-radius:0 0 24px 24px;">
+
+  <!-- Wordmark + date -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;">
+    <div style="font-family:{FONT};font-size:11px;font-weight:800;letter-spacing:0.28em;
+                color:#7eb8e8;text-transform:uppercase;">Investor&nbsp;Mimic</div>
+    <div style="font-family:{FONT};font-size:11px;color:#7eb8e8;letter-spacing:0.06em;
+                font-weight:600;">{html_lib.escape(date_str)}</div>
   </div>
+
+  <!-- Vibe line -->
+  <div style="font-family:{DISPLAY};font-style:italic;font-size:18px;
+              color:#a8cce8;line-height:1.3;margin-bottom:18px;
+              letter-spacing:-0.01em;">{vibe}</div>
+
+  <!-- Big number -->
+  <div style="font-family:{DISPLAY};font-size:64px;font-weight:900;
+              letter-spacing:-0.04em;color:#ffffff;line-height:1;
+              margin-bottom:16px;">${pv:,.2f}</div>
+
+  <!-- Today chip -->
+  <div style="display:inline-flex;align-items:center;gap:8px;">
+    <span style="display:inline-block;background:{'rgba(16,185,129,0.18)' if is_up else 'rgba(220,38,38,0.18)'};
+                 color:{'#6ee7b7' if is_up else '#fca5a5'};
+                 border:1.5px solid {'rgba(16,185,129,0.4)' if is_up else 'rgba(220,38,38,0.4)'};
+                 font-family:{FONT};font-size:15px;font-weight:800;
+                 padding:8px 18px;border-radius:999px;letter-spacing:-0.01em;">
+      {arrow} ${abs(today_pnl):,.2f}
+      <span style="opacity:0.80;font-weight:600;margin-left:8px;">{today_pct:+.2f}%</span>
+    </span>
+    <span style="font-family:{FONT};font-size:11px;color:#7eb8e8;
+                 font-weight:600;letter-spacing:0.08em;text-transform:uppercase;">today</span>
+  </div>
+
+  {chart_html}
 </div>
 """
 
 
-def _kpi_card(
-    label: str,
-    value: str,
-    value_color: str,
-    sub: str = "",
-    bg: str = CARD,
-    border_col: str = BORDER,
-    label_col: str | None = None,
-) -> str:
-    """One KPI card. bg/border_col let each card carry its own pastel tone."""
-    label_color = label_col or TEXT_MUTE
-    sub_html = (
-        f'<div style="font-family:{FONT};font-size:11px;color:{TEXT_DIM};'
-        f'margin-top:6px;letter-spacing:0.04em;font-weight:600;">{sub}</div>'
-        if sub
-        else ""
+# ── Section: Alert Banner ─────────────────────────────────────────────────────
+def build_alert_banner(alerts: list[dict]) -> str:
+    if not alerts:
+        return ""
+    has_critical = any(a.get("level") == "critical" for a in alerts)
+    bg = RED_BG if has_critical else AMBER_BG
+    border = RED_BORDER if has_critical else AMBER_BORDER
+    ink = RED_DARK if has_critical else AMBER_DARK
+
+    items = "".join(
+        f"""<div style="display:flex;align-items:flex-start;gap:10px;
+                        padding:10px 0;border-top:1px solid {border};">
+              <span style="font-size:16px;flex-shrink:0;">{a.get('icon','⚠️')}</span>
+              <span style="font-family:{FONT};font-size:13px;color:{ink};
+                           font-weight:500;line-height:1.5;">{html_lib.escape(a['msg'])}</span>
+            </div>"""
+        for a in alerts
     )
+
+    headline = "Action Needed" if has_critical else "Heads Up"
     return f"""
-<td style="padding:20px 18px;background:{bg};border:1px solid {border_col};
-           border-radius:16px;vertical-align:top;width:25%;">
-  <div style="font-family:{FONT};font-size:10px;font-weight:800;
-              letter-spacing:0.2em;color:{label_color};
-              text-transform:uppercase;margin-bottom:10px;">{label}</div>
-  <div style="font-family:{DISPLAY};font-size:30px;font-weight:900;
-              letter-spacing:-0.03em;color:{value_color};line-height:1;">{value}</div>
-  {sub_html}
-</td>
+<div style="margin:16px 24px 0;background:{bg};border:1.5px solid {border};
+            border-radius:16px;padding:18px 22px;">
+  <div style="font-family:{FONT};font-size:10px;font-weight:800;letter-spacing:0.22em;
+              color:{ink};text-transform:uppercase;margin-bottom:4px;">{headline}</div>
+  {items}
+</div>
 """
 
 
+# ── Section: KPI Strip ────────────────────────────────────────────────────────
 def build_kpi_strip(
     today_realized: float,
     total_pnl: float,
     win_rate: float | None,
     wins: int,
     losses: int,
-    open_positions: int,
+    open_count: int,
 ) -> str:
     wr_str = f"{int(round(win_rate * 100))}%" if win_rate is not None else "—"
-    wr_sub = f"{wins}W · {losses}L" if win_rate is not None else "no closed trades"
-
-    # Each KPI gets its own pastel tone so the row reads like a magazine
-    # contents block instead of four cloned white squares.
-    today_bg, today_border, today_label = (
-        (VOLT_SOFT, VOLT, "#1a3300")
-        if today_realized > 0
-        else (LOSS_SOFT, LOSS, "#7a1a1a")
-        if today_realized < 0
-        else (CARD, BORDER, TEXT_MUTE)
-    )
-    total_bg, total_border, total_label = (
-        (VOLT_SOFT, VOLT, "#1a3300")
-        if total_pnl > 0
-        else (LOSS_SOFT, LOSS, "#7a1a1a")
-        if total_pnl < 0
-        else (CARD, BORDER, TEXT_MUTE)
-    )
+    wr_sub = f"{wins} wins · {losses} losses" if win_rate is not None else "No closed trades yet"
     wr_col = (
-        VOLT if win_rate and win_rate >= 0.5 else (LOSS if win_rate and win_rate < 0.4 else GOLD)
+        GREEN
+        if (win_rate and win_rate >= 0.5)
+        else (RED if (win_rate and win_rate < 0.4) else AMBER)
     )
+
+    def _card(
+        label: str,
+        value: str,
+        val_col: str,
+        sub: str,
+        bg: str,
+        border: str,
+        lbl_col: str,
+        tip: str = "",
+    ) -> str:
+        tip_html = (
+            (
+                f'<div style="font-family:{FONT};font-size:10px;color:{INK_MUTE};'
+                f'margin-top:8px;line-height:1.4;font-weight:400;">{tip}</div>'
+            )
+            if tip
+            else ""
+        )
+        return f"""
+<td style="padding:20px 18px;background:{bg};border:1.5px solid {border};
+           border-radius:16px;vertical-align:top;width:25%;">
+  <div style="font-family:{FONT};font-size:9px;font-weight:800;letter-spacing:0.22em;
+              color:{lbl_col};text-transform:uppercase;margin-bottom:10px;">{label}</div>
+  <div style="font-family:{DISPLAY};font-size:28px;font-weight:900;letter-spacing:-0.03em;
+              color:{val_col};line-height:1;">{value}</div>
+  <div style="font-family:{FONT};font-size:11px;color:{INK_DIM};
+              margin-top:6px;font-weight:500;">{sub}</div>
+  {tip_html}
+</td>"""
+
+    today_bg = GREEN_BG if today_realized > 0 else (RED_BG if today_realized < 0 else CARD_ALT)
+    today_border = (
+        GREEN_BORDER if today_realized > 0 else (RED_BORDER if today_realized < 0 else BORDER)
+    )
+    today_lbl = GREEN_DARK if today_realized > 0 else (RED_DARK if today_realized < 0 else INK_MUTE)
+
+    total_bg = GREEN_BG if total_pnl > 0 else (RED_BG if total_pnl < 0 else CARD_ALT)
+    total_border = GREEN_BORDER if total_pnl > 0 else (RED_BORDER if total_pnl < 0 else BORDER)
+    total_lbl = GREEN_DARK if total_pnl > 0 else (RED_DARK if total_pnl < 0 else INK_MUTE)
 
     return f"""
-<div style="padding:14px 22px 4px;">
+<div style="padding:20px 24px 4px;">
   <table style="width:100%;border-collapse:separate;border-spacing:10px 0;">
     <tr>
-      {_kpi_card("Today", fmt_money(today_realized, sign=True),
-                pnl_color(today_realized), "realized",
-                bg=today_bg, border_col=today_border, label_col=today_label)}
-      {_kpi_card("Total P&amp;L", fmt_money(total_pnl, sign=True),
-                pnl_color(total_pnl), "all-time",
-                bg=total_bg, border_col=total_border, label_col=total_label)}
-      {_kpi_card("Win rate", wr_str, wr_col, wr_sub,
-                bg=GOLD_SOFT, border_col=GOLD, label_col="#7a4a00")}
-      {_kpi_card("Open", str(open_positions), INDIGO, "positions",
-                bg=INDIGO_SOFT, border_col=INDIGO, label_col="#1e1b6e")}
+      {_card("Today's P&L", fmt_money(today_realized, sign=True),
+             pnl_color(today_realized), "realized gains &amp; losses",
+             today_bg, today_border, today_lbl,
+             "Money actually made or lost from trades that closed today.")}
+      {_card("All-Time P&L", fmt_money(total_pnl, sign=True),
+             pnl_color(total_pnl), "since inception",
+             total_bg, total_border, total_lbl,
+             "Total profit or loss across every closed trade ever.")}
+      {_card("Win Rate", wr_str, wr_col, wr_sub,
+             AMBER_BG, AMBER_BORDER, AMBER_DARK,
+             "% of closed trades that made money. Above 50% is profitable.")}
+      {_card("Open Positions", str(open_count), BLUE, "stocks held right now",
+             BLUE_BG, BLUE_BORDER, BLUE_DARK,
+             "Stocks the system currently owns but hasn't sold yet.")}
     </tr>
   </table>
 </div>
 """
 
 
-def _section_title(text: str, count: int | None = None, accent: str = TEXT) -> str:
-    """Magazine-style section heading: serif italic display + volt counter pill.
+# ── Section: Strategy Dashboard ───────────────────────────────────────────────
+def build_strategy_dashboard(strategy_rows: list[dict]) -> str:
+    if not strategy_rows:
+        return ""
 
-    `accent` lets a section signal its own tone (e.g., volt for Movers,
-    grape for News, indigo for Open Positions) via a tinted underline bar.
-    """
-    badge = ""
-    if count is not None and count > 0:
-        badge = (
-            f'<span style="margin-left:12px;display:inline-block;'
-            f"font-family:{FONT};font-size:12px;font-weight:800;"
-            f"color:#1a3300;background:{VOLT_SOFT};border:1px solid {VOLT};"
-            f"padding:3px 11px;border-radius:999px;letter-spacing:0;"
-            f'vertical-align:middle;">{count}</span>'
+    # Mark Factor Momentum as disabled from config (regardless of DB status)
+    disabled_names = {"Factor Momentum"}
+
+    cards = []
+    for row in strategy_rows:
+        name = row.get("name") or ""
+        open_count = int(row.get("open_count") or 0)
+        unr = float(row.get("unrealized_total") or 0)
+        db_status = (row.get("status") or "active").lower()
+
+        is_disabled = name in disabled_names
+        is_active = not is_disabled and db_status in ("active", "")
+
+        ink, bg, border = STRAT_BRAND.get(name, (SLATE, SLATE_BG, SLATE_BORDER))
+
+        if is_disabled:
+            status_html = """
+<span style="display:inline-block;background:#f1f5f9;color:#64748b;
+             border:1px solid #cbd5e1;font-size:9px;font-weight:800;
+             letter-spacing:0.18em;padding:3px 10px;border-radius:999px;">
+  ⏸ PAUSED
+</span>"""
+        elif is_active:
+            status_html = f"""
+<span style="display:inline-block;background:{GREEN_BG};color:{GREEN_DARK};
+             border:1px solid {GREEN_BORDER};font-size:9px;font-weight:800;
+             letter-spacing:0.18em;padding:3px 10px;border-radius:999px;">
+  ● ACTIVE
+</span>"""
+        else:
+            status_html = f"""
+<span style="display:inline-block;background:{AMBER_BG};color:{AMBER_DARK};
+             border:1px solid {AMBER_BORDER};font-size:9px;font-weight:800;
+             letter-spacing:0.18em;padding:3px 10px;border-radius:999px;">
+  ⚠ {db_status.upper()}
+</span>"""
+
+        positions_line = (
+            f"{open_count} position{'s' if open_count != 1 else ''} open"
+            if is_active
+            else "No positions"
         )
-    return f"""
-<div style="padding:34px 32px 14px;">
-  <div style="font-family:{DISPLAY};font-size:30px;font-weight:900;
-              font-style:italic;letter-spacing:-0.025em;color:{TEXT};
-              line-height:1.05;">
-    {html_lib.escape(text)}{badge}
+        unr_line = ""
+        if is_active and open_count > 0:
+            unr_col = GREEN_DARK if unr >= 0 else RED_DARK
+            unr_bg = GREEN_BG if unr >= 0 else RED_BG
+            unr_border = GREEN_BORDER if unr >= 0 else RED_BORDER
+            unr_line = f"""
+<div style="margin-top:10px;display:inline-block;
+            background:{unr_bg};border:1px solid {unr_border};
+            border-radius:8px;padding:5px 10px;">
+  <span style="font-family:{MONO};font-size:13px;font-weight:700;
+               color:{unr_col};">{fmt_money(unr, sign=True)}</span>
+  <span style="font-family:{FONT};font-size:10px;color:{INK_DIM};
+               margin-left:4px;">unrealized</span>
+</div>"""
+
+        explainer = STRATEGY_EXPLAINERS.get(name, "")
+        explainer_html = ""
+        if explainer:
+            icon = "💡" if not is_disabled else "🔎"
+            explainer_html = f"""
+<div style="margin-top:14px;padding-top:12px;border-top:1px solid {border};">
+  <div style="font-family:{FONT};font-size:11px;color:{INK_DIM};
+              line-height:1.55;font-weight:400;">
+    {icon} {html_lib.escape(explainer)}
   </div>
-  <div style="margin-top:10px;width:48px;height:3px;background:{accent};
-              border-radius:3px;"></div>
+</div>"""
+
+        cards.append(
+            f"""
+<td style="padding:6px;width:50%;vertical-align:top;">
+  <div style="background:{bg};border:1.5px solid {border};border-radius:16px;
+              padding:20px 20px 16px;height:100%;box-sizing:border-box;">
+    <div style="display:flex;justify-content:space-between;
+                align-items:flex-start;margin-bottom:10px;">
+      <div>
+        <div style="font-family:{FONT};font-size:15px;font-weight:800;
+                    color:{ink};letter-spacing:-0.01em;">
+          {html_lib.escape(name)}
+        </div>
+        <div style="font-family:{FONT};font-size:11px;color:{INK_MUTE};
+                    margin-top:3px;font-weight:500;">{positions_line}</div>
+      </div>
+      {status_html}
+    </div>
+    {unr_line}
+    {explainer_html}
+  </div>
+</td>"""
+        )
+
+    rows_html = ""
+    for i in range(0, len(cards), 2):
+        pair = cards[i : i + 2]
+        if len(pair) == 1:
+            pair.append('<td style="padding:6px;width:50%;"></td>')
+        rows_html += "<tr>" + "".join(pair) + "</tr>"
+
+    return f"""
+<div style="padding:28px 24px 0;">
+  <div style="font-family:{DISPLAY};font-size:26px;font-weight:900;font-style:italic;
+              letter-spacing:-0.025em;color:{INK};margin-bottom:6px;">
+    Your Strategies
+  </div>
+  <div style="font-family:{FONT};font-size:13px;color:{INK_DIM};
+              margin-bottom:16px;line-height:1.5;">
+    Your portfolio is run by multiple specialized strategies, each with its own
+    logic and edge. Here's their current status.
+  </div>
+  <table style="width:100%;border-collapse:separate;border-spacing:0;">
+    {rows_html}
+  </table>
 </div>
 """
 
 
+# ── Section: Today's Tape ─────────────────────────────────────────────────────
 def build_today_trades(
     trades: list[dict],
     sig_map: dict[tuple[str, str], dict],
@@ -688,41 +878,70 @@ def build_today_trades(
     zero_trade_streak: int = 0,
 ) -> str:
     if not trades:
-        streak_note = ""
+        streak_html = ""
         if zero_trade_streak >= 3:
-            streak_note = (
-                f'<div style="font-family:{FONT};font-size:11px;color:#c97a00;'
-                f'margin-top:6px;font-weight:600;">'
-                f"⚠️ {zero_trade_streak} consecutive trading days with no executions</div>"
-            )
+            streak_html = f"""
+<div style="margin-top:14px;padding:12px 16px;background:{AMBER_BG};
+            border:1px solid {AMBER_BORDER};border-radius:10px;
+            font-family:{FONT};font-size:12px;color:{AMBER_DARK};line-height:1.5;">
+  💤 <strong>{zero_trade_streak} consecutive days</strong> with no trades. This is normal —
+  the system only trades when its conditions are met. Patience is part of the strategy.
+</div>"""
+
         rej_html = ""
         if rejections:
+            rej_label_map = {
+                "portfolio_heat": "Portfolio too concentrated",
+                "insufficient_cash": "Not enough cash reserved",
+                "correlation": "Too similar to existing position",
+                "sector_concentration": "Sector limit reached",
+                "max_positions_reached": "Already at max position count",
+                "benchmark_etf_guard": "Symbol is a benchmark ETF",
+                "cross_strategy_dedup": "Already held by another strategy",
+                "wash_trade_guard": "Wash-trade prevention",
+                "ml_risk_off": "AI model in risk-off mode",
+                "size_reduced_to_zero": "Size calculation returned 0",
+            }
             rej_rows = "".join(
-                f'<tr><td style="font-family:{FONT};font-size:11px;color:{TEXT_DIM};'
-                f'padding:2px 8px 2px 0;">{html_lib.escape(r.get("stage",""))}'
-                f'&thinsp;·&thinsp;{html_lib.escape(r.get("reason_code",""))}</td>'
-                f'<td style="font-family:{FONT};font-size:11px;color:{TEXT_DIM};'
-                f'text-align:right;">{r.get("cnt","")}</td></tr>'
+                f"""<tr>
+  <td style="font-family:{FONT};font-size:12px;color:{INK_DIM};padding:6px 0;">
+    {html_lib.escape(rej_label_map.get(r.get('reason_code',''), r.get('reason_code','')))}
+  </td>
+  <td style="font-family:{MONO};font-size:12px;color:{INK_MUTE};text-align:right;
+             padding:6px 0;">{r.get('cnt','')}×</td>
+</tr>"""
                 for r in rejections
             )
-            rej_html = (
-                f'<div style="margin-top:12px;text-align:left;">'
-                f'<div style="font-family:{FONT};font-size:11px;font-weight:600;'
-                f'color:{TEXT_DIM};letter-spacing:0.06em;margin-bottom:6px;">WHY NO TRADES</div>'
-                f"<table width='100%'>{rej_rows}</table></div>"
-            )
+            rej_html = f"""
+<div style="margin-top:16px;">
+  <div style="font-family:{FONT};font-size:10px;font-weight:800;letter-spacing:0.18em;
+              color:{INK_MUTE};text-transform:uppercase;margin-bottom:8px;">
+    Why no trades fired today
+  </div>
+  <table style="width:100%;border-collapse:collapse;">{rej_rows}</table>
+  <div style="font-family:{FONT};font-size:11px;color:{INK_MUTE};margin-top:8px;
+              line-height:1.5;">
+    💡 These are risk filters doing their job — protecting capital by declining
+    low-quality or over-concentrated signals.
+  </div>
+</div>"""
+
         return f"""
-<div style="padding:0 22px 4px;">
-  <div style="background:{CARD};border:1px dashed {BORDER};border-radius:14px;
-              padding:22px 24px;text-align:center;">
-    <div style="font-family:{FONT};font-size:14px;font-weight:700;color:{TEXT};
-                letter-spacing:-0.01em;">Quiet day — no trades</div>
-    <div style="font-family:{FONT};font-size:12px;color:{TEXT_DIM};
-                margin-top:4px;">Holding existing positions.</div>
-    {streak_note}{rej_html}
+<div style="padding:0 24px 4px;">
+  <div style="background:{CARD};border:1.5px dashed {BORDER};border-radius:16px;
+              padding:24px 26px;">
+    <div style="font-family:{FONT};font-size:15px;font-weight:700;color:{INK};">
+      Quiet day — no trades executed
+    </div>
+    <div style="font-family:{FONT};font-size:13px;color:{INK_DIM};margin-top:4px;">
+      The system reviewed the market but didn't find opportunities worth acting on.
+      Existing positions continue to be held.
+    </div>
+    {streak_html}{rej_html}
   </div>
 </div>
 """
+
     rows = ""
     for t in trades:
         action = t.get("action") or ""
@@ -732,87 +951,84 @@ def build_today_trades(
         pnl = t.get("pnl")
         strat = t.get("strat") or ""
         is_buy = action == "BUY"
-        tag_bg = VOLT_SOFT if is_buy else LOSS_SOFT
-        tag_fg = "#1a3300" if is_buy else "#7a1a1a"
-        tag_border = VOLT if is_buy else LOSS
-        tag = "BUY" if is_buy else "SELL"
 
         sig = sig_map.get((sym, action)) or {}
         raw_reason = sig.get("reasoning") or ""
 
+        s_ink, s_bg, s_border = STRAT_BRAND.get(strat, (SLATE, SLATE_BG, SLATE_BORDER))
+
         if is_buy:
             reason = _infer_buy_reason(strat, raw_reason)
-            pnl_cell = (
-                f'<span style="color:{TEXT_DIM};font-family:{FONT};'
-                f'font-size:12px;">opened</span>'
-            )
+            pnl_html = f'<span style="font-family:{FONT};font-size:12px;color:{INK_MUTE};">Position opened</span>'
+            action_bg, action_fg, action_border = GREEN_BG, GREEN_DARK, GREEN_BORDER
+            action_label = "BUY"
         else:
             pnl_pct = None
-            if t.get("exec_price") and t.get("notional") and shares:
-                # Best-effort %: prefer pnl/notional, fall back to nothing
-                if pnl is not None and t.get("notional"):
-                    try:
-                        pnl_pct = (pnl / float(t["notional"])) * 100
-                    except Exception:
-                        pnl_pct = None
+            if pnl is not None and t.get("notional"):
+                try:
+                    pnl_pct = (pnl / float(t["notional"])) * 100
+                except Exception:
+                    pass
             reason = _infer_sell_reason(strat, raw_reason, pnl, pnl_pct, None)
-            pnl_cell = (
-                f'<span style="font-family:{MONO};font-size:14px;'
-                f'font-weight:700;color:{pnl_color(pnl)};">'
+            col = pnl_color(pnl)
+            pnl_html = (
+                f'<span style="font-family:{MONO};font-size:14px;font-weight:800;color:{col};">'
                 f'{fmt_money(pnl, sign=True) if pnl is not None else "—"}</span>'
             )
+            action_bg, action_fg, action_border = RED_BG, RED_DARK, RED_BORDER
+            action_label = "SELL"
 
         rows += f"""
-<tr>
-  <td style="padding:14px 16px;border-top:1px solid {BORDER};vertical-align:middle;">
-    <span style="display:inline-block;background:{tag_bg};color:{tag_fg};
-                 border:1px solid {tag_border};
-                 font-family:{FONT};font-size:10px;font-weight:800;
-                 letter-spacing:0.12em;padding:4px 8px;border-radius:6px;">
-      {tag}
-    </span>
-  </td>
-  <td style="padding:14px 4px;border-top:1px solid {BORDER};vertical-align:middle;
-             font-family:{FONT};font-size:15px;font-weight:700;color:{TEXT};
-             letter-spacing:-0.01em;">
-    {html_lib.escape(sym)}
-    <div style="font-size:11px;font-weight:500;color:{TEXT_MUTE};
-                letter-spacing:0.04em;margin-top:2px;">
-      {html_lib.escape(_short_strategy(strat))}
+<div style="padding:16px 0;border-top:1px solid {BORDER};display:flex;
+            align-items:flex-start;gap:14px;">
+
+  <!-- Action badge -->
+  <div style="flex-shrink:0;padding-top:2px;">
+    <span style="display:inline-block;background:{action_bg};color:{action_fg};
+                 border:1.5px solid {action_border};font-family:{FONT};
+                 font-size:10px;font-weight:800;letter-spacing:0.14em;
+                 padding:4px 10px;border-radius:8px;">{action_label}</span>
+  </div>
+
+  <!-- Main content -->
+  <div style="flex:1;min-width:0;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+      <div>
+        <span style="font-family:{FONT};font-size:17px;font-weight:800;
+                     color:{INK};letter-spacing:-0.02em;">{html_lib.escape(sym)}</span>
+        <span style="font-family:{FONT};font-size:12px;color:{INK_MUTE};
+                     margin-left:8px;">{int(shares)} shares @ ${price:,.2f}</span>
+      </div>
+      <div style="text-align:right;flex-shrink:0;padding-left:12px;">
+        {pnl_html}
+      </div>
     </div>
-  </td>
-  <td style="padding:14px 16px;border-top:1px solid {BORDER};vertical-align:middle;
-             text-align:right;font-family:{MONO};font-size:13px;color:{TEXT_DIM};">
-    {int(shares)} @ ${price:,.2f}
-  </td>
-  <td style="padding:14px 16px;border-top:1px solid {BORDER};vertical-align:middle;
-             font-family:{FONT};font-size:12px;color:{TEXT_DIM};max-width:280px;">
-    {html_lib.escape(reason)}
-  </td>
-  <td style="padding:14px 16px;border-top:1px solid {BORDER};vertical-align:middle;
-             text-align:right;">
-    {pnl_cell}
-  </td>
-</tr>
+    <!-- Reason line -->
+    <div style="font-family:{FONT};font-size:13px;color:{INK_DIM};
+                margin-top:5px;line-height:1.45;">{html_lib.escape(reason)}</div>
+    <!-- Strategy tag -->
+    <div style="margin-top:7px;">
+      <span style="display:inline-block;background:{s_bg};color:{s_ink};
+                   border:1px solid {s_border};font-family:{FONT};font-size:10px;
+                   font-weight:700;padding:2px 9px;border-radius:999px;
+                   letter-spacing:0.04em;">{html_lib.escape(_short_strategy(strat))}</span>
+    </div>
+  </div>
+</div>
 """
+
     return f"""
-<div style="padding:0 22px 4px;">
-  <table style="width:100%;border-collapse:collapse;background:{CARD};
-                border:1px solid {BORDER};border-radius:14px;overflow:hidden;">
+<div style="padding:0 24px 4px;">
+  <div style="background:{CARD};border:1.5px solid {BORDER};border-radius:16px;
+              padding:20px 24px;">
     {rows}
-  </table>
+  </div>
 </div>
 """
 
 
+# ── Section: Movers ───────────────────────────────────────────────────────────
 def build_movers(positions: list[dict], top_n: int = 3) -> str:
-    """
-    Two-column split: top winners and top losers by unrealized P&L.
-
-    Lives between Open Positions header and the position grid, so the most
-    interesting holdings are visible without scrolling through 14+ cards.
-    Returns "" if there are fewer than 2 positions (split is meaningless).
-    """
     if not positions or len(positions) < 2:
         return ""
 
@@ -829,28 +1045,24 @@ def build_movers(positions: list[dict], top_n: int = 3) -> str:
         entry = float(p.get("entry_price") or p.get("avg_price") or 0)
         curr = float(p.get("current_price") or entry)
         pct = ((curr - entry) / entry * 100) if entry else 0.0
-        c = VOLT if side == "win" else LOSS
+        c = GREEN if side == "win" else RED
         return f"""
 <tr>
-  <td style="padding:9px 0;font-family:{FONT};font-size:14px;font-weight:700;
-             color:{TEXT};letter-spacing:-0.01em;">{html_lib.escape(sym)}</td>
-  <td style="padding:9px 0;text-align:right;font-family:{MONO};font-size:13px;
-             font-weight:700;color:{c};letter-spacing:-0.01em;">
-    {fmt_money(unr, sign=True)}
-  </td>
-  <td style="padding:9px 0 9px 10px;text-align:right;font-family:{FONT};
-             font-size:11px;font-weight:600;color:{c};white-space:nowrap;">
-    {fmt_pct(pct)}
-  </td>
-</tr>
-"""
+  <td style="padding:8px 0;font-family:{FONT};font-size:14px;font-weight:700;
+             color:{INK};">{html_lib.escape(sym)}</td>
+  <td style="padding:8px 0;text-align:right;font-family:{MONO};font-size:13px;
+             font-weight:700;color:{c};">{fmt_money(unr, sign=True)}</td>
+  <td style="padding:8px 0 8px 12px;text-align:right;font-family:{FONT};
+             font-size:11px;font-weight:600;color:{c};">{fmt_pct(pct)}</td>
+</tr>"""
 
-    def _column(title: str, items: list[dict], side: str, accent: str, soft: str) -> str:
+    def _col(title: str, items: list[dict], side: str, bg: str, bdr: str, fg: str) -> str:
         if not items:
-            empty = "No winners yet" if side == "win" else "No losers — clean sheet"
             inner = (
-                f'<div style="padding:18px 0;font-family:{FONT};font-size:13px;'
-                f'font-weight:600;color:{TEXT_DIM};text-align:center;">{empty}</div>'
+                f'<div style="padding:16px 0;font-family:{FONT};font-size:13px;'
+                f'color:{INK_MUTE};text-align:center;">'
+                + ("No winners yet" if side == "win" else "No losing positions")
+                + "</div>"
             )
         else:
             inner = (
@@ -858,50 +1070,39 @@ def build_movers(positions: list[dict], top_n: int = 3) -> str:
                 + "".join(_row(p, side) for p in items)
                 + "</table>"
             )
-        chip_fg = "#1a3300" if side == "win" else "#7a1a1a"
-        chip = (
-            f'<span style="display:inline-block;background:{CARD};color:{chip_fg};'
-            f"border:1.5px solid {accent};font-family:{FONT};"
-            f"font-size:10px;font-weight:800;letter-spacing:0.14em;"
-            f"padding:2px 8px;border-radius:999px;vertical-align:middle;"
-            f'margin-left:10px;">{len(items)}</span>'
-        )
         emoji = "📈" if side == "win" else "📉"
         return f"""
 <td style="padding:6px;width:50%;vertical-align:top;">
-  <div style="background:{soft};border:1px solid {accent};border-radius:16px;
-              padding:18px 20px 8px;">
-    <div style="font-family:{DISPLAY};font-size:18px;font-weight:900;
-                font-style:italic;letter-spacing:-0.02em;color:{chip_fg};
-                margin-bottom:12px;">
-      {emoji} {title}{chip}
+  <div style="background:{bg};border:1.5px solid {bdr};border-radius:14px;padding:18px 20px;">
+    <div style="font-family:{FONT};font-size:11px;font-weight:800;letter-spacing:0.16em;
+                color:{fg};text-transform:uppercase;margin-bottom:12px;">
+      {emoji} {title}
     </div>
     {inner}
   </div>
-</td>
-"""
+</td>"""
 
     return f"""
-<div style="padding:0 22px 4px;">
+<div style="padding:0 24px 4px;">
   <table style="width:100%;border-collapse:separate;border-spacing:10px 0;">
     <tr>
-      {_column("Top winners", winners, "win", VOLT, VOLT_SOFT)}
-      {_column("Top losers", losers, "loss", LOSS, LOSS_SOFT)}
+      {_col("Top Winners", winners, "win", GREEN_BG, GREEN_BORDER, GREEN_DARK)}
+      {_col("Watch List", losers, "loss", RED_BG, RED_BORDER, RED_DARK)}
     </tr>
   </table>
 </div>
 """
 
 
+# ── Section: Open Positions ───────────────────────────────────────────────────
 def build_positions(positions: list[dict]) -> str:
     if not positions:
         return f"""
-<div style="padding:0 32px 4px;font-family:{FONT};font-size:13px;color:{TEXT_DIM};">
-  No open positions.
+<div style="padding:0 24px 4px;font-family:{FONT};font-size:13px;color:{INK_DIM};">
+  No open positions right now.
 </div>
 """
-    cards_list: list[str] = []
-    rows_html = ""
+    cards: list[str] = []
     for p in positions:
         sym = p.get("symbol") or ""
         shares = p.get("shares") or 0
@@ -909,69 +1110,114 @@ def build_positions(positions: list[dict]) -> str:
         curr = p.get("current_price") or entry
         unr = p.get("unrealized_pnl") or 0
         days = p.get("days_held")
+        stop = p.get("stop_loss_price")
+        strat = p.get("strat") or ""
         ret_pct = ((curr - entry) / entry * 100) if entry else 0
+        is_up = unr >= 0
         col = pnl_color(unr)
+        rail_col = GREEN if is_up else RED
+        s_ink, s_bg, s_border = STRAT_BRAND.get(strat, (SLATE, SLATE_BG, SLATE_BORDER))
+
         chart_b64 = render_sparkline(sym, entry_price=float(entry) if entry else None)
         chart_html = (
             f'<img src="data:image/png;base64,{chart_b64}" '
             f'style="display:block;width:100%;height:auto;border-radius:8px;" />'
             if chart_b64
-            else f'<div style="height:60px;background:{CARD_ALT};border-radius:8px;"></div>'
+            else f'<div style="height:56px;background:{CARD_ALT};border-radius:8px;"></div>'
         )
-        # Color-coded left rail makes up/down instantly scannable
-        rail_col = VOLT if unr > 0 else (LOSS if unr < 0 else BORDER)
-        cards_list.append(
+
+        # Stop loss distance indicator
+        stop_html = ""
+        if stop and curr:
+            stop_dist = (curr - float(stop)) / curr * 100
+            stop_col = RED if stop_dist < 5 else (AMBER if stop_dist < 10 else INK_MUTE)
+            stop_html = f"""
+<div style="margin-top:8px;padding:7px 10px;background:{CARD_ALT};
+            border-radius:8px;display:flex;justify-content:space-between;
+            align-items:center;">
+  <span style="font-family:{FONT};font-size:10px;color:{INK_MUTE};font-weight:600;
+               letter-spacing:0.08em;">STOP LOSS</span>
+  <span style="font-family:{MONO};font-size:12px;font-weight:700;color:{stop_col};">
+    ${float(stop):,.2f}
+    <span style="font-family:{FONT};font-size:10px;font-weight:500;color:{stop_col};
+                 margin-left:4px;">({stop_dist:.1f}% away)</span>
+  </span>
+</div>"""
+
+        days_html = (
+            f'<span style="font-family:{FONT};font-size:10px;color:{INK_MUTE};"> · {days}d held</span>'
+            if days is not None
+            else ""
+        )
+
+        cards.append(
             f"""
 <td style="padding:6px;width:50%;vertical-align:top;">
-  <div style="background:{CARD};border:1px solid {BORDER};border-radius:14px;
-              padding:16px 16px 14px 18px;position:relative;overflow:hidden;">
-    <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:{rail_col};"></div>
+  <div style="background:{CARD};border:1.5px solid {BORDER};border-radius:16px;
+              padding:16px 18px 14px;position:relative;overflow:hidden;">
+    <div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:{rail_col};
+                border-radius:4px 0 0 4px;"></div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;
+                margin-bottom:10px;">
+      <div>
+        <div style="font-family:{FONT};font-size:20px;font-weight:800;color:{INK};
+                    letter-spacing:-0.025em;line-height:1;">{html_lib.escape(sym)}</div>
+        <div style="margin-top:4px;">
+          <span style="display:inline-block;background:{s_bg};color:{s_ink};
+                       border:1px solid {s_border};font-size:9px;font-weight:700;
+                       padding:2px 8px;border-radius:999px;letter-spacing:0.04em;">
+            {html_lib.escape(_short_strategy(strat))}
+          </span>
+          <span style="font-family:{FONT};font-size:11px;color:{INK_MUTE};">
+            &nbsp;{int(shares)} shares{days_html}
+          </span>
+        </div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-family:{MONO};font-size:16px;font-weight:800;color:{col};
+                    letter-spacing:-0.01em;">{fmt_money(unr, sign=True)}</div>
+        <div style="font-family:{FONT};font-size:12px;color:{col};font-weight:600;
+                    margin-top:2px;">{fmt_pct(ret_pct)}</div>
+      </div>
+    </div>
+    <div style="margin-bottom:10px;">{chart_html}</div>
     <table style="width:100%;border-collapse:collapse;">
       <tr>
-        <td style="vertical-align:top;">
-          <div style="font-family:{FONT};font-size:19px;font-weight:800;color:{TEXT};
-                      letter-spacing:-0.025em;line-height:1;">{html_lib.escape(sym)}</div>
-          <div style="font-family:{FONT};font-size:11px;color:{TEXT_MUTE};
-                      letter-spacing:0.02em;margin-top:5px;font-weight:500;">
-            {int(shares)} sh · {html_lib.escape(_short_strategy(p.get('strat') or ''))}{f" · {days}d" if days is not None else ""}
-          </div>
-        </td>
-        <td style="text-align:right;vertical-align:top;">
-          <div style="font-family:{MONO};font-size:15px;font-weight:700;color:{col};
-                      letter-spacing:-0.01em;line-height:1;">{fmt_money(unr, sign=True)}</div>
-          <div style="font-family:{FONT};font-size:11px;color:{col};margin-top:4px;
-                      font-weight:600;">
-            {fmt_pct(ret_pct)}
-          </div>
-        </td>
+        <td style="font-family:{FONT};font-size:10px;color:{INK_MUTE};letter-spacing:0.10em;
+                   font-weight:600;">BOUGHT AT</td>
+        <td style="font-family:{MONO};font-size:12px;color:{INK_DIM};text-align:right;">
+          ${entry:,.2f}</td>
+        <td style="font-family:{FONT};font-size:10px;color:{INK_MUTE};letter-spacing:0.10em;
+                   font-weight:600;text-align:right;padding-left:14px;">NOW</td>
+        <td style="font-family:{MONO};font-size:12px;color:{INK};font-weight:700;
+                   text-align:right;padding-left:6px;">${curr:,.2f}</td>
       </tr>
     </table>
-    <div style="margin-top:12px;">{chart_html}</div>
-    <table style="width:100%;border-collapse:collapse;margin-top:8px;">
-      <tr>
-        <td style="font-family:{FONT};font-size:10px;color:{TEXT_MUTE};
-                   letter-spacing:0.12em;font-weight:600;">ENTRY</td>
-        <td style="font-family:{MONO};font-size:12px;color:{TEXT_DIM};
-                   text-align:right;">${entry:,.2f}</td>
-        <td style="font-family:{FONT};font-size:10px;color:{TEXT_MUTE};
-                   letter-spacing:0.12em;font-weight:600;text-align:right;
-                   padding-left:14px;">NOW</td>
-        <td style="font-family:{MONO};font-size:12px;color:{TEXT};
-                   text-align:right;font-weight:700;padding-left:6px;">${curr:,.2f}</td>
-      </tr>
-    </table>
+    {stop_html}
   </div>
-</td>
-"""
+</td>"""
         )
-    for i in range(0, len(cards_list), 2):
-        pair = cards_list[i : i + 2]
+
+    rows_html = ""
+    for i in range(0, len(cards), 2):
+        pair = cards[i : i + 2]
         if len(pair) == 1:
             pair.append('<td style="padding:6px;width:50%;"></td>')
         rows_html += "<tr>" + "".join(pair) + "</tr>"
 
+    tip_html = f"""
+<div style="margin-bottom:14px;padding:12px 16px;background:{BLUE_BG};
+            border:1px solid {BLUE_BORDER};border-radius:10px;">
+  <span style="font-family:{FONT};font-size:11px;color:{BLUE_DARK};line-height:1.5;">
+    💡 <strong>How to read these cards:</strong> The colored bar on the left
+    shows green (profitable) or red (losing). The "stop loss" price is the automatic
+    exit price if the stock falls too far — it limits your downside.
+  </span>
+</div>"""
+
     return f"""
-<div style="padding:0 22px 4px;">
+<div style="padding:0 24px 4px;">
+  {tip_html}
   <table style="width:100%;border-collapse:separate;border-spacing:0;">
     {rows_html}
   </table>
@@ -979,7 +1225,7 @@ def build_positions(positions: list[dict]) -> str:
 """
 
 
-# ── Morning Brew–style news digest ────────────────────────────────────────────
+# ── Section: News Digest ──────────────────────────────────────────────────────
 _NEWS_CACHE_PATH = Path("/tmp/imb_news_cache.json")
 
 
@@ -991,8 +1237,7 @@ def _load_news_cache() -> dict[str, dict]:
 
         data = _json.loads(_NEWS_CACHE_PATH.read_text())
         if data.get("date") == datetime.now().strftime("%Y-%m-%d"):
-            symbols = data.get("symbols") or {}
-            return {str(k): dict(v) for k, v in symbols.items()}
+            return {str(k): dict(v) for k, v in (data.get("symbols") or {}).items()}
     except Exception:
         pass
     return {}
@@ -1013,7 +1258,6 @@ def _save_news_cache(symbols: dict[str, dict]) -> None:
 
 
 def _fetch_position_news(symbols: list[str]) -> dict[str, dict]:
-    """Return {symbol: {headlines: [...], score: float}} with one-day disk cache."""
     cache = _load_news_cache()
     missing = [s for s in symbols if s not in cache]
     if missing:
@@ -1025,102 +1269,82 @@ def _fetch_position_news(symbols: list[str]) -> dict[str, dict]:
             cache.update(fresh)
             _save_news_cache(cache)
         except Exception:
-            # News is best-effort; never let it break the email
             pass
     return {s: cache.get(s, {"headlines": [], "score": 0.5}) for s in symbols}
 
 
 def _tone_chip(score: float) -> str:
-    """Return a small inline chip describing the headline tone."""
     if score >= 0.62:
-        bg, fg, border, label = VOLT_SOFT, "#1a3300", VOLT, "BULLISH"
+        bg, fg, border, label = GREEN_BG, GREEN_DARK, GREEN_BORDER, "BULLISH"
     elif score <= 0.38:
-        bg, fg, border, label = LOSS_SOFT, "#7a1a1a", LOSS, "BEARISH"
+        bg, fg, border, label = RED_BG, RED_DARK, RED_BORDER, "BEARISH"
     else:
-        bg, fg, border, label = CARD_ALT, TEXT_DIM, BORDER, "NEUTRAL"
+        bg, fg, border, label = CARD_ALT, INK_DIM, BORDER, "NEUTRAL"
     return (
-        f'<span style="display:inline-block;background:{bg};color:{fg};'
-        f"border:1px solid {border};font-size:9px;font-weight:800;"
-        f"letter-spacing:0.16em;padding:2px 7px;border-radius:4px;"
-        f'vertical-align:middle;">{label}</span>'
+        f'<span style="display:inline-block;background:{bg};color:{fg};border:1px solid {border};'
+        f'font-size:9px;font-weight:800;letter-spacing:0.16em;padding:2px 8px;border-radius:6px;">'
+        f"{label}</span>"
     )
 
 
 def _position_context(positions: list[dict], symbol: str) -> dict:
-    """Pull shares + unrealized P&L for a symbol from the positions list.
-
-    The DB schema gives us since-entry P&L (`unrealized_pnl`) and shares,
-    not a per-position today's P&L, so we report unrealized + percent vs
-    cost basis. That is editorially honest and still position-specific.
-    """
     for p in positions:
         if (p.get("symbol") or "").upper() == symbol:
             shares = float(p.get("shares") or 0)
-            avg_price = float(p.get("avg_price") or 0)
+            avg = float(p.get("avg_price") or 0)
             unr = float(p.get("unrealized_pnl") or 0)
-            cost_basis = shares * avg_price
-            unr_pct = (unr / cost_basis * 100) if cost_basis > 0 else 0.0
-            return {
-                "qty": shares,
-                "today_pnl": unr,  # used by summarizer; map to unrealized
-                "today_pct": unr_pct,
-                "unrealized_pnl": unr,
-            }
+            cost = shares * avg
+            unr_pct = (unr / cost * 100) if cost > 0 else 0.0
+            return {"qty": shares, "today_pnl": unr, "today_pct": unr_pct, "unrealized_pnl": unr}
     return {}
 
 
-def build_news_digest(positions: list[dict], max_stories: int = 6) -> str:
-    """
-    Editorial digest: per-position story card with publisher, age, link,
-    and a one-sentence "why it matters" line generated by the LLM
-    summarizer (or a heuristic fallback if no API key).
-
-    Caps to `max_stories` symbols so the email stays scannable.
-    """
+def build_news_digest(
+    positions: list[dict], traded_today: list[str] | None = None, max_stories: int = 6
+) -> str:
     if not positions:
         return ""
-    symbols = list(
+    traded_set = {s.upper() for s in (traded_today or [])}
+    all_symbols = list(
         dict.fromkeys((p.get("symbol") or "").upper() for p in positions if p.get("symbol"))
     )
-    if not symbols:
+    if not all_symbols:
         return ""
-    news_map = _fetch_position_news(symbols)
+    news_map = _fetch_position_news(all_symbols)
 
-    # Rank: composite of sentiment magnitude + presence of a high-quality
-    # article. Symbols with at least one substantive (quality > 0.55)
-    # article surface first.
-    def _rank_key(s: str) -> tuple[float, float]:
+    def _rank_key(s: str) -> tuple[int, float, float]:
         ctx = news_map.get(s, {})
         articles = ctx.get("articles") or []
         best_q = max((a.get("quality", 0.0) for a in articles), default=0.0)
         sent_mag = abs(float(ctx.get("score", 0.5)) - 0.5)
-        return (best_q, sent_mag)
+        traded_bonus = 1 if s in traded_set else 0
+        return (traded_bonus, best_q, sent_mag)
 
     ranked = sorted(
-        [s for s in symbols if news_map.get(s, {}).get("articles")],
+        [s for s in all_symbols if news_map.get(s, {}).get("articles")],
         key=_rank_key,
         reverse=True,
     )[:max_stories]
 
     if not ranked:
         return f"""
-<div style="padding:0 22px 4px;">
-  <div style="background:{CARD};border:1px dashed {BORDER};border-radius:14px;
-              padding:18px 22px;text-align:center;font-size:12px;color:{TEXT_DIM};">
-    No fresh headlines for today's holdings.
+<div style="padding:0 24px 4px;">
+  <div style="background:{CARD};border:1.5px dashed {BORDER};border-radius:16px;
+              padding:20px 24px;text-align:center;">
+    <div style="font-family:{FONT};font-size:13px;color:{INK_DIM};">
+      No fresh headlines for today's holdings.
+    </div>
   </div>
 </div>
 """
 
-    # Lazy-import the summarizer so generate_daily_email stays usable even
-    # if src.utils.news_summarizer ever drops out of the path.
     summarizer = None
     try:
         from src.utils.news_summarizer import NewsSummarizer
 
         summarizer = NewsSummarizer()
     except Exception:
-        summarizer = None
+        pass
 
     blocks = []
     for sym in ranked:
@@ -1132,200 +1356,237 @@ def build_news_digest(positions: list[dict], max_stories: int = 6) -> str:
         score = float(ctx.get("score", 0.5))
         chip = _tone_chip(score)
         pos_ctx = _position_context(positions, sym)
+        is_traded = sym in traded_set
 
-        # Why-it-matters line — LLM if available, heuristic otherwise
+        why = ""
         if summarizer is not None:
             try:
                 why = summarizer.summarize_for_position(sym, articles, pos_ctx, score)
             except Exception:
                 why = ""
-        else:
-            why = ""
 
-        # Position strap: shares + today's P&L tying the story to *us*
         pos_strap = ""
         if pos_ctx.get("qty", 0) > 0:
-            tp = float(pos_ctx.get("today_pnl") or 0)
-            tpc = float(pos_ctx.get("today_pct") or 0)
-            tp_col = VOLT if tp >= 0 else LOSS
-            tp_sign = "+" if tp >= 0 else "−"
-            qty = pos_ctx["qty"]
+            unr = float(pos_ctx.get("unrealized_pnl") or 0)
+            unr_pct = float(pos_ctx.get("today_pct") or 0)
+            unr_col = GREEN if unr >= 0 else RED
             pos_strap = (
-                f'<div style="font-family:{FONT};font-size:11px;'
-                f"color:{TEXT_MUTE};margin-top:4px;letter-spacing:0.04em;"
-                f'font-weight:600;">'
-                f"We hold {qty:.0f} sh · "
-                f'<span style="color:{tp_col};font-weight:800;">'
-                f"{tp_sign}${abs(tp):,.2f} ({tpc:+.2f}%) unrealized</span>"
-                f"</div>"
+                f'<div style="font-family:{FONT};font-size:11px;color:{INK_MUTE};'
+                f'margin-top:6px;line-height:1.45;">'
+                f'You hold {pos_ctx["qty"]:.0f} shares · '
+                f'<span style="color:{unr_col};font-weight:700;">'
+                f"{fmt_money(unr, sign=True)} ({unr_pct:+.2f}%) unrealized</span></div>"
             )
 
-        # Headline as clickable link if we have one
+        traded_badge = (
+            f'<span style="display:inline-block;background:{AMBER_BG};color:{AMBER_DARK};'
+            f"border:1px solid {AMBER_BORDER};font-size:9px;font-weight:800;"
+            f'letter-spacing:0.14em;padding:2px 8px;border-radius:6px;margin-left:6px;">'
+            f"TRADED TODAY</span>"
+            if is_traded
+            else ""
+        )
+
         headline_html = html_lib.escape(lead.get("title", ""))
         link = lead.get("link", "")
         if link:
             headline_html = (
                 f'<a href="{html_lib.escape(link)}" target="_blank" '
-                f'style="color:{TEXT};text-decoration:none;'
-                f'border-bottom:1px solid {GRAPE_SOFT};">'
-                f"{headline_html}</a>"
+                f'style="color:{INK};text-decoration:none;">{headline_html}</a>'
             )
 
-        # Publisher + age sub-line
         meta_bits = []
         if lead.get("source"):
             meta_bits.append(html_lib.escape(lead["source"]))
         if lead.get("age"):
             meta_bits.append(html_lib.escape(lead["age"]))
-        meta_line = " · ".join(meta_bits)
         meta_html = (
-            f'<div style="font-family:{FONT};font-size:11px;'
-            f"color:{TEXT_MUTE};margin-top:8px;letter-spacing:0.04em;"
-            f'font-weight:600;text-transform:uppercase;">{meta_line}</div>'
-            if meta_line
+            f'<div style="font-family:{FONT};font-size:10px;color:{INK_MUTE};margin-top:8px;'
+            f'letter-spacing:0.06em;font-weight:600;text-transform:uppercase;">'
+            + " · ".join(meta_bits)
+            + "</div>"
+            if meta_bits
             else ""
         )
 
-        # Why-it-matters line in italic Fraunces — the editorial voice
         why_html = (
-            f'<div style="font-family:{DISPLAY};font-style:italic;'
-            f"font-size:14px;color:{TEXT_DIM};margin-top:10px;"
-            f'line-height:1.45;letter-spacing:-0.005em;">{html_lib.escape(why)}</div>'
+            f'<div style="font-family:{DISPLAY};font-style:italic;font-size:13px;'
+            f'color:{INK_DIM};margin-top:10px;line-height:1.5;">{html_lib.escape(why)}</div>'
             if why
             else ""
         )
 
         blocks.append(
             f"""
-<div style="padding:22px 26px;border-bottom:1px solid {GRAPE_SOFT};
-            background:{CARD};">
-  <div style="margin-bottom:10px;">
-    <span style="display:inline-block;font-family:{FONT};font-size:11px;
-                 font-weight:800;color:{GRAPE};background:{GRAPE_SOFT};
-                 border:1px solid {GRAPE};padding:2px 9px;border-radius:999px;
-                 letter-spacing:0.08em;vertical-align:middle;">
+<div style="padding:20px 24px;border-bottom:1px solid {PURPLE_BG};">
+  <div style="margin-bottom:10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
+    <span style="display:inline-block;background:{PURPLE_BG};color:{PURPLE_DARK};
+                 border:1px solid {PURPLE_BORDER};font-family:{FONT};font-size:11px;
+                 font-weight:800;padding:3px 10px;border-radius:999px;letter-spacing:0.06em;">
       {html_lib.escape(sym)}
     </span>
-    <span style="margin-left:8px;vertical-align:middle;">{chip}</span>
+    {chip}{traded_badge}
     {pos_strap}
   </div>
-  <div style="font-family:{DISPLAY};font-size:19px;font-weight:700;
-              color:{TEXT};line-height:1.3;letter-spacing:-0.015em;">
-    <span style="color:{GRAPE};font-family:{DISPLAY};font-size:30px;
-                 font-weight:900;line-height:0;vertical-align:-7px;
-                 margin-right:4px;">“</span>{headline_html}
+  <div style="font-family:{DISPLAY};font-size:18px;font-weight:700;color:{INK};
+              line-height:1.35;letter-spacing:-0.01em;">
+    <span style="color:{PURPLE};font-size:26px;line-height:0;vertical-align:-6px;
+                 margin-right:3px;">"</span>{headline_html}
   </div>
-  {why_html}
-  {meta_html}
-</div>
-"""
+  {why_html}{meta_html}
+</div>"""
         )
 
-    # Footer indicates whether we used LLM or heuristic
     llm_label = (
-        "LLM-summarized · headlines via Google News"
+        "AI-summarized via LLM · headlines via Google News"
         if summarizer is not None and summarizer.llm_enabled
-        else "Heuristic summary · headlines via Google News"
+        else "Headlines via Google News"
     )
 
     return f"""
-<div style="padding:0 22px 4px;">
-  <div style="background:{CARD};border:1px solid {GRAPE};border-radius:18px;
-              overflow:hidden;box-shadow:0 1px 0 {GRAPE_SOFT};">
+<div style="padding:0 24px 4px;">
+  <div style="background:{CARD};border:1.5px solid {PURPLE_BORDER};border-radius:18px;
+              overflow:hidden;">
     {''.join(blocks)}
-    <div style="padding:12px 22px;background:{GRAPE_SOFT};font-size:11px;
-                color:{GRAPE};letter-spacing:0.06em;font-weight:700;
-                text-transform:uppercase;">
-      The Wire · {llm_label}
+    <div style="padding:10px 20px;background:{PURPLE_BG};font-size:10px;color:{PURPLE};
+                letter-spacing:0.08em;font-weight:700;text-transform:uppercase;">
+      Market Intel · {llm_label}
     </div>
   </div>
 </div>
 """
 
 
-def build_readiness(db_path: str) -> str:
-    """Render the live-trading readiness gate as a single black card."""
+# ── Section: System Status ────────────────────────────────────────────────────
+def build_system_status(recon_status: str, fill_summary: dict, db_path: str) -> str:
+    recon_upper = (recon_status or "").upper()
+    recon_ok = "SYNCED" in recon_upper or "PASS" in recon_upper
+    recon_label = "Account balanced with broker" if recon_ok else f"Sync issue: {recon_status}"
+
+    # Fill quality row
+    fill_count = int(fill_summary.get("fill_count") or 0)
+    avg_dev = fill_summary.get("avg_dev")
+    fill_ok = fill_count == 0 or (avg_dev is not None and float(avg_dev) < 30)
+    fill_label = (
+        "No fills today — no quality data"
+        if fill_count == 0
+        else f"{fill_count} fills · avg {float(avg_dev or 0):.0f} bps slippage"
+    )
+
+    # Live readiness (keep existing check)
+    readiness_html = ""
     try:
         from check_live_readiness import evaluate_readiness
-    except Exception:
-        return ""
-    try:
+
         result = evaluate_readiness(db_path)
-    except Exception:
-        return ""
-
-    ready = result.get("ready")
-    passed = result.get("passed", 0)
-    total = result.get("total", 0)
-    headline = "READY TO GO LIVE" if ready else f"NOT READY · {passed}/{total}"
-    head_bg = VOLT_SOFT if ready else CARD_ALT
-    head_fg = "#1a3300" if ready else TEXT
-    head_border = VOLT if ready else BORDER
-
-    rows = ""
-    for c in result.get("checks", []):
-        ok = c.get("ok")
-        dot = VOLT if ok else LOSS
-        val_col = TEXT if ok else TEXT_DIM
-        rows += f"""
-<tr>
-  <td style="padding:9px 0;border-top:1px solid {BORDER};">
-    <span style="display:inline-block;width:6px;height:6px;border-radius:50%;
-                 background:{dot};margin-right:10px;vertical-align:middle;"></span>
-    <span style="font-family:{FONT};font-size:13px;color:{TEXT};">
-      {html_lib.escape(c.get('label', ''))}
+        ready = result.get("ready")
+        passed = result.get("passed", 0)
+        total = result.get("total", 0)
+        r_ok = bool(ready)
+        checks_html = ""
+        for c in result.get("checks", []):
+            ok = c.get("ok")
+            dot = GREEN if ok else RED
+            checks_html += f"""
+<div style="display:flex;justify-content:space-between;padding:7px 0;
+            border-top:1px solid {BORDER};">
+  <span style="font-family:{FONT};font-size:12px;color:{INK_DIM};">
+    <span style="display:inline-block;width:7px;height:7px;border-radius:50%;
+                 background:{dot};margin-right:8px;vertical-align:middle;"></span>
+    {html_lib.escape(c.get('label',''))}
+  </span>
+  <span style="font-family:{MONO};font-size:12px;color:{INK_DIM};font-weight:600;">
+    {html_lib.escape(c.get('display','—'))}
+    <span style="font-family:{FONT};font-size:10px;color:{INK_MUTE};margin-left:4px;">
+      {html_lib.escape(c.get('target',''))}
     </span>
-  </td>
-  <td style="padding:9px 0;border-top:1px solid {BORDER};text-align:right;
-             font-family:{MONO};font-size:13px;color:{val_col};font-weight:600;">
-    {html_lib.escape(c.get('display', '—'))}
-  </td>
-  <td style="padding:9px 0 9px 14px;border-top:1px solid {BORDER};
-             font-family:{FONT};font-size:11px;color:{TEXT_MUTE};
-             text-align:right;letter-spacing:0.04em;">
-    {html_lib.escape(c.get('target', ''))}
-  </td>
-</tr>
-"""
+  </span>
+</div>"""
+        readiness_html = f"""
+<div style="margin-top:14px;padding-top:14px;border-top:2px dashed {BORDER};">
+  <div style="font-family:{FONT};font-size:10px;font-weight:800;letter-spacing:0.18em;
+              color:{INK_MUTE};text-transform:uppercase;margin-bottom:8px;">
+    Live Trading Readiness
+  </div>
+  <div style="font-family:{FONT};font-size:12px;color:{INK_DIM};margin-bottom:8px;">
+    {'✅ Ready to trade with real money' if r_ok else f'⏳ Not yet — {total - passed} check(s) remaining'}
+  </div>
+  {checks_html}
+</div>"""
+    except Exception:
+        pass
+
+    def _status_row(label: str, detail: str, ok: bool) -> str:
+        icon = "✅" if ok else "⚠️"
+        return f"""
+<div style="display:flex;justify-content:space-between;align-items:center;
+            padding:10px 0;border-top:1px solid {BORDER};">
+  <span style="font-family:{FONT};font-size:13px;color:{INK};">
+    <span style="margin-right:8px;">{icon}</span>{label}
+  </span>
+  <span style="font-family:{FONT};font-size:12px;color:{INK_DIM};">{html_lib.escape(detail)}</span>
+</div>"""
+
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M ET")
     return f"""
-<div style="padding:0 22px 4px;">
-  <div style="background:{CARD};border:1px solid {BORDER};border-radius:14px;
-              padding:20px 22px;">
-    <div style="display:inline-block;background:{head_bg};color:{head_fg};
-                border:1px solid {head_border};
-                font-family:{FONT};font-size:11px;font-weight:800;
-                letter-spacing:0.18em;padding:5px 10px;border-radius:6px;">
-      {headline}
+<div style="padding:0 24px 4px;">
+  <div style="background:{CARD};border:1.5px solid {BORDER};border-radius:16px;padding:20px 24px;">
+    <div style="font-family:{FONT};font-size:10px;font-weight:800;letter-spacing:0.18em;
+                color:{INK_MUTE};text-transform:uppercase;margin-bottom:4px;">System Status</div>
+    <div style="font-family:{FONT};font-size:11px;color:{INK_MUTE};margin-bottom:12px;">
+      Generated {ts}
     </div>
-    <table style="width:100%;border-collapse:collapse;margin-top:14px;">
-      {rows}
-    </table>
+    {_status_row("Broker reconciliation", recon_label, recon_ok)}
+    {_status_row("Fill quality", fill_label, fill_ok)}
+    {readiness_html}
   </div>
 </div>
 """
 
 
-def build_footer(recon_status: str) -> str:
-    ok = "SYNCED" in recon_status.upper() or "PASS" in recon_status.upper()
-    dot_col = VOLT if ok else LOSS
-    label = "Account synced" if ok else f"Sync: {recon_status}"
+# ── Section header helper ─────────────────────────────────────────────────────
+def _section_title(text: str, sub: str = "", count: int | None = None, accent: str = BLUE) -> str:
+    badge = (
+        f'<span style="margin-left:10px;display:inline-block;font-family:{FONT};font-size:11px;'
+        f"font-weight:800;color:{BLUE_DARK};background:{BLUE_BG};border:1px solid {BLUE_BORDER};"
+        f'padding:2px 10px;border-radius:999px;">{count}</span>'
+        if count is not None and count > 0
+        else ""
+    )
+    sub_html = (
+        f'<div style="font-family:{FONT};font-size:12px;color:{INK_MUTE};'
+        f'margin-top:4px;font-weight:400;">{html_lib.escape(sub)}</div>'
+        if sub
+        else ""
+    )
+    return f"""
+<div style="padding:28px 24px 12px;">
+  <div style="font-family:{DISPLAY};font-size:24px;font-weight:900;font-style:italic;
+              letter-spacing:-0.025em;color:{INK};line-height:1.05;">
+    {html_lib.escape(text)}{badge}
+  </div>
+  {sub_html}
+  <div style="margin-top:8px;width:40px;height:3px;background:{accent};border-radius:3px;"></div>
+</div>
+"""
+
+
+# ── Footer ────────────────────────────────────────────────────────────────────
+def build_footer() -> str:
     ts = datetime.now().strftime("%Y-%m-%d %H:%M")
     return f"""
-<div style="padding:24px 32px 32px;border-top:1px solid {BORDER};margin-top:18px;">
-  <table style="width:100%;border-collapse:collapse;">
-    <tr>
-      <td style="font-family:{FONT};font-size:11px;color:{TEXT_MUTE};
-                 letter-spacing:0.08em;">
-        <span style="display:inline-block;width:7px;height:7px;border-radius:50%;
-                     background:{dot_col};margin-right:6px;vertical-align:middle;"></span>
-        {html_lib.escape(label)}
-      </td>
-      <td style="font-family:{FONT};font-size:11px;color:{TEXT_MUTE};
-                 text-align:right;letter-spacing:0.06em;">
-        Investor Mimic · {ts}
-      </td>
-    </tr>
-  </table>
+<div style="padding:28px 24px 36px;border-top:2px solid {BORDER};margin-top:24px;
+            background:{PAGE_BG};">
+  <div style="font-family:{FONT};font-size:11px;color:{INK_MUTE};
+              line-height:1.6;max-width:520px;">
+    <strong style="color:{INK_DIM};">Investor Mimic</strong> is a fully automated paper-trading
+    system. All trades are simulated — no real money is at risk. Past paper performance
+    does not guarantee live trading results.
+  </div>
+  <div style="font-family:{FONT};font-size:10px;color:{INK_MUTE};
+              margin-top:10px;letter-spacing:0.06em;">
+    Generated {ts} · Paper trading only
+  </div>
 </div>
 """
 
@@ -1344,16 +1605,20 @@ def generate_email_body(db_path: str = "trading.db", include_visuals: bool = Tru
         run_id = get_latest_run_id(db)
         rejections = get_rejection_summary(db, run_id) if not trades_today else []
         zero_streak = get_zero_trade_streak(db) if not trades_today else 0
+        strategy_rows = get_strategy_statuses(db)
+        fill_summary = get_fill_quality_summary(db)
     finally:
         db.close()
 
     pv = float(snap.get("portfolio_value") or 0)
     recon = snap.get("reconciliation_status") or "UNKNOWN"
+
     today_pnl = 0.0
     today_pct = 0.0
     if len(equity) >= 2:
-        prev, curr = equity[-2]["total"], equity[-1]["total"]
-        today_pnl = (curr or 0) - (prev or 0)
+        prev = equity[-2]["total"]
+        curr_e = equity[-1]["total"]
+        today_pnl = (curr_e or 0) - (prev or 0)
         today_pct = (today_pnl / prev * 100) if prev else 0.0
 
     today_real = float(agg.get("today_realized") or 0)
@@ -1363,48 +1628,82 @@ def generate_email_body(db_path: str = "trading.db", include_visuals: bool = Tru
     losses = closed - wins
     win_rate = (wins / closed) if closed else None
 
-    date_str = datetime.now().strftime("%A, %b %-d")
+    date_str = datetime.now().strftime("%A, %B %-d")
+
+    # Compute alerts using a transient conn (db is already closed)
+    db2 = _conn(db_path)
+    try:
+        alerts = get_system_alerts(db2, recon, zero_streak)
+    finally:
+        db2.close()
+
+    traded_today_syms = [t.get("symbol", "") for t in trades_today if t.get("symbol")]
 
     body = (
-        build_header(pv, today_pnl, today_pct, date_str, equity=equity)
+        build_hero(pv, today_pnl, today_pct, date_str, equity=equity)
+        + build_alert_banner(alerts)
         + build_kpi_strip(today_real, total_pnl, win_rate, wins, losses, len(positions))
-        + _section_title("Today's tape", count=len(trades_today), accent=GOLD)
+        + build_strategy_dashboard(strategy_rows)
+        + _section_title(
+            "Today's Tape",
+            sub="What the system bought and sold — and why."
+            if trades_today
+            else "No trades executed today.",
+            count=len(trades_today),
+            accent=AMBER,
+        )
         + build_today_trades(
             trades_today, sig_map, rejections=rejections, zero_trade_streak=zero_streak
         )
-        + _section_title("Movers & shakers", accent=VOLT)
+        + _section_title(
+            "Movers & Shakers", sub="Best and worst positions right now.", accent=GREEN
+        )
         + build_movers(positions)
-        + _section_title("The book", count=len(positions), accent=INDIGO)
+        + _section_title(
+            "What You Own",
+            sub="Every open position with price history and stop losses.",
+            count=len(positions),
+            accent=BLUE,
+        )
         + build_positions(positions)
-        + _section_title("On the wire", accent=GRAPE)
-        + build_news_digest(positions)
-        + _section_title("Live readiness", accent=TEXT)
-        + build_readiness(db_path)
-        + build_footer(recon)
+        + _section_title(
+            "Market Intel",
+            sub="News on the stocks you hold — ranked by relevance to your positions.",
+            accent=PURPLE,
+        )
+        + build_news_digest(positions, traded_today=traded_today_syms)
+        + _section_title("System Status", sub="How the engine performed today.", accent=SLATE)
+        + build_system_status(recon, fill_summary, db_path)
+        + build_footer()
     )
 
     return f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Daily</title>
-<!-- Inter (sans) + Fraunces (serif display) for clients that allow web fonts; safe fallback otherwise -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&display=swap" rel="stylesheet">
-<style>
-  body, table, td, div, p, span {{
-    font-family: {FONT};
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
-  }}
-</style>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Investor Mimic · Daily</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,ital,wght@9..144,0,700;9..144,0,900;9..144,1,500;9..144,1,700;9..144,1,900&display=swap" rel="stylesheet">
+  <style>
+    body, table, td, div, p, span, a {{
+      font-family: {FONT};
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+      box-sizing: border-box;
+    }}
+    a {{ color: inherit; }}
+    img {{ border: 0; display: block; }}
+  </style>
 </head>
-<body style="margin:0;padding:0;background:{BG};font-family:{FONT};color:{TEXT};">
-  <div style="max-width:720px;margin:0 auto;background:{BG};font-family:{FONT};">
+<body style="margin:0;padding:0;background:{PAGE_BG};color:{INK};">
+  <div style="max-width:700px;margin:0 auto;background:{PAGE_BG};">
     {body}
   </div>
-</body></html>"""
+</body>
+</html>"""
 
 
 def main() -> int:
@@ -1424,7 +1723,6 @@ def main() -> int:
         pass
 
     html = generate_email_body(db_path=args.db, include_visuals=True)
-
     out_path = "/tmp/daily_email.html"
     Path(out_path).write_text(html, encoding="utf-8")
     print(f"✅ Email HTML generated: {out_path}")
