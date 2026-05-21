@@ -87,15 +87,22 @@ jobs:
       run: |
         mkdir -p artifacts/json artifacts/markdown artifacts/funnel artifacts/data_quality artifacts/drawdown artifacts/health logs data
 
-    - name: Pre-execution broker sync (cold start only)
-      if: steps.download_db.outputs.cold_start == 'true'
+    - name: Pre-execution broker sync
       continue-on-error: true
       env:
         ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
         ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
         ALPACA_PAPER: 'true'
       run: |
-        echo "=== Cold start detected — pre-syncing broker positions into fresh DB ==="
+        # Runs every session (not just cold start) to clear phantom positions from
+        # prior-run OPG orders that were assumed-filled in paper mode but expired
+        # unfilled at the open.  Without this, ghost positions accumulate each run
+        # and cause the reconciliation gate to fail before any trading happens.
+        if [ "${{ steps.download_db.outputs.cold_start }}" = "true" ]; then
+          echo "=== Cold start — pre-syncing broker positions into fresh DB ==="
+        else
+          echo "=== Warm start — clearing unfilled OPG phantom positions ==="
+        fi
         python scripts/sync_broker_state.py && echo "✅ Pre-sync complete" || echo "⚠️ Pre-sync failed (broker may have no positions)"
 
     - name: Download previous training data (if exists)
@@ -353,6 +360,15 @@ jobs:
           sqlite3 trading.db "SELECT COUNT(*) FROM trades WHERE run_id='$RUN_ID';"
         fi
 
+    - name: Checkpoint WAL and upload trading database
+      if: always() && steps.auto_sync.outputs.synced != 'true'
+      run: |
+        # Force SQLite WAL checkpoint so all writes are in the main .db file before
+        # uploading.  Without this, uncheckpointed WAL frames (e.g. from the inline
+        # auto-sync that deleted ghost positions) are lost when only trading.db is
+        # captured — the next run would restore the pre-deletion state and trigger
+        # another reconciliation failure.
+        sqlite3 trading.db "PRAGMA wal_checkpoint(TRUNCATE);" || true
     - name: Upload trading database
       if: always() && steps.auto_sync.outputs.synced != 'true'
       uses: actions/upload-artifact@v4
