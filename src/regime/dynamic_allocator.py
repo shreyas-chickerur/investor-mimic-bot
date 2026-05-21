@@ -75,6 +75,7 @@ class DynamicAllocator:
         strategy_ids: list[int],
         strategy_performance: dict[int, list[float]] | None = None,
         per_strategy_max: dict[int, float] | None = None,
+        prior_sharpes: dict[int, float] | None = None,
     ) -> dict[int, float]:
         """
         Calculate dynamic capital allocations
@@ -83,25 +84,39 @@ class DynamicAllocator:
             strategy_ids: List of strategy IDs
             strategy_performance: Optional performance data for dynamic weighting
             per_strategy_max: Optional per-strategy max allocation overrides {strategy_id: max_pct}
+            prior_sharpes: Backtest-derived Sharpes used when live history < 20 days
 
         Returns:
             Dict of {strategy_id: capital_allocation}
         """
         per_strategy_max = per_strategy_max or {}
+        prior_sharpes = prior_sharpes or {}
         num_strategies = len(strategy_ids)
 
         def _max(sid: int) -> float:
             return per_strategy_max.get(sid, self.max_allocation)
 
-        # If no performance data, use equal weighting clipped to per-strategy caps
-        if not strategy_performance or all(
-            len(perf) < 20 for perf in strategy_performance.values()
-        ):
+        # Calculate live Sharpe ratios from returns history
+        sharpe_ratios = self.calculate_sharpe_ratios(strategy_performance or {})
+
+        # For strategies with < 20 live returns, substitute backtest prior Sharpe.
+        # This prevents cold-start equal-weight fallback from ignoring known edge differences.
+        for sid in strategy_ids:
+            live_returns = (strategy_performance or {}).get(sid, [])
+            if len(live_returns) < 20 and sid in prior_sharpes:
+                sharpe_ratios[sid] = max(prior_sharpes[sid], 0.0)
+                logger.info(
+                    f"Strategy {sid}: using prior Sharpe {prior_sharpes[sid]:.2f} (only {len(live_returns)} live days)"
+                )
+
+        # If all Sharpe ratios are 0 or negative (e.g. no priors and no live data),
+        # fall back to equal weighting clipped to per-strategy caps
+        total_sharpe = sum(sharpe_ratios.values())
+        if total_sharpe <= 0:
             equal_weight = 1.0 / num_strategies
             weights = {}
             for sid in strategy_ids:
                 weights[sid] = min(equal_weight, _max(sid))
-            # Redistribute weight freed by caps
             total = sum(weights.values())
             if total < 1.0 - 1e-6:
                 uncapped = [sid for sid in strategy_ids if weights[sid] < _max(sid)]
@@ -110,20 +125,7 @@ class DynamicAllocator:
                     weights[sid] = min(weights[sid] + bonus, _max(sid))
             allocations = {sid: w * self.total_capital for sid, w in weights.items()}
             logger.info(
-                f"Using equal allocation (with caps): ${self.total_capital/num_strategies:,.2f} base"
-            )
-            return allocations
-
-        # Calculate Sharpe ratios
-        sharpe_ratios = self.calculate_sharpe_ratios(strategy_performance)
-
-        # If all Sharpe ratios are 0 or negative, use equal weighting
-        total_sharpe = sum(sharpe_ratios.values())
-        if total_sharpe <= 0:
-            equal_weight = 1.0 / num_strategies
-            allocations = {sid: equal_weight * self.total_capital for sid in strategy_ids}
-            logger.info(
-                f"All Sharpe ≤ 0, using equal allocation: ${self.total_capital/num_strategies:,.2f}"
+                f"All Sharpe ≤ 0, using equal allocation (with caps): ${self.total_capital/num_strategies:,.2f} base"
             )
             return allocations
 

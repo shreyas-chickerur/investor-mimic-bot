@@ -86,6 +86,17 @@ strategies:
   min_allocation_pct: 0.05   # Minimum 5% per strategy
   max_allocation_pct: 0.35   # Default maximum 35% per strategy
 
+  # Backtest Sharpe priors — seed allocator when live history < 20 days
+  # RSI Sharpe 0.65 (p=0.019), Earnings Drift estimated 0.80 (p=0.001),
+  # ML Momentum 0.30 (edge only at high conf), Factor Momentum 0.0 (no edge)
+  backtest_sharpe_priors:
+    rsi_mean_reversion: 0.65
+    earnings_drift: 0.80
+    ml_momentum: 0.30
+    factor_momentum: 0.0
+    ma_crossover: 0.20
+    volatility_breakout: 0.20
+
   # Per-strategy allocation caps (override global max_allocation_pct)
   # Based on backtest edge analysis: RSI p=0.019, Earnings Drift p=0.001,
   # ML Momentum edge only at >0.65 confidence, Factor Momentum p=0.575 (no edge)
@@ -118,6 +129,7 @@ strategies:
     buy_quantile_threshold: 0.70  # Raised from 0.65 — only top-decile ML signals
 
   factor_momentum:
+    disabled: true  # No edge: p=0.575, profit factor 0.80 — frozen pending redesign
     top_n: 3  # Reduced from 5 — higher conviction, lower overtrading cost drag
 
   earnings_drift:

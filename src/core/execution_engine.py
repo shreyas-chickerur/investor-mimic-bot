@@ -47,7 +47,7 @@ from src.risk.correlation_filter import CorrelationFilter
 from src.risk.drawdown_stop_manager import DrawdownStopManager
 from src.risk.portfolio_risk_manager import PortfolioRiskManager
 from src.strategies.strategy_earnings_drift import EarningsDriftStrategy
-from src.strategies.strategy_factor_momentum import FactorMomentumStrategy
+from src.strategies.strategy_factor_momentum import _SECTOR_MAP, FactorMomentumStrategy
 from src.strategies.strategy_ml_momentum import MLMomentumStrategy
 from src.strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
 from src.utils.config_loader import get_config
@@ -504,18 +504,31 @@ class MultiStrategyRunner:
         logger.info("Confirmed fills: %s/%s", len(self.confirmed_fills), len(self.executed_trades))
 
     def initialize_strategies(self):
-        """Initialize the 4 canonical active strategies, creating DB entries for any that are missing."""
-        capital_per_strategy = self.portfolio_value / len(CANONICAL_STRATEGY_SPECS)
+        """Initialize canonical active strategies, skipping any marked disabled in config."""
+        # Filter out strategies disabled via config (e.g. factor_momentum: disabled: true)
+        active_specs = [
+            (name, desc, cls)
+            for name, desc, cls in CANONICAL_STRATEGY_SPECS
+            if not self.config.get(f"strategies.{name.lower().replace(' ', '_')}.disabled", False)
+        ]
+        active_names = {name for name, _, _ in active_specs}
+        disabled_names = [
+            name for name, _, _ in CANONICAL_STRATEGY_SPECS if name not in active_names
+        ]
+        if disabled_names:
+            logger.warning("Disabled strategies (config): %s", disabled_names)
+
+        capital_per_strategy = self.portfolio_value / max(len(active_specs), 1)
 
         # Build a name→id lookup from whatever is already in the DB
         existing_by_name = {s["name"]: s for s in self.db.get_all_strategies()}
         logger.info(
             f"DB has {len(existing_by_name)} strategies: {list(existing_by_name.keys())}. "
-            f"Enforcing canonical set: {[n for n, _, _ in CANONICAL_STRATEGY_SPECS]}"
+            f"Active: {[n for n, _, _ in active_specs]}"
         )
 
         strategies = []
-        for name, desc, strategy_class in CANONICAL_STRATEGY_SPECS:
+        for name, desc, strategy_class in active_specs:
             if name in existing_by_name:
                 strategy_id = existing_by_name[name]["id"]
                 logger.info(f"  Loaded existing: {name} (ID: {strategy_id})")
@@ -1633,10 +1646,12 @@ class MultiStrategyRunner:
             )
             frozen_capital = strategy.capital
             active_others = [s for s in strategies if s is not strategy]
+            redistribution_lines = []
             if active_others and frozen_capital > 0:
                 share = frozen_capital / len(active_others)
                 for other in active_others:
                     other.capital += share
+                    redistribution_lines.append(f"<li>{other.name}: +${share:,.2f}</li>")
                     logger.info(
                         "Redistributed $%.2f from frozen strategy %s to %s",
                         share,
@@ -1644,6 +1659,30 @@ class MultiStrategyRunner:
                         other.name,
                     )
                 strategy.capital = 0.0
+
+            # Email alert — strategy freeze is a critical event requiring human awareness
+            try:
+                self.email_notifier.send_alert(
+                    subject=f"STRATEGY FROZEN: {strategy.name}",
+                    message=(
+                        f"<h2>Strategy Loss Limit Triggered</h2>"
+                        f"<p>Strategy <strong>{strategy.name}</strong> has been frozen "
+                        f"after losing <strong>{loss_pct*100:.1f}%</strong> of initial capital "
+                        f"(limit: {max_loss*100:.0f}%).</p>"
+                        f"<table>"
+                        f"<tr><td>Initial capital</td><td>${initial_capital:,.2f}</td></tr>"
+                        f"<tr><td>Current value</td><td>${current_value:,.2f}</td></tr>"
+                        f"<tr><td>Loss</td><td>${initial_capital - current_value:,.2f} "
+                        f"({loss_pct*100:.1f}%)</td></tr>"
+                        f"</table>"
+                        f"<h3>Capital redistributed to:</h3><ul>"
+                        + "".join(redistribution_lines)
+                        + "</ul><p>No further trades will be placed for this strategy.</p>"
+                    ),
+                )
+            except Exception as _email_exc:
+                logger.warning("Failed to send strategy-freeze email: %s", _email_exc)
+
             return True
         return False
 
@@ -1856,6 +1895,43 @@ class MultiStrategyRunner:
                         self.cash_manager.release_cash(strategy.strategy_id, trade_value)
                         continue
 
+                    # Sector concentration check — uses per-position market values
+                    _prices = getattr(self, "_typical_prices", {})
+                    _open_positions = self.db.get_all_open_positions()
+                    _current_mvs = {
+                        p["symbol"]: float(p.get("shares", 0)) * _prices.get(p["symbol"], 0)
+                        for p in _open_positions
+                    }
+                    max_sector_pct = self.config.get("risk.max_sector_pct", 0.30)
+                    (
+                        _sector_allowed,
+                        _sector_reason,
+                    ) = self.portfolio_risk.check_sector_concentration(
+                        symbol=symbol,
+                        position_value=trade_value,
+                        current_positions=_current_mvs,
+                        portfolio_value=portfolio_value,
+                        sector_map=_SECTOR_MAP,
+                        max_sector_pct=max_sector_pct,
+                        strategy_name=strategy.name,
+                    )
+                    if not _sector_allowed:
+                        logger.warning(
+                            f"Skipping BUY {symbol} ({strategy.name}) - {_sector_reason}"
+                        )
+                        self.rejected_signals.append(
+                            {
+                                "strategy": strategy.name,
+                                "symbol": symbol,
+                                "action": action,
+                                "shares": adjusted_shares,
+                                "price": price,
+                                "reason": "sector_concentration",
+                            }
+                        )
+                        self.cash_manager.release_cash(strategy.strategy_id, trade_value)
+                        continue
+
                     # Create order intent (idempotency)
                     intent_id = self.db.create_order_intent(
                         strategy.strategy_id, symbol, "BUY", adjusted_shares
@@ -2056,6 +2132,27 @@ class MultiStrategyRunner:
                         None,  # pnl is None for open positions; set on SELL
                     )
 
+                    # Fill quality: record deviation between signal price and actual fill
+                    if price > 0 and actual_fill_price > 0:
+                        deviation_bps = int(round((actual_fill_price / price - 1) * 10000))
+                        self.db.log_fill_quality(
+                            strategy_id=strategy.strategy_id,
+                            symbol=symbol,
+                            action="BUY",
+                            expected_price=price,
+                            fill_price=actual_fill_price,
+                            shares=actual_filled_qty,
+                            deviation_bps=deviation_bps,
+                        )
+                        if abs(deviation_bps) > 100:
+                            logger.warning(
+                                "Poor fill quality: %s BUY expected $%.2f got $%.2f (%+d bps)",
+                                symbol,
+                                price,
+                                actual_fill_price,
+                                deviation_bps,
+                            )
+
                 except Exception as e:
                     logger.error(f"Failed to execute {symbol}: {e}")
                     print(f"  ❌ Failed {symbol}: {e}")
@@ -2203,6 +2300,27 @@ class MultiStrategyRunner:
                         str(order.id),
                         pnl,
                     )
+
+                    # Fill quality: record deviation between signal price and actual fill
+                    if price > 0 and actual_fill_price > 0:
+                        deviation_bps = int(round((actual_fill_price / price - 1) * 10000))
+                        self.db.log_fill_quality(
+                            strategy_id=strategy.strategy_id,
+                            symbol=symbol,
+                            action="SELL",
+                            expected_price=price,
+                            fill_price=actual_fill_price,
+                            shares=actual_filled_qty,
+                            deviation_bps=deviation_bps,
+                        )
+                        if abs(deviation_bps) > 100:
+                            logger.warning(
+                                "Poor fill quality: %s SELL expected $%.2f got $%.2f (%+d bps)",
+                                symbol,
+                                price,
+                                actual_fill_price,
+                                deviation_bps,
+                            )
 
                     # CRITICAL FIX: Update strategy positions with actual filled quantities
                     entry_price_for_pnl = getattr(strategy, "entry_prices", {}).get(symbol)
@@ -2427,9 +2545,10 @@ class MultiStrategyRunner:
             else:
                 performance_data[strategy.strategy_id] = []
 
+        config_key_map = {s.name.lower().replace(" ", "_"): s.strategy_id for s in strategies}
+
         # Build per-strategy max allocation from config overrides
         raw_overrides = self.config.get("strategies.allocation_overrides", {}) or {}
-        config_key_map = {s.name.lower().replace(" ", "_"): s.strategy_id for s in strategies}
         per_strategy_max: dict[int, float] = {}
         for config_key, max_pct in raw_overrides.items():
             sid = config_key_map.get(config_key)
@@ -2437,9 +2556,20 @@ class MultiStrategyRunner:
                 per_strategy_max[sid] = float(max_pct)
                 logger.info(f"Allocation cap override: {config_key} → {max_pct*100:.0f}%")
 
+        # Build prior Sharpes from backtest results — used when live history < 20 days
+        raw_priors = self.config.get("strategies.backtest_sharpe_priors", {}) or {}
+        prior_sharpes: dict[int, float] = {}
+        for config_key, sharpe in raw_priors.items():
+            sid = config_key_map.get(config_key)
+            if sid is not None:
+                prior_sharpes[sid] = float(sharpe)
+
         strategy_ids = [strategy.strategy_id for strategy in strategies]
         return self.dynamic_allocator.calculate_allocations(
-            strategy_ids, performance_data, per_strategy_max=per_strategy_max
+            strategy_ids,
+            performance_data,
+            per_strategy_max=per_strategy_max,
+            prior_sharpes=prior_sharpes,
         )
 
     def _calculate_strategy_exposures(self, strategies, current_prices):
