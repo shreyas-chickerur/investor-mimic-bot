@@ -256,6 +256,10 @@ class MultiStrategyRunner:
         # Set daily start value for risk management
         self.portfolio_risk.set_daily_start_value(self.portfolio_value)
 
+        # PDT guardrail tracking
+        self._day_trades_today: list = []
+        self._day_trade_count: int = 0
+
         # Track errors and executed trades for email reporting
         self.errors = []
         self.executed_trades = []
@@ -1335,6 +1339,19 @@ class MultiStrategyRunner:
                         self.funnel_tracker.record_after_regime(strategy.strategy_id, 0)
                         continue
 
+                    if self._check_strategy_loss_limit(strategy, strategies):
+                        logger.warning(
+                            "Skipping %s signal generation — strategy loss limit triggered",
+                            strategy.name,
+                        )
+                        self.funnel_tracker.record_raw_signals(strategy.strategy_id, 0)
+                        self.funnel_tracker.record_after_regime(strategy.strategy_id, 0)
+                        self.funnel_tracker.record_after_correlation(strategy.strategy_id, 0)
+                        self.funnel_tracker.record_after_risk(strategy.strategy_id, 0)
+                        self.funnel_tracker.record_executed(strategy.strategy_id, 0)
+                        self.funnel_tracker.save_to_database(strategy.strategy_id, strategy.name)
+                        continue
+
                     # Generate signals (reuse ML pre-scan cache to avoid double-training)
                     logger.info(
                         f"  Calling {strategy.name}.generate_signals() with {len(market_data)} rows, {market_data['symbol'].nunique()} symbols"
@@ -1506,6 +1523,23 @@ class MultiStrategyRunner:
                     print(f"❌ Error: {e}")
                     self.errors.append(f"{strategy.name}: {e}")
 
+            # Signal crowding detection: warn if 2+ strategies want the same symbol
+
+            buy_symbol_sources: dict = {}
+            for strat_name, strat_signals in self.raw_signals_by_strategy.items():
+                for sig in strat_signals or []:
+                    if sig.get("action", "").upper() == "BUY":
+                        sym = sig.get("symbol")
+                        if sym:
+                            buy_symbol_sources.setdefault(sym, []).append(strat_name)
+            for sym, sources in buy_symbol_sources.items():
+                if len(sources) >= 2:
+                    logger.warning(
+                        "Crowding detected: %s wanted by %s — signals may reflect same factor, not independent edge",
+                        sym,
+                        " + ".join(sources),
+                    )
+
             # Generate artifacts after all strategies complete
             logger.info("=" * 80)
             logger.info("GENERATING ARTIFACTS")
@@ -1559,6 +1593,59 @@ class MultiStrategyRunner:
                 reconciliation_status=self.reconciliation_status,
                 discrepancies=self.reconciliation_discrepancies,
             )
+
+    def _check_strategy_loss_limit(self, strategy, strategies) -> bool:
+        """Return True (halted) if strategy has lost more than max_strategy_loss_pct of its initial capital."""
+        max_loss = self.config.get("risk.max_strategy_loss_pct", 0.20)
+        all_strategies_db = {s["name"]: s for s in self.db.get_all_strategies()}
+        db_entry = all_strategies_db.get(strategy.name, {})
+        initial_capital = float(
+            db_entry.get("capital_allocation", strategy.capital) or strategy.capital
+        )
+        if initial_capital <= 0:
+            return False
+
+        current_prices = {}
+        try:
+            import pandas as pd
+
+            data_file = project_root / "data" / "training_data.csv"
+            if data_file.exists():
+                _df = pd.read_csv(data_file, index_col=0)
+                current_prices = (
+                    _df.groupby("symbol")["close"].last().dropna().astype(float).to_dict()
+                )
+        except Exception:
+            pass
+
+        positions_value = sum(
+            shares * current_prices.get(sym, 0) for sym, shares in strategy.positions.items()
+        )
+        current_value = strategy.capital + positions_value
+        loss_pct = (initial_capital - current_value) / initial_capital
+
+        if loss_pct > max_loss:
+            logger.critical(
+                "STRATEGY LOSS LIMIT: %s has lost %.1f%% (limit %.0f%%) — freezing strategy",
+                strategy.name,
+                loss_pct * 100,
+                max_loss * 100,
+            )
+            frozen_capital = strategy.capital
+            active_others = [s for s in strategies if s is not strategy]
+            if active_others and frozen_capital > 0:
+                share = frozen_capital / len(active_others)
+                for other in active_others:
+                    other.capital += share
+                    logger.info(
+                        "Redistributed $%.2f from frozen strategy %s to %s",
+                        share,
+                        strategy.name,
+                        other.name,
+                    )
+                strategy.capital = 0.0
+            return True
+        return False
 
     def _execute_strategy_trades(self, strategy, signals, total_exposure, portfolio_value):
         """Execute trades for a specific strategy"""
@@ -2074,6 +2161,16 @@ class MultiStrategyRunner:
                         f"  ✅ SELL {actual_filled_qty} {symbol} @ ${actual_fill_price:.2f} (Order: {order.id})"
                     )
                     self.symbols_sold_this_run.add(symbol)
+
+                    # PDT guardrail: track day trades (buy and sell same symbol same day)
+                    if symbol in self.symbols_bought_this_run:
+                        self._day_trades_today.append(symbol)
+                        self._day_trade_count = len(set(self._day_trades_today))
+                        if self._day_trade_count >= 3:
+                            logger.warning(
+                                "PDT WARNING: 3 day trades reached — next day trade would trigger "
+                                "PDT restriction on accounts under $25k"
+                            )
 
                     # Release cash back with actual filled quantities
                     trade_value = actual_fill_price * actual_filled_qty - total_cost

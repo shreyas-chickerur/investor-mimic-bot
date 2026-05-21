@@ -710,6 +710,22 @@ jobs:
           </div>
           </body></html>
 
+    - name: Ping dead-man's switch
+      if: always()
+      continue-on-error: true
+      run: |
+        # Ping healthchecks.io so external monitoring knows the run completed.
+        # Set HEALTHCHECKS_URL secret to your healthchecks.io check URL.
+        # If the secret is absent, this is a no-op (continue-on-error: true handles it).
+        if [ -n "${{ secrets.HEALTHCHECKS_URL }}" ]; then
+          STATUS="0"
+          if [ "${{ job.status }}" != "success" ]; then STATUS="1"; fi
+          curl -fsS --retry 3 --max-time 10 \
+            "${{ secrets.HEALTHCHECKS_URL }}/$STATUS" > /dev/null 2>&1 || true
+        else
+          echo "HEALTHCHECKS_URL not set — skipping dead-man's switch ping"
+        fi
+
     - name: Send failure notification
       if: failure() && steps.check_status.outputs.status != 'MARKET_CLOSED'
       uses: dawidd6/action-send-mail@v3
