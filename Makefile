@@ -222,7 +222,9 @@ metrics:
 
 email-test:
 	@echo "$(BLUE)📧 Generating email preview...$(NC)"
-	@python3 scripts/generate_daily_email.py
+	$(if $(STATE), \
+		python3 scripts/generate_daily_email.py --mock-state $(STATE), \
+		python3 scripts/generate_daily_email.py)
 	@open /tmp/daily_email.html 2>/dev/null || xdg-open /tmp/daily_email.html 2>/dev/null || echo "Email HTML at /tmp/daily_email.html"
 	@echo "$(GREEN)✅ Email preview ready$(NC)"
 
