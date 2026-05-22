@@ -1684,6 +1684,36 @@ class TradingDatabase:
 
         return None
 
+    def find_active_order_intent_for_today(
+        self, strategy_id: int, symbol: str, side: str
+    ) -> Optional[dict]:
+        """Return the most recent active (SUBMITTED/ACKED/FILLED) intent for this
+        (strategy_id, symbol, side) pair created today, regardless of run_id.
+
+        This is the true idempotency gate: a second run on the same calendar day
+        will find the first run's intent and skip re-submitting the order.
+        """
+        today = datetime.now().strftime("%Y-%m-%d")
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT * FROM order_intents
+            WHERE strategy_id = ?
+              AND symbol = ?
+              AND side = ?
+              AND status IN ('SUBMITTED', 'ACKED', 'FILLED')
+              AND created_at >= ?
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (strategy_id, symbol, side, today),
+        )
+        row = cursor.fetchone()
+        conn.close()
+        return dict(row) if row else None
+
     def count_duplicate_order_intents(self, hours: int = 24) -> int:
         """
         Count duplicate order intents in the last N hours.
