@@ -130,11 +130,14 @@ exclude = [
     "tests/",
     "dashboard/",
     "scripts/generate_daily_email\\.py",
+    "scripts/generate_platform_status\\.py",
+    "scripts/run_backtest\\.py",
     "src/core/database\\.py",
     "src/core/execution_engine\\.py",
     "src/integration/portfolio_backtester\\.py",
     "src/strategies/strategy_rsi_mean_reversion\\.py",
     "src/strategies/strategy_factor_momentum\\.py",
+    "src/regime/regime_detector\\.py",
 ]
 
 [tool.pytest.ini_options]

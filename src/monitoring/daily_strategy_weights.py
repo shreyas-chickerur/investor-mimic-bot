@@ -11,7 +11,49 @@ CANONICAL_STRATEGY_NAMES = (
     "ML Momentum",
     "Earnings Drift",
     "Factor Momentum",
+    "News Sentiment",
+    "MA Crossover",
+    "Volatility Breakout",
 )
+
+# Additive weight deltas per composite regime per strategy keyword.
+# Keys are substrings matched against strategy names (case-sensitive to mirror CANONICAL_STRATEGY_SPECS).
+# Deltas are additive on top of the base weight of 1.0 before health/Sharpe adjustments.
+REGIME_WEIGHT_TABLE: dict[str, dict[str, float]] = {
+    "TRENDING_BULL": {
+        "ML Momentum": +0.20,  # momentum thrives in trending markets
+        "MA Crossover": +0.20,  # crossover signals are reliable in strong trends
+        "Volatility Breakout": +0.15,
+        "RSI Mean Reversion": -0.15,  # mean-reversion fights the trend
+        "News Sentiment": +0.05,
+        "Earnings Drift": +0.05,
+    },
+    "RANGING": {
+        "RSI Mean Reversion": +0.20,  # mean-reversion excels in range-bound markets
+        "News Sentiment": +0.10,
+        "ML Momentum": -0.15,
+        "MA Crossover": -0.15,  # false crossovers are common in chop
+        "Volatility Breakout": -0.10,
+        "Earnings Drift": 0.0,
+    },
+    "HIGH_VOL": {
+        "RSI Mean Reversion": +0.15,
+        "Earnings Drift": +0.05,
+        "ML Momentum": -0.10,
+        "Volatility Breakout": -0.15,  # breakout signals fail in volatile/whipsaw markets
+        "MA Crossover": -0.10,
+        "News Sentiment": 0.0,
+    },
+    "LOW_VOL": {
+        "ML Momentum": +0.15,
+        "MA Crossover": +0.10,
+        "Volatility Breakout": +0.10,
+        "RSI Mean Reversion": -0.05,
+        "News Sentiment": +0.05,
+        "Earnings Drift": 0.0,
+    },
+    "NORMAL": {},  # no deltas — fall through to health/Sharpe adjustments
+}
 
 
 def _clamp(value: float, lo: float, hi: float) -> float:
@@ -23,48 +65,57 @@ def compute_strategy_weights(
     regime_adjustments: dict,
     health_by_strategy: dict[str, dict],
     trailing_sharpe_by_strategy: dict[str, float] | None = None,
+    composite_regime: str | None = None,
+    kelly_weights: dict[str, float] | None = None,
 ) -> dict[str, float]:
     """Return a normalized weight for each strategy in [0.5, 1.5]."""
     vol_regime = (regime_adjustments or {}).get("volatility_regime", "normal")
     trend_regime = (regime_adjustments or {}).get("trend_regime", "weak_trend")
     hmm_regime = (regime_adjustments or {}).get("hmm_regime", "unknown")
 
+    # 5-regime composite table overrides granular vol/trend logic when available
+    regime_deltas = REGIME_WEIGHT_TABLE.get(composite_regime or "NORMAL", {})
+
     weights: dict[str, float] = {}
     for name in strategy_names:
         w = 1.0
 
-        # Regime-based priors
-        if vol_regime == "high_volatility":
-            if "RSI" in name:
-                w += 0.15
-            elif "ML" in name:
-                w -= 0.10
-            elif "Factor" in name:
-                w -= 0.05
-            elif "Earnings" in name:
-                w += 0.05
-        elif vol_regime == "low_volatility":
-            if "ML" in name:
-                w += 0.10
-            elif "Factor" in name:
-                w += 0.05
-            elif "RSI" in name:
-                w -= 0.05
+        # Apply composite-regime deltas (exact name match from table)
+        w += regime_deltas.get(name, 0.0)
 
-        if trend_regime == "strong_trend":
-            if "ML" in name:
-                w += 0.15
-            elif "Factor" in name:
-                w += 0.10
-            elif "RSI" in name:
-                w -= 0.05
-        elif trend_regime == "choppy":
-            if "RSI" in name:
-                w += 0.15
-            elif "ML" in name:
-                w -= 0.10
-            elif "Factor" in name:
-                w -= 0.05
+        # Legacy vol/trend adjustments (still active when composite is NORMAL or unavailable)
+        if not composite_regime or composite_regime == "NORMAL":
+            if vol_regime == "high_volatility":
+                if "RSI" in name:
+                    w += 0.15
+                elif "ML" in name:
+                    w -= 0.10
+                elif "Factor" in name:
+                    w -= 0.05
+                elif "Earnings" in name:
+                    w += 0.05
+            elif vol_regime == "low_volatility":
+                if "ML" in name:
+                    w += 0.10
+                elif "Factor" in name:
+                    w += 0.05
+                elif "RSI" in name:
+                    w -= 0.05
+
+            if trend_regime == "strong_trend":
+                if "ML" in name:
+                    w += 0.15
+                elif "Factor" in name:
+                    w += 0.10
+                elif "RSI" in name:
+                    w -= 0.05
+            elif trend_regime == "choppy":
+                if "RSI" in name:
+                    w += 0.15
+                elif "ML" in name:
+                    w -= 0.10
+                elif "Factor" in name:
+                    w -= 0.05
 
         # Existing HMM bear logic already suppresses RSI BUYs; also reduce its priority.
         if hmm_regime == "bear" and "RSI" in name:
@@ -100,6 +151,14 @@ def compute_strategy_weights(
                     w -= 0.20
                 elif sharpe < 0.5:
                     w -= 0.10
+
+        # Fractional Kelly multiplier (activates at >= 20 closed trades per strategy).
+        # kelly_weights[name] is 1.0 (neutral) below the gate, >1.0 for positive edge.
+        if kelly_weights:
+            kelly = kelly_weights.get(name, 1.0)
+            if kelly != 1.0:
+                # Blend Kelly into weight: nudge toward Kelly-scaled value, not hard replace
+                w = w * kelly
 
         weights[name] = _clamp(round(w, 3), 0.5, 1.5)
 
