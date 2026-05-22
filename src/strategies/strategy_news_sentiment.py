@@ -107,7 +107,7 @@ class NewsSentimentStrategy(TradingStrategy):
             return signals
 
         market_uptrend = self._spy_above_sma50(market_data)
-        sym_map = dict(market_data.groupby("symbol"))
+        sym_map = {sym: grp for sym, grp in market_data.groupby("symbol")}
 
         # Import benchmark set to exclude ETFs from screening
         try:
