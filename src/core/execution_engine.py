@@ -2624,13 +2624,40 @@ class MultiStrategyRunner:
         )
 
     def _calculate_strategy_exposures(self, strategies, current_prices):
-        """Calculate current exposure per strategy"""
+        """Calculate current exposure per strategy, including BROKER_SYNC."""
         exposures = {}
         for strategy in strategies:
             exposure = 0.0
             for symbol, shares in strategy.positions.items():
                 exposure += shares * current_prices.get(symbol, 0)
             exposures[strategy.strategy_id] = exposure
+
+        # Include BROKER_SYNC positions so they count toward portfolio heat.
+        # BROKER_SYNC is not a canonical strategy object, so it never appears
+        # in the loop above — without this, its $85k of positions is invisible
+        # to the heat limit and the system can over-deploy capital.
+        try:
+            import sqlite3 as _sqlite3
+
+            _conn = _sqlite3.connect(self.db.db_path)
+            _cur = _conn.cursor()
+            _cur.execute(
+                """
+                SELECT p.symbol, p.shares
+                FROM positions p
+                JOIN strategies s ON p.strategy_id = s.id
+                WHERE s.name = 'BROKER_SYNC' AND p.shares > 0
+                """
+            )
+            bs_rows = _cur.fetchall()
+            _conn.close()
+            bs_exposure = sum(shares * current_prices.get(sym, 0) for sym, shares in bs_rows)
+            if bs_exposure > 0:
+                exposures["BROKER_SYNC"] = bs_exposure
+                logger.info("BROKER_SYNC exposure included in heat: $%.0f", bs_exposure)
+        except Exception as _exc:
+            logger.warning("Could not compute BROKER_SYNC exposure: %s", _exc)
+
         return exposures
 
     def _apply_allocations(self, strategies, allocations, exposures):
