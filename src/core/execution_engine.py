@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Multi-Strategy Trading System - Main Execution
-Runs all 4 canonical strategies independently with separate tracking
+Runs all strategies independently with separate tracking per strategy
 """
 from __future__ import annotations
 
@@ -654,8 +654,7 @@ class MultiStrategyRunner:
             strategy.entry_dates = {}
 
     def _create_strategy_instance(self, strategy_id, name, capital):
-        """Create strategy instance for one of the 4 canonical strategies.
-        Returns None for any other name so callers can skip gracefully."""
+        """Create strategy instance by name; returns None for unknown names."""
         strategy_map = {
             "RSI Mean Reversion": RSIMeanReversionStrategy,
             "ML Momentum": MLMomentumStrategy,
@@ -1951,7 +1950,7 @@ class MultiStrategyRunner:
                     strategy_mult = float(signal.get("strategy_weight", 1.0))
                     # Confidence-scaled sizing: linear interpolation
                     # conf=0.55→0.75x, conf=0.90→1.25x (allows high-conviction oversize)
-                    _conf = max(0.55, min(1.0, float(signal.get("confidence", 0.70))))
+                    _conf = max(0.55, min(0.90, float(signal.get("confidence", 0.70))))
                     _t = (_conf - 0.55) / (0.90 - 0.55)
                     conviction_mult = round(0.75 + _t * (1.25 - 0.75), 3)
                     combined_mult = size_mult * drawdown_mult * strategy_mult * conviction_mult

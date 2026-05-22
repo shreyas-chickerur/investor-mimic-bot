@@ -1,7 +1,12 @@
 name: Sync Database with Broker
 
 on:
-  workflow_dispatch:  # Manual trigger only
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Why is this sync being triggered?'
+        required: false
+        default: 'Manual sync'
 
 env:
   PYTHON_VERSION: "3.8"
@@ -9,30 +14,31 @@ env:
 jobs:
   sync-database:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PYTHON_VERSION }}
-    
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-    
+
     - name: Download previous database
       continue-on-error: true
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
         echo "=== Downloading latest trading-database artifact ==="
+        echo "Reason: ${{ github.event.inputs.reason }}"
         ARTIFACT_ID=$(gh api repos/${{ github.repository }}/actions/artifacts \
           --jq '.artifacts | map(select(.name == "trading-database" and .expired == false)) | sort_by(.created_at) | reverse | .[0].id // empty')
-        
+
         if [ -n "$ARTIFACT_ID" ]; then
           echo "Found artifact ID: $ARTIFACT_ID"
           gh api repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip > trading-db.zip
@@ -43,11 +49,11 @@ jobs:
         else
           echo "⚠️ No trading-database artifact found — will initialize fresh"
         fi
-    
+
     - name: Initialize database if needed
       run: |
         python scripts/setup_database.py --db trading.db
-    
+
     - name: Sync broker state to database
       env:
         ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
@@ -57,7 +63,43 @@ jobs:
         echo "🔄 Syncing database with broker state..."
         python scripts/sync_broker_state.py
         echo "✅ Database synced successfully"
-    
+
+    - name: Verify reconciliation after sync
+      id: verify
+      env:
+        ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+        ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+        ALPACA_PAPER: true
+      continue-on-error: true
+      run: |
+        echo "=== Verifying reconciliation ==="
+        python3 - <<'PY'
+        import json, sys, sqlite3
+        from src.risk.broker_reconciler import BrokerReconciler
+        r = BrokerReconciler()
+        broker = r.get_broker_state()
+        con = sqlite3.connect('trading.db'); con.row_factory = sqlite3.Row
+        rows = con.execute(
+            "SELECT symbol, SUM(shares) qty FROM positions "
+            "WHERE shares > 0 GROUP BY symbol"
+        ).fetchall()
+        local = {r['symbol']: {'qty': float(r['qty']), 'avg_price': 0.0} for r in rows}
+        ok, disc = r.reconcile_daily(local, float(broker.get('cash', 0)))
+        print(json.dumps({'ok': ok, 'discrepancies': disc}, indent=2))
+        sys.exit(0 if ok else 1)
+        PY
+        if [ $? -eq 0 ]; then
+          echo "verified=true" >> $GITHUB_OUTPUT
+          echo "✅ Reconciliation clean after sync"
+        else
+          echo "verified=false" >> $GITHUB_OUTPUT
+          echo "⚠️ Reconciliation still has discrepancies after sync"
+        fi
+
+    - name: WAL checkpoint
+      run: |
+        sqlite3 trading.db "PRAGMA wal_checkpoint(TRUNCATE);" || true
+
     - name: Upload synced database
       if: always()
       uses: actions/upload-artifact@v4
@@ -66,12 +108,18 @@ jobs:
         path: trading.db
         retention-days: 90
         overwrite: true
-    
+
     - name: Summary
       if: always()
       run: |
-        echo "## Database Sync Complete" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "✅ Database has been synced with broker state" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "The next daily trading run should pass reconciliation." >> $GITHUB_STEP_SUMMARY
+        VERIFIED="${{ steps.verify.outputs.verified }}"
+        REASON="${{ github.event.inputs.reason }}"
+        cat >> $GITHUB_STEP_SUMMARY << EOF
+        ## Database Sync — $(date +%Y-%m-%d)
+
+        **Reason:** ${REASON:-Manual sync}
+        **Post-sync reconciliation:** $([ "$VERIFIED" = "true" ] && echo "✅ Clean" || echo "⚠️ Discrepancies remain")
+
+        The updated database has been uploaded as the \`trading-database\` artifact.
+        The next daily trading run will download this synced state.
+        EOF
