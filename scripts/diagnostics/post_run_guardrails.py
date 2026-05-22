@@ -11,7 +11,10 @@ CANONICAL_STRATEGIES = [
     "RSI Mean Reversion",
     "ML Momentum",
     "Earnings Drift",
-    "Factor Momentum",
+    "News Sentiment",
+    "MA Crossover",
+    "Volatility Breakout",
+    # Factor Momentum intentionally excluded — disabled in config (no demonstrated edge)
 ]
 
 
