@@ -60,7 +60,7 @@ class MACrossoverStrategy(TradingStrategy):
             return signals
 
         market_uptrend = self._spy_above_sma50(market_data)
-        sym_map = dict(market_data.groupby("symbol"))
+        sym_map = {sym: grp for sym, grp in market_data.groupby("symbol")}
 
         for symbol, sym_data in sym_map.items():
             if len(sym_data) < self.long_window + 2:
