@@ -107,10 +107,14 @@ ignore = [
 # Pre-existing violations in large files — suppressed to avoid scope creep in unrelated PRs
 "src/core/database.py" = ["UP007", "F811"]
 "src/core/execution_engine.py" = ["E402", "E722", "F841"]
+"scripts/generate_daily_email.py" = ["F841"]
 "src/strategies/strategy_factor_momentum.py" = ["E402"]
 "src/strategies/strategy_rsi_mean_reversion.py" = ["E402"]
 "src/strategies/strategy_ml_momentum.py" = ["E402"]
 "src/strategies/strategy_earnings_drift.py" = ["E402"]
+"src/strategies/strategy_ma_crossover.py" = ["E402"]
+"src/strategies/strategy_news_sentiment.py" = ["E402"]
+"src/strategies/strategy_volatility_breakout.py" = ["E402"]
 "src/integration/portfolio_backtester.py" = ["E402"]
 "scripts/*.py" = ["E402"]
 "tests/*.py" = ["E402"]
@@ -125,11 +129,12 @@ ignore_missing_imports = true
 exclude = [
     "tests/",
     "dashboard/",
-    "src/core/database.py",
-    "src/core/execution_engine.py",
-    "src/integration/portfolio_backtester.py",
-    "src/strategies/strategy_rsi_mean_reversion.py",
-    "src/strategies/strategy_factor_momentum.py",
+    "scripts/generate_daily_email\\.py",
+    "src/core/database\\.py",
+    "src/core/execution_engine\\.py",
+    "src/integration/portfolio_backtester\\.py",
+    "src/strategies/strategy_rsi_mean_reversion\\.py",
+    "src/strategies/strategy_factor_momentum\\.py",
 ]
 
 [tool.pytest.ini_options]

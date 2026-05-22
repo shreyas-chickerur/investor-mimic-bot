@@ -135,13 +135,54 @@ jobs:
           python3 scripts/fetch_historical_data.py
         fi
 
+    - name: Download previous earnings calendar (if exists)
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        echo "=== Downloading earnings calendar artifact ==="
+        ARTIFACT_ID=$(gh api repos/${{ github.repository }}/actions/artifacts \
+          --jq '.artifacts | map(select(.name == "earnings-calendar" and .expired == false)) | sort_by(.created_at) | reverse | .[0].id // empty')
+        if [ -n "$ARTIFACT_ID" ]; then
+          gh api repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip > earnings-cal.zip
+          unzip -o earnings-cal.zip -d data/
+          rm -f earnings-cal.zip
+          echo "✅ Restored earnings calendar from artifact"
+        else
+          echo "⚠️ No earnings calendar artifact found — will fetch fresh"
+        fi
+
+    - name: Download ML model (if exists)
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        echo "=== Downloading ML model artifact ==="
+        ARTIFACT_ID=$(gh api repos/${{ github.repository }}/actions/artifacts \
+          --jq '.artifacts | map(select(.name == "ml-model" and .expired == false)) | sort_by(.created_at) | reverse | .[0].id // empty')
+        if [ -n "$ARTIFACT_ID" ]; then
+          gh api repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip > ml-model.zip
+          unzip -o ml-model.zip -d data/
+          rm -f ml-model.zip
+          echo "✅ Restored ML model from artifact"
+          ls -lh data/ml_model.pkl
+        else
+          echo "⚠️ No ML model artifact found — will train fresh"
+        fi
+
     - name: Update market data
       continue-on-error: true
       env:
         ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
       run: |
         echo "=== Fetching Latest Market Data ==="
-        python3 scripts/update_daily_data.py || echo "⚠️  Market data update failed — pre-flight will enforce staleness threshold"
+        for attempt in 1 2 3; do
+          echo "Attempt $attempt/3..."
+          python3 scripts/update_daily_data.py && break
+          if [ "$attempt" -lt 3 ]; then
+            sleep $((attempt * 20))
+          fi
+        done || echo "⚠️  Market data update failed after 3 attempts — pre-flight will enforce staleness threshold"
 
     - name: Update earnings calendar
       continue-on-error: true
@@ -150,6 +191,26 @@ jobs:
       run: |
         echo "=== Updating Earnings Calendar ==="
         python3 scripts/update_earnings_calendar.py || echo "Earnings calendar update skipped (API key missing or AV error)"
+
+    - name: Upload earnings calendar
+      if: always()
+      continue-on-error: true
+      uses: actions/upload-artifact@v4
+      with:
+        name: earnings-calendar
+        path: data/earnings_calendar.csv
+        retention-days: 90
+        overwrite: true
+
+    - name: Upload ML model
+      if: always()
+      continue-on-error: true
+      uses: actions/upload-artifact@v4
+      with:
+        name: ml-model
+        path: data/ml_model.pkl
+        retention-days: 14
+        overwrite: true
 
     - name: Update fundamental data (weekly, Mondays only)
       continue-on-error: true
@@ -180,7 +241,7 @@ jobs:
         ALPACA_LIVE_ENABLED: 'false'
         DRY_RUN: 'false'
         ENABLE_BROKER_RECONCILIATION: 'true'
-        DATA_MAX_AGE_HOURS: '288'
+        DATA_MAX_AGE_HOURS: '48'
         TRADING_DISABLED: 'false'
       run: |
         chmod +x scripts/run_trading.sh
@@ -458,6 +519,12 @@ jobs:
         # heuristic summary built from headlines + position context.
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         NEWS_SUMMARY_MODEL: gpt-4o-mini
+        # Workflow health context for the system health card in the email
+        RECON_STATUS: ${{ steps.check_reconciliation.outputs.status }}
+        AUTO_SYNC_OK: ${{ steps.auto_sync.outputs.sync_ok }}
+        DRIFT_RESOLVED: ${{ steps.verify_sync.outputs.resolved }}
+        DRIFT_REMAINING: ${{ steps.verify_sync.outputs.remaining }}
+        RUN_NUMBER: ${{ github.run_number }}
       run: |
         # Check if today is Mon/Wed/Fri for visual reports
         DAY_OF_WEEK=$(date +%u)  # 1=Mon, 3=Wed, 5=Fri

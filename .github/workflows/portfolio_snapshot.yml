@@ -1,0 +1,63 @@
+name: Daily Portfolio Snapshot
+
+on:
+  schedule:
+    # 1:05 AM UTC = 9:05 PM ET — after US market close, every day including weekends
+    - cron: '5 1 * * *'
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Download previous database
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        ARTIFACT_ID=$(gh api repos/${{ github.repository }}/actions/artifacts \
+          --jq '.artifacts | map(select(.name == "trading-database" and .expired == false)) | sort_by(.created_at) | reverse | .[0].id // empty')
+        if [ -n "$ARTIFACT_ID" ]; then
+          gh api repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip > trading-db.zip
+          unzip -o trading-db.zip
+          rm -f trading-db.zip
+          echo "✅ Downloaded trading.db"
+        else
+          echo "⚠️ No trading-database artifact — initializing fresh"
+          python scripts/setup_database.py --db trading.db
+        fi
+
+    - name: Record portfolio snapshot
+      env:
+        ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+        ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+        ALPACA_PAPER: ${{ secrets.ALPACA_PAPER }}
+        DB_PATH: trading.db
+      run: |
+        python scripts/record_portfolio_snapshot.py
+
+    - name: Upload updated database
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: trading-database
+        path: trading.db
+        retention-days: 90
+        overwrite: true

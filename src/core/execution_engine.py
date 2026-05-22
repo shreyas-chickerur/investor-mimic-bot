@@ -48,8 +48,11 @@ from src.risk.drawdown_stop_manager import DrawdownStopManager
 from src.risk.portfolio_risk_manager import PortfolioRiskManager
 from src.strategies.strategy_earnings_drift import EarningsDriftStrategy
 from src.strategies.strategy_factor_momentum import _SECTOR_MAP, FactorMomentumStrategy
+from src.strategies.strategy_ma_crossover import MACrossoverStrategy
 from src.strategies.strategy_ml_momentum import MLMomentumStrategy
+from src.strategies.strategy_news_sentiment import NewsSentimentStrategy
 from src.strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
+from src.strategies.strategy_volatility_breakout import VolatilityBreakoutStrategy
 from src.utils.config_loader import get_config
 
 # Import new modules for professional-grade system
@@ -90,11 +93,26 @@ CANONICAL_STRATEGY_SPECS = [
         "Cross-sectional factor ranking: momentum+quality+reversion",
         FactorMomentumStrategy,
     ),
+    (
+        "News Sentiment",
+        "Buy on positive news sentiment score (Google News RSS + VADER), exit when sentiment sours",
+        NewsSentimentStrategy,
+    ),
+    (
+        "MA Crossover",
+        "Golden/death cross on SMA-20/50 with ADX trend filter and volume confirmation",
+        MACrossoverStrategy,
+    ),
+    (
+        "Volatility Breakout",
+        "Bollinger Band upper breakout with 1.5x volume surge confirmation",
+        VolatilityBreakoutStrategy,
+    ),
 ]
 
 
 class MultiStrategyRunner:
-    """Runs all 4 canonical strategies with independent tracking"""
+    """Runs all 7 canonical strategies with independent tracking"""
 
     def __init__(self):
         # Load configuration
@@ -456,7 +474,13 @@ class MultiStrategyRunner:
         }
 
     def verify_order_statuses(self):
-        """Verify order status with Alpaca and track confirmed fills."""
+        """Verify order status with Alpaca and track confirmed fills.
+
+        For paper-mode OPG orders: the fill was optimistically recorded at submission
+        time (intent already marked FILLED).  We treat those as confirmed fills without
+        re-polling Alpaca, which would always return 'new' since OPG executes at the
+        next morning's open — hours after this method runs.
+        """
         self.confirmed_fills = []
         self.pending_orders = []
         self.rejected_orders = []
@@ -468,6 +492,14 @@ class MultiStrategyRunner:
             if not order_id:
                 self.pending_orders.append({**trade, "status": "UNKNOWN"})
                 continue
+
+            # If we already marked this intent FILLED optimistically (paper OPG path),
+            # trust that record rather than re-polling Alpaca and downgrading to ACKED.
+            if intent_id and self.paper_mode:
+                existing = self.db.get_order_intent_by_id(intent_id)
+                if existing and existing.get("status") == "FILLED":
+                    self.confirmed_fills.append(trade)
+                    continue
 
             try:
                 order = self.trading_client.get_order_by_id(order_id)
@@ -1458,7 +1490,9 @@ class MultiStrategyRunner:
                             signal["signal_id"] = signal_id
 
                         # FUNNEL STAGE 4: Risk/cash limits (tracked in _execute_strategy_trades)
-                        # Use strategy's own top_n if set (e.g. FactorMomentum=5), else 5
+                        # Sort: SELL signals always execute before BUYs so exits are never
+                        # throttled by the top_n cap when a strategy generates both actions.
+                        signals.sort(key=lambda s: 0 if s.get("action") == "SELL" else 1)
                         max_signals = getattr(strategy, "top_n", 5)
                         signals_to_execute = signals[:max_signals]
                         self.funnel_tracker.record_after_risk(
@@ -1500,8 +1534,16 @@ class MultiStrategyRunner:
                                         signal_id, "EXECUTED", "filled"
                                     )
                                 else:
+                                    # Use distinct reasons so auditing can tell
+                                    # cash/heat rejections apart from failed exits.
+                                    _action = signal.get("action", "BUY")
+                                    _reason = (
+                                        "exit_blocked"
+                                        if _action == "SELL"
+                                        else "risk_or_cash_limit"
+                                    )
                                     self.db.update_signal_terminal_state(
-                                        signal_id, "FILTERED", "risk_or_cash_limit"
+                                        signal_id, "FILTERED", _reason
                                     )
 
                         # Mark throttled signals as FILTERED
@@ -1932,23 +1974,27 @@ class MultiStrategyRunner:
                         self.cash_manager.release_cash(strategy.strategy_id, trade_value)
                         continue
 
-                    # Create order intent (idempotency)
-                    intent_id = self.db.create_order_intent(
-                        strategy.strategy_id, symbol, "BUY", adjusted_shares
+                    # True idempotency gate: check for an existing active intent
+                    # for this (strategy, symbol, side) today BEFORE creating a new one.
+                    # create_order_intent embeds run_id in the hash, so two runs on the
+                    # same day generate different intent_ids — the old check was circular.
+                    existing_today = self.db.find_active_order_intent_for_today(
+                        strategy.strategy_id, symbol, "BUY"
                     )
-
-                    # Check if already submitted
-                    existing_intent = self.db.get_order_intent_by_id(intent_id)
-                    if existing_intent and existing_intent["status"] in [
-                        "SUBMITTED",
-                        "ACKED",
-                        "FILLED",
-                    ]:
+                    if existing_today:
                         logger.warning(
-                            f"Order intent {intent_id} already {existing_intent['status']} - skipping"
+                            "Idempotency guard: %s BUY already %s today (intent %s) — skipping",
+                            symbol,
+                            existing_today["status"],
+                            existing_today["intent_id"],
                         )
                         self.cash_manager.release_cash(strategy.strategy_id, trade_value)
                         continue
+
+                    # Create order intent
+                    intent_id = self.db.create_order_intent(
+                        strategy.strategy_id, symbol, "BUY", adjusted_shares
+                    )
 
                     # Log order intent to structured logger
                     self.structured_logger.log_order_intent(
@@ -2038,19 +2084,26 @@ class MultiStrategyRunner:
                             )
                         else:
                             logger.info(
-                                f"Order {order.id} not filled yet: status={filled_order.status} (expected at market close)"
+                                f"Order {order.id} not filled yet: status={filled_order.status} (OPG fills at market open)"
                             )
-                            # For paper trading, assume immediate fill
+                            # OPG orders fill at next morning's open, not immediately.
+                            # In paper mode we treat the submission as a confirmed fill
+                            # and mark FILLED now so the intent lifecycle completes this run.
                             if self.paper_mode:
                                 fill_verified = True
-                                logger.info("Paper trading mode - assuming immediate fill")
+                                self.db.update_order_intent_status(
+                                    intent_id, "FILLED", broker_order_id=str(order.id)
+                                )
+                                logger.info("Paper mode: OPG order marked FILLED optimistically")
                     except Exception as e:
                         logger.warning(f"Could not verify fill for {order.id}: {e}")
-                        # For paper trading, assume fill succeeded
                         if self.paper_mode:
                             fill_verified = True
+                            self.db.update_order_intent_status(
+                                intent_id, "FILLED", broker_order_id=str(order.id)
+                            )
                             logger.info(
-                                "Paper trading mode - assuming fill despite verification error"
+                                "Paper mode: OPG order marked FILLED despite status-check error"
                             )
 
                     if not fill_verified:
@@ -2233,19 +2286,17 @@ class MultiStrategyRunner:
                             )
                         else:
                             logger.info(
-                                f"SELL Order {order.id} not filled yet: status={filled_order.status} (expected at market close)"
+                                f"SELL Order {order.id} not filled yet: status={filled_order.status} (OPG fills at market open)"
                             )
-                            # For paper trading, assume immediate fill
                             if self.paper_mode:
                                 fill_verified = True
-                                logger.info("Paper trading mode - assuming immediate SELL fill")
+                                logger.info("Paper mode: SELL OPG order assumed filled")
                     except Exception as e:
                         logger.warning(f"Could not verify SELL fill for {order.id}: {e}")
-                        # For paper trading, assume fill succeeded
                         if self.paper_mode:
                             fill_verified = True
                             logger.info(
-                                "Paper trading mode - assuming SELL fill despite verification error"
+                                "Paper mode: SELL OPG order assumed filled despite status-check error"
                             )
 
                     if not fill_verified:

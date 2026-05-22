@@ -16,6 +16,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import logging
+import pickle  # nosec B403
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
@@ -49,6 +51,9 @@ _FEATURE_NAMES = [
     "atr_pct",
     "adx",
 ]
+
+_MODEL_PATH = Path("data/ml_model.pkl")
+_MODEL_MAX_AGE_DAYS = 7
 
 
 class MLMomentumStrategy(TradingStrategy):
@@ -97,6 +102,56 @@ class MLMomentumStrategy(TradingStrategy):
         self.last_feature_importances: dict = {}
         self.last_oos_accuracy: float | None = None
         self.last_train_accuracy: float | None = None
+
+    # ------------------------------------------------------------------
+    # Model persistence
+    # ------------------------------------------------------------------
+    def _save_model(self) -> None:
+        try:
+            _MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
+            payload = {
+                "model": self.model,
+                "is_trained": self.is_trained,
+                "train_date": self._train_date,
+                "feature_importances": self.last_feature_importances,
+                "oos_accuracy": self.last_oos_accuracy,
+                "train_accuracy": self.last_train_accuracy,
+                "saved_at": datetime.utcnow().isoformat(),
+            }
+            with open(_MODEL_PATH, "wb") as f:
+                pickle.dump(payload, f)
+            logger.info("ML model saved to %s", _MODEL_PATH)
+        except Exception as exc:
+            logger.warning("ML model save failed: %s", exc)
+
+    def _load_model(self) -> bool:
+        """Return True if a fresh-enough saved model was loaded."""
+        if not _MODEL_PATH.exists():
+            return False
+        try:
+            age_days = (
+                datetime.utcnow() - datetime.utcfromtimestamp(_MODEL_PATH.stat().st_mtime)
+            ).days
+            if age_days > _MODEL_MAX_AGE_DAYS:
+                logger.info("ML model on disk is %d days old — will retrain", age_days)
+                return False
+            with open(_MODEL_PATH, "rb") as f:
+                payload = pickle.load(f)  # nosec B301
+            self.model = payload["model"]
+            self.is_trained = payload.get("is_trained", True)
+            self._train_date = payload.get("train_date", "")
+            self.last_feature_importances = payload.get("feature_importances", {})
+            self.last_oos_accuracy = payload.get("oos_accuracy")
+            self.last_train_accuracy = payload.get("train_accuracy")
+            logger.info(
+                "ML model loaded from disk (trained %s, OOS acc=%.1f%%)",
+                self._train_date,
+                self.last_oos_accuracy or 0,
+            )
+            return True
+        except Exception as exc:
+            logger.warning("ML model load failed: %s — will retrain", exc)
+            return False
 
     # ------------------------------------------------------------------
     # Feature extraction
@@ -239,6 +294,8 @@ class MLMomentumStrategy(TradingStrategy):
             use_precomputed,
             spy_available,
         )
+
+        self._save_model()
 
         if hasattr(self.model, "feature_importances_"):
             importances = self.model.feature_importances_
@@ -384,8 +441,10 @@ class MLMomentumStrategy(TradingStrategy):
         signals: list[dict] = []
         buy_candidates: list[dict] = []
 
-        # Retrain daily (model is cheap and data changes each day)
+        # Load persisted model on first call; retrain if stale or not trained
         today = str(market_data.index.max().date()) if len(market_data) > 0 else ""
+        if not self.is_trained:
+            self._load_model()
         if not self.is_trained or today != self._train_date:
             # Run walk-forward accuracy check before committing to new signals
             all_sym_rows = sum(
