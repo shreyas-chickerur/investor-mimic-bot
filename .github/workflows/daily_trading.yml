@@ -448,15 +448,31 @@ jobs:
         retention-days: 14
         overwrite: true
 
-    - name: Upload artifacts
+    - name: Generate platform status report
       if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: daily-artifacts-${{ github.run_number }}
-        path: |
-          artifacts/
-          logs/
-        retention-days: 90
+      continue-on-error: true
+      env:
+        RUN_NUMBER: ${{ github.run_number }}
+        DB_PATH: trading.db
+      run: |
+        echo "=== Platform Status Report ==="
+        python3 scripts/generate_platform_status.py
+
+    - name: Run per-strategy backtest (Mondays only)
+      if: always()
+      continue-on-error: true
+      run: |
+        DAY=$(date +%u)
+        if [ "$DAY" = "1" ]; then
+          echo "=== Per-Strategy Walk-Forward Backtest (Monday refresh) ==="
+          if [ -f data/training_data.csv ]; then
+            python3 scripts/run_backtest.py --per-strategy --years 3 || echo "Per-strategy backtest failed"
+          else
+            echo "⚠️ No training data available — skipping per-strategy backtest"
+          fi
+        else
+          echo "=== Skipping per-strategy backtest (runs Mondays only, today is day $DAY) ==="
+        fi
 
     - name: Generate strategy performance report
       if: always() && steps.check_execution.outputs.executed == 'true'
@@ -493,6 +509,16 @@ jobs:
         else
           echo "⚠️ trading.db not found; skipping DB snapshot"
         fi
+
+    - name: Upload artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: daily-artifacts-${{ github.run_number }}
+        path: |
+          artifacts/
+          logs/
+        retention-days: 90
 
     - name: Validate email inputs
       id: validate_email

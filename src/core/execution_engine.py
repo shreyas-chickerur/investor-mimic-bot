@@ -550,7 +550,20 @@ class MultiStrategyRunner:
         if disabled_names:
             logger.warning("Disabled strategies (config): %s", disabled_names)
 
-        capital_per_strategy = self.portfolio_value / max(len(active_specs), 1)
+        # Equal capital normalization: each active strategy gets an equal share of
+        # deployed_capital_pct * portfolio_value so strategies are directly comparable.
+        deployed_pct = self.config.get("strategies.deployed_capital_pct", 0.85)
+        deployed_capital = self.portfolio_value * deployed_pct
+        capital_per_strategy = deployed_capital / max(len(active_specs), 1)
+        logger.info(
+            "Capital normalization: portfolio=$%.2f deployed_pct=%.0f%% "
+            "deployed=$%.2f per_strategy=$%.2f (n=%d)",
+            self.portfolio_value,
+            deployed_pct * 100,
+            deployed_capital,
+            capital_per_strategy,
+            len(active_specs),
+        )
 
         # Build a name→id lookup from whatever is already in the DB
         existing_by_name = {s["name"]: s for s in self.db.get_all_strategies()}
@@ -563,7 +576,11 @@ class MultiStrategyRunner:
         for name, desc, strategy_class in active_specs:
             if name in existing_by_name:
                 strategy_id = existing_by_name[name]["id"]
-                logger.info(f"  Loaded existing: {name} (ID: {strategy_id})")
+                # Normalize capital allocation each run so all strategies stay equal
+                self.db.update_strategy_capital_allocation(strategy_id, capital_per_strategy)
+                logger.info(
+                    f"  Loaded existing: {name} (ID: {strategy_id}, Capital updated: ${capital_per_strategy:.2f})"
+                )
             else:
                 strategy_id = self.db.create_strategy(name, desc, capital_per_strategy)
                 logger.info(
@@ -694,6 +711,49 @@ class MultiStrategyRunner:
             except Exception as exc:
                 logger.debug("Trailing Sharpe unavailable for %s: %s", strategy.name, exc)
         return sharpe_by_strategy
+
+    def _compute_kelly_weights(
+        self, strategies, min_trades: int = 20, fraction: float = 0.25
+    ) -> dict[str, float]:
+        """Compute fractional Kelly multipliers per strategy.
+
+        f* = p - (1-p)/b  where b = avg_win / avg_loss (in % terms)
+        Applied at `fraction` x Kelly (default 0.25x = quarter-Kelly) to cap volatility.
+        Gate: only activates when strategy has >= min_trades closed trades.
+        Returns weight in [0.5, 1.5]; neutral 1.0 for strategies below the trade gate.
+        """
+        kelly_weights: dict[str, float] = {}
+        for strategy in strategies:
+            stats = self.db.get_strategy_pnl_stats(strategy.strategy_id)
+            n = stats.get("trades", 0)
+            if n < min_trades:
+                kelly_weights[strategy.name] = 1.0
+                logger.debug(
+                    "Kelly gated for %s: only %d closed trades (need %d)",
+                    strategy.name,
+                    n,
+                    min_trades,
+                )
+                continue
+            p = stats["win_rate"]
+            avg_win = stats["avg_win_pct"] or 0.0
+            avg_loss = stats["avg_loss_pct"] or 1e-9  # avoid div/0
+            b = avg_win / avg_loss
+            f_star = p - (1 - p) / b
+            # Clamp Kelly fraction and convert to a position-sizing multiplier around 1.0
+            f_capped = max(0.0, min(f_star * fraction, 0.5))  # quarter-Kelly, max +50%
+            mult = round(1.0 + f_capped, 3)  # e.g. f*=0.3 → mult=1.075
+            kelly_weights[strategy.name] = max(0.5, min(1.5, mult))
+            logger.info(
+                "Kelly(%s): n=%d p=%.2f b=%.2f f*=%.3f → mult=%.3f",
+                strategy.name,
+                n,
+                p,
+                b,
+                f_star,
+                kelly_weights[strategy.name],
+            )
+        return kelly_weights
 
     def _maybe_refresh_earnings_calendar(self):
         """Auto-refresh the earnings calendar CSV if it is older than 7 days."""
@@ -1157,6 +1217,20 @@ class MultiStrategyRunner:
         except Exception as _exc:
             logger.warning("Could not persist regime to system_state: %s", _exc)
 
+        # 5-regime composite label for the strategy weight table
+        composite_regime = self.regime_detector.detect_composite_regime(
+            vix=regime_adjustments.get("vix"), market_data=market_data
+        )
+        # Persist composite alongside legacy regime fields
+        try:
+            import json as _json2
+
+            _regime_state = _json2.loads(self.db.get_system_state("regime") or "{}")
+            _regime_state["composite_regime"] = composite_regime
+            self.db.set_system_state("regime", _json2.dumps(_regime_state))
+        except Exception as _exc2:
+            logger.warning("Could not persist composite regime: %s", _exc2)
+
         health_by_strategy = self._collect_strategy_health(strategies)
         trailing_sharpe = self._compute_trailing_sharpe(strategies)
         if trailing_sharpe:
@@ -1164,11 +1238,14 @@ class MultiStrategyRunner:
                 "Trailing 30d Sharpe: %s",
                 ", ".join(f"{k}={v:.2f}" for k, v in trailing_sharpe.items()),
             )
+        kelly_weights = self._compute_kelly_weights(strategies)
         self.strategy_weights = compute_strategy_weights(
             strategy_names=[s.name for s in strategies],
             regime_adjustments=regime_adjustments,
             health_by_strategy=health_by_strategy,
             trailing_sharpe_by_strategy=trailing_sharpe,
+            composite_regime=composite_regime,
+            kelly_weights=kelly_weights,
         )
         logger.info(
             "Daily strategy weights: %s",
@@ -1872,8 +1949,11 @@ class MultiStrategyRunner:
                     drawdown_mult = self.drawdown_manager.get_sizing_multiplier()
                     # Daily strategy weighting multiplier (meta-layer)
                     strategy_mult = float(signal.get("strategy_weight", 1.0))
-                    # Apply conviction multiplier: scale 50%–100% based on signal confidence
-                    conviction_mult = max(0.5, min(1.0, float(signal.get("confidence", 0.7))))
+                    # Confidence-scaled sizing: linear interpolation
+                    # conf=0.55→0.75x, conf=0.90→1.25x (allows high-conviction oversize)
+                    _conf = max(0.55, min(1.0, float(signal.get("confidence", 0.70))))
+                    _t = (_conf - 0.55) / (0.90 - 0.55)
+                    conviction_mult = round(0.75 + _t * (1.25 - 0.75), 3)
                     combined_mult = size_mult * drawdown_mult * strategy_mult * conviction_mult
                     adjusted_shares = int(shares * combined_mult)
 

@@ -975,6 +975,45 @@ class TradingDatabase:
         conn.close()
         return strategy_id
 
+    def get_strategy_pnl_stats(self, strategy_id: int) -> dict:
+        """Return closed-trade stats for a single strategy from trade_pnl_detail.
+
+        Returns dict with keys: trades, win_rate, avg_win_pct, avg_loss_pct.
+        Returns None when trade count < 1.
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT gross_pnl, gross_pnl_pct, is_winner
+            FROM trade_pnl_detail
+            WHERE strategy_id = ?
+            """,
+            (strategy_id,),
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        if not rows:
+            return {"trades": 0, "win_rate": None, "avg_win_pct": None, "avg_loss_pct": None}
+        wins = [r for r in rows if r[2] == 1]
+        losses = [r for r in rows if r[2] == 0]
+        return {
+            "trades": len(rows),
+            "win_rate": len(wins) / len(rows),
+            "avg_win_pct": sum(r[1] for r in wins) / len(wins) if wins else 0.0,
+            "avg_loss_pct": abs(sum(r[1] for r in losses) / len(losses)) if losses else 0.0,
+        }
+
+    def update_strategy_capital_allocation(self, strategy_id: int, capital: float) -> None:
+        """Update capital_allocation for an existing strategy."""
+        conn = sqlite3.connect(self.db_path)
+        conn.execute(
+            "UPDATE strategies SET capital_allocation = ? WHERE id = ?",
+            (capital, strategy_id),
+        )
+        conn.commit()
+        conn.close()
+
     def log_signal(
         self,
         strategy_id: int,
