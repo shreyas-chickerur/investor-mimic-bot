@@ -202,16 +202,6 @@ jobs:
         retention-days: 90
         overwrite: true
 
-    - name: Upload ML model
-      if: always()
-      continue-on-error: true
-      uses: actions/upload-artifact@v4
-      with:
-        name: ml-model
-        path: data/ml_model.pkl
-        retention-days: 14
-        overwrite: true
-
     - name: Update fundamental data (weekly, Mondays only)
       continue-on-error: true
       env:
@@ -446,6 +436,16 @@ jobs:
         name: training-data
         path: data/training_data.csv
         retention-days: 90
+        overwrite: true
+
+    - name: Upload ML model
+      if: always()
+      continue-on-error: true
+      uses: actions/upload-artifact@v4
+      with:
+        name: ml-model
+        path: data/ml_model.pkl
+        retention-days: 14
         overwrite: true
 
     - name: Upload artifacts
