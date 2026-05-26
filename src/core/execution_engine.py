@@ -1823,6 +1823,7 @@ class MultiStrategyRunner:
             price = signal.get("price", 0)
 
             if action == "BUY" and shares > 0:
+                intent_id = None
                 try:
                     # Benchmark ETF guard: never trade index/sector ETFs as positions
                     if symbol in UniverseProvider.BENCHMARK_SYMBOLS:
@@ -2296,10 +2297,11 @@ class MultiStrategyRunner:
                 except Exception as e:
                     logger.error(f"Failed to execute {symbol}: {e}")
                     print(f"  ❌ Failed {symbol}: {e}")
-                    try:
-                        self.db.update_order_intent_status(intent_id, "FAILED", error=str(e))
-                    except Exception:
-                        logger.warning("Failed to update order intent status for %s", intent_id)
+                    if intent_id is not None:
+                        try:
+                            self.db.update_order_intent_status(intent_id, "FAILED", error=str(e))
+                        except Exception:
+                            logger.warning("Failed to update order intent status for %s", intent_id)
 
             elif action == "SELL" and shares > 0:
                 try:
@@ -2891,6 +2893,7 @@ def main():
         )
 
         # Send email summary
+        positions_data: list = []
         try:
             positions = runner.trading_client.get_all_positions()
 
