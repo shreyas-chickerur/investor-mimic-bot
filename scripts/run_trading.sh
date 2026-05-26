@@ -14,7 +14,7 @@ echo ""
 cd "$(dirname "$0")/.."
 
 # Set default environment variables if not set
-export DATA_VALIDATOR_MAX_AGE_HOURS="${DATA_VALIDATOR_MAX_AGE_HOURS:-96}"
+export DATA_VALIDATOR_MAX_AGE_HOURS="${DATA_VALIDATOR_MAX_AGE_HOURS:-144}"
 export ALPACA_PAPER="${ALPACA_PAPER:-true}"
 export DRY_RUN="${DRY_RUN:-false}"
 
