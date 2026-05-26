@@ -144,7 +144,7 @@ def check_data_freshness() -> bool:
                     ["python3", "scripts/update_daily_data.py"],
                     capture_output=True,
                     text=True,
-                    timeout=300,
+                    timeout=700,
                 )
                 if result.returncode != 0:
                     raise Exception(f"Update failed: {result.stderr}")
