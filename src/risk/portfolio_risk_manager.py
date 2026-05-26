@@ -81,6 +81,7 @@ class PortfolioRiskManager:
             True if trading should continue, False if halted
         """
         if self.daily_start_value is None:
+            logger.warning("daily_start_value not set — skipping daily loss check")
             return True
 
         daily_loss = (current_value - self.daily_start_value) / self.daily_start_value

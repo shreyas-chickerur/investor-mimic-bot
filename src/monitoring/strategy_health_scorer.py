@@ -76,13 +76,16 @@ class StrategyHealthScorer:
         finally:
             conn.close()
 
+        # Fetch real P&L stats from trade_pnl_detail (matched entry/exit records)
+        pnl_stats = self.db.get_strategy_win_loss_stats(strategy_id)
+
+        trades_7d = [t for t in trades if self._is_within_days(t["executed_at"], self.short_window)]
+
         # Calculate metrics
         metrics = {
             "strategy_id": strategy_id,
             "strategy_name": strategy_name,
-            "trade_count_7d": len(
-                [t for t in trades if self._is_within_days(t["executed_at"], self.short_window)]
-            ),
+            "trade_count_7d": len(trades_7d),
             "trade_count_30d": len(trades),
             "signal_count_7d": len(
                 [s for s in signals if self._is_within_days(s["generated_at"], self.short_window)]
@@ -92,14 +95,18 @@ class StrategyHealthScorer:
                 [r for r in rejections if self._is_within_days(r["created_at"], self.short_window)]
             ),
             "rejection_count_30d": len(rejections),
-            "expectancy_7d": self._calculate_expectancy(
-                [t for t in trades if self._is_within_days(t["executed_at"], self.short_window)]
-            ),
-            "expectancy_30d": self._calculate_expectancy(trades),
+            "expectancy_7d": self._calculate_expectancy(trades_7d),
+            "expectancy_30d": self._pnl_expectancy(pnl_stats),
             "max_drawdown_30d": self._calculate_max_drawdown(trades),
-            "win_rate_30d": self._calculate_win_rate(trades),
-            "avg_win_30d": self._calculate_avg_win(trades),
-            "avg_loss_30d": self._calculate_avg_loss(trades),
+            "win_rate_30d": pnl_stats["win_rate"]
+            if pnl_stats["win_rate"] is not None
+            else self._calculate_win_rate(trades),
+            "avg_win_30d": pnl_stats["avg_win_pct"]
+            if pnl_stats["avg_win_pct"] is not None
+            else self._calculate_avg_win(trades),
+            "avg_loss_30d": pnl_stats["avg_loss_pct"]
+            if pnl_stats["avg_loss_pct"] is not None
+            else self._calculate_avg_loss(trades),
             "rejection_rate_7d": self._calculate_rejection_rate(
                 [s for s in signals if self._is_within_days(s["generated_at"], self.short_window)],
                 [r for r in rejections if self._is_within_days(r["created_at"], self.short_window)],
@@ -190,21 +197,25 @@ class StrategyHealthScorer:
             return False
 
     def _calculate_expectancy(self, trades: list[dict]) -> float:
-        """Calculate expectancy (average P&L per trade)."""
+        """Calculate expectancy from recent trades (proxy — used only for short-window 7d metric)."""
         if not trades:
             return 0.0
 
         total_pnl = 0.0
         for trade in trades:
-            # Calculate P&L (simplified - would need position tracking for actual)
             pnl = 0.0
             if trade["action"] == "SELL":
-                # For sells, we'd need to match with buy to calculate P&L
-                # For now, use notional as proxy
-                pnl = trade.get("notional", 0.0) * 0.01  # Assume 1% profit
+                pnl = trade.get("notional", 0.0) * 0.01
             total_pnl += pnl
 
         return total_pnl / len(trades)
+
+    def _pnl_expectancy(self, pnl_stats: dict) -> float:
+        """Calculate % expectancy from matched trade P&L records in trade_pnl_detail."""
+        wr = pnl_stats.get("win_rate") or 0.0
+        avg_win = pnl_stats.get("avg_win_pct") or 0.0
+        avg_loss = pnl_stats.get("avg_loss_pct") or 0.0
+        return (wr * avg_win) - ((1.0 - wr) * avg_loss)
 
     def _calculate_max_drawdown(self, trades: list[dict]) -> float:
         """Calculate maximum drawdown from trades."""

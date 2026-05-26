@@ -1243,7 +1243,9 @@ def build_today_trades(
             pnl_pct = None
             if pnl is not None and t.get("notional"):
                 try:
-                    pnl_pct = (pnl / float(t["notional"])) * 100
+                    cost_basis = float(t["notional"]) - pnl
+                    if abs(cost_basis) > 0.01:
+                        pnl_pct = (pnl / cost_basis) * 100
                 except Exception:
                     pass
             reason = _infer_sell_reason(strat, raw_reason, pnl, pnl_pct, None)
