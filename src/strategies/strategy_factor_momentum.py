@@ -328,7 +328,7 @@ class FactorMomentumStrategy(TradingStrategy):
                     and (price - entry_price) / entry_price >= self.let_winners_run_pct
                 ):
                     pass  # momentum still working — keep holding
-                elif 250 <= days_held < 255:
+                elif 365 <= days_held < 370:
                     pass  # extend hold to cross the 1-year long-term capital gains threshold
                 else:
                     exit_reason = f"Factor rebalance: held {days_held}d"

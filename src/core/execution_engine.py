@@ -178,7 +178,7 @@ class MultiStrategyRunner:
         self.email_notifier = EmailNotifier(outbox_writer=self.db.enqueue_notification)
         self.data_validator = DataValidator()
         total_capital = max(self.portfolio_value, self.buying_power)
-        self.cash_manager = CashManager(total_capital, num_strategies=4)
+        self.cash_manager = CashManager(total_capital, num_strategies=len(CANONICAL_STRATEGY_SPECS))
 
         # Portfolio risk manager - load from config
         max_heat = self.config.get("risk.max_portfolio_heat", 0.30)
@@ -291,6 +291,11 @@ class MultiStrategyRunner:
         self.peak_portfolio_value = self._get_peak_portfolio_value()
         self.cumulative_pnl = 0.0
         self.max_drawdown = 0.0
+
+        # Initialize reconciliation state so finally block never hits AttributeError
+        self.reconciliation_status = "UNKNOWN"
+        self.reconciliation_discrepancies = []
+        self.strategies_cache: list = []
 
     def _set_run_stage(
         self,
@@ -938,12 +943,14 @@ class MultiStrategyRunner:
 
                 logger.info(f"Executing stop loss exit: SELL {shares} {symbol}")
 
-                # Create market order to close position
+                # Create market order to close position - DAY fills immediately during market hours
                 order_data = MarketOrderRequest(
-                    symbol=symbol, qty=shares, side=OrderSide.SELL, time_in_force=TimeInForce.OPG
+                    symbol=symbol, qty=shares, side=OrderSide.SELL, time_in_force=TimeInForce.DAY
                 )
 
-                order = self.trading_client.submit_order(order_data)
+                order = self.dry_run.execute_broker_operation(
+                    f"submit_order_stoploss_{symbol}", self.trading_client.submit_order, order_data
+                )
 
                 exit_price = position["current_price"]
 
@@ -992,6 +999,7 @@ class MultiStrategyRunner:
     def run_all_strategies(self, market_data):
         """Run all strategies and execute trades"""
         strategies = self.initialize_strategies()
+        self.strategies_cache = strategies
         self.raw_signals_by_strategy = {}
 
         # CRITICAL: Check kill switches BEFORE any trading
@@ -2517,7 +2525,7 @@ class MultiStrategyRunner:
                     trade_record = {
                         "strategy": strategy.name,
                         "symbol": symbol,
-                        "shares": shares,
+                        "shares": actual_filled_qty,
                         "price": price,
                         "action": "SELL",
                         "order_id": order.id,
@@ -2526,7 +2534,7 @@ class MultiStrategyRunner:
                     self.executed_trades.append(trade_record)
                     self.executed_signals.append(trade_record)
                     self.performance_metrics.add_trade(
-                        "SELL", symbol, shares, exec_price, trade_value
+                        "SELL", symbol, actual_filled_qty, exec_price, trade_value
                     )
                 except Exception as e:
                     logger.error(f"Failed to execute {symbol}: {e}")

@@ -240,7 +240,7 @@ class EarningsDriftStrategy(TradingStrategy):
 
                 # Tax-aware: extend drift hold to cross 1-year mark if close.
                 if exit_reason is None and days_held >= self.drift_hold_days:
-                    if 250 <= days_held < 255:
+                    if 365 <= days_held < 370:
                         pass  # extend hold for long-term capital gains treatment
                     else:
                         exit_reason = f"Drift window expired ({days_held}d held)"

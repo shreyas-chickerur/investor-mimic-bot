@@ -6,6 +6,7 @@ Corrective sync: adjusts existing strategy positions to match broker totals.
 Does NOT wipe positions — preserves strategy-level tracking and entry dates.
 Only creates BROKER_SYNC entries for truly untracked positions.
 """
+import json
 import sqlite3
 import sys
 from datetime import datetime
@@ -271,7 +272,7 @@ def sync_broker_to_database(db_path="trading.db"):
                 broker_state["cash"],
                 broker_state["portfolio_value"],
                 broker_state["buying_power"],
-                str(broker_positions),
+                json.dumps(broker_positions),
                 "SYNCED",
                 datetime.now().isoformat(),
             ),

@@ -114,7 +114,7 @@ class StopLossManager:
         if symbol not in self.stop_levels or not atr or atr <= 0:
             return
         entry = self.entry_prices.get(symbol)
-        if not entry:
+        if entry is None:
             return self.update_trailing_stop(symbol, current_price, atr)
 
         open_profit = current_price - entry

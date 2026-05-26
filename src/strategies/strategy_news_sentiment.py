@@ -157,10 +157,10 @@ class NewsSentimentStrategy(TradingStrategy):
 
                 if score < self.sell_threshold:
                     exit_reason = f"Sentiment soured (score={score:.2f}): {top_headline[:60]}"
-                elif days_held >= self.hold_days:
-                    exit_reason = f"Sentiment hold window expired ({days_held}d)"
                 elif days_held >= self.max_hold_days:
                     exit_reason = f"Max hold reached ({days_held}d)"
+                elif days_held >= self.hold_days:
+                    exit_reason = f"Sentiment hold window expired ({days_held}d)"
 
                 if exit_reason:
                     signals.append(

@@ -339,7 +339,7 @@ class BrokerReconciler:
             return {
                 "positions": {
                     pos.symbol: {
-                        "qty": int(pos.qty),
+                        "qty": float(pos.qty),
                         "avg_price": float(pos.avg_entry_price),
                         "market_value": float(pos.market_value),
                         "unrealized_pl": float(pos.unrealized_pl),
