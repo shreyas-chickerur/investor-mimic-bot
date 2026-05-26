@@ -591,167 +591,6 @@ class TradingDatabase:
         conn.commit()
         conn.close()
 
-    def upsert_run_state(
-        self,
-        stage: str,
-        status: str,
-        error_message: Optional[str] = None,
-        metadata: Optional[dict] = None,
-        completed: bool = False,
-    ) -> None:
-        """Create or update run-state machine row for the current run."""
-        now = datetime.now().isoformat()
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-
-        cursor.execute("SELECT run_id FROM run_state WHERE run_id = ?", (self.run_id,))
-        exists = cursor.fetchone() is not None
-        metadata_json = json.dumps(metadata) if metadata else None
-
-        if exists:
-            cursor.execute(
-                """
-                UPDATE run_state
-                SET stage = ?,
-                    status = ?,
-                    error_message = ?,
-                    metadata_json = ?,
-                    updated_at = ?,
-                    completed_at = CASE WHEN ? THEN ? ELSE completed_at END
-                WHERE run_id = ?
-                """,
-                (stage, status, error_message, metadata_json, now, completed, now, self.run_id),
-            )
-        else:
-            cursor.execute(
-                """
-                INSERT INTO run_state
-                (run_id, stage, status, error_message, metadata_json, started_at, updated_at, completed_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    self.run_id,
-                    stage,
-                    status,
-                    error_message,
-                    metadata_json,
-                    now,
-                    now,
-                    now if completed else None,
-                ),
-            )
-
-        conn.commit()
-        conn.close()
-
-    def enqueue_notification(self, channel: str, category: str, subject: str, body: str) -> int:
-        """Queue a notification for asynchronous delivery."""
-        now = datetime.now().isoformat()
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            INSERT INTO notification_outbox
-            (run_id, channel, category, subject, body, status, attempts, created_at)
-            VALUES (?, ?, ?, ?, ?, 'PENDING', 0, ?)
-            """,
-            (self.run_id, channel, category, subject, body, now),
-        )
-        notification_id = cursor.lastrowid
-        conn.commit()
-        conn.close()
-        return notification_id
-
-    def fetch_pending_notifications(self, limit: int = 50) -> list[dict]:
-        """Fetch pending/failed notifications for delivery workers."""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT * FROM notification_outbox
-            WHERE status IN ('PENDING', 'FAILED')
-            ORDER BY created_at ASC
-            LIMIT ?
-            """,
-            (limit,),
-        )
-        rows = [dict(r) for r in cursor.fetchall()]
-        conn.close()
-        return rows
-
-    def mark_notification_sent(self, notification_id: int) -> None:
-        """Mark outbox notification as sent."""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            UPDATE notification_outbox
-            SET status = 'SENT',
-                attempts = attempts + 1,
-                sent_at = ?
-            WHERE id = ?
-            """,
-            (datetime.now().isoformat(), notification_id),
-        )
-        conn.commit()
-        conn.close()
-
-    def mark_notification_failed(self, notification_id: int, error_message: str) -> None:
-        """Mark outbox notification delivery failure."""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            UPDATE notification_outbox
-            SET status = 'FAILED',
-                attempts = attempts + 1,
-                last_error = ?
-            WHERE id = ?
-            """,
-            (error_message[:1000], notification_id),
-        )
-        conn.commit()
-        conn.close()
-
-    def get_consecutive_failed_runs(self, max_lookback: int = 20) -> int:
-        """Return count of consecutive failed runs from most recent run backward."""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT status
-            FROM run_state
-            ORDER BY updated_at DESC
-            LIMIT ?
-            """,
-            (max_lookback,),
-        )
-        rows = [str(r[0]).upper() for r in cursor.fetchall()]
-        conn.close()
-
-        failures = 0
-        for status in rows:
-            if status == "FAILED":
-                failures += 1
-            else:
-                break
-        return failures
-
-    def save_run_slo_metrics(self, metrics: dict) -> None:
-        """Persist per-run SLO metrics for observability dashboards and audits."""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            INSERT OR REPLACE INTO run_slo_metrics (run_id, metrics_json, created_at)
-            VALUES (?, ?, ?)
-            """,
-            (self.run_id, json.dumps(metrics), datetime.now().isoformat()),
-        )
-        conn.commit()
-        conn.close()
-
     def log_daily_snapshot(
         self,
         run_id: str,
@@ -786,7 +625,7 @@ class TradingDatabase:
         initial_capital = row[0] if row and row[0] else portfolio_value
         cumulative_pnl = portfolio_value - initial_capital
 
-        drawdown_pct = (portfolio_value - peak_value) / peak_value if peak_value else 0.0
+        drawdown_pct = (peak_value - portfolio_value) / peak_value if peak_value else 0.0
 
         cursor.execute(
             """
@@ -1001,7 +840,7 @@ class TradingDatabase:
             "trades": len(rows),
             "win_rate": len(wins) / len(rows),
             "avg_win_pct": sum(r[1] for r in wins) / len(wins) if wins else 0.0,
-            "avg_loss_pct": abs(sum(r[1] for r in losses) / len(losses)) if losses else 0.0,
+            "avg_loss_pct": sum(abs(r[1]) for r in losses) / len(losses) if losses else 0.0,
         }
 
     def update_strategy_capital_allocation(self, strategy_id: int, capital: float) -> None:

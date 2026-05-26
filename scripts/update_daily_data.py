@@ -162,10 +162,10 @@ class DailyDataUpdater:
             returns = symbol_data["close"].pct_change()
             symbol_data["volatility_20d"] = returns.rolling(window=20).std()
 
-            # VWAP
-            symbol_data["vwap"] = (
-                symbol_data["close"] * symbol_data["volume"]
-            ).cumsum() / symbol_data["volume"].cumsum()
+            # VWAP: 20-day rolling volume-weighted average price
+            _tp_vol = symbol_data["close"] * symbol_data["volume"]
+            _vol_sum = symbol_data["volume"].rolling(window=20).sum().replace(0, float("nan"))
+            symbol_data["vwap"] = _tp_vol.rolling(window=20).sum() / _vol_sum
 
             # ADX (simplified)
             plus_dm = symbol_data["high"].diff()
@@ -175,7 +175,7 @@ class DailyDataUpdater:
             tr_smooth = tr.rolling(window=14).mean()
             plus_di = 100 * (plus_dm.rolling(window=14).mean() / tr_smooth)
             minus_di = 100 * (minus_dm.rolling(window=14).mean() / tr_smooth)
-            dx = 100 * abs(plus_di - minus_di) / (plus_di + minus_di)
+            dx = 100 * abs(plus_di - minus_di) / (plus_di + minus_di).replace(0, float("nan"))
             symbol_data["adx"] = dx.rolling(window=14).mean()
 
             # Price returns (required by ML Momentum + Factor Momentum)

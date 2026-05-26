@@ -156,7 +156,7 @@ class RSIMeanReversionStrategy(TradingStrategy):
                         and rsi < self.rsi_exit
                     ):
                         pass  # still healthy — keep holding
-                    elif 250 <= days_held < 255:
+                    elif 365 <= days_held < 370:
                         pass  # extend hold to cross the 1-year long-term capital gains threshold
                     else:
                         exit_reason = f"Held {days_held}d >= {self.hold_days}d (time-based exit)"

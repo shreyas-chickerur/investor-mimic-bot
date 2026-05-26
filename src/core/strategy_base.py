@@ -58,6 +58,9 @@ class TradingStrategy(ABC):
         Returns:
             Number of shares to buy
         """
+        if price <= 0:
+            return 0
+
         # VOLATILITY-ADJUSTED SIZING: Target 1% portfolio volatility per position
         if atr and atr > 0:
             # Position size inversely proportional to volatility (ATR)
@@ -105,6 +108,8 @@ class TradingStrategy(ABC):
 
     def get_return_pct(self, current_prices: dict[str, float]) -> float:
         """Calculate total return percentage"""
+        if self.initial_capital <= 0:
+            return 0.0
         current_value = self.get_portfolio_value(current_prices)
         return ((current_value - self.initial_capital) / self.initial_capital) * 100
 

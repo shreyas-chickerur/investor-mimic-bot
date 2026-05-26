@@ -235,7 +235,7 @@ class DynamicAllocator:
         for strategy_id, target in target_allocations.items():
             current = current_allocations.get(strategy_id, 0)
 
-            if abs(current - target) / target > threshold:
+            if target > 0 and abs(current - target) / target > threshold:
                 logger.info(
                     f"Rebalance needed: Strategy {strategy_id} "
                     f"current=${current:,.2f} vs target=${target:,.2f}"

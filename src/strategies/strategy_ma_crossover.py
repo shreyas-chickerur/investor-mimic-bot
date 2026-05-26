@@ -137,7 +137,7 @@ class MACrossoverStrategy(TradingStrategy):
                         and sma20_now > sma50_now  # trend intact
                     ):
                         pass  # let winner run
-                    elif 250 <= days_held < 255:
+                    elif 365 <= days_held < 370:
                         pass  # hold to 1-year LTCG threshold
                     else:
                         exit_reason = f"Time exit: held {days_held}d"
@@ -173,7 +173,7 @@ class MACrossoverStrategy(TradingStrategy):
             if shares <= 0:
                 continue
 
-            gap_pct = (sma20_now - sma50_now) / sma50_now
+            gap_pct = (sma20_now - sma50_now) / sma50_now if sma50_now else 0.0
             confidence = min(0.88, 0.55 + abs(gap_pct) * 5 + (((adx or 25) - 20) / 100))
             signals.append(
                 {

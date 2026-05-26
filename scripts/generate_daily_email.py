@@ -503,8 +503,8 @@ def _infer_sell_reason(
 def fmt_money(v: float | None, sign: bool = False) -> str:
     if v is None:
         return "—"
-    s = "+" if (sign and v >= 0) else ""
-    return f"{s}${abs(v):,.2f}" if v < 0 and not sign else f"{s}${v:,.2f}"
+    prefix = "-" if v < 0 else ("+" if sign else "")
+    return f"{prefix}${abs(v):,.2f}"
 
 
 def fmt_pct(v: float | None, digits: int = 1) -> str:
