@@ -318,6 +318,7 @@ class EarningsDriftStrategy(TradingStrategy):
                     "confidence": confidence,
                     "reasoning": reasoning,
                     "atr": atr if atr > 0 else None,
+                    "asof_date": sym_latest_date,
                 }
             )
 
