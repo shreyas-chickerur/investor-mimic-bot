@@ -63,6 +63,7 @@ class EarningsDriftStrategy(TradingStrategy):
         self.stop_loss_pct = _cfg.get("strategies.earnings_drift.stop_loss_pct", 0.10)
         self.entry_dates: dict = {}
         self.event_returns: dict = {}
+        self._partial_exit_done: set = set()
         # Entry window: buy up to N trading days after the earnings date
         self.calendar_entry_window_days = _cfg.get(
             "strategies.earnings_drift.calendar_entry_window_days", 5

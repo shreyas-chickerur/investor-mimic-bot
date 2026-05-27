@@ -40,6 +40,7 @@ class RSIMeanReversionStrategy(TradingStrategy):
         self.hold_days = 20
         self.max_hold_days = 40  # absolute ceiling even for profitable positions
         self.profit_target_pct = 0.05  # exit at 5% profit
+        self._partial_exit_done: set = set()
         self.stop_loss_pct = 0.07  # exit at 7% loss (mean reversion can fail hard)
         self.let_winners_run_pct = 0.03  # hold past time exit if ≥3% in profit and RSI not extended
         self.volume_spike_threshold = 1.5  # skip if volume >1.5x avg (capitulation, not reversion)

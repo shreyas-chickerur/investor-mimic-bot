@@ -74,7 +74,7 @@ def _record_snapshot(state: dict) -> None:
 
     cursor.execute('SELECT SUM(initial_capital) FROM strategies WHERE name != "BROKER_SYNC"')
     row = cursor.fetchone()
-    initial_capital = row[0] if row and row[0] else state["portfolio_value"]
+    initial_capital = row[0] if row and row[0] is not None else state["portfolio_value"]
     cumulative_pnl = state["portfolio_value"] - initial_capital
     drawdown_pct = (state["portfolio_value"] - peak_value) / peak_value if peak_value else 0.0
 

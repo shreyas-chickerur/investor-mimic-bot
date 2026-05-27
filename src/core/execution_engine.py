@@ -2232,6 +2232,7 @@ class MultiStrategyRunner:
 
                     if not fill_verified:
                         logger.info(f"Order {order.id} not filled yet - keeping order pending")
+                        self.cash_manager.release_cash(strategy.strategy_id, trade_value)
                         self.db.update_order_intent_status(
                             intent_id, "ACKED", broker_order_id=str(order.id)
                         )
@@ -2300,7 +2301,7 @@ class MultiStrategyRunner:
                         signal_id,
                         symbol,
                         "BUY",
-                        adjusted_shares,
+                        actual_filled_qty,
                         price,
                         exec_price,
                         slippage_cost,
@@ -2334,6 +2335,7 @@ class MultiStrategyRunner:
                     logger.error(f"Failed to execute {symbol}: {e}")
                     print(f"  ❌ Failed {symbol}: {e}")
                     if intent_id is not None:
+                        self.cash_manager.release_cash(strategy.strategy_id, trade_value)
                         try:
                             self.db.update_order_intent_status(intent_id, "FAILED", error=str(e))
                         except Exception:
