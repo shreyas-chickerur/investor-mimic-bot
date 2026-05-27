@@ -6,6 +6,10 @@ Implements 2-3x ATR stop losses for tail protection
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.core.database import TradingDatabase
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +21,7 @@ class StopLossManager:
       * Per-call multiplier override (regime-aware stops).
       * Ratchet trailing: lock-in to entry once +1×ATR, lock to entry+1×ATR
         once +2×ATR. Stops only ever move UP.
+      * DB persistence: stop levels survive across daily GHA runs.
     """
 
     def __init__(
@@ -24,13 +29,19 @@ class StopLossManager:
         atr_multiplier: float = 2.5,
         breakeven_atr: float = 1.0,
         lock_atr: float = 2.0,
+        db: TradingDatabase | None = None,
     ):
         self.atr_multiplier = atr_multiplier
         self.breakeven_atr = breakeven_atr
         self.lock_atr = lock_atr
+        self.db = db
         self.stop_levels: dict[str, float] = {}
         self.entry_prices: dict[str, float] = {}
         self.entry_atrs: dict[str, float] = {}
+
+        if self.db is not None:
+            self._load_from_db()
+
         logger.info(
             "Stop Loss Manager: %.1fx ATR base, ratchet @ +%.1f×ATR → entry, "
             "+%.1f×ATR → entry+1×ATR",
@@ -38,6 +49,33 @@ class StopLossManager:
             breakeven_atr,
             lock_atr,
         )
+
+    def _load_from_db(self) -> None:
+        """Restore persisted stop levels from the database on startup."""
+        try:
+            rows = self.db.load_all_stop_losses()  # type: ignore[union-attr]
+            for symbol, data in rows.items():
+                self.stop_levels[symbol] = data["stop_price"]
+                self.entry_prices[symbol] = data["entry_price"]
+                self.entry_atrs[symbol] = data["entry_atr"]
+            if rows:
+                logger.info("Restored %d stop-loss levels from DB: %s", len(rows), list(rows))
+        except Exception as e:
+            logger.warning("Could not load stop losses from DB: %s", e)
+
+    def _persist(self, symbol: str) -> None:
+        """Save current stop-loss state for a symbol to the database."""
+        if self.db is None:
+            return
+        try:
+            self.db.save_stop_loss(
+                symbol,
+                self.stop_levels[symbol],
+                self.entry_prices[symbol],
+                self.entry_atrs.get(symbol, 0.0),
+            )
+        except Exception as e:
+            logger.warning("Could not persist stop loss for %s: %s", symbol, e)
 
     def set_stop_loss(
         self,
@@ -55,6 +93,7 @@ class StopLossManager:
         self.stop_levels[symbol] = stop_price
         self.entry_prices[symbol] = entry_price
         self.entry_atrs[symbol] = atr
+        self._persist(symbol)
         logger.info(
             f"Stop loss set for {symbol}: ${stop_price:.2f} "
             f"({mult:.1f}x ATR from ${entry_price:.2f})"
@@ -89,6 +128,11 @@ class StopLossManager:
         self.stop_levels.pop(symbol, None)
         self.entry_prices.pop(symbol, None)
         self.entry_atrs.pop(symbol, None)
+        if self.db is not None:
+            try:
+                self.db.delete_stop_loss(symbol)
+            except Exception as e:
+                logger.warning("Could not delete stop loss for %s from DB: %s", symbol, e)
         logger.debug(f"Stop loss removed for {symbol}")
 
     def get_stop_price(self, symbol: str) -> float:
@@ -102,6 +146,7 @@ class StopLossManager:
         new_stop = max(current_price - (self.atr_multiplier * atr), 0.01)
         if new_stop > self.stop_levels[symbol]:
             self.stop_levels[symbol] = new_stop
+            self._persist(symbol)
             logger.info(f"Trailing stop updated for {symbol}: ${new_stop:.2f}")
 
     def update_ratchet_stop(self, symbol: str, current_price: float, atr: float):
@@ -134,6 +179,7 @@ class StopLossManager:
 
         if new_stop > current_stop:
             self.stop_levels[symbol] = new_stop
+            self._persist(symbol)
             logger.info(
                 f"Ratchet stop for {symbol}: ${new_stop:.2f} "
                 f"(entry ${entry:.2f}, profit {open_profit:+.2f} = {open_profit/atr:.1f}×ATR)"
