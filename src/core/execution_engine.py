@@ -1734,17 +1734,40 @@ class MultiStrategyRunner:
             )
 
     def _check_strategy_loss_limit(self, strategy, strategies) -> bool:
-        """Return True (halted) if strategy has lost more than max_strategy_loss_pct of its initial capital."""
+        """Return True (halted) if strategy has lost more than max_strategy_loss_pct of its capital.
+
+        Loss is measured from actual trade P&L (trade_pnl_detail) plus unrealized open-position
+        P&L — NOT from capital_allocation changes. The dynamic allocator legitimately reduces a
+        strategy's budget when its Sharpe is poor; that must not count as a trading loss.
+        """
         max_loss = self.config.get("risk.max_strategy_loss_pct", 0.20)
         all_strategies_db = {s["name"]: s for s in self.db.get_all_strategies()}
         db_entry = all_strategies_db.get(strategy.name, {})
-        initial_capital = float(
+        reference_capital = float(
             db_entry.get("capital_allocation", strategy.capital) or strategy.capital
         )
-        if initial_capital <= 0:
+        if reference_capital <= 0:
             return False
 
-        current_prices = {}
+        # Realized P&L: sum of all closed trade gross_pnl for this strategy
+        import sqlite3 as _sqlite3
+
+        realized_pnl = 0.0
+        try:
+            _conn = _sqlite3.connect(self.db.db_path)
+            _cur = _conn.cursor()
+            _cur.execute(
+                "SELECT COALESCE(SUM(gross_pnl), 0.0) FROM trade_pnl_detail WHERE strategy_id = ?",
+                (strategy.strategy_id,),
+            )
+            row = _cur.fetchone()
+            realized_pnl = float(row[0]) if row else 0.0
+            _conn.close()
+        except Exception:
+            pass
+
+        # Unrealized P&L: (current_price - avg_entry_price) * shares for open positions
+        current_prices: dict = {}
         try:
             import pandas as pd
 
@@ -1757,11 +1780,23 @@ class MultiStrategyRunner:
         except Exception:
             pass
 
-        positions_value = sum(
-            shares * current_prices.get(sym, 0) for sym, shares in strategy.positions.items()
-        )
-        current_value = strategy.capital + positions_value
-        loss_pct = (initial_capital - current_value) / initial_capital
+        unrealized_pnl = 0.0
+        try:
+            _conn = _sqlite3.connect(self.db.db_path)
+            _cur = _conn.cursor()
+            _cur.execute(
+                "SELECT symbol, shares, avg_price FROM positions WHERE strategy_id = ? AND shares > 0",
+                (strategy.strategy_id,),
+            )
+            for sym, shares, avg_price in _cur.fetchall():
+                current = current_prices.get(sym, avg_price)
+                unrealized_pnl += (current - avg_price) * shares
+            _conn.close()
+        except Exception:
+            pass
+
+        total_pnl = realized_pnl + unrealized_pnl
+        loss_pct = (-total_pnl / reference_capital) if total_pnl < 0 else 0.0
 
         if loss_pct > max_loss:
             logger.critical(
@@ -1793,12 +1828,13 @@ class MultiStrategyRunner:
                     message=(
                         f"<h2>Strategy Loss Limit Triggered</h2>"
                         f"<p>Strategy <strong>{strategy.name}</strong> has been frozen "
-                        f"after losing <strong>{loss_pct*100:.1f}%</strong> of initial capital "
+                        f"after losing <strong>{loss_pct*100:.1f}%</strong> of its capital "
                         f"(limit: {max_loss*100:.0f}%).</p>"
                         f"<table>"
-                        f"<tr><td>Initial capital</td><td>${initial_capital:,.2f}</td></tr>"
-                        f"<tr><td>Current value</td><td>${current_value:,.2f}</td></tr>"
-                        f"<tr><td>Loss</td><td>${initial_capital - current_value:,.2f} "
+                        f"<tr><td>Reference capital</td><td>${reference_capital:,.2f}</td></tr>"
+                        f"<tr><td>Realized P&L</td><td>${realized_pnl:,.2f}</td></tr>"
+                        f"<tr><td>Unrealized P&L</td><td>${unrealized_pnl:,.2f}</td></tr>"
+                        f"<tr><td>Total loss</td><td>${-total_pnl:,.2f} "
                         f"({loss_pct*100:.1f}%)</td></tr>"
                         f"</table>"
                         f"<h3>Capital redistributed to:</h3><ul>"
