@@ -227,6 +227,7 @@ class MultiStrategyRunner:
             atr_multiplier=stop_loss_multiplier,
             breakeven_atr=breakeven_atr,
             lock_atr=lock_atr,
+            db=self.db,
         )
         # Cached current regime-adjusted multiplier (refreshed per run)
         self._current_stop_multiplier = stop_loss_multiplier
