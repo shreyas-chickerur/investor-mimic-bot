@@ -47,8 +47,11 @@ class EmailNotifier:
             logger.warning("Email notifications disabled - alert not sent")
             return
 
+        import html as _html_mod
+
         alert_subject = f"🚨 ALERT: {subject}"
-        self._send_email(alert_subject, message)
+        html_body = f"<html><body><pre style='font-family:monospace;white-space:pre-wrap'>{_html_mod.escape(message)}</pre></body></html>"
+        self._send_email(alert_subject, html_body, is_html=True)
 
     def send_error_alert(self, error_message: str, details: str = ""):
         """Send error alert email"""
@@ -119,7 +122,6 @@ class EmailNotifier:
 
         except Exception as e:
             logger.error(f"Failed to send email: {e}")
-            raise
 
 
 def send_error_alert(error_message: str, details: str = ""):

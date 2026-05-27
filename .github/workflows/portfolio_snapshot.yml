@@ -53,6 +53,9 @@ jobs:
       run: |
         python scripts/record_portfolio_snapshot.py
 
+    - name: WAL checkpoint before upload
+      run: sqlite3 trading.db "PRAGMA wal_checkpoint(TRUNCATE);" || true
+
     - name: Upload updated database
       if: always()
       uses: actions/upload-artifact@v4

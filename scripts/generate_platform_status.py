@@ -207,7 +207,7 @@ def generate(conn: sqlite3.Connection) -> str:
     cb_clear = _circuit_breaker(conn)
 
     health_markers = [
-        ("Broker reconciled", recon in ("OK", "BALANCED", "balanced"), f"Status: {recon}"),
+        ("Broker reconciled", recon in ("PASS", "SYNCED"), f"Status: {recon}"),
         (
             "Data fresh",
             data_age is not None and data_age < 48,

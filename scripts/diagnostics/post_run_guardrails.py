@@ -14,7 +14,7 @@ CANONICAL_STRATEGIES = [
     "News Sentiment",
     "MA Crossover",
     "Volatility Breakout",
-    # Factor Momentum intentionally excluded — disabled in config (no demonstrated edge)
+    "Factor Momentum",
 ]
 
 

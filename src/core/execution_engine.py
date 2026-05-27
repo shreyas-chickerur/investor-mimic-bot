@@ -928,6 +928,11 @@ class MultiStrategyRunner:
                 symbol = position["symbol"]
                 shares = abs(position["shares"])
 
+                if shares <= 0:
+                    logger.warning("Skipping stop-loss exit for %s: shares=%s", symbol, shares)
+                    self.stop_loss_manager.remove_stop_loss(symbol)
+                    continue
+
                 # Short-prevention guard: a double-exit (stop-loss fired twice, or race
                 # between stop-loss and strategy exit) would submit a SELL with 0 broker
                 # shares and create a short position. Verify the DB still shows shares > 0.
@@ -972,6 +977,31 @@ class MultiStrategyRunner:
                 # broker=0 and DB=0 (previously this was missing, causing every
                 # stop-loss to produce a guaranteed reconciliation mismatch).
                 self._update_position_record(position["strategy_id"], symbol, -shares, exit_price)
+
+                # Release cash back to the pool so other strategies see correct capacity
+                exit_proceeds = exit_price * shares
+                self.cash_manager.release_cash(position["strategy_id"], exit_proceeds)
+
+                # Record matched P&L so stop-loss exits appear in win-rate and profit-factor
+                entry_price_sl = float(
+                    position.get("avg_price") or position.get("entry_price") or 0
+                )
+                if entry_price_sl > 0:
+                    try:
+                        self.db.log_trade_pnl(
+                            strategy_id=position["strategy_id"],
+                            strategy_name=position.get("strategy_name", ""),
+                            symbol=symbol,
+                            sell_run_id=self.run_id,
+                            entry_price=entry_price_sl,
+                            exit_price=exit_price,
+                            shares=shares,
+                            exit_reason="STOP_LOSS",
+                        )
+                    except Exception as _sl_pnl_exc:
+                        logger.warning(
+                            "log_trade_pnl failed for stop-loss %s: %s", symbol, _sl_pnl_exc
+                        )
 
                 # Remove stop loss tracking
                 self.stop_loss_manager.remove_stop_loss(symbol)
@@ -1281,18 +1311,19 @@ class MultiStrategyRunner:
                 discrepancies=[],
             )
 
-            if not self.portfolio_risk.check_daily_loss_limit(self.portfolio_value):
-                logger.warning("Trading halted due to daily loss limit")
-                return []
-
             # CRITICAL: Hard reconciliation gate (MANDATORY)
             logger.info("=" * 80)
             logger.info("BROKER RECONCILIATION (MANDATORY GATE)")
             logger.info("=" * 80)
 
-            # Refresh account before reconciliation
+            # Refresh account before reconciliation (also ensures daily loss check
+            # uses fresh portfolio_value, not the stale value from __init__)
             logger.info("Refreshing account state before reconciliation...")
             self._refresh_account_state()
+
+            if not self.portfolio_risk.check_daily_loss_limit(self.portfolio_value):
+                logger.warning("Trading halted due to daily loss limit")
+                return []
 
             local_positions = self._build_local_positions()
             success, discrepancies = self.broker_reconciler.reconcile_daily(
@@ -1578,7 +1609,10 @@ class MultiStrategyRunner:
                         # throttled by the top_n cap when a strategy generates both actions.
                         signals.sort(key=lambda s: 0 if s.get("action") == "SELL" else 1)
                         max_signals = getattr(strategy, "top_n", 5)
-                        signals_to_execute = signals[:max_signals]
+                        # Always include all SELL signals; cap only BUY signals with top_n
+                        _sells = [s for s in signals if s.get("action") == "SELL"]
+                        _buys = [s for s in signals if s.get("action") != "SELL"]
+                        signals_to_execute = _sells + _buys[: max(0, max_signals - len(_sells))]
                         self.funnel_tracker.record_after_risk(
                             strategy.strategy_id, len(signals_to_execute)
                         )
@@ -1611,7 +1645,9 @@ class MultiStrategyRunner:
                             signal_id = signal.get("signal_id")
                             if signal_id:
                                 was_executed = any(
-                                    e.get("symbol") == signal.get("symbol") for e in executed
+                                    e.get("symbol") == signal.get("symbol")
+                                    and e.get("action") == signal.get("action")
+                                    for e in executed
                                 )
                                 if was_executed:
                                     self.db.update_signal_terminal_state(
@@ -2259,6 +2295,7 @@ class MultiStrategyRunner:
                     strategy.update_capital(-actual_trade_value)
                     entry_date = signal.get("asof_date") or datetime.now()
                     strategy.entry_dates[symbol] = entry_date
+                    strategy.entry_prices[symbol] = actual_fill_price
                     total_exposure += actual_trade_value
                     self.performance_metrics.add_trade(
                         "BUY", symbol, actual_filled_qty, actual_fill_price, actual_trade_value
@@ -2561,6 +2598,8 @@ class MultiStrategyRunner:
                     self._update_position_record(
                         strategy.strategy_id, symbol, -actual_filled_qty, actual_fill_price
                     )
+                    # Release cross-strategy dedup lock so other strategies can buy this symbol again
+                    self._held_symbols.discard(symbol)
 
                     trade_record = {
                         "strategy": strategy.name,
@@ -2574,7 +2613,7 @@ class MultiStrategyRunner:
                     self.executed_trades.append(trade_record)
                     self.executed_signals.append(trade_record)
                     self.performance_metrics.add_trade(
-                        "SELL", symbol, actual_filled_qty, exec_price, trade_value
+                        "SELL", symbol, actual_filled_qty, actual_fill_price, trade_value
                     )
                 except Exception as e:
                     logger.error(f"Failed to execute {symbol}: {e}")
