@@ -322,7 +322,7 @@ class DrawdownStopManager:
         # Check 4: At least one strategy enabled
         disabled_strategies = os.getenv("STRATEGY_DISABLED_LIST", "").split(",")
         disabled_strategies = [s.strip() for s in disabled_strategies if s.strip()]
-        checks["strategies_enabled"] = len(disabled_strategies) < 4  # At least 1 of 4 enabled
+        checks["strategies_enabled"] = len(disabled_strategies) < 7  # At least 1 of 7 enabled
 
         # Save health check artifact
         self._save_health_check_artifact(checks)
@@ -364,7 +364,7 @@ class DrawdownStopManager:
         """Send halt alert email."""
         subject = f"🛑 TRADING HALT: {drawdown:.2%} Drawdown"
 
-        message = f"""
+        message = f"""<html><body style="font-family:monospace;white-space:pre-wrap">
 TRADING HALT TRIGGERED
 
 Drawdown: {drawdown:.2%} (threshold: {self.halt_threshold:.1%})
@@ -384,9 +384,9 @@ RESUME PROTOCOL:
 4. Then return to normal sizing
 
 No manual intervention required unless health checks fail.
-"""
+</body></html>"""
 
-        self.email_notifier.send_alert(subject, message)
+        self.email_notifier._send_email(subject, message, is_html=True)
 
     def _send_panic_alert(self, drawdown: float, current_value: float, peak_value: float):
         """Send panic alert email."""
@@ -398,7 +398,7 @@ No manual intervention required unless health checks fail.
             else "NO - Positions will be managed normally"
         )
 
-        message = f"""
+        message = f"""<html><body style="font-family:monospace;white-space:pre-wrap">
 PANIC MODE TRIGGERED
 
 Drawdown: {drawdown:.2%} (threshold: {self.panic_threshold:.1%})
@@ -418,9 +418,9 @@ RESUME PROTOCOL:
 4. Then return to normal sizing
 
 IMMEDIATE MANUAL REVIEW RECOMMENDED.
-"""
+</body></html>"""
 
-        self.email_notifier.send_alert(subject, message)
+        self.email_notifier._send_email(subject, message, is_html=True)
 
     def should_flatten_positions(self) -> bool:
         """

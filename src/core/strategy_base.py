@@ -21,6 +21,7 @@ class TradingStrategy(ABC):
         self.initial_capital = capital
         self.positions: dict[str, float] = {}  # {symbol: shares}
         self.entry_dates: dict[str, object] = {}
+        self.entry_prices: dict[str, float] = {}
         self.trade_history: list[dict] = []
         # Tracks symbols where the first 50% tranche has already been sold.
         # Populated from DB system_state on startup; persisted back by execution_engine.
@@ -144,5 +145,10 @@ class TradingStrategy(ABC):
 
         entry_ts = pd.to_datetime(entry_date)
         asof_ts = pd.to_datetime(asof_date)
+        # Normalize to tz-naive to prevent TypeError when one side carries tz info
+        if hasattr(entry_ts, "tzinfo") and entry_ts.tzinfo is not None:
+            entry_ts = entry_ts.tz_localize(None)
+        if hasattr(asof_ts, "tzinfo") and asof_ts.tzinfo is not None:
+            asof_ts = asof_ts.tz_localize(None)
         days_held = int((asof_ts - entry_ts).days)
         return max(days_held, 0)

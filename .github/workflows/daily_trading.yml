@@ -85,7 +85,7 @@ jobs:
 
     - name: Create required directories
       run: |
-        mkdir -p artifacts/json artifacts/markdown artifacts/funnel artifacts/data_quality artifacts/drawdown artifacts/health logs data
+        mkdir -p artifacts/json artifacts/markdown artifacts/funnel artifacts/data_quality artifacts/drawdown artifacts/health artifacts/diagnostics logs data
 
     - name: Pre-execution broker sync
       continue-on-error: true

@@ -61,11 +61,11 @@ class DynamicAllocator:
 
             returns_array = np.array(returns)
 
-            if returns_array.std() == 0:
+            if returns_array.std(ddof=1) == 0:
                 sharpe_ratios[strategy_id] = 0.0
             else:
-                # Annualized Sharpe ratio
-                sharpe = np.sqrt(252) * (returns_array.mean() / returns_array.std())
+                # Annualized Sharpe ratio (ddof=1 consistent with PerformanceMetrics)
+                sharpe = np.sqrt(252) * (returns_array.mean() / returns_array.std(ddof=1))
                 sharpe_ratios[strategy_id] = max(sharpe, 0.0)  # Floor at 0
 
         return sharpe_ratios
@@ -116,7 +116,7 @@ class DynamicAllocator:
             equal_weight = 1.0 / num_strategies
             weights = {}
             for sid in strategy_ids:
-                weights[sid] = min(equal_weight, _max(sid))
+                weights[sid] = max(self.min_allocation, min(equal_weight, _max(sid)))
             total = sum(weights.values())
             if total < 1.0 - 1e-6:
                 uncapped = [sid for sid in strategy_ids if weights[sid] < _max(sid)]

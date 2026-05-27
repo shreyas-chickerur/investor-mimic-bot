@@ -697,9 +697,18 @@ class TradingDatabase:
         if entry_date:
             try:
                 from datetime import date
+                from datetime import datetime as _dt
 
-                ed = date.fromisoformat(entry_date[:10])
+                if isinstance(entry_date, _dt):
+                    ed = entry_date.date()
+                elif isinstance(entry_date, date):
+                    ed = entry_date
+                else:
+                    ed = date.fromisoformat(str(entry_date)[:10])
                 hold_days = (date.today() - ed).days
+                # Normalize entry_date to string for the INSERT
+                if not isinstance(entry_date, str):
+                    entry_date = ed.isoformat()
             except Exception:
                 pass
 
@@ -1576,7 +1585,6 @@ class TradingDatabase:
         This is the true idempotency gate: a second run on the same calendar day
         will find the first run's intent and skip re-submitting the order.
         """
-        today = datetime.now().strftime("%Y-%m-%d")
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
@@ -1587,11 +1595,11 @@ class TradingDatabase:
               AND symbol = ?
               AND side = ?
               AND status IN ('SUBMITTED', 'ACKED', 'FILLED')
-              AND created_at >= ?
+              AND DATE(created_at) = DATE('now')
             ORDER BY created_at DESC
             LIMIT 1
             """,
-            (strategy_id, symbol, side, today),
+            (strategy_id, symbol, side),
         )
         row = cursor.fetchone()
         conn.close()

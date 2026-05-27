@@ -427,6 +427,7 @@ class MLMomentumStrategy(TradingStrategy):
         )
         if len(spy_rows) < 50:
             return True  # not enough data — allow signals
+        spy_rows = spy_rows.sort_index()
         prices = spy_rows["close"].values
         sma50 = float(np.mean(prices[-50:]))
         above = float(prices[-1]) > sma50

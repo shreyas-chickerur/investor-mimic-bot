@@ -131,7 +131,7 @@ class PerformanceMetrics:
 
         # Max Drawdown
         if len(self.equity_curve) > 0:
-            equity_values = [e["portfolio_value"] for e in self.equity_curve]
+            equity_values = np.array([e["portfolio_value"] for e in self.equity_curve])
             running_max = np.maximum.accumulate(equity_values)
             drawdown = (equity_values - running_max) / running_max
             max_drawdown = abs(min(drawdown)) * 100 if len(drawdown) > 0 else 0

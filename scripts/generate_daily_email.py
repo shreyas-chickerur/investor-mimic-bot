@@ -589,7 +589,7 @@ def build_health_card(
 
     # 2. Data fresh — training_data.csv mtime
     csv_path = PROJECT_ROOT / "data" / "training_data.csv"
-    DATA_MAX_AGE_HOURS = 26
+    DATA_MAX_AGE_HOURS = 144
     if csv_path.exists():
         age_hours = (_time.time() - csv_path.stat().st_mtime) / 3600
         data_ok = age_hours < DATA_MAX_AGE_HOURS
@@ -620,12 +620,15 @@ def build_health_card(
         )
         db_tmp.close()
         if slo_row and slo_row.get("metrics_json"):
-            slo = _json.loads(slo_row["metrics_json"])
-            dpct = float(slo.get("daily_pnl_pct") or slo.get("daily_pnl") or 0)
-            if dpct < -5.0:
-                cb_ok, cb_detail = False, f"Tripped: {dpct:.1f}%"
-            else:
-                cb_detail = f"Daily: {'+' if dpct >= 0 else ''}{dpct:.1f}%"
+            try:
+                slo = _json.loads(slo_row["metrics_json"])
+                dpct = float(slo.get("daily_pnl_pct") or slo.get("daily_pnl") or 0)
+                if dpct < -5.0:
+                    cb_ok, cb_detail = False, f"Tripped: {dpct:.1f}%"
+                else:
+                    cb_detail = f"Daily: {'+' if dpct >= 0 else ''}{dpct:.1f}%"
+            except (_json.JSONDecodeError, ValueError, TypeError):
+                cb_detail = "Metrics parse error"
     except Exception:
         pass
 
@@ -2011,7 +2014,7 @@ def generate_email_body(db_path: str = "trading.db", include_visuals: bool = Tru
     import time as _time
 
     _csv = PROJECT_ROOT / "data" / "training_data.csv"
-    _data_stale = not _csv.exists() or ((_time.time() - _csv.stat().st_mtime) / 3600 >= 26)
+    _data_stale = not _csv.exists() or ((_time.time() - _csv.stat().st_mtime) / 3600 >= 144)
 
     _trades_html = build_today_trades(
         trades_today, sig_map, rejections=rejections, zero_trade_streak=zero_streak
