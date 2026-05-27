@@ -96,18 +96,18 @@ strategies:
     rsi_mean_reversion: 0.65
     earnings_drift: 0.80
     ml_momentum: 0.30
-    factor_momentum: 0.0
+    factor_momentum: 0.25
+    news_sentiment: 0.25
     ma_crossover: 0.20
     volatility_breakout: 0.20
 
   # Per-strategy allocation caps (override global max_allocation_pct)
-  # Based on backtest edge analysis: RSI p=0.019, Earnings Drift p=0.001,
-  # ML Momentum edge only at >0.65 confidence, Factor Momentum p=0.575 (no edge)
   allocation_overrides:
-    rsi_mean_reversion: 0.40   # Proven edge — allow up to 40%
-    earnings_drift: 0.35       # Proven edge — allow up to 35%
+    rsi_mean_reversion: 0.25   # Capped down from 0.40 — prior Sharpe doesn't warrant 40%
+    earnings_drift: 0.25       # Capped down from 0.35 — still highest-prior strategy
     ml_momentum: 0.20          # Edge at high-conf only — cap at 20%
-    factor_momentum: 0.05      # No demonstrated edge — pin to minimum
+    factor_momentum: 0.15      # Re-enabled; live P&L positive but limited sample
+    news_sentiment: 0.15       # Unvalidated — moderate cap
     ma_crossover: 0.15         # Unvalidated — moderate cap
     volatility_breakout: 0.15  # Unvalidated — moderate cap
 
@@ -123,21 +123,23 @@ strategies:
     fast_ma: 20
     slow_ma: 50
     volume_confirmation: true
+    volume_min_ratio: 0.3      # Liquidity floor only — not a momentum filter
+    cross_lookback: 5          # Accept golden cross within last 5 trading days
 
   ml_momentum:
     lookback_days: 60
-    min_confidence: 0.65  # Raised from 0.60 — live 25% win rate required higher bar
+    min_confidence: 0.65
     feature_count: 12
-    max_new_positions_per_day: 2  # Reduced from 3 — fewer but higher-conviction entries
-    buy_quantile_threshold: 0.70  # Raised from 0.65 — only top-decile ML signals
+    max_new_positions_per_day: 2
+    buy_quantile_threshold: 0.70
 
   factor_momentum:
-    disabled: true  # No edge: p=0.575, profit factor 0.80 — frozen pending redesign
-    top_n: 3  # Reduced from 5 — higher conviction, lower overtrading cost drag
+    disabled: false  # Re-enabled: live P&L +$714, 50% win rate (2 closed trades)
+    top_n: 3
 
   earnings_drift:
-    volume_spike_threshold: 1.3  # Volume must be ≥1.3× 20-day avg (relaxed from 2.0)
-    calendar_entry_window_days: 5  # Entry up to T+5 after earnings (relaxed from 3)
+    volume_spike_threshold: 1.3
+    calendar_entry_window_days: 5
     drift_hold_days: 40
     profit_target_pct: 0.20
     stop_loss_pct: 0.10
@@ -146,7 +148,7 @@ strategies:
   volatility_breakout:
     atr_period: 14
     breakout_multiplier: 2.0
-    volume_surge_threshold: 1.5
+    volume_spike_min: 1.2      # Lowered from 1.5 — max universe vol today was 1.46
 
 # Data Management
 data:

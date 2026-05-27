@@ -619,10 +619,15 @@ class TradingDatabase:
         daily_pnl_pct = daily_pnl / prev_value if prev_value else 0.0
         peak_value = max(prev_peak, portfolio_value)
 
-        # Cumulative P&L: read initial capital from strategies table
-        cursor.execute('SELECT SUM(initial_capital) FROM strategies WHERE name != "BROKER_SYNC"')
-        row = cursor.fetchone()
-        initial_capital = row[0] if row and row[0] else portfolio_value
+        # Cumulative P&L: use first recorded portfolio snapshot as baseline.
+        # SUM(initial_capital) across all strategies exceeds the actual broker account
+        # value because strategies were added over time — each carries its own budget,
+        # making the total appear far larger than what the broker ever held.
+        cursor.execute(
+            "SELECT portfolio_value FROM daily_portfolio_snapshot ORDER BY snapshot_date ASC LIMIT 1"
+        )
+        first_snap = cursor.fetchone()
+        initial_capital = first_snap[0] if first_snap else portfolio_value
         cumulative_pnl = portfolio_value - initial_capital
 
         drawdown_pct = (peak_value - portfolio_value) / peak_value if peak_value else 0.0

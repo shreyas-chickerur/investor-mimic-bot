@@ -40,8 +40,10 @@ class MACrossoverStrategy(TradingStrategy):
         self.max_hold_days = cfg.get("strategies.ma_crossover.max_hold_days", 50)
         self.profit_target_pct = cfg.get("strategies.ma_crossover.profit_target_pct", 0.12)
         self.let_winners_run_pct = cfg.get("strategies.ma_crossover.let_winners_run_pct", 0.05)
-        self.volume_min_ratio = cfg.get("strategies.ma_crossover.volume_min_ratio", 0.8)
+        self.volume_min_ratio = cfg.get("strategies.ma_crossover.volume_min_ratio", 0.3)
+        self.cross_lookback = cfg.get("strategies.ma_crossover.cross_lookback", 5)
         self.entry_dates: dict = {}
+        self._partial_exit_done: set = set()
 
     def _spy_above_sma50(self, market_data: pd.DataFrame) -> bool:
         spy = (
@@ -96,8 +98,17 @@ class MACrossoverStrategy(TradingStrategy):
             if any(pd.isna(v) for v in [sma20_now, sma50_now, sma20_prev, sma50_prev]):
                 continue
 
-            golden_cross = sma20_prev <= sma50_prev and sma20_now > sma50_now
             death_cross = sma20_prev >= sma50_prev and sma20_now < sma50_now
+
+            # Entry window: accept a golden cross within the last `cross_lookback` days.
+            # The exact crossover day fires infrequently — widening to 5 days catches the
+            # setup before it runs away while still requiring a recent event.
+            lookback = min(self.cross_lookback, len(sym_data) - 1)
+            recently_below = any(
+                sym_data["sma_20"].iloc[-(i + 1)] <= sym_data["sma_50"].iloc[-(i + 1)]
+                for i in range(1, lookback + 1)
+            )
+            golden_cross = sma20_now > sma50_now and recently_below
 
             adx_raw = latest.get("adx", None)
             adx = float(adx_raw) if adx_raw is not None and not pd.isna(adx_raw) else None

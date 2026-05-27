@@ -2708,20 +2708,19 @@ class MultiStrategyRunner:
         )
 
     def _calculate_dynamic_allocations(self, strategies):
-        """Calculate strategy allocations from recent performance"""
+        """Calculate strategy allocations from actual closed-trade P&L.
+
+        Previously used strategy_performance.portfolio_value history, which is
+        contaminated by the allocator's own capital re-assignments (a strategy
+        getting more budget registers as a large positive "return", creating a
+        self-reinforcing feedback loop). Using per-trade gross_pnl_pct from
+        trade_pnl_detail gives genuine edge signal — the same data used by the
+        trailing Sharpe logger and health scorer.
+        """
         performance_data = {}
         for strategy in strategies:
-            history = self.db.get_strategy_performance(strategy.strategy_id, days=60)
-            if history:
-                values = [row["portfolio_value"] for row in reversed(history)]
-                returns = []
-                for idx in range(1, len(values)):
-                    prev = values[idx - 1]
-                    if prev:
-                        returns.append((values[idx] - prev) / prev)
-                performance_data[strategy.strategy_id] = returns
-            else:
-                performance_data[strategy.strategy_id] = []
+            returns = self.db.get_strategy_trade_returns(strategy.strategy_id, days=60)
+            performance_data[strategy.strategy_id] = returns
 
         config_key_map = {s.name.lower().replace(" ", "_"): s.strategy_id for s in strategies}
 
