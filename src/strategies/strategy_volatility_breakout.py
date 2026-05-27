@@ -32,7 +32,10 @@ class VolatilityBreakoutStrategy(TradingStrategy):
     def __init__(self, strategy_id: int, capital: float):
         super().__init__(strategy_id=strategy_id, name="Volatility Breakout", capital=capital)
         cfg = get_config()
-        self.volume_spike_min = cfg.get("strategies.volatility_breakout.volume_spike_min", 1.5)
+        self.volume_spike_min = cfg.get(
+            "strategies.volatility_breakout.volume_spike_min",
+            cfg.get("strategies.volatility_breakout.volume_surge_threshold", 1.2),
+        )
         self.hold_days = cfg.get("strategies.volatility_breakout.hold_days", 15)
         self.max_hold_days = cfg.get("strategies.volatility_breakout.max_hold_days", 25)
         self.profit_target_pct = cfg.get("strategies.volatility_breakout.profit_target_pct", 0.08)
