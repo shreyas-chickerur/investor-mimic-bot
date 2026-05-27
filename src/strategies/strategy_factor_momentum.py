@@ -105,6 +105,7 @@ class FactorMomentumStrategy(TradingStrategy):
         self.let_winners_run_pct = 0.05  # hold past time exit if ≥5% in profit
         self.entry_dates = {}
         self._last_rerank_date = None
+        self._partial_exit_done: set = set()
 
     def _load_fundamentals(self) -> dict[str, dict]:
         """Load fundamental data from data/fundamentals.json. Returns empty dict if absent."""
@@ -343,6 +344,7 @@ class FactorMomentumStrategy(TradingStrategy):
                         "value": exit_shares * price,
                         "confidence": 0.9 if partial_exit else 0.7,
                         "reasoning": exit_reason,
+                        "asof_date": latest_date,
                         "partial_exit": partial_exit,
                     }
                 )
@@ -396,6 +398,7 @@ class FactorMomentumStrategy(TradingStrategy):
                     "confidence": confidence,
                     "reasoning": f"Factor rank score {score:.3f} (top {len(candidates)})",
                     "atr": atr if atr > 0 else None,
+                    "asof_date": latest_date,
                 }
             )
 

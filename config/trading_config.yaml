@@ -126,6 +126,12 @@ strategies:
     volume_min_ratio: 0.3      # Liquidity floor only — not a momentum filter
     cross_lookback: 5          # Accept golden cross within last 5 trading days
 
+  news_sentiment:
+    buy_threshold: 0.60    # Lowered from 0.68; VADER compound >0.36 was rarely met
+    sell_threshold: 0.38
+    hold_days: 7
+    max_hold_days: 14
+
   ml_momentum:
     lookback_days: 60
     min_confidence: 0.65
