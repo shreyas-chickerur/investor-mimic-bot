@@ -289,8 +289,10 @@ class MultiStrategyRunner:
         # Track P&L metrics
         self.initial_portfolio_value = self.portfolio_value
         self.peak_portfolio_value = self._get_peak_portfolio_value()
-        self.cumulative_pnl = 0.0
-        self.max_drawdown = 0.0
+        _cpnl = self.db.get_system_state("cumulative_pnl")
+        self.cumulative_pnl = float(_cpnl) if _cpnl else 0.0
+        _mdd = self.db.get_system_state("max_drawdown")
+        self.max_drawdown = float(_mdd) if _mdd else 0.0
 
         # Initialize reconciliation state so finally block never hits AttributeError
         self.reconciliation_status = "UNKNOWN"
@@ -469,6 +471,9 @@ class MultiStrategyRunner:
 
         if drawdown > self.max_drawdown:
             self.max_drawdown = drawdown
+
+        self.db.set_system_state("cumulative_pnl", str(self.cumulative_pnl))
+        self.db.set_system_state("max_drawdown", str(self.max_drawdown))
 
         return {
             "final_portfolio_value": final_portfolio_value,
@@ -1618,7 +1623,7 @@ class MultiStrategyRunner:
                         )
 
                         # Execute trades
-                        executed = self._execute_strategy_trades(
+                        executed, total_exposure = self._execute_strategy_trades(
                             strategy, signals_to_execute, total_exposure, self.portfolio_value
                         )
 
@@ -2379,6 +2384,7 @@ class MultiStrategyRunner:
                             logger.warning("Failed to update order intent status for %s", intent_id)
 
             elif action == "SELL" and shares > 0:
+                sell_intent_id = None
                 try:
                     # Wash trade prevention: skip if already bought this symbol this run
                     if symbol in self.symbols_bought_this_run:
@@ -2400,6 +2406,23 @@ class MultiStrategyRunner:
                         # Clean up stale in-memory state to match DB reality
                         strategy.positions.pop(symbol, None)
                         continue
+
+                    # Idempotency gate for SELL: GHA retries would re-submit exit orders,
+                    # potentially creating short positions if the first run already sold.
+                    existing_sell = self.db.find_active_order_intent_for_today(
+                        strategy.strategy_id, symbol, "SELL"
+                    )
+                    if existing_sell:
+                        logger.warning(
+                            "Idempotency guard: %s SELL already %s today (intent %s) — skipping",
+                            symbol,
+                            existing_sell["status"],
+                            existing_sell["intent_id"],
+                        )
+                        continue
+                    sell_intent_id = self.db.create_order_intent(
+                        strategy.strategy_id, symbol, "SELL", shares
+                    )
 
                     (
                         exec_price,
@@ -2473,6 +2496,13 @@ class MultiStrategyRunner:
                         f"  ✅ SELL {actual_filled_qty} {symbol} @ ${actual_fill_price:.2f} (Order: {order.id})"
                     )
                     self.symbols_sold_this_run.add(symbol)
+                    if sell_intent_id:
+                        try:
+                            self.db.update_order_intent_status(
+                                sell_intent_id, "FILLED", broker_order_id=str(order.id)
+                            )
+                        except Exception as _ie:
+                            logger.warning("Failed to update SELL intent status: %s", _ie)
 
                     # PDT guardrail: track day trades (buy and sell same symbol same day)
                     if symbol in self.symbols_bought_this_run:
@@ -2618,8 +2648,15 @@ class MultiStrategyRunner:
                 except Exception as e:
                     logger.error(f"Failed to execute {symbol}: {e}")
                     print(f"  ❌ Failed {symbol}: {e}")
+                    if sell_intent_id:
+                        try:
+                            self.db.update_order_intent_status(
+                                sell_intent_id, "FAILED", error=str(e)
+                            )
+                        except Exception:
+                            pass
 
-        return executed
+        return executed, total_exposure
 
     def _record_performance(self, strategy, current_prices):
         """Record daily performance for a strategy into DB for dynamic allocation."""
