@@ -217,17 +217,20 @@ def sync_broker_to_database(db_path="trading.db"):
 
             else:
                 # Local has more shares than broker — reduce
+                # Sort by abs(shares) so the largest positions absorb the excess first.
+                # Using abs() is critical for short positions (negative shares) where
+                # sorting by raw value would put the biggest shorts last.
                 excess = abs(diff)
-                strats = sorted(local_info["strategies"], key=lambda x: x[2], reverse=True)
+                strats = sorted(local_info["strategies"], key=lambda x: abs(x[2]), reverse=True)
 
                 for sid, sname, sshares, _ in strats:
                     if excess <= 0:
                         break
-                    reduce = min(sshares, excess)
+                    reduce = min(abs(sshares), excess)
                     new_shares = sshares - reduce
                     excess -= reduce
 
-                    if new_shares <= 0:
+                    if new_shares == 0:
                         cursor.execute(
                             "DELETE FROM positions WHERE strategy_id = ? AND symbol = ?",
                             (sid, symbol),
