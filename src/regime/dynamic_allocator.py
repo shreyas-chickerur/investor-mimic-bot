@@ -66,7 +66,7 @@ class DynamicAllocator:
             else:
                 # Annualized Sharpe ratio (ddof=1 consistent with PerformanceMetrics)
                 sharpe = np.sqrt(252) * (returns_array.mean() / returns_array.std(ddof=1))
-                sharpe_ratios[strategy_id] = max(sharpe, 0.0)  # Floor at 0
+                sharpe_ratios[strategy_id] = sharpe
 
         return sharpe_ratios
 
@@ -104,7 +104,7 @@ class DynamicAllocator:
         for sid in strategy_ids:
             live_returns = (strategy_performance or {}).get(sid, [])
             if len(live_returns) < 20 and sid in prior_sharpes:
-                sharpe_ratios[sid] = max(prior_sharpes[sid], 0.0)
+                sharpe_ratios[sid] = prior_sharpes[sid]
                 logger.info(
                     f"Strategy {sid}: using prior Sharpe {prior_sharpes[sid]:.2f} (only {len(live_returns)} live days)"
                 )

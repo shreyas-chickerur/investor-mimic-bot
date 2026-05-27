@@ -101,11 +101,11 @@ def get_strategy_performance(db_path="trading.db", days=30):
         total_trades = all_trade_count
         wins = sum(1 for t in trades if t["pnl"] > 0)
         losses = sum(1 for t in trades if t["pnl"] < 0)
-        win_rate = (wins / closed_sells * 100) if closed_sells > 0 else 0.0
+        win_rate = (wins / len(trades) * 100) if len(trades) > 0 else 0.0
 
         pnls = [t["pnl"] for t in trades]
         total_pnl = sum(pnls)
-        avg_pnl = total_pnl / closed_sells if closed_sells > 0 else 0.0
+        avg_pnl = total_pnl / len(trades) if len(trades) > 0 else 0.0
         max_win = max(pnls) if pnls else 0.0
         max_loss = min(pnls) if pnls else 0.0
 

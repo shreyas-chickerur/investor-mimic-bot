@@ -156,7 +156,7 @@ def _data_age_hours(conn: sqlite3.Connection) -> float | None:
 
 def _circuit_breaker(conn: sqlite3.Connection) -> bool:
     raw = _scalar(conn, "SELECT value FROM system_state WHERE key = 'circuit_breaker_active'")
-    return (raw or "false").lower() not in ("true", "1")
+    return (raw or "false").lower() in ("true", "1")
 
 
 def _run_number() -> str:

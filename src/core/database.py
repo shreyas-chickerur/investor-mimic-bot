@@ -1595,7 +1595,7 @@ class TradingDatabase:
               AND symbol = ?
               AND side = ?
               AND status IN ('SUBMITTED', 'ACKED', 'FILLED')
-              AND DATE(created_at) = DATE('now')
+              AND DATE(created_at, 'localtime') = DATE('now', 'localtime')
             ORDER BY created_at DESC
             LIMIT 1
             """,

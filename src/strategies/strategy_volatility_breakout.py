@@ -154,7 +154,7 @@ class VolatilityBreakoutStrategy(TradingStrategy):
 
             # Width of bands relative to price — wider = more volatile = more meaningful breakout
             band_width = (bb_upper - bb_lower) / bb_middle if bb_middle > 0 else 0.0
-            excess = (price - bb_upper) / bb_upper  # how far above the band
+            excess = (price - bb_upper) / bb_upper if bb_upper > 0 else 0.0
             confidence = min(0.88, 0.55 + vol_ratio * 0.08 + excess * 5 + band_width * 0.5)
 
             shares = self.calculate_position_size(price, atr=atr, max_position_pct=0.08)

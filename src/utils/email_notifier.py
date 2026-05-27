@@ -79,7 +79,7 @@ class EmailNotifier:
         <h2 style="color: #dc3545;">Error Occurred</h2>
         <p style="font-size: 16px; color: #333;">{error_message}</p>
 
-        {f'<div style="background: white; padding: 15px; border-left: 4px solid #dc3545; margin-top: 15px;"><pre style="margin: 0; white-space: pre-wrap;">{details}</pre></div>' if details else ''}
+        {f'<div style="background: white; padding: 15px; border-left: 4px solid #dc3545; margin-top: 15px;"><pre style="margin: 0; white-space: pre-wrap;">{__import__("html").escape(str(details))}</pre></div>' if details else ''}
 
         <p style="margin-top: 20px; color: #666;">
             <strong>Time:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}<br>

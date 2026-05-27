@@ -184,7 +184,7 @@ class MACrossoverStrategy(TradingStrategy):
             if shares <= 0:
                 continue
 
-            gap_pct = (sma20_now - sma50_now) / sma50_now if sma50_now else 0.0
+            gap_pct = (sma20_now - sma50_now) / sma50_now if sma50_now > 1e-6 else 0.0
             confidence = min(0.88, 0.55 + abs(gap_pct) * 5 + (((adx or 25) - 20) / 100))
             signals.append(
                 {
