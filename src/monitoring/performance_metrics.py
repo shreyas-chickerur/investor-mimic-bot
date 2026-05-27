@@ -163,7 +163,12 @@ class PerformanceMetrics:
         # Profit Factor
         total_wins = wins["pnl"].sum() if len(wins) > 0 else 0
         total_losses = abs(losses["pnl"].sum()) if len(losses) > 0 else 0
-        profit_factor = total_wins / total_losses if total_losses > 0 else 0
+        if total_losses > 0:
+            profit_factor = total_wins / total_losses
+        elif total_wins > 0:
+            profit_factor = float("inf")
+        else:
+            profit_factor = 0.0
 
         # Average hold time
         avg_hold_days = df_trades["hold_days"].mean()

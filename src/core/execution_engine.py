@@ -951,6 +951,24 @@ class MultiStrategyRunner:
                     self.stop_loss_manager.remove_stop_loss(symbol)
                     continue
 
+                # Idempotency guard: GHA retries must not re-submit stop-loss exits
+                # that already completed in a prior run (would create a short).
+                existing_stop_intent = self.db.find_active_order_intent_for_today(
+                    position["strategy_id"], symbol, "SELL"
+                )
+                if existing_stop_intent:
+                    logger.warning(
+                        "Idempotency guard: stop-loss SELL %s already %s today (intent %s) — skipping",
+                        symbol,
+                        existing_stop_intent["status"],
+                        existing_stop_intent["intent_id"],
+                    )
+                    self.stop_loss_manager.remove_stop_loss(symbol)
+                    continue
+                stop_intent_id = self.db.create_order_intent(
+                    position["strategy_id"], symbol, "SELL", shares
+                )
+
                 logger.info(f"Executing stop loss exit: SELL {shares} {symbol}")
 
                 # Create market order to close position - DAY fills immediately during market hours
@@ -1010,6 +1028,13 @@ class MultiStrategyRunner:
 
                 # Remove stop loss tracking
                 self.stop_loss_manager.remove_stop_loss(symbol)
+
+                try:
+                    self.db.update_order_intent_status(
+                        stop_intent_id, "FILLED", broker_order_id=str(order.id)
+                    )
+                except Exception as _ie:
+                    logger.warning("Failed to update stop-loss intent status: %s", _ie)
 
                 logger.info(f"Stop loss exit executed: {symbol} order {order.id}")
 
@@ -1671,8 +1696,9 @@ class MultiStrategyRunner:
                                         signal_id, "FILTERED", _reason
                                     )
 
-                        # Mark throttled signals as FILTERED
-                        for signal in signals[max_signals:]:
+                        # Mark throttled BUY signals as FILTERED (only BUYs are capped by top_n;
+                        # SELLs always execute so they are never throttled here)
+                        for signal in _buys[max(0, max_signals - len(_sells)) :]:
                             signal_id = signal.get("signal_id")
                             if signal_id:
                                 self.db.update_signal_terminal_state(
@@ -1804,8 +1830,8 @@ class MultiStrategyRunner:
             row = _cur.fetchone()
             realized_pnl = float(row[0]) if row else 0.0
             _conn.close()
-        except Exception:
-            pass
+        except Exception as _e:
+            logger.warning("Failed to load realized P&L for strategy loss check: %s", _e)
 
         # Unrealized P&L: (current_price - avg_entry_price) * shares for open positions
         current_prices: dict = {}
@@ -1818,8 +1844,8 @@ class MultiStrategyRunner:
                 current_prices = (
                     _df.groupby("symbol")["close"].last().dropna().astype(float).to_dict()
                 )
-        except Exception:
-            pass
+        except Exception as _e:
+            logger.warning("Failed to load price data for strategy loss check: %s", _e)
 
         unrealized_pnl = 0.0
         try:
@@ -1833,8 +1859,8 @@ class MultiStrategyRunner:
                 current = current_prices.get(sym, avg_price)
                 unrealized_pnl += (current - avg_price) * shares
             _conn.close()
-        except Exception:
-            pass
+        except Exception as _e:
+            logger.warning("Failed to compute unrealized P&L for strategy loss check: %s", _e)
 
         total_pnl = realized_pnl + unrealized_pnl
         loss_pct = (-total_pnl / reference_capital) if total_pnl < 0 else 0.0
@@ -2040,7 +2066,7 @@ class MultiStrategyRunner:
                     _t = (_conf - 0.55) / (0.90 - 0.55)
                     conviction_mult = round(0.75 + _t * (1.25 - 0.75), 3)
                     combined_mult = size_mult * drawdown_mult * strategy_mult * conviction_mult
-                    adjusted_shares = int(shares * combined_mult)
+                    adjusted_shares = round(shares * combined_mult)
 
                     if adjusted_shares == 0:
                         logger.info(f"Skipping {symbol} - size multiplier reduced shares to 0")
@@ -2589,7 +2615,9 @@ class MultiStrategyRunner:
                             # Remove stop loss when position is fully closed
                             self.stop_loss_manager.remove_stop_loss(symbol)
                             logger.info(f"Stop loss removed for {symbol} (position closed)")
-                            total_exposure = max(total_exposure - trade_value, 0)
+                            total_exposure = max(
+                                total_exposure - actual_fill_price * actual_filled_qty, 0
+                            )
                             # Clear partial-exit DB flag now that position is gone
                             self.db.set_system_state(
                                 f"partial_exit_{strategy.strategy_id}_{symbol}", "0"
