@@ -38,6 +38,7 @@ class VolatilityBreakoutStrategy(TradingStrategy):
         self.profit_target_pct = cfg.get("strategies.volatility_breakout.profit_target_pct", 0.08)
         self.min_return_5d = cfg.get("strategies.volatility_breakout.min_return_5d", 0.0)
         self.entry_dates: dict = {}
+        self._partial_exit_done: set = set()
 
     def _spy_above_sma50(self, market_data: pd.DataFrame) -> bool:
         spy = (

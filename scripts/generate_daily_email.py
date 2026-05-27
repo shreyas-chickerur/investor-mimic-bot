@@ -120,11 +120,10 @@ def get_equity_curve(db, days: int = 30) -> list[dict]:
     return _q(
         db,
         """
-        SELECT snapshot_date AS date, MAX(portfolio_value) AS total
+        SELECT snapshot_date AS date, portfolio_value AS total
         FROM broker_state
-        WHERE snapshot_type IN ('START','END')
+        WHERE snapshot_type = 'END'
           AND snapshot_date >= date('now', ?)
-        GROUP BY snapshot_date
         ORDER BY snapshot_date
         """,
         f"-{days} days",
