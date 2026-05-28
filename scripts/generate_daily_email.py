@@ -1035,18 +1035,27 @@ def build_strategy_dashboard(
 
         # Right-side stat: unrealized P&L, dash, or nothing
         if open_count > 0:
-            unr_col = GREEN if unr >= 0 else RED
-            right_html = (
-                f'<td align="right" style="font-family:{SERIF};color:{unr_col};'
-                f"font-size:18px;font-weight:bold;vertical-align:top;"
-                f'white-space:nowrap;padding-left:12px;">'
-                f"{fmt_money(unr, sign=True)}</td>"
-            )
+            prices_look_stale = abs(unr) < 0.01
+            if prices_look_stale:
+                right_html = (
+                    f'<td align="right" style="font-family:{FONT};color:{INK_MUTE};'
+                    f"font-size:13px;vertical-align:top;padding-left:12px;"
+                    f'white-space:nowrap;">'
+                    f"{open_count} position{'s' if open_count != 1 else ''} &middot; prices loading</td>"
+                )
+            else:
+                unr_col = GREEN if unr >= 0 else RED
+                right_html = (
+                    f'<td align="right" style="font-family:{SERIF};color:{unr_col};'
+                    f"font-size:18px;font-weight:bold;vertical-align:top;"
+                    f'white-space:nowrap;padding-left:12px;">'
+                    f"{fmt_money(unr, sign=True)}</td>"
+                )
         elif is_active:
             right_html = (
                 f'<td align="right" style="font-family:{FONT};color:{INK_MUTE};'
                 f'font-size:13px;vertical-align:top;padding-left:12px;">'
-                f"watching &middot; &mdash;</td>"
+                f"scanning &middot; no positions</td>"
             )
         else:
             right_html = (
@@ -1054,11 +1063,16 @@ def build_strategy_dashboard(
                 f'font-size:13px;vertical-align:top;padding-left:12px;">&mdash;</td>'
             )
 
-        # Allocation bar: width = % of portfolio, teal if positive/flat, red if loss
+        # Allocation bar: width = % of portfolio, teal if active+profit, red if loss, grey if undeployed
         alloc_pct = (
             max(1, min(95, int(capital_alloc / _alloc_base * 100))) if capital_alloc > 0 else 5
         )
-        bar_col = RED if (open_count > 0 and unr < 0) else TEAL
+        if open_count > 0 and unr < -0.01:
+            bar_col = RED
+        elif open_count == 0:
+            bar_col = INK_FAINT  # grey = budget reserved but not deployed
+        else:
+            bar_col = TEAL
         alloc_bar = (
             f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"'
             f' style="margin-top:12px;background-color:{CARD_ALT};border-radius:6px;height:8px;"><tr>'
@@ -1071,8 +1085,11 @@ def build_strategy_dashboard(
         # Footer line: allocation %, position count, or "not implemented" warning
         footer_parts = []
         if is_active and capital_alloc > 0:
-            footer_parts.append(f"{alloc_pct}% of portfolio")
-        if open_count > 0:
+            if open_count > 0:
+                footer_parts.append(f"{alloc_pct}% capital deployed")
+            else:
+                footer_parts.append(f"{alloc_pct}% capital budgeted &middot; waiting for signals")
+        elif open_count > 0:
             footer_parts.append(f"{open_count} position{'s' if open_count != 1 else ''}")
         footer_txt = " &middot; ".join(footer_parts) if footer_parts else ""
 
@@ -1260,35 +1277,43 @@ def build_today_trades(
             action_label = "SELL"
 
         rows_html += f"""
-<div style="display:flex;align-items:flex-start;gap:16px;
-            padding:20px 32px;border-top:1px solid {BORDER};">
-  <div style="flex-shrink:0;padding-top:3px;">
-    <span style="display:inline-block;background:{action_bg_col};color:{action_col};
-                 border:1px solid {action_bdr};font-family:{FONT};
-                 font-size:10px;font-weight:800;letter-spacing:0.14em;
-                 padding:5px 12px;border-radius:4px;">{action_label}</span>
-  </div>
-  <div style="flex:1;">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-      <div>
-        <span style="font-family:{MONO};font-size:22px;font-weight:700;
-                     color:{INK};letter-spacing:-0.02em;">{html_lib.escape(sym)}</span>
-        <span style="font-family:{FONT};font-size:12px;color:{INK_MUTE};margin-left:10px;">
-          {int(shares)} sh @ ${price:,.2f}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+       style="border-top:1px solid {BORDER};">
+<tr><td style="padding:26px 32px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr>
+    <td width="64" style="vertical-align:top;padding-right:20px;padding-top:4px;">
+      <span style="display:inline-block;background:{action_bg_col};color:{action_col};
+                   border:1px solid {action_bdr};font-family:{FONT};
+                   font-size:10px;font-weight:800;letter-spacing:0.14em;
+                   padding:6px 14px;border-radius:4px;">{action_label}</span>
+    </td>
+    <td style="vertical-align:top;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+      <tr>
+        <td style="vertical-align:bottom;">
+          <span style="font-family:{MONO};font-size:22px;font-weight:700;
+                       color:{INK};letter-spacing:-0.02em;">{html_lib.escape(sym)}</span>
+        </td>
+        <td align="right" style="vertical-align:top;padding-top:3px;">{pnl_html}</td>
+      </tr>
+      </table>
+      <div style="font-family:{FONT};font-size:13px;color:{INK_MUTE};margin-top:6px;">
+        {int(shares)} shares &nbsp;&middot;&nbsp; ${price:,.2f} per share
+      </div>
+      <div style="font-family:{FONT};font-size:12px;color:{INK_DIM};
+                  margin-top:10px;line-height:1.55;">{html_lib.escape(reason)}</div>
+      <div style="margin-top:10px;">
+        <span style="font-family:{FONT};font-size:10px;color:{s_ink};
+                     font-weight:700;letter-spacing:0.05em;text-transform:uppercase;">
+          {html_lib.escape(_short_strategy(strat))}
         </span>
       </div>
-      <div style="padding-top:4px;">{pnl_html}</div>
-    </div>
-    <div style="font-family:{FONT};font-size:12px;color:{INK_DIM};
-                margin-top:6px;line-height:1.45;">{html_lib.escape(reason)}</div>
-    <div style="margin-top:6px;">
-      <span style="font-family:{FONT};font-size:10px;color:{s_ink};
-                   font-weight:700;letter-spacing:0.04em;">
-        {html_lib.escape(_short_strategy(strat))}
-      </span>
-    </div>
-  </div>
-</div>
+    </td>
+  </tr>
+  </table>
+</td></tr>
+</table>
 """
     return f'<div style="background:{CARD};">{rows_html}</div>'
 
@@ -1310,22 +1335,43 @@ def build_movers(positions: list[dict], top_n: int = 3) -> str:
     def _mover_row(p: dict, col: str) -> str:
         sym = html_lib.escape(p.get("symbol") or "")
         pct = _pct(p)
-        pct_str = f"{'+' if pct >= 0 else ''}{pct:.1f}%"
+        entry = float(p.get("entry_price") or p.get("avg_price") or 0)
+        curr = float(p.get("current_price") or entry)
+        is_stale = abs(curr - entry) < 0.001
+        pct_str = "—" if is_stale else f"{'+' if pct >= 0 else ''}{pct:.1f}%"
+        pnl_dollar = float(p.get("unrealized_pnl") or 0)
+        dollar_str = "" if is_stale else fmt_money(pnl_dollar, sign=True)
+        sub = (
+            f'<span style="font-family:{FONT};font-size:10px;color:{INK_FAINT};">price pending</span>'
+            if is_stale
+            else f'<span style="font-family:{FONT};font-size:10px;color:{INK_MUTE};">{dollar_str} since entry</span>'
+        )
         return f"""
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+       style="padding:6px 0;">
+<tr>
   <td style="font-family:{FONT};color:{INK};font-size:14px;font-weight:bold;
-             padding:5px 0;">{sym}</td>
-  <td align="right" style="font-family:{SERIF};color:{col};font-size:13px;
-             padding:5px 0;">{pct_str}</td>
-</tr></table>"""
+             vertical-align:middle;">{sym}</td>
+  <td align="right" style="font-family:{SERIF};color:{col};font-size:14px;font-weight:bold;
+             vertical-align:middle;">{pct_str}</td>
+</tr>
+<tr>
+  <td colspan="2" style="padding-bottom:4px;">{sub}</td>
+</tr>
+</table>"""
 
     def _half_card(title: str, title_col: str, items: list[dict], col: str, arrow: str) -> str:
         if items:
             rows = "".join(_mover_row(p, col) for p in items)
         else:
+            no_data_msg = (
+                "No positions are up right now."
+                if "Gainers" in title
+                else "No positions are down right now."
+            )
             rows = (
                 f'<div style="font-family:{FONT};color:{INK_FAINT};font-size:13px;'
-                f'font-style:italic;padding-top:4px;">No notable {title.lower().replace(arrow + " ", "")} today.</div>'
+                f'font-style:italic;padding-top:4px;">{no_data_msg}</div>'
             )
         return f"""
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
@@ -1340,7 +1386,7 @@ def build_movers(positions: list[dict], top_n: int = 3) -> str:
 </table>"""
 
     gainers_card = _half_card("Top Gainers", GREEN, winners, GREEN, "&#9650;")
-    losers_card = _half_card("Watch List", RED, losers, RED, "&#9660;")
+    losers_card = _half_card("Laggards", RED, losers, RED, "&#9660;")
 
     return f"""
 <tr><td style="padding:0 0 12px 0;">
@@ -1352,7 +1398,7 @@ def build_movers(positions: list[dict], top_n: int = 3) -> str:
 """
 
 
-# ── Section: Open Positions (simple 3-column card) ────────────────────────────
+# ── Section: Open Positions ────────────────────────────────────────────────────
 def build_positions(positions: list[dict]) -> str:
     MAX_ROWS = 6
     shown = positions[:MAX_ROWS]
@@ -1364,63 +1410,69 @@ def build_positions(positions: list[dict]) -> str:
         else ""
     )
 
-    _LABEL_STYLE = (
-        f"padding:12px 0 10px 0;font-family:{FONT};color:{INK_FAINT};"
-        f"font-size:10px;letter-spacing:1px;text-transform:uppercase;"
-        f"border-bottom:1px solid {BORDER};"
-    )
-
     if not shown:
-        inner_rows = (
-            f'<tr><td colspan="3" style="padding:18px 0;font-family:{FONT};'
-            f'color:{INK_FAINT};font-size:13px;font-style:italic;">'
-            f"No open positions right now.</td></tr>"
+        inner_html = (
+            f'<div style="padding:20px 0;font-family:{FONT};color:{INK_FAINT};'
+            f'font-size:13px;font-style:italic;">No open positions right now.</div>'
         )
     else:
-        # Header row — shared table so widths are consistent across all data rows
-        header = (
-            f"<tr>"
-            f'<td width="35%" style="{_LABEL_STYLE}">Symbol</td>'
-            f'<td width="28%" align="right" style="{_LABEL_STYLE}">Value</td>'
-            f'<td width="37%" align="right" style="{_LABEL_STYLE}">Unreal. P&amp;L</td>'
-            f"</tr>"
-        )
-
-        data_rows = ""
+        rows_html = ""
         for i, p in enumerate(shown):
             sym = p.get("symbol") or ""
             shares = float(p.get("shares") or 0)
             avg = float(p.get("avg_price") or 0)
             curr = float(p.get("current_price") or avg)
             stored_unr = float(p.get("unrealized_pnl") or 0)
+            days_held = int(p.get("days_held") or 0)
             value = shares * curr
 
             prices_stale = abs(curr - avg) < 0.001
             if prices_stale and stored_unr == 0.0:
-                pnl_col, pnl_str = INK_FAINT, "&mdash;"
+                pnl_col = INK_FAINT
+                pnl_main = "&mdash;"
+                pnl_sub = ""
             else:
-                unr = stored_unr if stored_unr != 0.0 else (shares * (curr - avg))
+                unr = stored_unr if abs(stored_unr) > 0.001 else (shares * (curr - avg))
                 ret_pct = ((curr - avg) / avg * 100) if avg else 0.0
-                pnl_col = INK_MUTE if unr == 0.0 else (GREEN if unr > 0 else RED)
+                pnl_col = INK_MUTE if abs(unr) < 0.01 else (GREEN if unr > 0 else RED)
                 sign = "&minus;" if unr < 0 else "+"
-                pnl_str = f"{sign}${abs(unr):,.2f} ({ret_pct:+.1f}%)"
+                pnl_main = f"{sign}${abs(unr):,.2f}"
+                pnl_sub = f"{ret_pct:+.1f}%"
 
             is_last = i == len(shown) - 1
-            divider = "" if is_last else "border-bottom:1px solid #14202f;"
-            row_style = f"padding:11px 0;{divider}"
+            border_style = "" if is_last else "border-bottom:1px solid #14202f;"
+            days_txt = "today" if days_held == 0 else f"{days_held}d"
 
-            data_rows += (
-                f"<tr>"
-                f'<td style="{row_style}font-family:{FONT};color:{INK};font-size:14px;font-weight:bold;">'
-                f"{html_lib.escape(sym)}</td>"
-                f'<td align="right" style="{row_style}font-family:{FONT};color:{INK_DIM};font-size:13px;">'
-                f"${value:,.0f}</td>"
-                f'<td align="right" style="{row_style}font-family:{SERIF};color:{pnl_col};font-size:13px;">'
-                f"{pnl_str}</td>"
-                f"</tr>"
-            )
+            rows_html += f"""
+<tr><td style="padding:16px 0;{border_style}">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr>
+    <td style="vertical-align:bottom;">
+      <span style="font-family:{FONT};font-size:15px;font-weight:bold;color:{INK};">{html_lib.escape(sym)}</span>
+      <span style="font-family:{FONT};font-size:11px;color:{INK_MUTE};margin-left:8px;">{int(shares)} shares</span>
+    </td>
+    <td align="right" style="vertical-align:bottom;">
+      <span style="font-family:{SERIF};font-size:16px;font-weight:bold;color:{pnl_col};">{pnl_main}</span>
+      {"&nbsp;<span style='font-family:" + FONT + ";font-size:12px;color:" + pnl_col + ";'>" + pnl_sub + "</span>" if pnl_sub else ""}
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" style="padding-top:5px;">
+      <span style="font-family:{FONT};font-size:11px;color:{INK_MUTE};">
+        ${value:,.0f} total
+        &nbsp;&middot;&nbsp; avg ${avg:,.2f}
+        {"&nbsp;&middot;&nbsp; now $" + f"{curr:,.2f}" if not prices_stale else ""}
+        &nbsp;&middot;&nbsp; held {days_txt}
+      </span>
+    </td>
+  </tr>
+  </table>
+</td></tr>"""
 
-        inner_rows = header + data_rows
+        inner_html = f"""
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+  {rows_html}
+</table>"""
 
     return f"""
 <tr><td style="padding:12px 4px 12px 4px;font-family:{FONT};color:{INK_MUTE};
@@ -1430,10 +1482,8 @@ def build_positions(positions: list[dict]) -> str:
 <tr><td style="padding:0 0 12px 0;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
          style="background-color:{CARD};border:1px solid {BORDER};border-radius:14px;">
-  <tr><td style="padding:6px 22px;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-      {inner_rows}
-    </table>
+  <tr><td style="padding:8px 22px 14px 22px;">
+    {inner_html}
   </td></tr>
   </table>
 </td></tr>
@@ -1500,6 +1550,16 @@ def _position_context(positions: list[dict], symbol: str) -> dict:
     return {}
 
 
+def _sentiment_plain(score: float) -> tuple[str, str, str]:
+    """Return (plain-English label, color, bg) for a sentiment score."""
+    if score >= 0.62:
+        return "Good news", GREEN, GREEN_BG
+    elif score <= 0.38:
+        return "Concerning news", RED, RED_BG
+    else:
+        return "Mixed / neutral news", INK_MUTE, CARD_ALT
+
+
 def build_news_digest(
     positions: list[dict], traded_today: list[str] | None = None, max_stories: int = 6
 ) -> str:
@@ -1554,12 +1614,7 @@ def build_news_digest(
         is_traded = sym in traded_set
         pos_ctx = _position_context(positions, sym)
 
-        if score >= 0.62:
-            tone, tone_col, tone_bg = "BULLISH", GREEN, GREEN_BG
-        elif score <= 0.38:
-            tone, tone_col, tone_bg = "BEARISH", RED, RED_BG
-        else:
-            tone, tone_col, tone_bg = "NEUTRAL", INK_MUTE, CARD_ALT
+        tone_label, tone_col, tone_bg = _sentiment_plain(score)
 
         why = ""
         if summarizer is not None:
@@ -1568,80 +1623,108 @@ def build_news_digest(
             except Exception:
                 why = ""
 
-        headline_html = html_lib.escape(lead.get("title", ""))
+        # Headline as clickable link
+        headline_text = html_lib.escape(lead.get("title", ""))
         link = lead.get("link", "")
         if link:
             headline_html = (
                 f'<a href="{html_lib.escape(link)}" target="_blank" '
-                f'style="color:{INK};text-decoration:none;">{headline_html}</a>'
+                f'style="color:{INK_DIM};text-decoration:underline;font-size:12px;">{headline_text} &#8599;</a>'
             )
+        else:
+            headline_html = f'<span style="color:{INK_DIM};font-size:12px;">{headline_text}</span>'
 
         meta_bits = []
         if lead.get("source"):
             meta_bits.append(html_lib.escape(lead["source"]))
         if lead.get("age"):
             meta_bits.append(html_lib.escape(lead["age"]))
-        meta_html = (
-            f'<div style="font-family:{FONT};font-size:10px;color:{INK_MUTE};'
-            f'margin-top:8px;letter-spacing:0.08em;font-weight:600;text-transform:uppercase;">'
-            + " · ".join(meta_bits)
-            + "</div>"
-            if meta_bits
-            else ""
-        )
+        meta_str = " &middot; ".join(meta_bits)
 
-        pos_html = ""
-        if pos_ctx.get("qty", 0) > 0:
-            unr = float(pos_ctx.get("unrealized_pnl") or 0)
+        # Position context for this symbol
+        qty = float(pos_ctx.get("qty") or 0)
+        unr = float(pos_ctx.get("unrealized_pnl") or 0)
+
+        # "You own" line with P&L context
+        if qty > 0:
             unr_col = GREEN if unr >= 0 else RED
-            pos_html = (
-                f'<span style="font-family:{FONT};font-size:11px;color:{INK_MUTE};'
-                f'margin-left:10px;">you hold {pos_ctx["qty"]:.0f} sh · '
-                f'<span style="color:{unr_col};font-weight:600;">'
-                f"{fmt_money(unr, sign=True)}</span></span>"
-            )
+            if abs(unr) < 0.01:
+                pos_context_html = (
+                    f'<span style="font-family:{FONT};font-size:12px;color:{INK_MUTE};">'
+                    f"You own {int(qty)} shares of {html_lib.escape(sym)}.</span>"
+                )
+            else:
+                pos_context_html = (
+                    f'<span style="font-family:{FONT};font-size:12px;color:{INK_MUTE};">'
+                    f"You own {int(qty)} shares &middot; "
+                    f'<span style="color:{unr_col};font-weight:600;">{fmt_money(unr, sign=True)} unrealized</span></span>'
+                )
+        else:
+            pos_context_html = ""
 
         traded_badge = (
-            f' &nbsp;<span style="background:{AMBER_BG};color:{AMBER};'
+            f'<span style="background:{AMBER_BG};color:{AMBER};'
             f"border:1px solid {AMBER_BORDER};font-size:9px;font-weight:800;"
             f"letter-spacing:0.12em;padding:2px 8px;border-radius:4px;"
-            f'vertical-align:middle;">TRADED</span>'
+            f'display:inline-block;margin-left:6px;">TRADED TODAY</span>'
             if is_traded
             else ""
         )
 
-        why_html = (
-            f'<div style="font-family:{FONT};font-style:italic;font-size:12px;'
-            f'color:{INK_MUTE};margin-top:8px;line-height:1.5;">{html_lib.escape(why)}</div>'
-            if why
-            else ""
-        )
+        # Plain-English "why it matters" — prefer AI summary, fall back to simple framing
+        if why:
+            explanation = html_lib.escape(why)
+        elif score >= 0.62:
+            explanation = (
+                f"Positive news about {html_lib.escape(sym)} — this type of coverage "
+                f"typically supports the stock price."
+            )
+        elif score <= 0.38:
+            explanation = (
+                f"Negative coverage around {html_lib.escape(sym)} — this may create "
+                f"short-term selling pressure on the stock."
+            )
+        else:
+            explanation = f"Mixed or neutral coverage. No strong signal either way for {html_lib.escape(sym)}."
 
         blocks.append(
             f"""
-<div style="padding:22px 32px;border-top:1px solid {BORDER};">
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
-    <span style="font-family:{MONO};font-size:14px;font-weight:700;color:{INK};">
-      {html_lib.escape(sym)}
-    </span>
-    {traded_badge}
-    <span style="display:inline-block;background:{tone_bg};color:{tone_col};
-                 font-size:9px;font-weight:800;letter-spacing:0.14em;
-                 padding:2px 9px;border-radius:4px;">{tone}</span>
-    {pos_html}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+       style="border-top:1px solid {BORDER};">
+<tr><td style="padding:22px 32px;">
+  <!-- Header: symbol + sentiment pill -->
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+         style="margin-bottom:12px;">
+  <tr>
+    <td style="vertical-align:middle;">
+      <span style="font-family:{MONO};font-size:15px;font-weight:700;color:{INK};">{html_lib.escape(sym)}</span>
+      {traded_badge}
+    </td>
+    <td align="right" style="vertical-align:middle;">
+      <span style="display:inline-block;background:{tone_bg};color:{tone_col};
+                   font-family:{FONT};font-size:10px;font-weight:700;
+                   padding:3px 10px;border-radius:5px;">{html_lib.escape(tone_label)}</span>
+    </td>
+  </tr>
+  </table>
+  <!-- Position context -->
+  {('<div style="margin-bottom:10px;">' + pos_context_html + '</div>') if pos_context_html else ''}
+  <!-- Plain-English explanation -->
+  <div style="font-family:{FONT};font-size:13px;color:{INK_DIM};
+              line-height:1.6;margin-bottom:12px;">
+    {explanation}
   </div>
-  <div style="font-family:{DISPLAY};font-size:19px;font-weight:700;color:{INK};
-              line-height:1.35;letter-spacing:-0.01em;">{headline_html}</div>
-  {why_html}
-  {meta_html}
-</div>"""
+  <!-- Source headline (secondary) -->
+  <div style="font-family:{FONT};font-size:11px;color:{INK_FAINT};
+              border-left:2px solid {BORDER_STRONG};padding-left:10px;
+              margin-bottom:8px;line-height:1.5;">
+    {headline_html}
+  </div>
+  <!-- Source + age -->
+  {"<div style='font-family:" + FONT + ";font-size:10px;color:" + INK_FAINT + ";'>" + meta_str + "</div>" if meta_str else ""}
+</td></tr>
+</table>"""
         )
-
-    llm_label = (
-        "AI-summarized · Google News"
-        if summarizer is not None and summarizer.llm_enabled
-        else "Google News"
-    )
 
     return f"""
 <div style="background:{CARD};">
@@ -1649,7 +1732,7 @@ def build_news_digest(
   <div style="padding:10px 32px;border-top:1px solid {BORDER};background:{CARD_ALT};
               font-family:{FONT};font-size:10px;color:{INK_MUTE};
               letter-spacing:0.08em;font-weight:600;text-transform:uppercase;">
-    Market Intel · {llm_label}
+    News affecting your holdings &middot; Google News
   </div>
 </div>
 """
@@ -2041,7 +2124,7 @@ def generate_email_body(db_path: str = "trading.db", include_visuals: bool = Tru
         + _section_title("Movers & Shakers")
         + build_movers(positions)
         + build_positions(positions)
-        + _section_title("Market Intel")
+        + _section_title("What's Moving Your Stocks")
         + (f'<tr><td style="padding:0 0 12px 0;">{_news_html}</td></tr>' if _news_html else "")
         + _section_title("System Status")
         + build_health_card(

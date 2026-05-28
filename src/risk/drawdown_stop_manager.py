@@ -225,7 +225,23 @@ class DrawdownStopManager:
         return state_data
 
     def _set_drawdown_state(self, state: str, drawdown: float, cooldown_days: int):
-        """Set drawdown stop state in database."""
+        """Set drawdown stop state in database. Only initializes cooldown on first trigger;
+        subsequent calls while already in the same state preserve the existing cooldown_end
+        so the timer cannot be indefinitely deferred by repeated daily drawdown checks."""
+        existing = self.db.get_system_state("drawdown_stop_state")
+        if existing:
+            try:
+                existing_data = json.loads(existing)
+                if existing_data.get("state") == state:
+                    logger.debug(
+                        f"Drawdown state already {state} — preserving existing cooldown end "
+                        f"{existing_data.get('cooldown_end')}"
+                    )
+                    return
+            except (json.JSONDecodeError, KeyError):
+                # Corrupted state data — overwrite with fresh state below
+                logger.warning("Drawdown state data corrupted; resetting to %s", state)
+
         cooldown_end = datetime.now() + timedelta(days=cooldown_days)
 
         state_data = {

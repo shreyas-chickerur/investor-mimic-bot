@@ -820,7 +820,12 @@ jobs:
         fi
 
     - name: Send failure notification
-      if: failure() && steps.check_status.outputs.status != 'MARKET_CLOSED'
+      if: |
+        always() &&
+        steps.check_status.outputs.status != 'MARKET_CLOSED' &&
+        (steps.check_status.outputs.status == 'PREFLIGHT_FAILED' ||
+         steps.check_status.outputs.status == 'EXECUTION_FAILED' ||
+         steps.validate_email.outputs.email_ok != 'true')
       uses: dawidd6/action-send-mail@v3
       with:
         server_address: smtp.gmail.com
