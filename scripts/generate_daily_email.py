@@ -769,11 +769,21 @@ def build_hero(
     cash: float = 0.0,
     open_count: int = 0,
 ) -> str:
-    is_up = today_pnl >= 0
-    arrow = "&#9650;" if is_up else "&#9660;"
-    pnl_col = GREEN if is_up else RED
-    pnl_bg_col = GREEN_BG if is_up else RED_BG
-    pnl_border = GREEN_BORDER if is_up else RED_BORDER
+    # Treat near-zero P&L as a neutral state, not a green up-arrow. The prior
+    # `today_pnl >= 0` rule lit a green ▲ at exactly $0.00 (e.g., when there
+    # are no positions and prices haven't moved), which read as a small win.
+    is_flat = abs(today_pnl) < 0.01
+    is_up = not is_flat and today_pnl > 0
+    if is_flat:
+        arrow = "&mdash;"
+        pnl_col = INK_MUTE
+        pnl_bg_col = CARD_ALT
+        pnl_border = BORDER
+    else:
+        arrow = "&#9650;" if is_up else "&#9660;"
+        pnl_col = GREEN if is_up else RED
+        pnl_bg_col = GREEN_BG if is_up else RED_BG
+        pnl_border = GREEN_BORDER if is_up else RED_BORDER
 
     if open_count == 0:
         vibe = "No active positions &mdash; system is scanning for signals."
@@ -2170,8 +2180,12 @@ def generate_email_body(db_path: str = "trading.db", include_visuals: bool = Tru
         + _section_title("Movers & Shakers")
         + build_movers(positions)
         + build_positions(positions)
-        + _section_title("What's Moving Your Stocks")
-        + (f'<tr><td style="padding:0 0 12px 0;">{_news_html}</td></tr>' if _news_html else "")
+        + (
+            _section_title("What's Moving Your Stocks")
+            + f'<tr><td style="padding:0 0 12px 0;">{_news_html}</td></tr>'
+            if _news_html
+            else ""
+        )
         + _section_title("System Status")
         + build_health_card(
             recon_status=recon_status_env or recon,
