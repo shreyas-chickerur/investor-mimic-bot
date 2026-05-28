@@ -1,0 +1,44 @@
+docs(audit): deep sweep — 4 critical new bugs surface
+
+Section 13 of the audit doc captures a deeper investigation triggered
+by "are there any other issues" - the answer is yes, several:
+
+- 13.1 CRITICAL: SELL trades bypass order_intents tracking entirely.
+  89 BUY intents in DB, 0 SELL intents, despite 19 SELL trades. The
+  create_order_intent calls in the SELL paths never persist a row.
+  Means SELLs are never broker-confirmed by verify_order_statuses.
+
+- 13.2 CRITICAL: XLV phantom-trade chain. ML Momentum BUY 11 XLV
+  on 2026-05-18 (intent stuck ACKED, never confirmed). Local SELL
+  recorded on 2026-05-21 with +$24 P&L (no intent created at all).
+  Broker SYNC on 2026-05-22 found XLV still in account at a different
+  cost basis ($145.44 vs local $145.79), imported as BROKER_SYNC.
+  The +$24 P&L is fictitious. Same pattern likely affects others.
+
+- 13.3 CRITICAL: $36k cash-impact divergence. Trades table shows
+  -$41,818 net cash impact over 14 days, actual cash dropped only
+  -$5,543. ~$36k worth of BUYs are recorded locally but never
+  actually executed at broker. The 31.6% win rate / +$204 P&L /
+  live-readiness gate are all computed from possibly-fictitious
+  trade rows.
+
+- 13.4 HIGH: News Sentiment has the SAME naive time-exit anti-pattern
+  ML Momentum had before commit 9f1471a. AMZN/ABBV opened 2026-05-27
+  will force-exit on 2026-06-03 regardless of P&L unless fixed.
+
+- 13.5: 4 unit tests failing - OPG order timing, two LTCG tax-aware
+  exits, and a Python 3.9/3.10 compat issue.
+
+- 13.6: Email script (scripts/generate_daily_email.py) carries the
+  same latent shares > 0 short-position bug + reads the misleading
+  equal capital_allocation DB column.
+
+Section 14 has a combined priority-ordered fix list across both
+audit passes.
+
+Adhoc artifacts (all under scripts/adhoc/):
+- probe_allocator.py - DynamicAllocator reproduction
+- issue_sweep.sql / .out - broad DB integrity scan
+- xlv_forensics.sql / .out - XLV phantom-trade reconstruction
+- trade_intent_audit.sql / .out - trade-intent linkage check
+- sell_intent_audit.sql / .out - SELL intent existence check

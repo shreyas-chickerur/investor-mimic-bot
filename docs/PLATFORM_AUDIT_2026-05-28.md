@@ -686,5 +686,231 @@ In priority order:
 
 ---
 
-*Generated 2026-05-28 17:54, extended 18:15 (post-commits `9f1471a`,
-`9796c1d`).*
+## 13. Deep sweep findings (2026-05-28 18:30) — major new bugs
+
+After the user asked "are there any other issues", I ran a broader DB
+forensics + test-suite + cross-strategy scan. Several **significant**
+new issues surfaced.
+
+### 13.1 🚨 SELL trades bypass `order_intents` tracking entirely
+
+Database state:
+
+| | Count |
+|---|---|
+| `order_intents` rows where `side='BUY'` | 89 |
+| `order_intents` rows where `side='SELL'` | **0** |
+| `trades` rows where `action='SELL'` | 19 |
+
+Every one of the 19 SELL trades has an `order_id` that **does not match
+any row in `order_intents`** (verified by left-join). The SELL
+codepaths in
+`@/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/src/core/execution_engine.py:969`
+and `:2484` both call `db.create_order_intent(..., "SELL", ...)`, yet
+no SELL intent has ever been persisted.
+
+**Implications**:
+- `verify_order_statuses()` walks intents, so **SELLs are never
+  broker-confirmed**. The local DB optimistically writes the SELL into
+  `trades` (with computed P&L), but there's no audit trail to confirm
+  the broker actually executed it.
+- This is the proximate cause of the XLV phantom-trade pattern (§13.2).
+
+**Investigation needed**: figure out why `create_order_intent` for
+SELLs never produces a row. Options:
+- Some upstream `continue` is firing before the call (no logs say so)
+- `conn.commit()` failing silently
+- Duplicate intent_id collision (deterministic ID — but BUY/SELL params
+  are in the hash, so this shouldn't happen)
+- A legacy DAY-order SELL path is taking precedence
+
+**Verify daily**:
+```sql
+SELECT side, COUNT(*) FROM order_intents GROUP BY side;
+```
+SELL count should be > 0 once the bug is fixed.
+
+### 13.2 🚨 XLV phantom-trade chain (consequence of §13.1)
+
+Reconstructing the full XLV story:
+
+| Date | Event | Source |
+|---|---|---|
+| 2026-05-18 22:28:18 | ML Momentum BUY 11 XLV @ $145.79 | `trades` |
+| 2026-05-18 22:28:18 | order_intents: ACKED, broker_order_id `4c678c65…` | `order_intents` |
+| 2026-05-21 23:18:57 | ML Momentum SELL 11 XLV @ $148.08, **+$24.30 P&L** | `trades` |
+| 2026-05-21 23:18:57 | **NO order_intent row** | — |
+| 2026-05-22 (next day SYNC) | Broker reports 11 XLV @ $145.44 in account | `broker_state` |
+| 2026-05-22 → today | XLV imported as BROKER_SYNC strategy, 11 shares | `positions` |
+
+**Read the timeline**:
+1. Bot believed it bought 11 XLV at $145.79 (paper-OPG optimistic
+   record), but the BUY intent stayed `ACKED` — broker never confirmed
+   the fill.
+2. Three days later, bot believed it sold 11 XLV at $148.08 with +$24
+   P&L, but no SELL intent was ever written.
+3. The next day's broker reconciliation found XLV still in the account
+   at a **different cost basis** ($145.44, not $145.79) and imported it
+   as a "new" BROKER_SYNC position.
+
+**The +$24.30 P&L on the XLV trade is fictitious**. The broker never
+sold those shares; we're still long 11 XLV. The local DB credits ML
+Momentum with a "win" that didn't happen.
+
+This is recorded in `trade_pnl_detail` and contributes to the win-rate
+calculation used by the live-readiness gate.
+
+### 13.3 🚨 Cash-impact divergence ($36k unaccounted)
+
+| Source | 14-day cash impact |
+|---|---|
+| Sum over `trades`: SELL notional − BUY notional | **−$41,818** |
+| Actual cash delta: $100k − $94,457 | **−$5,543** |
+| **Discrepancy** | **$36,275** |
+
+Per-strategy breakdown of the 14d trade-table cash impact:
+
+| Strategy | BUY notional | SELL notional | Net |
+|---|---|---|---|
+| ML Momentum | $13,964 | $8,654 | −$5,310 |
+| News Sentiment | $12,354 | $0 | −$12,354 |
+| Earnings Drift | $11,575 | $0 | −$11,575 |
+| Factor Momentum | $8,848 | $421 | −$8,427 |
+| MA Crossover | $4,152 | $0 | −$4,152 |
+
+If we trust the trades table, the bot deployed ~$42k of new capital in
+14 days. Reality: only $5.5k of cash actually moved. The simplest
+explanation consistent with §13.1 and §13.2:
+
+**Many BUY trades that the local DB records as filled never actually
+executed at the broker.** They were submitted as paper-OPG, the bot
+optimistically wrote a `trades` row, the intent stayed `ACKED`, and the
+broker never filled the order (or filled at the open and was never
+reconciled back into the local intent state).
+
+**Severity**: this means the entire P&L narrative is partially
+fictitious. The 31.6% win rate, the +$204 net P&L, the live-readiness
+gate output — all of it is computed from `trades` rows that may or may
+not correspond to real broker executions.
+
+**Verify**:
+```sql
+SELECT t.executed_at, t.symbol, t.action, t.shares, t.exec_price, oi.status AS intent_status
+FROM trades t LEFT JOIN order_intents oi ON t.order_id = oi.broker_order_id
+WHERE t.executed_at >= datetime('now','-14 days')
+ORDER BY t.executed_at DESC;
+```
+Any row with `intent_status` ≠ 'FILLED' is a candidate phantom trade.
+
+### 13.4 🚨 News Sentiment has the same naive time-exit as old ML Momentum
+
+`@/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/src/strategies/strategy_news_sentiment.py:160-163`:
+
+```python
+elif days_held >= self.max_hold_days:
+    exit_reason = f"Max hold reached ({days_held}d)"
+elif days_held >= self.hold_days:
+    exit_reason = f"Sentiment hold window expired ({days_held}d)"
+```
+
+No profit-or-bearish gate at `hold_days = 7`. Same anti-pattern that
+caused the 2026-05-18 ML Momentum bulk dump.
+
+**Imminent risk**: AMZN (4 sh @ $271.99) and ABBV (5 sh @ $215.51) were
+opened by News Sentiment on 2026-05-27. They will be force-exited on
+**2026-06-03** regardless of profitability or sentiment score.
+
+**Recommended fix**: mirror the ML Momentum pattern — exit at
+`hold_days` only if (a) profitable, OR (b) sentiment has crossed
+`sell_threshold`. Hold to `max_hold_days = 14` otherwise.
+
+### 13.5 ⚠️ 4 failing unit tests
+
+```
+FAILED tests/unit/test_critical_bugs_and_guards.py::TestOrderTimingOPG::test_execution_engine_uses_opg_not_day_for_buys
+FAILED tests/unit/test_ten_improvements.py::TestImprovement10TaxAwareExit::test_rsi_extends_hold_at_day_250
+FAILED tests/unit/test_ten_improvements.py::TestImprovement10TaxAwareExit::test_factor_extends_hold_at_day_252
+FAILED tests/unit/test_workflow_fixes.py::TestFetchHistoricalDataTierDetection::test_fetcher_respects_premium_flag
+```
+
+- **`test_execution_engine_uses_opg_not_day_for_buys`**: BUY orders
+  should use `TimeInForce.OPG`. Test failing suggests a regression to
+  `DAY` somewhere — could explain unexpected fills outside the
+  market-on-open path.
+- **`test_rsi_extends_hold_at_day_250`** and
+  **`test_factor_extends_hold_at_day_252`**: the tax-aware "extend hold
+  to cross 1-year LTCG threshold" logic emits a SELL when it should
+  defer. We have no positions near the 1-year mark today, but this is
+  broken and will silently realize short-term capital gains when we do.
+- **`test_fetcher_respects_premium_flag`**: `TypeError` from
+  `str | None` syntax in `scripts/fetch_historical_data.py:79` —
+  Python 3.9 vs 3.10+ compat. Test infra issue, not a runtime bug.
+
+**Verify**:
+```bash
+python3 -m pytest tests/unit -q --tb=short
+```
+
+### 13.6 ⚠️ Email script bugs (extends earlier findings)
+
+`@/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/scripts/generate_daily_email.py:156`,
+`:263`, `:265` — all filter positions with `WHERE p.shares > 0`. Same
+latent short-position bug fixed in `database.py` (commit `9f1471a`)
+still present in the email script.
+
+`@/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/scripts/generate_daily_email.py:999`,
+`:1009` — read `capital_allocation` directly from the DB column, which
+is the equal-weighted misleading value (Issue #10.3). The email
+displays inaccurate per-strategy allocations.
+
+### 13.7 ✅ What I confirmed is healthy
+
+- All signals have `terminal_state` populated.
+- No positions with `current_price = 0` or `NULL`.
+- No stale (>3d) open positions.
+- `trade_pnl_detail` row count matches SELL count (19/19).
+- No absurd `gross_pnl_pct` values.
+- Health scorer is running daily — strategy_performance snapshots are
+  current for all strategies.
+- No orphan signals (foreign-key integrity intact).
+- No positions with `avg_price = 0`.
+- Other strategies (RSI MR, MA Crossover, Vol Breakout, Earnings Drift,
+  Factor Momentum) all have proper `max_hold_days` ceilings + profit
+  gating in their time-exit logic. Only News Sentiment shares the old
+  ML Momentum anti-pattern (§13.4).
+
+---
+
+## 14. Combined fix priority list
+
+After both audit passes, here's the priority-ordered fix list:
+
+| # | Fix | Severity | Effort |
+|---|---|---|---|
+| 1 | **§13.1 + §13.2 + §13.3 — SELL intent + phantom trade chain** | 🚨 critical (data integrity) | Multi-file, ~1-2h |
+| 2 | **§10.4 — Stale ACKED orders never reconciled** | 🚨 high (causes resubmissions) | ~30 lines |
+| 3 | **§13.4 — News Sentiment time-exit gating** | 🚨 high (imminent 06-03 dump) | ~15 lines |
+| 4 | **§10.3 — Capital allocation DB observability** | medium | ~3 lines |
+| 5 | **§13.5 — Tax-aware exit unit tests fail** | medium (silent STCG when 1y old positions exist) | needs investigation |
+| 6 | **§13.6 — Email script filters/displays** | low (UI only) | ~5 lines |
+| 7 | **§13.5 — `OrderTimingOPG` test fail** | medium | needs investigation |
+| 8 | **§10.5 — Cross-strategy position duplication** | design decision | discuss first |
+| 9 | **§10.2 — cron-job.org timing buffer** | low | UI change in cron-job.org |
+
+---
+
+## 15. Adhoc artifacts created during this audit
+
+All under `@/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/scripts/adhoc/`:
+
+- `probe_allocator.py` — reproduce DynamicAllocator output
+- `issue_sweep.sql` + `.out` — broad DB integrity scan
+- `xlv_forensics.sql` + `.out` — XLV phantom-trade reconstruction
+- `trade_intent_audit.sql` + `.out` — trade↔intent linkage check
+- `sell_intent_audit.sql` + `.out` — SELL intent existence check
+- `commit_msg_*.txt` — commit message bodies for `git commit -F`
+
+---
+
+*Generated 2026-05-28 17:54, extended 18:15 and 18:30 (post-commits
+`9f1471a`, `9796c1d`, `e7c06a4`).*
