@@ -77,7 +77,7 @@ class StrategyHealthScorer:
             conn.close()
 
         # Fetch real P&L stats from trade_pnl_detail (matched entry/exit records)
-        pnl_stats = self.db.get_strategy_win_loss_stats(strategy_id)
+        pnl_stats = self.db.get_strategy_pnl_stats(strategy_id)
 
         trades_7d = [t for t in trades if self._is_within_days(t["executed_at"], self.short_window)]
 
@@ -197,18 +197,12 @@ class StrategyHealthScorer:
             return False
 
     def _calculate_expectancy(self, trades: list[dict]) -> float:
-        """Calculate expectancy from recent trades (proxy — used only for short-window 7d metric)."""
-        if not trades:
+        """Calculate expectancy from recent SELL trades using actual realized P&L."""
+        sells = [t for t in trades if t.get("action") == "SELL"]
+        if not sells:
             return 0.0
-
-        total_pnl = 0.0
-        for trade in trades:
-            pnl = 0.0
-            if trade["action"] == "SELL":
-                pnl = trade.get("notional", 0.0) * 0.01
-            total_pnl += pnl
-
-        return total_pnl / len(trades)
+        total_pnl = sum(float(t.get("pnl") or 0) for t in sells)
+        return total_pnl / len(sells)
 
     def _pnl_expectancy(self, pnl_stats: dict) -> float:
         """Calculate % expectancy from matched trade P&L records in trade_pnl_detail."""
@@ -218,60 +212,51 @@ class StrategyHealthScorer:
         return (wr * avg_win) - ((1.0 - wr) * avg_loss)
 
     def _calculate_max_drawdown(self, trades: list[dict]) -> float:
-        """Calculate maximum drawdown from trades."""
-        if not trades:
+        """Calculate maximum drawdown from trades using actual realized P&L."""
+        sells = [t for t in trades if t.get("action") == "SELL"]
+        if not sells:
             return 0.0
 
-        # Build equity curve
         equity = []
         cumulative_pnl = 0.0
-
-        for trade in sorted(trades, key=lambda t: t["executed_at"]):
-            # Simplified P&L calculation
-            pnl = 0.0
-            if trade["action"] == "SELL":
-                pnl = trade.get("notional", 0.0) * 0.01
-            cumulative_pnl += pnl
+        for trade in sorted(sells, key=lambda t: t["executed_at"]):
+            cumulative_pnl += float(trade.get("pnl") or 0)
             equity.append(cumulative_pnl)
 
-        # Calculate max drawdown
         peak = equity[0]
         max_dd = 0.0
-
         for value in equity:
             if value > peak:
                 peak = value
-            dd = (peak - value) / peak if peak > 0 else 0
-            max_dd = max(max_dd, dd)
+            if peak > 0:
+                dd = (peak - value) / peak
+                max_dd = max(max_dd, dd)
 
         return max_dd
 
     def _calculate_win_rate(self, trades: list[dict]) -> float:
-        """Calculate win rate."""
-        if not trades:
-            return 0.0
-
-        sells = [t for t in trades if t["action"] == "SELL"]
+        """Calculate win rate using actual realized P&L (pnl > 0 = win)."""
+        sells = [t for t in trades if t.get("action") == "SELL"]
         if not sells:
             return 0.0
-        wins = sum(1 for t in sells if t.get("notional", 0) > 0)
+        wins = sum(1 for t in sells if (t.get("pnl") or 0) > 0)
         return wins / len(sells)
 
     def _calculate_avg_win(self, trades: list[dict]) -> float:
-        """Calculate average winning trade."""
+        """Calculate average winning trade P&L."""
         wins = [
-            float(t.get("notional", 0)) * 0.01
+            float(t.get("pnl") or 0)
             for t in trades
-            if t["action"] == "SELL" and t.get("notional", 0) > 0
+            if t.get("action") == "SELL" and (t.get("pnl") or 0) > 0
         ]
         return sum(wins) / len(wins) if wins else 0.0
 
     def _calculate_avg_loss(self, trades: list[dict]) -> float:
-        """Calculate average losing trade."""
+        """Calculate average losing trade P&L magnitude (positive value)."""
         losses = [
-            float(t.get("notional", 0)) * 0.01
+            abs(float(t.get("pnl") or 0))
             for t in trades
-            if t["action"] == "SELL" and t.get("notional", 0) < 0
+            if t.get("action") == "SELL" and (t.get("pnl") or 0) < 0
         ]
         return sum(losses) / len(losses) if losses else 0.0
 

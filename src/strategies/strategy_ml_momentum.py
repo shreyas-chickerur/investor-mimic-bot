@@ -493,6 +493,7 @@ class MLMomentumStrategy(TradingStrategy):
                     shares = self.calculate_position_size(price, atr=atr, max_position_pct=0.10)
                     if shares <= 0:
                         continue
+                    sym_latest_date = str(symbol_data.index[-1])[:10]
                     buy_candidates.append(
                         {
                             "symbol": symbol,
@@ -503,6 +504,7 @@ class MLMomentumStrategy(TradingStrategy):
                             "confidence": prob_positive,
                             "reasoning": f"ML prob positive 5d return: {prob_positive * 100:.1f}%",
                             "atr": atr if atr and atr > 0 else None,
+                            "asof_date": sym_latest_date,
                         }
                     )
 
@@ -525,6 +527,7 @@ class MLMomentumStrategy(TradingStrategy):
                                 "reasoning": f"Held {days_held}d"
                                 if days_held >= self.hold_days
                                 else f"ML bearish ({prob_positive:.0%})",
+                                "asof_date": str(latest_date)[:10],
                             }
                         )
 

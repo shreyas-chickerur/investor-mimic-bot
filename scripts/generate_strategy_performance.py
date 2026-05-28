@@ -20,10 +20,11 @@ sys.path.insert(0, str(project_root))
 
 
 def calculate_sharpe_ratio(returns, risk_free_rate=0.0):
-    """Calculate Sharpe ratio from returns list"""
+    """Calculate annualized Sharpe ratio from daily returns list."""
     if not returns or len(returns) < 2:
         return 0.0
 
+    import math
     import statistics
 
     avg_return = statistics.mean(returns)
@@ -32,7 +33,7 @@ def calculate_sharpe_ratio(returns, risk_free_rate=0.0):
     if std_return == 0:
         return 0.0
 
-    return (avg_return - risk_free_rate) / std_return
+    return (avg_return - risk_free_rate) / std_return * math.sqrt(252)
 
 
 def get_strategy_performance(db_path="trading.db", days=30):
