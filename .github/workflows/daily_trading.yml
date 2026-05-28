@@ -1,13 +1,17 @@
 name: Daily Trading Execution
 
 on:
-  schedule:
-    # PRIMARY trigger is cron-job.org firing at 00:30 UTC (7:30 PM ET summer / 6:30 PM CT).
-    # This cron is a safety net only — fires at 03:00 UTC (~11 PM ET) if the external
-    # trigger failed. Day-of-week 2-6 (Tue-Sat UTC) = Mon-Fri evening US Eastern time.
-    # Alpaca OPG orders require submission after 7:00 PM ET; both times satisfy that.
-    - cron: '0 3 * * 2-6'
-  workflow_dispatch:  # Allow manual trigger
+  # PRIMARY trigger is cron-job.org firing at 00:30 UTC (7:30 PM ET summer / 6:30 PM CT)
+  # via workflow_dispatch. GitHub's free-tier schedule runs were unreliable as a primary,
+  # and worse — when they DID fire, they ran 3-4 hours late (06-07 UTC) which put them
+  # AFTER cron-job.org's run, producing duplicate trading runs and duplicate emails per
+  # day (see 2026-05-28 inbox: two emails for the same trading session). Disabling the
+  # schedule cron so cron-job.org is the sole trigger. Re-enable here if cron-job.org
+  # goes down for an extended period.
+  #
+  # schedule:
+  #   - cron: '0 3 * * 2-6'
+  workflow_dispatch:  # Triggered by cron-job.org (and available for manual runs)
 
 env:
   PYTHON_VERSION: "3.11"

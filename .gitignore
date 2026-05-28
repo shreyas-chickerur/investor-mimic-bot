@@ -30,6 +30,9 @@ data/.encryption_key
 
 # Database files (contain sensitive data)
 trading.db
+trading.db-shm
+trading.db-wal
+trading.db.backup_*
 data/*.db
 
 # ML model artifacts (regenerated on train)
