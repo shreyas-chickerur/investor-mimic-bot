@@ -185,16 +185,19 @@ def get_signal_reasons(db, symbols: list[str]) -> dict[tuple[str, str], dict]:
     return out
 
 
-def get_latest_run_id(db) -> str | None:
+def get_latest_run_id(db) -> tuple[str | None, str | None]:
+    """Return (run_id, snapshot_date) for the most recent non-SYNC run."""
     rows = _q(
         db,
         """
-        SELECT run_id FROM broker_state
+        SELECT run_id, snapshot_date FROM broker_state
         WHERE snapshot_type != 'SYNC' AND run_id != 'AUTO_SYNC'
         ORDER BY created_at DESC LIMIT 1
         """,
     )
-    return rows[0]["run_id"] if rows else None
+    if rows:
+        return rows[0]["run_id"], rows[0]["snapshot_date"]
+    return None, None
 
 
 def get_rejection_summary(db, run_id: str | None) -> list[dict]:
@@ -772,7 +775,9 @@ def build_hero(
     pnl_bg_col = GREEN_BG if is_up else RED_BG
     pnl_border = GREEN_BORDER if is_up else RED_BORDER
 
-    if today_pct >= 1.5:
+    if open_count == 0:
+        vibe = "No active positions &mdash; system is scanning for signals."
+    elif today_pct >= 1.5:
         vibe = "Strong day. The system delivered."
     elif today_pct >= 0.3:
         vibe = "Quiet gains. Slow and steady wins."
@@ -1097,7 +1102,7 @@ def build_strategy_dashboard(
         if never_ran:
             issue_html = (
                 f'<div style="font-family:{FONT};color:{INK_FAINT};font-size:11px;padding-top:9px;">'
-                f"&#9888; No signals generated yet &mdash; strategy module not yet implemented</div>"
+                f"&#9680; No qualifying setups found yet &mdash; waiting for market conditions to align</div>"
             )
         elif health.get("issues"):
             issue_html = (
@@ -2065,8 +2070,18 @@ def generate_email_body(db_path: str = "trading.db", include_visuals: bool = Tru
         agg = get_aggregate_pnl(db)
         symbols: list[str] = list({str(s) for t in trades_today if (s := t.get("symbol"))})
         sig_map = get_signal_reasons(db, symbols)
-        run_id = get_latest_run_id(db)
-        rejections = get_rejection_summary(db, run_id) if not trades_today else []
+        run_id, run_date = get_latest_run_id(db)
+        # Only show rejections if the last run was within 2 days — stale data is misleading
+        run_is_recent = False
+        if run_date:
+            try:
+                run_dt = datetime.strptime(str(run_date)[:10], "%Y-%m-%d").date()
+                run_is_recent = (datetime.now().date() - run_dt).days <= 2
+            except ValueError:
+                pass
+        rejections = (
+            get_rejection_summary(db, run_id) if (not trades_today and run_is_recent) else []
+        )
         zero_streak = get_zero_trade_streak(db) if not trades_today else 0
         strategy_rows = get_strategy_statuses(db)
         fill_summary = get_fill_quality_summary(db)
