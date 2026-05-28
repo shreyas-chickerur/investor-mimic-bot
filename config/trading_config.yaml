@@ -138,6 +138,14 @@ strategies:
     feature_count: 12
     max_new_positions_per_day: 2
     buy_quantile_threshold: 0.70
+    # Time-exit gating. The strategy used to dump positions at day 5
+    # regardless of P&L, producing synchronized losing exits (AMD -$279
+    # on 2026-05-18). Now: exit at hold_days only if profitable OR the
+    # model's probability has fallen below time_exit_bearish_threshold;
+    # max_hold_days is the absolute ceiling.
+    hold_days: 5
+    max_hold_days: 15
+    time_exit_bearish_threshold: 0.50
 
   factor_momentum:
     disabled: false  # Re-enabled: live P&L +$714, 50% win rate (2 closed trades)

@@ -1080,7 +1080,7 @@ class TradingDatabase:
                            market_value   = shares * ?,
                            unrealized_pnl = (? - avg_price) * shares,
                            last_updated   = ?
-                       WHERE symbol = ? AND shares > 0""",
+                       WHERE symbol = ? AND shares != 0""",
                     (price, price, price, datetime.now().isoformat(), symbol),
                 )
                 updated += cursor.rowcount
@@ -1180,11 +1180,17 @@ class TradingDatabase:
         return dict(row) if row else None
 
     def get_all_open_positions(self) -> list[dict]:
-        """Return all open positions (shares > 0) across all strategies."""
+        """Return all open positions (non-zero shares) across all strategies.
+
+        Includes shorts (shares < 0) so reconciliation, P&L refresh, and
+        downstream consumers see broker-side state truthfully. The earlier
+        `shares > 0` filter silently dropped short positions imported under
+        BROKER_SYNC and caused reconciliation to perpetually fail.
+        """
         with closing(sqlite3.connect(self.db_path)) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM positions WHERE shares > 0")
+            cursor.execute("SELECT * FROM positions WHERE shares != 0")
             rows = cursor.fetchall()
         return [dict(row) for row in rows]
 

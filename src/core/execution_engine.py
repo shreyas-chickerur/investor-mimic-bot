@@ -1658,16 +1658,33 @@ class MultiStrategyRunner:
                             strategy.strategy_id, min(len(executed), len(signals_to_execute))
                         )
 
-                        # Log risk rejections
+                        # Log risk rejections with the *actual* downstream
+                        # reason (insufficient_cash, portfolio_heat,
+                        # cross_strategy_dedup, wash_trade_guard, etc.)
+                        # rather than the legacy ambiguous "cash_or_heat_limit"
+                        # bucket. The granular reasons are already populated by
+                        # _execute_strategy_trades on self.rejected_signals; we
+                        # just walk that list backwards (most-recent-first) to
+                        # find the matching rejection for this symbol/strategy.
                         for sig in signals_to_execute:
-                            if not any(e.get("symbol") == sig.get("symbol") for e in executed):
-                                self.funnel_tracker.log_rejection(
-                                    strategy.strategy_id,
-                                    sig.get("symbol"),
-                                    "RISK",
-                                    "cash_or_heat_limit",
-                                    {},
-                                )
+                            sym = sig.get("symbol")
+                            if any(e.get("symbol") == sym for e in executed):
+                                continue
+                            reason_code = "cash_or_heat_limit"
+                            for rec in reversed(self.rejected_signals):
+                                if (
+                                    rec.get("symbol") == sym
+                                    and rec.get("strategy") == strategy.name
+                                ):
+                                    reason_code = rec.get("reason") or reason_code
+                                    break
+                            self.funnel_tracker.log_rejection(
+                                strategy.strategy_id,
+                                sym,
+                                "RISK",
+                                reason_code,
+                                {},
+                            )
 
                         all_signals.extend(executed)
 
@@ -1780,6 +1797,23 @@ class MultiStrategyRunner:
                 logger.info(f"Generated health summary: {health_path}")
 
             logger.info("=" * 80)
+
+            # Second price refresh: pick up positions opened DURING this run.
+            # The first refresh at the top of run_all_strategies only covers
+            # positions that already existed; brand-new positions are inserted
+            # later with current_price = exec_price = avg_price and therefore
+            # show 0 unrealized P&L until tomorrow's run unless we re-mark
+            # them here. This is what the user observed in 2026-05-28's email
+            # (AMD / ABBV / AMZN all showed +$0.00 despite real intraday moves).
+            try:
+                refreshed_after = self.db.refresh_position_prices(current_prices)
+                if refreshed_after:
+                    logger.info(
+                        "Post-trade price refresh: marked %d positions to market",
+                        refreshed_after,
+                    )
+            except Exception as _refresh_exc:
+                logger.warning("Post-trade price refresh failed: %s", _refresh_exc)
 
             return all_signals
         finally:
