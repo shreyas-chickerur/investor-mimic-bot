@@ -478,4 +478,213 @@ python3 scripts/sync_broker_state.py
 
 ---
 
-*Generated 2026-05-28 17:54 (post-commit `9f1471a`).*
+## 10. Follow-up investigation (2026-05-28 18:15)
+
+Continued the audit after commit `9796c1d`. Several items closed,
+several new bugs surfaced.
+
+### 10.1 Issue #6 (workflow double-run) — RESOLVED ✅
+
+`gh run list` showed both `schedule` and `workflow_dispatch` events
+firing daily, but `git log .github/workflows/daily_trading.yml` reveals
+commit `6a251c8` (2026-05-28 17:24 CDT, ~3 hours ago) already commented
+out the `schedule:` block. The double-runs we observed in `broker_state`
+were from `schedule` cron firings that fired BEFORE the commit landed.
+
+**Action**: nothing. Tomorrow's `gh run list` should show only
+`workflow_dispatch` events. If `schedule` still appears, the comment-out
+didn't take effect.
+
+### 10.2 Issue #7 (order intent failure rate 16%) — RESOLVED, BENIGN ✅
+
+All 6 FAILED order intents in the last 14 days are from a single run:
+
+| Time | Symbol | Alpaca error |
+|---|---|---|
+| 2026-05-20 22:51:45 UTC | TSLA | `opg orders must be submitted after 7:00pm and before 9:28am` |
+| 2026-05-20 22:51:45 UTC | AAPL | (same) |
+| 2026-05-20 22:51:46 UTC | NVDA | (same) |
+| 2026-05-20 22:51:47 UTC | AVGO | (same) |
+| 2026-05-20 22:51:47 UTC | UNH | (same) |
+| 2026-05-20 22:51:47 UTC | AMD | (same) |
+
+22:51 UTC = 18:51 ET, i.e. ~9 minutes before the OPG submission window
+opens at 19:00 ET. A single mis-timed run rejected all six BUYs. **Not
+a systemic 16% failure rate** — just a one-time scheduling collision.
+
+**Action**: ensure all triggers fire at or after 19:00 ET. cron-job.org
+fires at 00:30 UTC (19:30 ET in summer / 18:30 ET in winter). If we're
+ever on winter time the cron will be ~30 min too early. Worth converting
+the cron-job.org schedule to dynamic ET-aware time, or just shifting it
+to 00:45 UTC year-round to leave headroom.
+
+### 10.3 Issue #5 (equal capital allocation) — ROOT CAUSE FOUND 🚨
+
+The dynamic allocator IS functioning. I reproduced it via
+`@/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/scripts/adhoc/probe_allocator.py`
+and confirmed it computes Sharpe-weighted allocations correctly:
+
+| Strategy | Computed allocation | Currently in DB |
+|---|---|---|
+| Earnings Drift | $20,419 (25.0%) | $11,668 |
+| RSI Mean Reversion | $20,088 (24.6%) | $11,668 |
+| ML Momentum | $9,271 (11.4%) | $11,668 |
+| Factor Momentum | $7,726 (9.5%) | $11,668 |
+| News Sentiment | $7,726 (9.5%) | $11,668 |
+| MA Crossover | $6,181 (7.6%) | $11,668 |
+| Volatility Breakout | $6,181 (7.6%) | $11,668 |
+
+**Root cause**: `@/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/src/core/execution_engine.py:591`
+inside `initialize_strategies()` calls
+`db.update_strategy_capital_allocation(strategy_id, capital_per_strategy)`
+where `capital_per_strategy = deployed_capital / num_strategies` is the
+EQUAL split. This hard-codes equal weights into the
+`strategies.capital_allocation` DB column on every run, BEFORE the
+dynamic allocator computes Sharpe-based weights.
+
+The dynamic allocator runs later and writes the correct weights to
+`strategy.capital` (the in-memory attribute that drives position
+sizing via `calculate_position_size`). **So sizing IS
+Sharpe-weighted** — but every external observer (DB queries, email
+template, dashboards, this audit) sees the misleading equal split.
+
+**Severity**: medium. Sizing is correct; observability is wrong.
+But because the email and audit show flat weights, we keep being
+fooled into thinking allocator is broken.
+
+**Recommended fix**: in `_apply_allocations`, also write the dynamic
+weights to the DB column so observability matches reality. ~3 line
+change.
+
+### 10.4 NEW BUG: stale ACKED orders never reconciled 🚨
+
+7 order intents in `order_intents` table are stuck at `ACKED` status,
+oldest from 2026-05-18:
+
+| Created | Symbol | Side | Qty | Broker order id |
+|---|---|---|---|---|
+| 2026-05-22 07:02:35 | AMZN | BUY | 8 | 7b4aa148… |
+| 2026-05-22 07:02:35 | AVGO | BUY | 4 | d06add83… |
+| 2026-05-22 06:44:02 | AMZN | BUY | 8 | 5d0a9a18… |
+| 2026-05-22 06:44:02 | AVGO | BUY | 4 | 4bc01e3e… |
+| 2026-05-21 23:18:57 | AMZN | BUY | 8 | f464685e… |
+| 2026-05-21 23:18:57 | AVGO | BUY | 4 | c1744193… |
+| 2026-05-18 22:28:18 | XLV | BUY | 11 | 4c678c65… |
+
+**Patterns to notice**:
+- AMZN BUY 8 appears **3 times** across 3 different runs on 2026-05-21
+  and 2026-05-22.
+- AVGO BUY 4 appears **3 times** on the same days.
+- These are real broker orders (have `broker_order_id`), submitted but
+  never re-checked.
+
+**Root cause**: `@/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/src/core/execution_engine.py:487-547`
+`verify_order_statuses()` only iterates `self.executed_trades` from the
+CURRENT run. Orders from previous runs that were `ACKED` but never
+reached terminal state are never re-polled. They stay `ACKED` forever
+even if Alpaca has long since filled, expired, or cancelled them.
+
+**Consequence**: the strategy doesn't know these BUYs failed (or
+succeeded), so it re-evaluates and re-submits. That's why AMZN BUY 8
+and AVGO BUY 4 each appear 3 times.
+
+**Recommended fix**: at the top of each run, sweep all `ACKED` intents,
+poll Alpaca for each broker_order_id, and update status. Add a max-age
+guard (e.g., expire ACKEDs older than 48h to `FAILED`).
+
+**Verify daily**:
+```sql
+SELECT created_at, symbol, side, target_qty, broker_order_id
+FROM order_intents
+WHERE status='ACKED' AND created_at < datetime('now','-1 day');
+```
+Should return 0 rows once the fix is in.
+
+### 10.5 NEW FINDING: cross-strategy position duplication ⚠️
+
+On 2026-05-08, **three different strategies bought AMD** within the
+same trading session:
+
+| Time (UTC) | Strategy | Shares @ Price |
+|---|---|---|
+| 21:24:29.12 | Earnings Drift | 1 @ $455.42 |
+| 21:24:29.28 | Factor Momentum | 1 @ $455.42 |
+| 22:00:07.94 | Earnings Drift | 1 @ $455.42 |
+| 22:00:08.04 | Factor Momentum | 1 @ $455.42 |
+| 22:24:05.97 | ML Momentum | 2 @ $455.42 |
+
+The 21:24, 22:00, and 22:24 are **three separate runs of the same day**
+(this was during the double-trigger period — see §10.1).
+
+The cross-strategy dedup at `@/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/src/core/execution_engine.py:1973-1976`
+checks "already held by another strategy" but presumably only at the
+moment each strategy processes its own signal queue. If multiple
+strategies all evaluate AMD before any one writes its position, none
+triggers the dedup. Or the dedup is only intra-run.
+
+**Question for you**: is this intentional (strategies independent,
+positions can overlap) or a bug (one strategy should own each symbol)?
+Current behavior creates fragmented small positions (1-2 shares each)
+and triples notional exposure to a single symbol.
+
+If unintentional, the dedup needs to check `positions` table across
+ALL strategies, not just within-run intent.
+
+### 10.6 News Sentiment hits `max_signals_limit` 7× in 14d ⚠️
+
+| Date | Hits |
+|---|---|
+| 2026-05-28 | 4 |
+| 2026-05-27 | 3 |
+
+The strategy generated more BUY signals than `top_n=5` (or the strategy's
+configured cap) allowed, so 3-4 candidates per day were throttled.
+
+**Could be**:
+- Strategy is correctly noisy and the throttle is doing its job
+  (most likely — it executed 11 of 23 raw signals).
+- Or the throttle is too tight and we're losing alpha by capping.
+
+**Not actionable without backtest validation**. Worth checking after
+News Sentiment has 20+ closed trades to compare throttled vs unthrottled
+hypothetical P&L. Until then, leave it.
+
+### 10.7 Volatility Breakout XLY rejection — WAITING ON DATA
+
+Both 2026-05-28 XLY breakout signals were rejected at the RISK stage
+with the (pre-fix) bucketed code `cash_or_heat_limit`. With the
+granular-reason fix from commit `9f1471a`, tomorrow's run will tell us
+which specific check failed.
+
+XLY is the Consumer Discretionary sector ETF. Hypothesis: the
+`benchmark_etf_filter` at line ~1934 in execution_engine.py blocks ETFs
+in non-BROKER_SYNC strategies. Will confirm when tomorrow's data lands.
+
+---
+
+## 11. Recommended next fixes
+
+In priority order:
+
+1. **Stale ACKED reconciliation** (10.4) — concrete bug, causes
+   duplicate broker submissions. Estimated effort: ~30 lines.
+2. **Capital allocation observability** (10.3) — write dynamic
+   allocations to the DB column so observers see truth. ~3 lines.
+3. **Cross-strategy AMD overlap** (10.5) — needs a design decision
+   first. Investigate / propose, don't change behavior yet.
+4. **cron-job.org timing buffer** (10.2) — shift to 00:45 UTC to
+   survive ET timezone shifts. Single config change in cron-job.org UI,
+   no code change.
+
+---
+
+## 12. Adhoc scripts created during this audit
+
+- `@/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/scripts/adhoc/probe_allocator.py` — reproduces
+  what `DynamicAllocator` sees during a live run. Useful any time
+  observed vs expected allocations diverge.
+
+---
+
+*Generated 2026-05-28 17:54, extended 18:15 (post-commits `9f1471a`,
+`9796c1d`).*
