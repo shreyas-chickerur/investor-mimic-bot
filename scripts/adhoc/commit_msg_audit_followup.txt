@@ -1,0 +1,23 @@
+docs(audit): extend with 7 follow-up findings + allocator probe
+
+Section 10 of the audit doc captures the follow-up investigation:
+
+- 10.1 GHA workflow double-run: already self-resolved by commit
+  6a251c8 a few hours ago. No action needed.
+- 10.2 Order intent FAILED rate: all 6 are from one mis-timed run
+  on 2026-05-20 18:51 ET that hit Alpaca's OPG submission window.
+  Not systemic.
+- 10.3 Capital allocation: dynamic allocator IS working (probe in
+  scripts/adhoc/probe_allocator.py reproduces it). But
+  initialize_strategies() hard-codes equal weights into the DB
+  column before the allocator runs. Sizing is correct; observability
+  is wrong.
+- 10.4 NEW BUG: 7 ACKED order intents stuck since 2026-05-18 because
+  verify_order_statuses only checks current-run trades. Caused
+  AMZN BUY 8 and AVGO BUY 4 to each appear 3 times across 3 runs.
+- 10.5 NEW FINDING: three strategies bought AMD on 2026-05-08.
+  Cross-strategy dedup did not fire. Design question for user.
+- 10.6 News Sentiment hits max_signals_limit 7x in 14d. Probably
+  benign - strategy is signal-rich.
+- 10.7 Vol Breakout XLY rejection: waiting on granular-reason data
+  from next run (post commit 9f1471a).
