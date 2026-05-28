@@ -73,7 +73,17 @@ class MLMomentumStrategy(TradingStrategy):
         self.buy_quantile_threshold = config.get(
             "strategies.ml_momentum.buy_quantile_threshold", 0.65
         )
-        self.hold_days = 5
+        # Hold horizon. The 5-day target matches the model's 5-day return label,
+        # but a hard "exit on day 5 regardless of P&L" was force-dumping losers
+        # at the worst possible moment (e.g., AMD -$279 on 2026-05-18 after a
+        # synchronized 4-position bulk exit). We now hold past hold_days as long
+        # as the position is unprofitable AND the model still likes it; the
+        # max_hold_days ceiling guarantees we never carry a stale thesis forever.
+        self.hold_days = config.get("strategies.ml_momentum.hold_days", 5)
+        self.max_hold_days = config.get("strategies.ml_momentum.max_hold_days", 15)
+        self.time_exit_bearish_threshold = config.get(
+            "strategies.ml_momentum.time_exit_bearish_threshold", 0.50
+        )
         self.entry_dates = {}
 
         if _LGBM_AVAILABLE:
@@ -508,11 +518,36 @@ class MLMomentumStrategy(TradingStrategy):
                         }
                     )
 
-                # SELL: held long enough or model flips bearish
+                # SELL: model flips bearish, OR time exit at hold_days with
+                # supporting evidence (profitable OR model has weakened), OR
+                # absolute max_hold_days ceiling. The supporting-evidence gate
+                # at hold_days prevents the "force-exit a losing thesis the
+                # model still believes in" pattern that produced the 2026-05-18
+                # synchronized 4-position dump (AMD -$279, TSLA -$71, UNH -$29,
+                # NVDA +$10).
                 elif symbol in self.positions:
                     latest_date = symbol_data.index[-1]
                     days_held = self.get_days_held(symbol, latest_date)
-                    if days_held >= self.hold_days or prob_positive < 0.40:
+                    entry_price = getattr(self, "entry_prices", {}).get(symbol)
+                    in_profit = (
+                        entry_price is not None and entry_price > 0 and price > float(entry_price)
+                    )
+                    model_weakened = prob_positive < self.time_exit_bearish_threshold
+
+                    exit_reason: str | None = None
+                    if prob_positive < 0.40:
+                        exit_reason = f"ML bearish ({prob_positive:.0%})"
+                    elif days_held >= self.max_hold_days:
+                        exit_reason = f"Held {days_held}d (max ceiling)"
+                    elif days_held >= self.hold_days and (in_profit or model_weakened):
+                        if in_profit:
+                            exit_reason = f"Held {days_held}d in profit"
+                        else:
+                            exit_reason = (
+                                f"Held {days_held}d, model weakened " f"({prob_positive:.0%})"
+                            )
+
+                    if exit_reason is not None:
                         shares = int(self.positions[symbol])
                         signals.append(
                             {
@@ -522,11 +557,9 @@ class MLMomentumStrategy(TradingStrategy):
                                 "price": price,
                                 "value": shares * price,
                                 "confidence": 1.0
-                                if days_held >= self.hold_days
-                                else (1.0 - prob_positive),
-                                "reasoning": f"Held {days_held}d"
-                                if days_held >= self.hold_days
-                                else f"ML bearish ({prob_positive:.0%})",
+                                if days_held >= self.max_hold_days or prob_positive < 0.40
+                                else max(0.5, 1.0 - prob_positive),
+                                "reasoning": exit_reason,
                                 "asof_date": str(latest_date)[:10],
                             }
                         )
