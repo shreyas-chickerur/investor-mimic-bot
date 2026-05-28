@@ -1808,7 +1808,20 @@ def build_system_status(recon_status: str, fill_summary: dict, db_path: str) -> 
 
 # ── Section: Live Readiness ───────────────────────────────────────────────────
 def build_golive_section(db_path: str, recon_status: str, data_stale: bool) -> str:
+    import math as _math
+    import time as _time2
     from datetime import date as _date
+
+    # Live readiness uses a stricter 26h freshness threshold (data should be from
+    # yesterday at latest). The 144h threshold in the health card is the operational
+    # fallback; here we want the tighter standard required before going live.
+    _csv_path2 = PROJECT_ROOT / "data" / "training_data.csv"
+    PIPELINE_MAX_HOURS = 26
+    if _csv_path2.exists():
+        _age_h = (_time2.time() - _csv_path2.stat().st_mtime) / 3600
+        pipeline_stale = _age_h >= PIPELINE_MAX_HOURS
+    else:
+        pipeline_stale = True
 
     db = _conn(db_path)
     try:
@@ -1879,12 +1892,30 @@ def build_golive_section(db_path: str, recon_status: str, data_stale: bool) -> s
     MAX_DD_THRESHOLD = 0.15
     MIN_RECON_RATE = 0.90
 
+    # Pace estimate: use actual closed-trade rate instead of hardcoded "2/week"
+    weeks_running = max(days_running / 7, 1)
+    trades_per_week = closed / weeks_running
+    needed = max(MIN_TRADES - closed, 0)
+    if closed >= MIN_TRADES:
+        pace_fix = None
+    elif trades_per_week >= 0.1:
+        weeks_needed = _math.ceil(needed / trades_per_week)
+        pace_fix = (
+            f"Need {needed} more closed trades "
+            f"(~{weeks_needed} weeks at current pace of {trades_per_week:.1f}/week)"
+        )
+    else:
+        pace_fix = (
+            f"Need {needed} more closed trades — current pace is very low "
+            f"({closed} in {days_running}d). Check strategy signal logs."
+        )
+
     criteria = [
         {
             "label": f"≥ {MIN_TRADES} closed trades",
             "ok": closed >= MIN_TRADES,
             "actual": f"{closed} closed",
-            "fix": f"Need {MIN_TRADES - closed} more closed trades (~{max(1, (MIN_TRADES - closed) // 2)} weeks at current pace)",
+            "fix": pace_fix,
         },
         {
             "label": f"≥ {MIN_DAYS} days paper-trading",
@@ -1895,11 +1926,11 @@ def build_golive_section(db_path: str, recon_status: str, data_stale: bool) -> s
             else None,
         },
         {
-            "label": "Data pipeline current (<26h)",
-            "ok": not data_stale,
-            "actual": "Fresh" if not data_stale else "Stale",
+            "label": f"Data pipeline current (<{PIPELINE_MAX_HOURS}h)",
+            "ok": not pipeline_stale,
+            "actual": "Fresh" if not pipeline_stale else "Stale",
             "fix": "python3 scripts/update_daily_data.py  (or run the GHA workflow manually)"
-            if data_stale
+            if pipeline_stale
             else None,
         },
         {
