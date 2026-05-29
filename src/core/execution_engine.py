@@ -430,7 +430,15 @@ class MultiStrategyRunner:
             broker_status = str(getattr(order, "status", "")).lower().split(".")[-1]
 
             if broker_status in {"canceled", "expired", "rejected"}:
-                self._reverse_optimistic_fill(intent, broker_status)
+                # Broker terminal-but-not-filled. May still have a partial
+                # fill we need to preserve (e.g. LOO order that filled 25/40
+                # before expiring).
+                try:
+                    filled_qty = float(getattr(order, "filled_qty", 0) or 0)
+                    filled_avg_price = float(getattr(order, "filled_avg_price", 0) or 0) or None
+                except (TypeError, ValueError):
+                    filled_qty, filled_avg_price = 0.0, None
+                self._reverse_optimistic_fill(intent, broker_status, filled_qty, filled_avg_price)
                 reversed_count += 1
             elif broker_status == "filled" and intent["status"] != "FILLED":
                 try:
@@ -455,17 +463,26 @@ class MultiStrategyRunner:
             len(intents),
         )
 
-    def _reverse_optimistic_fill(self, intent: dict, broker_status: str):
+    def _reverse_optimistic_fill(
+        self,
+        intent: dict,
+        broker_status: str,
+        broker_filled_qty: float = 0.0,
+        broker_filled_avg_price: float | None = None,
+    ):
         """Reverse a locally-applied position update for an intent that the
         broker rejected/cancelled/expired.
 
-        For BUY: the optimistic record added `target_qty` shares to the
-        local position. We subtract them and refund nothing in cash
-        (cash_manager is reseeded from broker each run).
+        Honors partial fills. If the broker reports `filled_qty > 0` on a
+        canceled/expired order (e.g. an LOO that filled 25/40 at the open
+        before the rest expired), we only reverse the UNFILLED portion so
+        the locally-recorded position matches broker truth.
 
-        For SELL: the optimistic record subtracted `target_qty` shares.
-        We add them back so the local position once again reflects the
-        unsold reality at the broker.
+        For BUY: optimistic local state added `target_qty` shares.
+          delta = filled_qty - target_qty (negative or zero) is what we apply.
+          When filled_qty == 0 the full target_qty is subtracted.
+        For SELL: optimistic local state subtracted `target_qty` shares.
+          delta = target_qty - filled_qty is what we add back.
         """
         strategy_id = intent["strategy_id"]
         symbol = intent["symbol"]
@@ -473,45 +490,73 @@ class MultiStrategyRunner:
         target_qty = float(intent["target_qty"])
         intent_id = intent["intent_id"]
         broker_order_id = intent.get("broker_order_id")
+        unfilled_qty = max(0.0, target_qty - broker_filled_qty)
+        partial = broker_filled_qty > 0 and unfilled_qty > 0
 
         pos = self.db.get_position(strategy_id, symbol)
         current_shares = float(pos["shares"]) if pos else 0.0
         avg_price = float(pos["avg_price"]) if pos else 0.0
+        # Prefer the broker's actual fill price for partials so the local
+        # cost basis reflects what we really paid.
+        effective_avg_price = (
+            broker_filled_avg_price
+            if (broker_filled_avg_price and broker_filled_qty > 0)
+            else avg_price
+        )
 
         logger.warning(
-            "Phantom %s detected: %s %.2f sh (strategy=%d, broker=%s, intent=%s) — "
-            "current local shares=%.2f, reversing",
+            "Phantom %s detected: %s %.2f sh (strategy=%d, broker=%s, "
+            "filled=%.2f, unfilled=%.2f, intent=%s) — local=%.2f, "
+            "reversing unfilled portion%s",
             side,
             symbol,
             target_qty,
             strategy_id,
             broker_status,
+            broker_filled_qty,
+            unfilled_qty,
             intent_id,
             current_shares,
+            " (PARTIAL FILL preserved)" if partial else "",
         )
 
-        if side == "BUY":
-            # Reverse the optimistic add by subtracting target_qty.
-            # _update_position_record handles deletion when shares hit zero.
-            self._update_position_record(strategy_id, symbol, -target_qty, avg_price)
-            # Clean up entry-date tracking + stop loss if the position is gone now
-            try:
-                self.stop_loss_manager.remove_stop_loss(symbol)
-            except Exception:
-                pass
-        else:  # SELL
-            # Reverse the optimistic subtract by adding target_qty back.
-            self._update_position_record(strategy_id, symbol, target_qty, avg_price)
+        if unfilled_qty > 0:
+            if side == "BUY":
+                # Subtract only the unfilled portion; the filled portion stays.
+                self._update_position_record(
+                    strategy_id, symbol, -unfilled_qty, effective_avg_price
+                )
+                # Only nuke stop loss if the position is truly gone now.
+                if current_shares - unfilled_qty <= 0:
+                    try:
+                        self.stop_loss_manager.remove_stop_loss(symbol)
+                    except Exception:
+                        pass
+            else:  # SELL
+                # Add back only the shares that didn't actually sell.
+                self._update_position_record(strategy_id, symbol, unfilled_qty, effective_avg_price)
 
+        # Status: FILLED if the broker actually filled some, else FAILED.
         try:
-            self.db.update_order_intent_status(
-                intent_id,
-                "FAILED",
-                broker_order_id=broker_order_id,
-                error=f"broker_{broker_status}",
-            )
+            if broker_filled_qty > 0:
+                self.db.update_order_intent_status(
+                    intent_id,
+                    "FILLED",
+                    broker_order_id=broker_order_id,
+                    error=(
+                        f"partial_{broker_status}:filled={broker_filled_qty:.2f}"
+                        f"/{target_qty:.2f}"
+                    ),
+                )
+            else:
+                self.db.update_order_intent_status(
+                    intent_id,
+                    "FAILED",
+                    broker_order_id=broker_order_id,
+                    error=f"broker_{broker_status}",
+                )
         except Exception as exc:
-            logger.warning("Reconcile: failed to mark intent %s FAILED: %s", intent_id, exc)
+            logger.warning("Reconcile: failed to update intent %s: %s", intent_id, exc)
 
     def _cancel_stale_orders(self):
         """Cancel all open orders left over from previous runs.
@@ -3317,14 +3362,20 @@ def main():
                 }
                 for trade in runner.executed_trades
             ]
-            fallback_fills = [
-                {
-                    "symbol": trade["symbol"],
-                    "side": trade["action"],
-                    "qty": trade["shares"],
-                    "price": trade["price"],
+
+            def _to_artifact_fill(trade: dict) -> dict:
+                # confirmed_fills entries are raw trade dicts (action/shares)
+                # but artifact_writer expects side/qty. Normalize either shape.
+                return {
+                    "symbol": trade.get("symbol"),
+                    "side": trade.get("side") or trade.get("action") or "N/A",
+                    "qty": trade.get("qty") or trade.get("shares") or 0,
+                    "price": trade.get("price") or trade.get("exec_price") or 0,
                 }
-                for trade in runner.executed_trades
+
+            fallback_fills = [_to_artifact_fill(t) for t in runner.executed_trades]
+            confirmed_fills_normalized = [
+                _to_artifact_fill(t) for t in (runner.confirmed_fills or [])
             ]
             open_positions = [
                 {
@@ -3349,7 +3400,7 @@ def main():
                 rejected_signals=runner.rejected_signals,
                 executed_signals=runner.executed_signals,
                 placed_orders=placed_orders,
-                filled_orders=runner.confirmed_fills or fallback_fills,
+                filled_orders=confirmed_fills_normalized or fallback_fills,
                 rejected_orders=runner.rejected_orders,
                 portfolio_heat=portfolio_heat,
                 daily_pnl=pnl_metrics["daily_pnl"],

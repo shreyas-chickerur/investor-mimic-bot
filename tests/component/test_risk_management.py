@@ -186,8 +186,10 @@ class TestDrawdownStopManager:
         """Test drawdown manager halts trading at 8% drawdown"""
         from unittest.mock import Mock
 
-        # Mock dependencies
+        # Mock dependencies — get_system_state must return None (no prior
+        # state) or a valid JSON string; default Mock() would not parse.
         mock_db = Mock()
+        mock_db.get_system_state.return_value = None
         mock_email = Mock()
 
         dd_manager = DrawdownStopManager(db=mock_db, email_notifier=mock_email)
@@ -205,6 +207,7 @@ class TestDrawdownStopManager:
         from unittest.mock import Mock
 
         mock_db = Mock()
+        mock_db.get_system_state.return_value = None
         mock_email = Mock()
 
         dd_manager = DrawdownStopManager(db=mock_db, email_notifier=mock_email)
