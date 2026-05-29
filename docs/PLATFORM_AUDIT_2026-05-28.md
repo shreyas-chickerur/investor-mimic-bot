@@ -912,5 +912,237 @@ All under `@/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/scripts/a
 
 ---
 
-*Generated 2026-05-28 17:54, extended 18:15 and 18:30 (post-commits
-`9f1471a`, `9796c1d`, `e7c06a4`).*
+## 16. Broker-verified update (2026-05-28 19:00)
+
+After user note that "Claude Code took care of XLV", I queried Alpaca
+directly via
+`@/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/scripts/adhoc/verify_against_alpaca.py`.
+Several earlier severities revised; one new bug surfaces.
+
+### 16.1 Alpaca account state (paper)
+
+| Field | Value |
+|---|---|
+| cash | **$94,456.92** |
+| portfolio_value | $96,091.85 |
+| buying_power | $190,548.77 |
+| equity | $96,091.85 |
+| status | ACTIVE |
+
+### 16.2 Broker positions vs local DB — **3 of 4 local positions are phantom**
+
+| Symbol | Local strategy | Local shares | Broker shares | Notes |
+|---|---|---|---|---|
+| ABBV | News Sentiment | 5.00 | **0.00** | 🚨 phantom |
+| AMD | Factor Momentum | 2.00 | **0.00** | 🚨 phantom |
+| AMZN | News Sentiment | 4.00 | **0.00** | 🚨 phantom |
+| XLV | BROKER_SYNC | 11.00 | 11.00 | ✓ matches |
+
+**Broker actually holds only 11 XLV.** Everything else the bot thinks
+it owns does not exist at Alpaca. The "reconciliation SYNCED" status in
+`broker_state` is misleading — the recon snapshots broker positions but
+doesn't actually compare local vs broker at the strategy level.
+
+Root cause: when a BUY order intent gets `canceled` or `expired` at the
+broker, the bot's optimistic `positions` row (created at signal
+submission time) stays put. There's no cleanup pass that removes
+phantom positions when their creating BUY order failed.
+
+### 16.3 XLV — user is correct, Claude Code handled it ✅
+
+Reconstructing with broker confirmation:
+
+| Date | Event | Broker reality |
+|---|---|---|
+| 2026-05-18 | ML Momentum BUY 11 XLV recorded at $145.79 | **Actually filled at $145.44** (different price — optimistic local record was off) |
+| 2026-05-21 | ML Momentum SELL 11 XLV recorded with **+$24.30 P&L** | **`canceled` at broker** — SELL never executed |
+| 2026-05-22 | Broker SYNC saw XLV still in account, imported as BROKER_SYNC | ✓ real position |
+| 2026-05-28 22:23:15 | **New SELL XLV 11 submitted today, status `accepted`** | ✓ will fill at next open |
+
+So:
+- The +$24.30 P&L in `trade_pnl_detail` for the 5/21 trade **is
+  fictitious** — broker canceled that SELL. This historical row is
+  wrong but the next fill will close the position cleanly.
+- A small +$0.35 correction would be needed to the historical entry
+  price ($145.79 → $145.44) but it's now moot since the position will
+  close.
+- **Action**: optionally clean up the bogus 5/21 row in `trade_pnl_detail`
+  (it inflates win rate by 1 trade). Otherwise accept as historical
+  noise.
+
+### 16.4 Stale ACKED order intents — corrected breakdown
+
+Of the 7 ACKED intents I flagged in §10.4, the broker-side truth:
+
+| Local status | Broker status | Count | Implication |
+|---|---|---|---|
+| ACKED | `canceled` | 6 (AMZN/AVGO 5/21–5/22) | 🚨 caused resubmission |
+| ACKED | `filled` | 1 (XLV 5/18) | False-negative; trade is real |
+
+Plus 10 OLDER intents from before 5/18 are also stuck at ACKED locally
+but are actually `filled` at broker (UNH 5/12, NVDA 5/11×2, AMD 5/11,
+TSLA 5/11, ABT 5/8, MCD 5/8, AMD 5/8×2, TSLA 5/8, UNH 5/8). Those
+trades are real; just the status field is stale.
+
+**Fix scope expands**: the reconciliation sweep needs to handle both
+directions:
+- ACKED→`canceled`: cancel the local position record (it's phantom)
+- ACKED→`filled`: update the intent status to FILLED (trade is real)
+
+### 16.5 Local SELL trades vs broker — **17 of 19 real, 2 phantom**
+
+Of the 19 SELL trades in `trades`:
+- **17 actually filled** at the broker. Local exec_price has typical
+  slippage of 0-170 bps vs broker fill price (acceptable).
+- **2 phantom SELLs** never executed at broker:
+  - 2026-05-21 XLV SELL 11 → broker `canceled` (covered in §16.3)
+  - **2026-05-18 TSLA SELL 2** → broker `expired`
+
+The TSLA case is a phantom we haven't addressed. If the broker still
+holds those 2 TSLA shares we have a `BROKER_SYNC`-style discrepancy
+that wasn't caught. Today's broker positions show 0 TSLA, so either:
+- The TSLA had also failed to BUY originally (paired phantom), or
+- It was later sold via another path
+
+**Action**: verify whether those 2 TSLA shares were ever real (check
+order history before 5/18) and if the local +pnl entry needs
+correction.
+
+### 16.6 Updated severity for earlier §13 findings
+
+| § | Original claim | Revised after broker check |
+|---|---|---|
+| 13.1 | SELL trades bypass order_intents | **Still real bug** — 0 SELL intents in DB. Less catastrophic than I thought because 17/19 SELLs did fill, but the auditability gap remains. |
+| 13.2 | XLV phantom +$24 P&L | **Confirmed phantom but already addressed** — Claude Code submitted fresh SELL today. Historical row in `trade_pnl_detail` is still wrong. |
+| 13.3 | $36k cash-impact divergence | **Re-explained** — divergence is dominated by phantom positions (§16.2), not phantom BUYs across the board. Most BUYs did fill at broker. |
+| 13.4 | News Sentiment time-exit | **Still real bug but moot for current positions** — AMZN/ABBV are phantom, so the 6/3 force-exit will fail at the broker with "insufficient shares". Code bug still needs fixing for the next time News Sentiment opens real positions. |
+
+---
+
+## 17. **Final consolidated bug list** (broker-verified)
+
+In priority order:
+
+### 🚨 1. Phantom position cleanup missing (NEW, root cause)
+
+When a BUY intent → `canceled` or `expired` at broker, the local
+`positions` row stays. **The bot is currently managing 3 positions
+(ABBV, AMD, AMZN) that don't exist at Alpaca.** When it tries to SELL
+them, the order will be rejected for insufficient shares.
+
+**Fix**: in `verify_order_statuses()` or a new daily sweep, walk
+`order_intents` with status='ACKED', poll Alpaca, and for any that
+came back `canceled`/`expired`/`rejected`:
+- Mark intent as FAILED in DB
+- Reverse the optimistic position update (`positions.shares -=
+  filled_qty_difference`)
+- Mark the matching `trades` row as `is_phantom=1` or delete it
+
+### 🚨 2. ACKED ↔ FILLED status drift (HIGH)
+
+10+ intents are stuck at ACKED locally but actually FILLED at broker.
+Same root cause as #1: `verify_order_statuses()` only walks current-run
+trades.
+
+**Fix**: same daily sweep as #1, in the `filled` branch, update intent
+status to FILLED + broker_order_id.
+
+### 🚨 3. SELL trades bypass `order_intents` entirely (MEDIUM-HIGH)
+
+DB has 89 BUY intents, 0 SELL intents despite 19 SELL trades. Auditing
+SELLs against the broker requires falling back to order_id lookup. The
+code paths at `execution_engine.py:969` and `:2484` aren't producing
+DB rows.
+
+**Fix**: investigate why `create_order_intent(side='SELL')` isn't
+persisting. Check if there's an early `continue` somewhere, a silently
+failing commit, or a code path that bypasses these methods.
+
+### 🚨 4. News Sentiment naive time-exit (HIGH, code bug — currently moot)
+
+`@/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/src/strategies/strategy_news_sentiment.py:160-163`
+fires SELL at `hold_days=7` with no profit/sentiment gate. Same anti-
+pattern that caused 2026-05-18 ML Momentum bulk dump. Moot for AMZN/ABBV
+(phantom) but will hit the next time News Sentiment opens real
+positions.
+
+**Fix**: mirror ML Momentum fix from `9f1471a` — gate
+`days_held >= hold_days` exit on profit OR sentiment-score weakening.
+
+### ⚠️ 5. Equal `capital_allocation` overwrites dynamic weights in DB (MEDIUM)
+
+`@/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/src/core/execution_engine.py:591`
+writes equal shares to `strategies.capital_allocation` on every run.
+Sizing IS Sharpe-weighted (uses `strategy.capital` in-memory), but
+observability (email, dashboards, queries) sees the wrong column.
+
+**Fix**: in `_apply_allocations()`, also write the dynamic allocation
+to the DB column.
+
+### ⚠️ 6. Tax-aware exit unit tests failing (MEDIUM)
+
+`test_rsi_extends_hold_at_day_250` and `test_factor_extends_hold_at_day_252`
+fail: the "extend hold to cross 1-year LTCG threshold" logic emits a
+SELL when it should defer. Currently no positions are near the 1-year
+mark so the bug is dormant.
+
+**Fix**: investigate the 250-365 day tax-aware extension code in
+strategy_rsi_mean_reversion.py and strategy_factor_momentum.py.
+
+### ⚠️ 7. `test_execution_engine_uses_opg_not_day_for_buys` failing (MEDIUM)
+
+Possible OPG → DAY regression in BUY order placement. The recent
+broker output shows orders being placed as expected OPG (multiple
+`expired` lines on 5/27 morning indicate OPG orders waiting for open),
+so this may be test-side only. Confirm.
+
+### ⚠️ 8. Email script latent bugs (LOW)
+
+`@/Users/shreyaschickerur/CascadeProjects/investor-mimic-bot/scripts/generate_daily_email.py:156`,
+`:263`, `:265` filter `WHERE p.shares > 0` (same short-position bug
+fixed in database.py at commit `9f1471a`). Line `:999`, `:1009` read
+the misleading equal `capital_allocation` column.
+
+**Fix**: change to `shares != 0` and consume the post-dynamic
+allocation value once §5 is fixed.
+
+### ⚠️ 9. Cross-strategy AMD purchasing on 2026-05-08 (DESIGN QUESTION)
+
+Three strategies bought AMD on the same day during the double-trigger
+period. With phantom-cleanup fix (#1) in place, this becomes less
+severe. Still want explicit policy: should multiple strategies be
+allowed to hold the same symbol independently?
+
+### ✅ 10. cron-job.org timing buffer (TRIVIAL)
+
+Shift cron-job.org daily fire from 00:30 UTC to 00:45 UTC to survive
+ET timezone shifts and avoid OPG window collisions like 2026-05-20.
+UI-only change.
+
+### ✅ 11. Python 3.9/3.10 test compat (TRIVIAL)
+
+`test_fetcher_respects_premium_flag` fails due to `str | None` in
+`scripts/fetch_historical_data.py:79`. Add `from __future__ import
+annotations` or upgrade test environment to Python 3.10+.
+
+---
+
+## 18. What I confirmed via broker is healthy
+
+- **Account is healthy**: ACTIVE, $94k cash, $96k equity, $190k
+  buying_power.
+- **17 of 19 SELL trades** are real broker fills with normal slippage
+  (0-170 bps).
+- **Most BUY intents** actually filled at broker, just have stale local
+  status.
+- **The XLV issue is being closed today** by Claude Code's fresh SELL
+  submission (5/28 22:23 UTC, status `accepted`).
+- **No reconciliation pause/alert is firing** despite the phantom
+  positions — meaning the recon logic itself needs strengthening
+  (it should be detecting and flagging the ABBV/AMD/AMZN drift).
+
+---
+
+*Generated 2026-05-28 17:54, extended 18:15, 18:30, and 19:00
+(post-commits `9f1471a`, `9796c1d`, `e7c06a4`, `9924c84`). Final
+verification against Alpaca paper account 2026-05-28 18:50 CDT.*
