@@ -1440,6 +1440,9 @@ def build_positions(positions: list[dict]) -> str:
             stored_unr = float(p.get("unrealized_pnl") or 0)
             days_held = int(p.get("days_held") or 0)
             value = shares * curr
+            strat = p.get("strat") or ""
+            strat_ink, _, _ = STRAT_BRAND.get(strat, (SLATE, SLATE_BG, SLATE_BORDER))
+            strat_label = html_lib.escape(_short_strategy(strat)) if strat else ""
 
             prices_stale = abs(curr - avg) < 0.001
             if prices_stale and stored_unr == 0.0:
@@ -1479,6 +1482,7 @@ def build_positions(positions: list[dict]) -> str:
         {"&nbsp;&middot;&nbsp; now $" + f"{curr:,.2f}" if not prices_stale else ""}
         &nbsp;&middot;&nbsp; held {days_txt}
       </span>
+      {("&nbsp;&middot;&nbsp;<span style='font-family:" + FONT + ";font-size:10px;color:" + strat_ink + ";font-weight:700;letter-spacing:0.05em;text-transform:uppercase;'>" + strat_label + "</span>") if strat_label else ""}
     </td>
   </tr>
   </table>
