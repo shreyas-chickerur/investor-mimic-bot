@@ -1485,6 +1485,37 @@ class TradingDatabase:
 
             conn.commit()
 
+    def get_intents_for_reconciliation(self, days: int = 7) -> list[dict]:
+        """Return order intents from last N days that may need broker reconciliation.
+
+        Returns intents with status in (SUBMITTED, ACKED, FILLED) and a non-null
+        broker_order_id. These are intents the bot believes are pending or
+        completed but whose actual broker status may have drifted (paper-mode
+        OPG orders that expire/cancel before market open, status updates that
+        never made it back to the local DB, etc.).
+
+        Caller is expected to poll Alpaca for each broker_order_id and either:
+        - Reverse the local state if broker status is canceled/expired/rejected
+        - Update local status to FILLED if broker confirms fill
+        - Leave alone if broker still pending
+        """
+        with closing(sqlite3.connect(self.db_path)) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT intent_id, run_id, strategy_id, symbol, side, target_qty,
+                       status, broker_order_id, created_at
+                FROM order_intents
+                WHERE status IN ('SUBMITTED', 'ACKED', 'FILLED')
+                  AND broker_order_id IS NOT NULL
+                  AND created_at >= datetime('now', ?)
+                ORDER BY created_at DESC
+                """,
+                (f"-{days} days",),
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
     def get_signal_funnel_summary(self, run_id: str = None) -> list[dict]:
         """Get funnel summary for email reporting"""
         with closing(sqlite3.connect(self.db_path)) as conn:

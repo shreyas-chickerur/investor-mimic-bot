@@ -379,6 +379,140 @@ class MultiStrategyRunner:
         """Alias for compatibility"""
         return self._refresh_account_values()
 
+    def _reconcile_optimistic_fills(self):
+        """Reconcile locally-recorded intents against actual broker status.
+
+        Paper-mode OPG submissions optimistically mark intents FILLED at
+        submission time and write a positions row, but Alpaca may
+        `expire`/`cancel` the order before the next market open. Without
+        this sweep the bot accumulates **phantom positions** for orders
+        that never actually filled at the broker (see PLATFORM_AUDIT
+        2026-05-28 §16.2).
+
+        For each intent in the last 7 days with status in
+        (SUBMITTED, ACKED, FILLED) and a broker_order_id we poll Alpaca:
+
+        - broker = `canceled`/`expired`/`rejected` → mark intent FAILED
+          and reverse the optimistic position update.
+        - broker = `filled` but local ≠ FILLED → update intent to FILLED
+          (fixes ACKED-but-actually-filled status drift).
+        - broker still pending → leave alone.
+        """
+        try:
+            intents = self.db.get_intents_for_reconciliation(days=7)
+        except Exception as exc:
+            logger.warning("get_intents_for_reconciliation failed (non-fatal): %s", exc)
+            return
+
+        if not intents:
+            logger.info("Optimistic-fill reconciliation: no intents to check")
+            return
+
+        reversed_count = 0
+        confirmed_count = 0
+        polled = 0
+        for intent in intents:
+            broker_order_id = intent.get("broker_order_id")
+            if not broker_order_id:
+                continue
+            try:
+                order = self.trading_client.get_order_by_id(broker_order_id)
+            except Exception as exc:
+                logger.warning(
+                    "Reconcile: could not poll order %s for %s %s: %s",
+                    broker_order_id,
+                    intent["symbol"],
+                    intent["side"],
+                    exc,
+                )
+                continue
+            polled += 1
+            broker_status = str(getattr(order, "status", "")).lower().split(".")[-1]
+
+            if broker_status in {"canceled", "expired", "rejected"}:
+                self._reverse_optimistic_fill(intent, broker_status)
+                reversed_count += 1
+            elif broker_status == "filled" and intent["status"] != "FILLED":
+                try:
+                    self.db.update_order_intent_status(
+                        intent["intent_id"], "FILLED", broker_order_id=broker_order_id
+                    )
+                    confirmed_count += 1
+                except Exception as exc:
+                    logger.warning(
+                        "Reconcile: failed to update intent %s to FILLED: %s",
+                        intent["intent_id"],
+                        exc,
+                    )
+            # else: still pending or already in sync — no action
+
+        logger.info(
+            "Optimistic-fill reconciliation complete: polled=%d phantom_reversed=%d "
+            "status_drift_fixed=%d (total intents scanned=%d)",
+            polled,
+            reversed_count,
+            confirmed_count,
+            len(intents),
+        )
+
+    def _reverse_optimistic_fill(self, intent: dict, broker_status: str):
+        """Reverse a locally-applied position update for an intent that the
+        broker rejected/cancelled/expired.
+
+        For BUY: the optimistic record added `target_qty` shares to the
+        local position. We subtract them and refund nothing in cash
+        (cash_manager is reseeded from broker each run).
+
+        For SELL: the optimistic record subtracted `target_qty` shares.
+        We add them back so the local position once again reflects the
+        unsold reality at the broker.
+        """
+        strategy_id = intent["strategy_id"]
+        symbol = intent["symbol"]
+        side = intent["side"]
+        target_qty = float(intent["target_qty"])
+        intent_id = intent["intent_id"]
+        broker_order_id = intent.get("broker_order_id")
+
+        pos = self.db.get_position(strategy_id, symbol)
+        current_shares = float(pos["shares"]) if pos else 0.0
+        avg_price = float(pos["avg_price"]) if pos else 0.0
+
+        logger.warning(
+            "Phantom %s detected: %s %.2f sh (strategy=%d, broker=%s, intent=%s) — "
+            "current local shares=%.2f, reversing",
+            side,
+            symbol,
+            target_qty,
+            strategy_id,
+            broker_status,
+            intent_id,
+            current_shares,
+        )
+
+        if side == "BUY":
+            # Reverse the optimistic add by subtracting target_qty.
+            # _update_position_record handles deletion when shares hit zero.
+            self._update_position_record(strategy_id, symbol, -target_qty, avg_price)
+            # Clean up entry-date tracking + stop loss if the position is gone now
+            try:
+                self.stop_loss_manager.remove_stop_loss(symbol)
+            except Exception:
+                pass
+        else:  # SELL
+            # Reverse the optimistic subtract by adding target_qty back.
+            self._update_position_record(strategy_id, symbol, target_qty, avg_price)
+
+        try:
+            self.db.update_order_intent_status(
+                intent_id,
+                "FAILED",
+                broker_order_id=broker_order_id,
+                error=f"broker_{broker_status}",
+            )
+        except Exception as exc:
+            logger.warning("Reconcile: failed to mark intent %s FAILED: %s", intent_id, exc)
+
     def _cancel_stale_orders(self):
         """Cancel all open orders left over from previous runs.
 
@@ -1123,6 +1257,12 @@ class MultiStrategyRunner:
         # OPG orders placed last session and not filled (e.g. market was closed, duplicate run)
         # must be cancelled so we don't accumulate conflicting order intent.
         self._cancel_stale_orders()
+
+        # Reconcile locally-recorded intents against actual broker status.
+        # Catches paper-mode OPG submissions that were marked FILLED optimistically
+        # but expired/canceled at the broker, and reverses the phantom positions.
+        # See PLATFORM_AUDIT 2026-05-28 §16.2 / §17 #1.
+        self._reconcile_optimistic_fills()
 
         # CRITICAL: Check data quality BEFORE trading
         logger.info("=" * 80)
@@ -2926,11 +3066,30 @@ class MultiStrategyRunner:
         return exposures
 
     def _apply_allocations(self, strategies, allocations, exposures):
-        """Apply capital allocations to strategies and cash manager"""
+        """Apply capital allocations to strategies and cash manager.
+
+        Writes the dynamic (Sharpe-weighted) allocation to both:
+        - `strategy.capital` (in-memory; drives position sizing)
+        - `strategies.capital_allocation` (DB column; used by email, dashboards,
+          and audit queries)
+
+        Prior to this, `initialize_strategies()` hard-coded equal weights into
+        the DB column at the start of every run, masking the true allocation
+        from every external observer (see PLATFORM_AUDIT 2026-05-28 §10.3).
+        """
         min_cash_pct = self.config.get("risk.min_cash_allocation_pct", 0.05)
         for strategy in strategies:
             allocation = allocations.get(strategy.strategy_id, strategy.capital)
             strategy.capital = max(allocation - exposures.get(strategy.strategy_id, 0), 0)
+            # Persist the dynamic allocation so observability matches reality.
+            try:
+                self.db.update_strategy_capital_allocation(strategy.strategy_id, allocation)
+            except Exception as exc:
+                logger.warning(
+                    "Failed to persist dynamic allocation for strategy %s: %s",
+                    strategy.strategy_id,
+                    exc,
+                )
         self.cash_manager.set_allocations(allocations, exposures, min_cash_pct=min_cash_pct)
 
     def _format_signal_flowchart(self, strategy_name, signal):

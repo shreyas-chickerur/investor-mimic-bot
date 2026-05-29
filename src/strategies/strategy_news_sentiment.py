@@ -153,14 +153,31 @@ class NewsSentimentStrategy(TradingStrategy):
             if symbol in self.positions:
                 days_held = self.get_days_held(symbol, sym_latest_date)
                 shares = self.positions[symbol]
+                entry_price = getattr(self, "entry_prices", {}).get(symbol)
+                in_profit = (
+                    entry_price is not None
+                    and float(entry_price) > 0
+                    and price > float(entry_price)
+                )
+                # Sentiment has materially weakened from the BUY-level threshold
+                # but hasn't yet crossed the hard sell_threshold.
+                sentiment_weakened = score < 0.55
                 exit_reason = None
 
                 if score < self.sell_threshold:
                     exit_reason = f"Sentiment soured (score={score:.2f}): {top_headline[:60]}"
                 elif days_held >= self.max_hold_days:
                     exit_reason = f"Max hold reached ({days_held}d)"
-                elif days_held >= self.hold_days:
-                    exit_reason = f"Sentiment hold window expired ({days_held}d)"
+                elif days_held >= self.hold_days and (in_profit or sentiment_weakened):
+                    # Same gate the ML Momentum strategy uses (commit 9f1471a):
+                    # do NOT force-exit at hold_days when the trade is still
+                    # underwater AND sentiment is still positive. The mechanical
+                    # exit caused a synchronized AMD/TSLA/UNH/NVDA dump on
+                    # 2026-05-18 — we hold to max_hold_days now instead.
+                    if in_profit:
+                        exit_reason = f"Sentiment hold window ({days_held}d) — exiting in profit"
+                    else:
+                        exit_reason = f"Sentiment weakened (score={score:.2f}) at {days_held}d hold"
 
                 if exit_reason:
                     signals.append(

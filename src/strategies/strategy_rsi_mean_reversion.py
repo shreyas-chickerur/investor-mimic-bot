@@ -147,7 +147,14 @@ class RSIMeanReversionStrategy(TradingStrategy):
                         )
                         partial_exit = True
 
-                # Tax-aware time exit: extend hold by up to 5 days to cross the 1-year mark.
+                # Tax-aware time exit: extend hold to cross the 1-year LTCG threshold.
+                # When a profitable position is approaching the 1-year mark
+                # (≈250+ days), defer the time-based exit so the gain qualifies
+                # for long-term capital gains treatment.
+                in_profit = (
+                    entry_price is not None and entry_price > 0 and price > float(entry_price)
+                )
+                approaching_ltcg = 250 <= days_held < 370
                 if exit_reason is None and days_held >= self.hold_days:
                     if (
                         entry_price
@@ -157,8 +164,8 @@ class RSIMeanReversionStrategy(TradingStrategy):
                         and rsi < self.rsi_exit
                     ):
                         pass  # still healthy — keep holding
-                    elif 365 <= days_held < 370:
-                        pass  # extend hold to cross the 1-year long-term capital gains threshold
+                    elif approaching_ltcg and in_profit:
+                        pass  # defer exit to capture long-term capital gains rate
                     else:
                         exit_reason = f"Held {days_held}d >= {self.hold_days}d (time-based exit)"
 

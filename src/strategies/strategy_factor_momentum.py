@@ -320,6 +320,11 @@ class FactorMomentumStrategy(TradingStrategy):
                     partial_exit = True
             # Stop-losses handled by StopLossManager (trailing ATR ratchet); no fixed pct here.
 
+            # Tax-aware extension: if profitable and approaching the 1-year
+            # LTCG threshold, defer the rebalance so the gain qualifies for
+            # long-term capital gains treatment.
+            in_profit = entry_price is not None and entry_price > 0 and price > float(entry_price)
+            approaching_ltcg = 250 <= days_held < 370
             if exit_reason is None and days_held >= self.hold_days:
                 # Let winners run; also respect 1-year tax threshold.
                 if (
@@ -329,8 +334,8 @@ class FactorMomentumStrategy(TradingStrategy):
                     and (price - entry_price) / entry_price >= self.let_winners_run_pct
                 ):
                     pass  # momentum still working — keep holding
-                elif 365 <= days_held < 370:
-                    pass  # extend hold to cross the 1-year long-term capital gains threshold
+                elif approaching_ltcg and in_profit:
+                    pass  # defer exit to capture long-term capital gains rate
                 else:
                     exit_reason = f"Factor rebalance: held {days_held}d"
 
