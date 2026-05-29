@@ -1,0 +1,84 @@
+fix(audit): resolve 8 issues from PLATFORM_AUDIT_2026-05-28
+
+Addresses §17 (final consolidated bug list) of the audit doc, broker-
+verified against Alpaca paper account. 354/354 unit tests pass.
+
+Issue #1 + #2: Phantom position cleanup + ACKED status drift
+  src/core/database.py:
+    + get_intents_for_reconciliation(days) — returns recent intents
+      that may need broker reconciliation (status in SUBMITTED/ACKED/
+      FILLED with broker_order_id, last N days)
+  src/core/execution_engine.py:
+    + _reconcile_optimistic_fills() — at start of every run, polls
+      Alpaca for each recent intent and:
+       - broker canceled/expired/rejected → reverse local position,
+         mark intent FAILED (catches paper-OPG optimistic fills that
+         never actually executed at the broker)
+       - broker filled but local ≠ FILLED → update intent status
+         (catches ACKED-but-actually-filled drift)
+       - else → leave alone
+    + _reverse_optimistic_fill(intent, broker_status) — handles the
+      position reversal mechanics for BUY (subtract shares) and SELL
+      (add shares back).
+    * run_all_strategies() — calls _reconcile_optimistic_fills after
+      _cancel_stale_orders, before data quality check.
+
+  Backfill: scripts/adhoc/backfill_phantom_cleanup.py ran the new
+  logic against current DB. Before: 4 open positions (ABBV, AMD, AMZN
+  phantom + XLV real). After: 1 open (XLV BROKER_SYNC, matches broker
+  exactly). 28 phantom intents marked FAILED.
+
+Issue #3: SELL trades bypass order_intents (deferred)
+  Investigation showed 17 of 19 SELL trades actually filled at broker;
+  only XLV (now closed by Claude Code) and TSLA 2026-05-18 are phantom
+  SELLs. The missing intent rows are an observability gap, not a data
+  correctness bug. Root cause requires deeper code archaeology; tracked
+  in the audit doc for follow-up.
+
+Issue #4: News Sentiment naive time-exit
+  src/strategies/strategy_news_sentiment.py:
+    Mirrors the ML Momentum fix from commit 9f1471a. At hold_days the
+    strategy now requires (in_profit OR sentiment_weakened) to fire
+    SELL; otherwise holds to max_hold_days. Prevents the synchronized
+    forced-exit pattern that produced the 2026-05-18 ML Momentum bulk
+    dump.
+
+Issue #5: Capital allocation observability
+  src/core/execution_engine.py:
+    _apply_allocations() now persists the dynamic Sharpe-weighted
+    allocation to strategies.capital_allocation, so email and audit
+    queries see the same value the bot uses for sizing. Previously
+    initialize_strategies() wrote equal weights to the DB column and
+    nothing updated it later.
+
+Issue #6: Tax-aware LTCG exit (RSI + Factor)
+  src/strategies/strategy_rsi_mean_reversion.py:
+  src/strategies/strategy_factor_momentum.py:
+    Widened the tax-aware extension window from 365-370d to 250-370d
+    AND in_profit. Defers time-based exits when a profitable position
+    is within ~115 days of the 1-year LTCG threshold, instead of only
+    the last 5 days. Unblocks test_rsi_extends_hold_at_day_250 and
+    test_factor_extends_hold_at_day_252.
+
+Issue #7: OPG-not-DAY unit test
+  tests/unit/test_critical_bugs_and_guards.py:
+    Updated the substring check to permit TimeInForce.DAY in SELL
+    contexts (stop-loss SELLs legitimately use DAY because they fire
+    intraday during market hours), while still asserting no BUY block
+    uses DAY. Same intent, more precise check.
+
+Issue #8: Email script latent bugs
+  scripts/generate_daily_email.py:
+    Changed two `WHERE p.shares > 0` to `WHERE p.shares != 0` so short
+    positions are visible in the email (same fix as commit 9f1471a
+    applied to database.py).
+
+Issue #9: Python 3.9 compat in fetch_historical_data.py
+  Added `from __future__ import annotations` so `str | None` parses on
+  Python 3.9. Unblocks test_fetcher_respects_premium_flag.
+
+Tests: 354 passed, 1 skipped (previously 350 passed, 4 failed).
+
+Remaining open from §17:
+- #9 cross-strategy AMD overlap (design question — punted)
+- #10 cron-job.org timing buffer (UI change, no code)

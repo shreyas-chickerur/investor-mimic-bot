@@ -153,7 +153,7 @@ def get_open_positions(db) -> list[dict]:
                CAST(julianday('now') - julianday(COALESCE(p.entry_date, date('now')))
                     AS INTEGER) AS days_held
         FROM positions p JOIN strategies s ON p.strategy_id = s.id
-        WHERE p.shares > 0 AND s.name != 'BROKER_SYNC'
+        WHERE p.shares != 0 AND s.name != 'BROKER_SYNC'
         ORDER BY p.unrealized_pnl DESC
         """,
     )
@@ -260,9 +260,9 @@ def get_strategy_statuses(db) -> list[dict]:
         """
         SELECT id, name, status, capital_allocation,
                (SELECT COUNT(*) FROM positions p
-                WHERE p.strategy_id = strategies.id AND p.shares > 0) AS open_count,
+                WHERE p.strategy_id = strategies.id AND p.shares != 0) AS open_count,
                (SELECT COALESCE(SUM(unrealized_pnl),0) FROM positions p
-                WHERE p.strategy_id = strategies.id AND p.shares > 0) AS unrealized_total,
+                WHERE p.strategy_id = strategies.id AND p.shares != 0) AS unrealized_total,
                (SELECT COUNT(*) FROM signals sg
                 WHERE sg.strategy_id = strategies.id) AS signal_count
         FROM strategies

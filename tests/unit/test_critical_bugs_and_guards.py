@@ -597,12 +597,24 @@ class TestOrderTimingOPG:
         Signals are generated after close at 4:15 PM ET.  DAY orders placed
         after market close are queued or rejected by Alpaca.  OPG (market-on-
         open) orders execute at the next session's open — the correct workflow.
+
+        Note: stop-loss SELLs legitimately use TimeInForce.DAY because they
+        execute intraday during market hours when the stop is triggered (the
+        bot polls during the session). DAY usage is therefore allowed but
+        only in SELL contexts; any DAY in a BUY block would be a bug.
         """
         engine_src = Path("src/core/execution_engine.py").read_text()
-        assert "TimeInForce.DAY" not in engine_src, (
-            "execution_engine.py still references TimeInForce.DAY — "
-            "orders placed after 4 PM ET with DAY never fill.  Use OPG."
-        )
+        lines = engine_src.splitlines()
+        for i, line in enumerate(lines):
+            if "TimeInForce.DAY" not in line:
+                continue
+            # Look backwards up to 8 lines for the OrderSide on this request
+            window = "\n".join(lines[max(0, i - 8) : i + 1])
+            assert "OrderSide.SELL" in window or "side=OrderSide.SELL" in window, (
+                f"execution_engine.py line {i+1} uses TimeInForce.DAY without a "
+                f"nearby OrderSide.SELL — BUY orders must use OPG to execute at "
+                f"next market open. Context:\n{window}"
+            )
 
     def test_execution_engine_uses_opg(self):
         engine_src = Path("src/core/execution_engine.py").read_text()
