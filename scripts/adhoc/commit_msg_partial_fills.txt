@@ -1,0 +1,61 @@
+fix(reconcile): preserve partial fills on canceled/expired orders + 2 bugs
+
+Last night's run (2026-05-29 05:55 UTC) surfaced three issues found via
+verify_against_alpaca.py against the broker:
+
+1. PARTIAL FILLS LOST DURING RECONCILIATION (data correctness)
+   When an LOO order is canceled or expired by the broker but had
+   filled some shares first (e.g. VZ filled 25/40 then expired,
+   UNH filled 3/6 then expired), _reverse_optimistic_fill was
+   subtracting the FULL target_qty from the local position — wiping
+   out shares we actually own at the broker.
+
+   Fix in src/core/execution_engine.py:
+     _reconcile_optimistic_fills() now reads `filled_qty` and
+     `filled_avg_price` from the broker order on canceled/expired
+     terminal status and passes them to _reverse_optimistic_fill.
+
+     _reverse_optimistic_fill() now computes unfilled_qty =
+     target_qty - filled_qty and only reverses that portion. If
+     filled_qty > 0 the intent is marked FILLED with a
+     partial_<status>:filled=X/Y error annotation; if filled_qty == 0
+     the existing behavior (FAILED, full reversal) applies.
+
+     Stop-loss is only removed when the resulting position truly
+     reaches zero; partial-fill survivors keep their stop.
+
+     Cost basis for the surviving portion is taken from the broker's
+     filled_avg_price when available, falling back to the local
+     avg_price otherwise.
+
+   Without this fix, tomorrow's reconciliation would have erased 28
+   shares from VZ + UNH that actually exist at the broker.
+
+2. ARTIFACT MARKDOWN "N/A 0 SYMBOL @ price" RENDERING
+   src/core/execution_engine.py post-trading artifact code passed
+   runner.confirmed_fills directly to artifact_writer. confirmed_fills
+   entries are raw trade dicts using keys `action`/`shares`, but the
+   artifact writer reads `side`/`qty`. Result: every filled-order row
+   in daily-artifact markdown showed "N/A 0 SYMBOL @ $price".
+
+   Fix: introduced a small _to_artifact_fill normalizer that accepts
+   either shape. Applied to both fallback_fills and the new
+   confirmed_fills_normalized list.
+
+3. CI COMPONENT TEST FAILURES (drawdown manager mocks)
+   tests/component/test_risk_management.py
+     test_drawdown_halt_threshold + test_drawdown_panic_threshold
+     used bare Mock() objects for db; recent code added a json.loads
+     of db.get_system_state("drawdown_stop_state") which choked on
+     the default Mock return value. Fix: explicitly stub
+     get_system_state.return_value = None so the "no prior state"
+     branch is exercised. Unblocks CI Tests workflow.
+
+Tests: 419 passed, 1 skipped (was 354 passed locally + 2 failing CI).
+
+Last night's run review (separate from fixes):
+  ✓ Reconciliation reversed 28 phantoms from prior runs
+  ✓ 11 new BUYs submitted, 0 errors, recon status PASS
+  ✗ At market open, broker expired 9/11 fully and partially-filled
+    VZ (25/40) and UNH (3/6) — only 28 shares actually acquired
+  → Tomorrow's run will now correctly handle this via fix #1
