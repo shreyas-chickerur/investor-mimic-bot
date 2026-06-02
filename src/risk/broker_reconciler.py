@@ -18,6 +18,8 @@ from alpaca.trading.enums import QueryOrderStatus
 from alpaca.trading.requests import GetOrdersRequest
 from dotenv import load_dotenv
 
+from src.utils.email_notifier import _bullet_list, build_alert_html
+
 load_dotenv()
 logger = logging.getLogger(__name__)
 
@@ -139,9 +141,13 @@ class BrokerReconciler:
 
                 broker_data = broker_dict[symbol]
 
-                # Check quantity — use 0.5-share tolerance to handle fractional
-                # share rounding and paper-trading fill estimation differences
-                if abs(local_data["qty"] - broker_data["qty"]) > 0.5:
+                # Check quantity — use the larger of: 0.5 shares (handles whole-share
+                # rounding artifacts in paper trading) or 0.5% of position size (catches
+                # meaningful drift on large positions while ignoring noise on small ones).
+                _broker_qty = broker_data["qty"]
+                _local_qty = local_data["qty"]
+                _qty_tol = max(0.5, 0.005 * max(abs(_broker_qty), abs(_local_qty)))
+                if abs(_local_qty - _broker_qty) > _qty_tol:
                     disc = f"Quantity mismatch for {symbol}: local={local_data['qty']}, broker={broker_data['qty']}"
                     discrepancies.append(disc)
 
@@ -270,35 +276,27 @@ class BrokerReconciler:
         # Send email alert
         if self.email_notifier:
             try:
-                subject = "⚠️ Broker Reconciliation Warning - Discrepancies Detected"
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                disc_items = "".join(
-                    f"<li style='margin-bottom:6px'>{d}</li>" for d in discrepancies
+                subject = "⚠️ Broker Reconciliation Warning — Discrepancies Detected"
+                n = len(discrepancies)
+                noun = "discrepancy" if n == 1 else "discrepancies"
+                body_html = (
+                    f"<p style='color:#333;margin:0 0 12px'>Trading completed, but "
+                    f"<strong>{n} {noun}</strong> were found between the local database "
+                    f"and Alpaca broker state.</p>"
+                    + "<h4 style='margin:0 0 6px;color:#e65100'>Discrepancies found</h4>"
+                    + _bullet_list(discrepancies)
+                    + "<div style='background:#fff8e1;border:1px solid #ffe082;border-radius:6px;"
+                    "padding:12px 16px;font-size:13px;margin-top:8px'>"
+                    "Common in paper trading (partial fills, timing gaps). Run "
+                    "<code style='background:#f0f0e8;padding:2px 5px;border-radius:3px'>"
+                    "python3 scripts/sync_broker_state.py</code> or trigger the "
+                    "<em>Sync Database</em> workflow to resolve. Trading will continue "
+                    "normally on the next run.</div>"
                 )
-                body = f"""<html><body style="font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;
-                    max-width:600px;margin:0 auto;color:#111;">
-                  <div style="background:#ff9800;color:#fff;padding:16px 20px;border-radius:8px 8px 0 0">
-                    <h2 style="margin:0">⚠️ Reconciliation Warning</h2>
-                  </div>
-                  <div style="padding:20px;border:1px solid #dee2e6;border-top:none">
-                    <p style="margin:0 0 12px"><strong>Time:</strong> {timestamp}</p>
-                    <p style="margin:0 0 12px">Trading completed, but <strong>{len(discrepancies)} discrepanc{'y' if len(discrepancies)==1 else 'ies'}</strong>
-                    were found between the local database and Alpaca broker state.</p>
-                    <h3 style="margin:16px 0 8px;color:#e65100">Discrepancies Found</h3>
-                    <ul style="line-height:1.6;padding-left:20px;margin:0 0 16px">{disc_items}</ul>
-                    <div style="background:#fff8e1;border:1px solid #ffe082;border-radius:6px;
-                                padding:12px 16px;margin-bottom:16px;font-size:13px">
-                      This is common in paper trading (e.g., manual trades, partial fills,
-                      or end-of-day timing gaps). Run
-                      <code style="background:#f0f0e8;padding:2px 6px;border-radius:3px">python3 scripts/sync_broker_state.py</code>
-                      or trigger the <em>Sync Database</em> workflow to resolve.
-                    </div>
-                    <p style="color:#555;font-size:13px;margin:0">
-                      The trading system will continue to operate normally on the next run.
-                    </p>
-                  </div>
-                </body></html>"""
-                self.email_notifier.send_alert(subject, body)
+                html = build_alert_html(
+                    "⚠️ Reconciliation Warning", body_html, accent_color="#e65100"
+                )
+                self.email_notifier.send_alert(subject, html)
                 logger.info("✅ Email alert sent")
             except Exception as e:
                 logger.error(f"Failed to send email alert: {e}")

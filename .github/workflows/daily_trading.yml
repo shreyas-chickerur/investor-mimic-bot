@@ -13,6 +13,13 @@ on:
   #   - cron: '0 3 * * 2-6'
   workflow_dispatch:  # Triggered by cron-job.org (and available for manual runs)
 
+# Prevent two trading runs from overlapping — concurrent runs would download the
+# same DB artifact, execute trades independently, and race to upload the result,
+# with the last upload winning and the other run's changes silently lost.
+concurrency:
+  group: daily-trading-execution
+  cancel-in-progress: false  # never cancel a run mid-trade; queue instead
+
 env:
   PYTHON_VERSION: "3.11"
 
@@ -423,7 +430,9 @@ jobs:
         # auto-sync that deleted ghost positions) are lost when only trading.db is
         # captured — the next run would restore the pre-deletion state and trigger
         # another reconciliation failure.
-        sqlite3 trading.db "PRAGMA wal_checkpoint(TRUNCATE);" || true
+        if ! sqlite3 trading.db "PRAGMA wal_checkpoint(TRUNCATE);"; then
+          echo "⚠️ WARNING: WAL checkpoint failed — uploaded DB may be missing recent writes"
+        fi
     - name: Upload trading database
       if: always() && steps.auto_sync.outputs.synced != 'true'
       uses: actions/upload-artifact@v4
