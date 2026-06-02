@@ -444,6 +444,35 @@ class TradingDatabase:
             """
             )
 
+            # Tax lot tracking: each BUY is a separate lot; SELLs are FIFO-matched
+            # so realized P&L can be split into LTCG (>365d) and STCG (<365d).
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS tax_lots (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    strategy_id INTEGER NOT NULL,
+                    symbol TEXT NOT NULL,
+                    buy_run_id TEXT NOT NULL,
+                    buy_date TEXT NOT NULL,
+                    buy_price REAL NOT NULL,
+                    quantity REAL NOT NULL,
+                    remaining_quantity REAL NOT NULL,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_tax_lots_symbol ON tax_lots(strategy_id, symbol)"
+            )
+
+            # Add tax_treatment column to trade_pnl_detail if it doesn't exist yet
+            try:
+                cursor.execute(
+                    "ALTER TABLE trade_pnl_detail ADD COLUMN tax_treatment TEXT DEFAULT 'STCG'"
+                )
+            except Exception:
+                pass  # column already exists — migration is idempotent
+
             conn.commit()
 
     def upsert_run_state(
@@ -587,6 +616,120 @@ class TradingDatabase:
                 break
         return failures
 
+    # ------------------------------------------------------------------
+    # Tax lot management
+    # ------------------------------------------------------------------
+
+    def record_tax_lot(
+        self,
+        strategy_id: int,
+        symbol: str,
+        buy_date: str,
+        buy_price: float,
+        quantity: float,
+    ) -> None:
+        """Record a new BUY as a tax lot for future FIFO matching."""
+        with closing(sqlite3.connect(self.db_path)) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO tax_lots
+                (strategy_id, symbol, buy_run_id, buy_date, buy_price, quantity, remaining_quantity)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (strategy_id, symbol, self.run_id, buy_date, buy_price, quantity, quantity),
+            )
+            conn.commit()
+
+    def fifo_match_sell(
+        self, strategy_id: int, symbol: str, sell_quantity: float, sell_price: float
+    ) -> str:
+        """FIFO-match a SELL against open lots.  Returns 'LTCG', 'STCG', or 'MIXED'.
+
+        Deducts sold quantity from the oldest lots first and determines
+        whether the matched holding period qualifies for long-term treatment
+        (>365 days).  Returns the dominant tax treatment.
+        """
+        with closing(sqlite3.connect(self.db_path)) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT id, buy_date, buy_price, remaining_quantity
+                FROM tax_lots
+                WHERE strategy_id = ? AND symbol = ? AND remaining_quantity > 0
+                ORDER BY buy_date ASC
+                """,
+                (strategy_id, symbol),
+            )
+            lots = cursor.fetchall()
+
+        if not lots:
+            return "STCG"
+
+        today = datetime.now().date()
+        remaining = sell_quantity
+        ltcg_qty = 0.0
+        stcg_qty = 0.0
+
+        updates: list[tuple] = []
+        for lot in lots:
+            if remaining <= 0:
+                break
+            lot_id = lot["id"]
+            lot_date = lot["buy_date"][:10]
+            lot_remaining = float(lot["remaining_quantity"])
+
+            try:
+                held_days = (today - datetime.strptime(lot_date, "%Y-%m-%d").date()).days
+            except ValueError:
+                held_days = 0
+
+            used = min(remaining, lot_remaining)
+            new_remaining = lot_remaining - used
+
+            if held_days >= 365:
+                ltcg_qty += used
+            else:
+                stcg_qty += used
+
+            remaining -= used
+            updates.append((new_remaining, lot_id))
+
+        with closing(sqlite3.connect(self.db_path)) as conn:
+            cursor = conn.cursor()
+            for new_rem, lot_id in updates:
+                cursor.execute(
+                    "UPDATE tax_lots SET remaining_quantity = ? WHERE id = ?",
+                    (new_rem, lot_id),
+                )
+            conn.commit()
+
+        if ltcg_qty > 0 and stcg_qty > 0:
+            return "MIXED"
+        return "LTCG" if ltcg_qty > 0 else "STCG"
+
+    def was_sold_at_loss_recently(self, symbol: str, strategy_id: int, days: int = 30) -> bool:
+        """Return True if this symbol was sold at a loss within the last ``days`` calendar days.
+
+        Used for the wash-sale guard: buying a security within 30 days of selling
+        it at a loss disallows the loss deduction under IRS wash-sale rules.
+        """
+        with closing(sqlite3.connect(self.db_path)) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT COUNT(*) FROM trade_pnl_detail
+                WHERE symbol = ?
+                  AND strategy_id = ?
+                  AND gross_pnl < 0
+                  AND DATE(exit_date) >= DATE('now', ?)
+                """,
+                (symbol, strategy_id, f"-{days} days"),
+            )
+            row = cursor.fetchone()
+        return bool(row and row[0] > 0)
+
     def count_day_trades_last_n_days(self, trading_days: int = 5) -> int:
         """Count PDT day trades (same-symbol buy+sell on the same calendar date) in the
         last ``trading_days`` trading days (approximated as trading_days * 1.4 calendar days
@@ -722,6 +865,7 @@ class TradingDatabase:
         shares: float,
         entry_date: str = None,
         exit_reason: str = None,
+        tax_treatment: str = None,
     ):
         """Record matched buy→sell P&L for win-rate and profit-factor tracking."""
         with closing(sqlite3.connect(self.db_path)) as conn:
@@ -757,13 +901,24 @@ class TradingDatabase:
             buy_row = cursor.fetchone()
             buy_run_id = buy_row[0] if buy_row else None
 
+            # FIFO-match against tax lots to determine LTCG/STCG treatment.
+            # Falls back to hold_days-based heuristic when lot data is absent.
+            if tax_treatment is None:
+                fifo_result = self.fifo_match_sell(strategy_id, symbol, shares, exit_price)
+                if fifo_result != "MIXED":
+                    tax_treatment = fifo_result
+                elif hold_days is not None:
+                    tax_treatment = "LTCG" if hold_days >= 365 else "STCG"
+                else:
+                    tax_treatment = "STCG"
+
             cursor.execute(
                 """
                 INSERT INTO trade_pnl_detail
                 (strategy_id, strategy_name, symbol, buy_run_id, sell_run_id,
                  entry_date, exit_date, entry_price, exit_price, shares,
-                 gross_pnl, gross_pnl_pct, hold_days, exit_reason, is_winner)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 gross_pnl, gross_pnl_pct, hold_days, exit_reason, is_winner, tax_treatment)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
                 (
                     strategy_id,
@@ -781,6 +936,7 @@ class TradingDatabase:
                     hold_days,
                     exit_reason,
                     1 if gross_pnl > 0 else 0,
+                    tax_treatment,
                 ),
             )
             conn.commit()

@@ -386,11 +386,14 @@ class MultiStrategyRunner:
         return metrics
 
     def _refresh_account_values(self):
-        """Refresh account values from Alpaca."""
+        """Refresh account values from Alpaca and sync CashManager to broker cash."""
         account = self.trading_client.get_account()
         self.portfolio_value = float(account.portfolio_value)
         self.cash_available = float(account.cash)
         self.buying_power = float(getattr(account, "buying_power", self.cash_available))
+        # Sync in-memory cash model to real broker cash to prevent drift
+        self.cash_manager.sync_from_broker(self.cash_available)
+        self.cash_manager.validate_invariants()
         return account
 
     def _refresh_account_state(self):
@@ -2356,6 +2359,31 @@ class MultiStrategyRunner:
                             stage="RISK",
                         )
 
+                    # ── Cross-run wash-sale guard ─────────────────────────────────
+                    # IRS wash-sale rule: if we sold this symbol at a loss within the
+                    # last 30 calendar days, buying it back disallows the loss deduction.
+                    # Block the BUY to preserve tax treatment on the recent loss sale.
+                    # This guard is silent in paper trading but critical for live migration.
+                    try:
+                        if self.db.was_sold_at_loss_recently(symbol, strategy.strategy_id, days=30):
+                            logger.info(
+                                "Wash-sale guard: skipping BUY %s — sold at a loss within 30 days",
+                                symbol,
+                            )
+                            self.rejected_signals.append(
+                                {
+                                    "strategy": strategy.name,
+                                    "symbol": symbol,
+                                    "action": action,
+                                    "shares": shares,
+                                    "price": price,
+                                    "reason": "wash_sale_guard",
+                                }
+                            )
+                            continue
+                    except Exception as _ws_exc:
+                        logger.debug("Wash-sale check skipped for %s: %s", symbol, _ws_exc)
+
                     # Wash trade prevention: skip if already sold this symbol this run
                     if symbol in self.symbols_sold_this_run:
                         logger.warning(
@@ -2836,6 +2864,18 @@ class MultiStrategyRunner:
                         entry_date=entry_date_str,
                         atr=atr if atr > 0 else None,
                     )
+
+                    # Record tax lot for FIFO matching and LTCG/STCG tagging on future SELLs
+                    try:
+                        self.db.record_tax_lot(
+                            strategy_id=strategy.strategy_id,
+                            symbol=symbol,
+                            buy_date=entry_date_str,
+                            buy_price=actual_fill_price,
+                            quantity=actual_filled_qty,
+                        )
+                    except Exception as _lot_exc:
+                        logger.warning("Tax lot recording failed for %s: %s", symbol, _lot_exc)
 
                     # CRITICAL: Set stop loss for new position (regime-aware multiplier)
                     if atr > 0:
