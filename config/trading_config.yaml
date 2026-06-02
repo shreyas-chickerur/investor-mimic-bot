@@ -33,6 +33,12 @@ risk:
   # Sector concentration limit
   max_sector_pct: 0.30  # No single sector may exceed 30% of portfolio
 
+  # Per-symbol concentration cap (cross-portfolio, all strategies combined)
+  max_single_symbol_pct: 0.15  # No single symbol may exceed 15% of total portfolio value
+
+  # Overnight exposure cap — total OPG-queued + open position value as % of portfolio
+  max_overnight_exposure_pct: 0.85  # At most 85% of portfolio value held or queued overnight
+
   # Per-strategy loss limit
   max_strategy_loss_pct: 0.20  # 20% loss from initial capital triggers strategy freeze
 
