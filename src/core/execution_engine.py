@@ -295,6 +295,14 @@ class MultiStrategyRunner:
         _mdd = self.db.get_system_state("max_drawdown")
         self.max_drawdown = float(_mdd) if _mdd else 0.0
 
+        # Initialize signal tracking so artifact generation never hits AttributeError
+        # when kill switch fires before run_all_strategies reaches its init block
+        self.executed_signals = []
+        self.rejected_signals = []
+        self.symbols_bought_this_run: set = set()
+        self.symbols_sold_this_run: set = set()
+        self._held_symbols: set = set()
+
         # Initialize reconciliation state so finally block never hits AttributeError
         self.reconciliation_status = "UNKNOWN"
         self.reconciliation_discrepancies = []
@@ -1247,9 +1255,18 @@ class MultiStrategyRunner:
         logger.info("CHECKING KILL SWITCHES")
         logger.info("=" * 80)
 
+        # Compute current drawdown from peak as a decimal fraction (0.05 = 5%).
+        # max_drawdown is stored as a percentage (e.g. 1.777 = 1.777%) so divide by 100.
+        # Use current portfolio value vs peak, not historical max drawdown, so a recovered
+        # drawdown doesn't permanently trip the kill switch.
+        _current_dd = (
+            (self.peak_portfolio_value - self.portfolio_value) / self.peak_portfolio_value
+            if self.peak_portfolio_value > 0
+            else 0.0
+        )
         kill_context = {
             "reconciliation_status": "UNKNOWN",
-            "daily_drawdown": abs(float(self.max_drawdown or 0.0)),
+            "daily_drawdown": max(_current_dd, 0.0),
             "consecutive_failures": self.db.get_consecutive_failed_runs(),
             "rejected_orders_count": 0,
             "total_orders": 0,
