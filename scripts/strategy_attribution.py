@@ -188,7 +188,7 @@ def main() -> int:
         print(f"trading.db not found at {DB_PATH}", file=sys.stderr)
         return 1
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=10)
     try:
         trades = fetch_trades(conn, args.days)
         positions = fetch_positions(conn)

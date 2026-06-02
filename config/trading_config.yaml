@@ -98,6 +98,19 @@ strategies:
   # Reserves 15% as unallocated buffer; each active strategy gets an equal share
   deployed_capital_pct: 0.85
 
+  # Strategy validation status — used in platform status report and daily email footer.
+  # BACKTESTED   : full-period in-sample backtest only (overfitting risk)
+  # PAPER_VALIDATED : live paper-trading results confirm edge
+  # OOS_VALIDATED   : walk-forward out-of-sample accuracy verified
+  validation_status:
+    rsi_mean_reversion: BACKTESTED
+    earnings_drift: BACKTESTED
+    ml_momentum: OOS_VALIDATED    # walk-forward accuracy gate enforced at runtime
+    factor_momentum: PAPER_VALIDATED
+    news_sentiment: UNVALIDATED   # threshold rarely met; experimental
+    ma_crossover: BACKTESTED
+    volatility_breakout: BACKTESTED
+
   # Backtest Sharpe priors — seed allocator when live history < 20 days
   # RSI Sharpe 0.65 (p=0.019), Earnings Drift estimated 0.80 (p=0.001),
   # ML Momentum 0.30 (edge only at high conf), Factor Momentum 0.0 (no edge)

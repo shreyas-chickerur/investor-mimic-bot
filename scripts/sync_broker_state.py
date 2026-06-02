@@ -110,7 +110,7 @@ def sync_broker_to_database(db_path="trading.db"):
         f"Portfolio: ${broker_state['portfolio_value']:,.2f}"
     )
 
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, timeout=10)
     cursor = conn.cursor()
 
     try:

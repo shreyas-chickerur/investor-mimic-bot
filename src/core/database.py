@@ -17,6 +17,32 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 
+def _with_retry(fn, max_attempts: int = 3, base_delay: float = 0.1):
+    """Retry ``fn`` on transient SQLite SQLITE_BUSY (database locked) errors.
+
+    Uses exponential backoff with jitter so parallel GHA steps (e.g. the
+    portfolio snapshot workflow overlapping the trading run) don't deadlock.
+    """
+    import random as _random
+    import time as _time
+
+    for attempt in range(max_attempts):
+        try:
+            return fn()
+        except sqlite3.OperationalError as exc:
+            if "database is locked" in str(exc) and attempt < max_attempts - 1:
+                delay = base_delay * (2**attempt) + _random.uniform(0, 0.05)
+                logger.warning(
+                    "SQLite locked (attempt %d/%d) — retrying in %.2fs",
+                    attempt + 1,
+                    max_attempts,
+                    delay,
+                )
+                _time.sleep(delay)
+            else:
+                raise
+
+
 class TradingDatabase:
     """Database adapter for trading system with proper schema"""
 
@@ -33,7 +59,7 @@ class TradingDatabase:
 
     def _init_database(self):
         """Initialize trading database schema"""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             conn.execute("PRAGMA journal_mode=WAL")  # concurrent readers don't block each other
             conn.execute("PRAGMA synchronous=NORMAL")  # safe + faster than FULL for WAL mode
             cursor = conn.cursor()
@@ -485,7 +511,7 @@ class TradingDatabase:
     ) -> None:
         """Create or update run-state machine row for the current run."""
         now = datetime.now().isoformat()
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
 
             cursor.execute("SELECT run_id FROM run_state WHERE run_id = ?", (self.run_id,))
@@ -530,7 +556,7 @@ class TradingDatabase:
     def enqueue_notification(self, channel: str, category: str, subject: str, body: str) -> int:
         """Queue a notification for asynchronous delivery."""
         now = datetime.now().isoformat()
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -546,7 +572,7 @@ class TradingDatabase:
 
     def fetch_pending_notifications(self, limit: int = 50) -> list[dict]:
         """Fetch pending/failed notifications for delivery workers."""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(
@@ -563,7 +589,7 @@ class TradingDatabase:
 
     def mark_notification_sent(self, notification_id: int) -> None:
         """Mark outbox notification as sent."""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -579,7 +605,7 @@ class TradingDatabase:
 
     def mark_notification_failed(self, notification_id: int, error_message: str) -> None:
         """Mark outbox notification delivery failure."""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -595,7 +621,7 @@ class TradingDatabase:
 
     def get_consecutive_failed_runs(self, max_lookback: int = 20) -> int:
         """Return count of consecutive failed runs from most recent run backward."""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -629,7 +655,7 @@ class TradingDatabase:
         quantity: float,
     ) -> None:
         """Record a new BUY as a tax lot for future FIFO matching."""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -650,7 +676,7 @@ class TradingDatabase:
         whether the matched holding period qualifies for long-term treatment
         (>365 days).  Returns the dominant tax treatment.
         """
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(
@@ -696,7 +722,7 @@ class TradingDatabase:
             remaining -= used
             updates.append((new_remaining, lot_id))
 
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
             for new_rem, lot_id in updates:
                 cursor.execute(
@@ -715,7 +741,7 @@ class TradingDatabase:
         Used for the wash-sale guard: buying a security within 30 days of selling
         it at a loss disallows the loss deduction under IRS wash-sale rules.
         """
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -735,7 +761,7 @@ class TradingDatabase:
         last ``trading_days`` trading days (approximated as trading_days * 1.4 calendar days
         to handle weekends).  Used by the PDT hard-block to enforce the 3-in-5-day rule."""
         calendar_days = int(trading_days * 1.5) + 1  # safe buffer for weekends/holidays
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -756,7 +782,7 @@ class TradingDatabase:
 
     def save_run_slo_metrics(self, metrics: dict) -> None:
         """Persist per-run SLO metrics for observability dashboards and audits."""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -779,7 +805,7 @@ class TradingDatabase:
         allocation_json: str = None,
     ):
         """Record end-of-run portfolio state for paper trading validation tracking."""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
             today = datetime.now().strftime("%Y-%m-%d")
 
@@ -868,7 +894,7 @@ class TradingDatabase:
         tax_treatment: str = None,
     ):
         """Record matched buy→sell P&L for win-rate and profit-factor tracking."""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
 
             gross_pnl = (exit_price - entry_price) * shares
@@ -943,7 +969,7 @@ class TradingDatabase:
 
     def get_paper_trading_stats(self, days: int = 30) -> dict:
         """Return win rate, profit factor, avg hold days, and streak stats for the last N days."""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
             since = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
 
@@ -996,7 +1022,7 @@ class TradingDatabase:
 
     def create_strategy(self, name: str, description: str, capital: float) -> int:
         """Create or get strategy"""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
 
             # Try to get existing
@@ -1024,7 +1050,7 @@ class TradingDatabase:
         Returns dict with keys: trades, win_rate, avg_win_pct, avg_loss_pct.
         Returns None when trade count < 1.
         """
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -1048,7 +1074,7 @@ class TradingDatabase:
 
     def update_strategy_capital_allocation(self, strategy_id: int, capital: float) -> None:
         """Update capital_allocation for an existing strategy."""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             conn.execute(
                 "UPDATE strategies SET capital_allocation = ? WHERE id = ?",
                 (capital, strategy_id),
@@ -1065,7 +1091,7 @@ class TradingDatabase:
         asof_date: str,
     ) -> int:
         """Log a trading signal"""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
 
             cursor.execute(
@@ -1084,7 +1110,7 @@ class TradingDatabase:
 
     def update_signal_terminal_state(self, signal_id: int, terminal_state: str, reason: str):
         """Update signal with terminal state"""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
 
             cursor.execute(
@@ -1113,7 +1139,7 @@ class TradingDatabase:
         pnl: Optional[float] = None,
     ) -> int:
         """Log a trade with execution costs and P&L"""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
 
             total_cost = slippage_cost + commission_cost
@@ -1166,7 +1192,7 @@ class TradingDatabase:
         deviation_bps: int,
     ) -> None:
         """Record fill price vs expected price for slippage monitoring."""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -1199,7 +1225,7 @@ class TradingDatabase:
     ):
         """Update or create position. entry_date and atr are only written on the
         first insert; subsequent updates preserve the original values via COALESCE."""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
 
             market_value = shares * current_price if current_price else shares * avg_price
@@ -1250,7 +1276,7 @@ class TradingDatabase:
         """
         if not price_map:
             return 0
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
             updated = 0
             for symbol, price in price_map.items():
@@ -1269,7 +1295,7 @@ class TradingDatabase:
 
     def delete_position(self, strategy_id: int, symbol: str):
         """Delete a position (when fully closed)"""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
 
             cursor.execute(
@@ -1294,7 +1320,7 @@ class TradingDatabase:
         Args:
             snapshot_type: 'START', 'RECONCILIATION', or 'END'
         """
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
 
             cursor.execute(
@@ -1321,7 +1347,7 @@ class TradingDatabase:
 
     def get_all_strategies(self) -> list[dict]:
         """Get all strategies"""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
@@ -1332,7 +1358,7 @@ class TradingDatabase:
 
     def get_positions(self, strategy_id: Optional[int] = None) -> list[dict]:
         """Get positions"""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
@@ -1347,7 +1373,7 @@ class TradingDatabase:
 
     def get_position(self, strategy_id: int, symbol: str) -> Optional[dict]:
         """Get a single position for a strategy and symbol."""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
@@ -1367,7 +1393,7 @@ class TradingDatabase:
         `shares > 0` filter silently dropped short positions imported under
         BROKER_SYNC and caused reconciliation to perpetually fail.
         """
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM positions WHERE shares != 0")
@@ -1376,7 +1402,7 @@ class TradingDatabase:
 
     def get_todays_trades(self, date: str) -> list[dict]:
         """Get trades for a specific date"""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
@@ -1397,7 +1423,7 @@ class TradingDatabase:
 
     def get_signals_without_terminal_state(self, run_id: Optional[str] = None) -> list[dict]:
         """Get signals that haven't reached terminal state for a run"""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
@@ -1416,7 +1442,7 @@ class TradingDatabase:
 
     def verify_terminal_states(self, run_id: Optional[str] = None) -> tuple[int, int]:
         """Verify all signals have terminal states. Returns (total, with_terminal)"""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
 
             rid = run_id or self.run_id
@@ -1436,7 +1462,7 @@ class TradingDatabase:
 
     def get_strategy_trades(self, strategy_id: int) -> list[dict]:
         """Get all trades for a strategy"""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
@@ -1460,7 +1486,7 @@ class TradingDatabase:
 
     def get_strategy_performance(self, strategy_id: int, days: int = 30) -> list[dict]:
         """Get strategy performance history for dynamic allocation."""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             conn.row_factory = sqlite3.Row
             try:
                 rows = conn.execute(
@@ -1479,7 +1505,7 @@ class TradingDatabase:
 
     def get_strategy_trade_returns(self, strategy_id: int, days: int = 30) -> list:
         """Return per-trade gross_pnl_pct values from trade_pnl_detail for Sharpe computation."""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             try:
                 rows = conn.execute(
                     """
@@ -1497,7 +1523,7 @@ class TradingDatabase:
 
     def get_latest_performance(self, strategy_id: int) -> Optional[dict]:
         """Get the most recent performance snapshot for a strategy."""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             conn.row_factory = sqlite3.Row
             try:
                 row = conn.execute(
@@ -1515,7 +1541,7 @@ class TradingDatabase:
 
     def record_daily_performance(self, strategy_id: int, **kwargs):
         """Record a daily performance snapshot for a strategy."""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             try:
                 conn.execute(
                     """
@@ -1553,7 +1579,7 @@ class TradingDatabase:
         executed: int,
     ):
         """Save signal funnel counts for a strategy"""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -1576,7 +1602,7 @@ class TradingDatabase:
         signal_id: int = None,
     ):
         """Log why a signal was rejected"""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -1608,7 +1634,7 @@ class TradingDatabase:
         )
         intent_id = hashlib.sha256(intent_string.encode()).hexdigest()[:16]
 
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
 
             cursor.execute(
@@ -1635,7 +1661,7 @@ class TradingDatabase:
         self, intent_id: str, status: str, broker_order_id: str = None, error: str = None
     ):
         """Update order intent status"""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
 
             timestamp_field = {
@@ -1679,7 +1705,7 @@ class TradingDatabase:
         - Update local status to FILLED if broker confirms fill
         - Leave alone if broker still pending
         """
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(
@@ -1698,7 +1724,7 @@ class TradingDatabase:
 
     def get_signal_funnel_summary(self, run_id: str = None) -> list[dict]:
         """Get funnel summary for email reporting"""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
@@ -1710,7 +1736,7 @@ class TradingDatabase:
 
     def get_signal_rejections_summary(self, run_id: str = None, limit: int = 10) -> list[dict]:
         """Get top rejection reasons for email reporting"""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
@@ -1733,7 +1759,7 @@ class TradingDatabase:
 
     def get_order_intent_by_id(self, intent_id: str) -> Optional[dict]:
         """Get order intent by ID"""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
@@ -1752,7 +1778,7 @@ class TradingDatabase:
         """
         intent_id = self.create_order_intent(strategy_id, symbol, side, target_qty)
 
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
 
             cursor.execute(
@@ -1779,7 +1805,7 @@ class TradingDatabase:
         This is the true idempotency gate: a second run on the same calendar day
         will find the first run's intent and skip re-submitting the order.
         """
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(
@@ -1808,7 +1834,7 @@ class TradingDatabase:
         Returns:
             Count of duplicate intents
         """
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
 
             cutoff_time = (datetime.now() - timedelta(hours=hours)).isoformat()
@@ -1838,7 +1864,7 @@ class TradingDatabase:
         Returns:
             State value or None if not found
         """
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
 
             cursor.execute(
@@ -1861,7 +1887,7 @@ class TradingDatabase:
             key: State key
             value: State value
         """
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
 
             cursor.execute(
@@ -1878,7 +1904,7 @@ class TradingDatabase:
         self, symbol: str, stop_price: float, entry_price: float, entry_atr: float
     ) -> None:
         """Persist a stop-loss level so it survives across daily runs."""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -1891,7 +1917,7 @@ class TradingDatabase:
 
     def load_all_stop_losses(self) -> dict:
         """Return persisted stop-loss levels keyed by symbol."""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT symbol, stop_price, entry_price, entry_atr FROM stop_loss_state")
             rows = cursor.fetchall()
@@ -1902,7 +1928,7 @@ class TradingDatabase:
 
     def delete_stop_loss(self, symbol: str) -> None:
         """Remove a persisted stop-loss level when a position is closed."""
-        with closing(sqlite3.connect(self.db_path)) as conn:
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM stop_loss_state WHERE symbol = ?", (symbol,))
             conn.commit()

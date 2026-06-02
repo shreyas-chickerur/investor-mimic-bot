@@ -107,12 +107,29 @@ class FactorMomentumStrategy(TradingStrategy):
         self._last_rerank_date = None
         self._partial_exit_done: set = set()
 
-    def _load_fundamentals(self) -> dict[str, dict]:
-        """Load fundamental data from data/fundamentals.json. Returns empty dict if absent."""
+    def _load_fundamentals(self, max_age_days: int = 90) -> dict[str, dict]:
+        """Load fundamental data from data/fundamentals.json.
+
+        Returns empty dict when the file is absent or older than ``max_age_days``.
+        Fundamentals are updated quarterly; data older than 90 days is stale enough
+        that using it may score companies on outdated earnings/debt ratios.
+        """
+        if not _FUNDAMENTALS_PATH.exists():
+            return {}
         try:
-            if _FUNDAMENTALS_PATH.exists():
-                with open(_FUNDAMENTALS_PATH) as f:
-                    return json.load(f)
+            from datetime import datetime as _dt
+
+            age_days = (_dt.now() - _dt.fromtimestamp(_FUNDAMENTALS_PATH.stat().st_mtime)).days
+            if age_days > max_age_days:
+                logger.warning(
+                    "Fundamentals data is %d days old (max %d) — skipping to avoid stale scores. "
+                    "Run scripts/update_fundamental_data.py to refresh.",
+                    age_days,
+                    max_age_days,
+                )
+                return {}
+            with open(_FUNDAMENTALS_PATH) as f:
+                return json.load(f)
         except Exception as exc:
             logger.warning("Could not load fundamentals: %s", exc)
         return {}

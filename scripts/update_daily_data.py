@@ -117,7 +117,62 @@ class DailyDataUpdater:
             return df
 
         except Exception as e:
-            logger.error(f"Error fetching {symbol}: {e}")
+            logger.error(f"Error fetching {symbol} from Alpha Vantage: {e}")
+            return self._fetch_fallback_yfinance(symbol, days)
+
+    def _fetch_fallback_yfinance(self, symbol: str, days: int):
+        """Fetch OHLCV from yfinance when Alpha Vantage is unavailable.
+
+        yfinance uses Yahoo Finance public endpoints and requires no API key.
+        Used as secondary source on rate-limit errors or quota exhaustion.
+        """
+        try:
+            import yfinance as yf  # optional dependency; in requirements.txt
+        except ImportError:
+            logger.warning("yfinance not installed — cannot use fallback source for %s", symbol)
+            return None
+
+        try:
+            end = datetime.now()
+            start = end - timedelta(days=max(days + 5, 10))  # slight buffer for weekends
+            ticker = yf.Ticker(symbol)
+            df_raw = ticker.history(start=start.strftime("%Y-%m-%d"), auto_adjust=True)
+            if df_raw.empty:
+                logger.warning("yfinance returned no data for %s", symbol)
+                return None
+
+            df_raw = df_raw.reset_index().rename(
+                columns={
+                    "Date": "date",
+                    "Open": "open",
+                    "High": "high",
+                    "Low": "low",
+                    "Close": "close",
+                    "Volume": "volume",
+                }
+            )
+            df_raw["date"] = pd.to_datetime(df_raw["date"]).dt.tz_localize(None)
+            df_raw["symbol"] = symbol
+            df_raw["adjusted_close"] = df_raw["close"]
+            df_raw["raw_close"] = df_raw["close"]
+            cols = [
+                "date",
+                "symbol",
+                "open",
+                "high",
+                "low",
+                "close",
+                "adjusted_close",
+                "raw_close",
+                "volume",
+            ]
+            df_raw = df_raw[[c for c in cols if c in df_raw.columns]].sort_values("date")
+            cutoff = datetime.now() - timedelta(days=days)
+            df_raw = df_raw[df_raw["date"] >= pd.Timestamp(cutoff)]
+            logger.info("yfinance fallback: fetched %d rows for %s", len(df_raw), symbol)
+            return df_raw
+        except Exception as exc:
+            logger.error("yfinance fallback failed for %s: %s", symbol, exc)
             return None
 
     def calculate_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -162,7 +217,11 @@ class DailyDataUpdater:
             returns = symbol_data["close"].pct_change()
             symbol_data["volatility_20d"] = returns.rolling(window=20).std()
 
-            # VWAP: 20-day rolling volume-weighted average price
+            # Rolling price-weighted average (stored as "vwap" for compatibility).
+            # This is a 20-day rolling (close × volume) / volume sum — a smoothed
+            # cost-basis proxy, NOT the intraday session VWAP used by day traders.
+            # Strategies use it as a medium-term price anchor ("near rolling VWAP"
+            # means near the average price paid over the last 20 trading days).
             _tp_vol = symbol_data["close"] * symbol_data["volume"]
             _vol_sum = symbol_data["volume"].rolling(window=20).sum().replace(0, float("nan"))
             symbol_data["vwap"] = _tp_vol.rolling(window=20).sum() / _vol_sum

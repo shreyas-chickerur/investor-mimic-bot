@@ -86,7 +86,7 @@ STRATEGY_EXPLAINERS: dict[str, str] = {
 
 # ── DB helpers ────────────────────────────────────────────────────────────────
 def _conn(db_path: str) -> sqlite3.Connection:
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, timeout=10)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -212,6 +212,77 @@ def get_rejection_summary(db, run_id: str | None) -> list[dict]:
         ORDER BY cnt DESC LIMIT 5
         """,
         run_id,
+    )
+
+
+def get_signal_funnel(db, run_id: str | None) -> list[dict]:
+    """Return per-strategy signal funnel stats for the most recent run."""
+    if not run_id:
+        return []
+    return _q(
+        db,
+        """
+        SELECT strategy_name,
+               raw_signals, after_regime, after_correlation, after_risk, executed,
+               CASE WHEN raw_signals > 0
+                    THEN ROUND(100.0 * executed / raw_signals, 1)
+                    ELSE 0 END AS overall_pct
+        FROM signal_funnel
+        WHERE run_id = ?
+        ORDER BY strategy_name
+        """,
+        run_id,
+    )
+
+
+def build_signal_funnel_section(funnel_rows: list[dict]) -> str:
+    """Build a compact signal funnel HTML table for the daily email."""
+    if not funnel_rows:
+        return ""
+
+    def _bar(pct: float, color: str = "#4caf50") -> str:
+        pct = max(0.0, min(100.0, float(pct or 0)))
+        return (
+            f"<div style='background:#1e2533;border-radius:3px;height:6px;width:80px;display:inline-block;vertical-align:middle'>"
+            f"<div style='background:{color};width:{pct:.0f}%;height:100%;border-radius:3px'></div></div>"
+        )
+
+    rows_html = ""
+    for r in funnel_rows:
+        name = r.get("strategy_name", "")
+        raw = int(r.get("raw_signals") or 0)
+        regime = int(r.get("after_regime") or 0)
+        corr = int(r.get("after_correlation") or 0)
+        risk = int(r.get("after_risk") or 0)
+        executed = int(r.get("executed") or 0)
+        overall = float(r.get("overall_pct") or 0)
+        color = "#4caf50" if executed > 0 else ("#ffc107" if raw > 0 else "#555")
+        rows_html += (
+            f"<tr>"
+            f"<td style='padding:5px 8px 5px 0;color:#aaa;font-size:12px;white-space:nowrap'>{name}</td>"
+            f"<td style='padding:5px 4px;color:#ccc;font-size:12px;text-align:center'>{raw}</td>"
+            f"<td style='padding:5px 4px;color:#ccc;font-size:12px;text-align:center'>{regime}</td>"
+            f"<td style='padding:5px 4px;color:#ccc;font-size:12px;text-align:center'>{corr}</td>"
+            f"<td style='padding:5px 4px;color:#ccc;font-size:12px;text-align:center'>{risk}</td>"
+            f"<td style='padding:5px 4px;color:#ccc;font-size:12px;text-align:center'>{executed}</td>"
+            f"<td style='padding:5px 4px 5px 8px'>{_bar(overall, color)} "
+            f"<span style='color:{color};font-size:11px'>{overall:.0f}%</span></td>"
+            f"</tr>"
+        )
+
+    return (
+        f"<table style='border-collapse:collapse;width:100%;font-size:12px'>"
+        f"<thead><tr style='border-bottom:1px solid #2a3344'>"
+        f"<th style='padding:4px 8px 4px 0;color:#666;font-weight:600;text-align:left'>Strategy</th>"
+        f"<th style='padding:4px;color:#666;font-weight:600'>Raw</th>"
+        f"<th style='padding:4px;color:#666;font-weight:600'>Regime</th>"
+        f"<th style='padding:4px;color:#666;font-weight:600'>Corr</th>"
+        f"<th style='padding:4px;color:#666;font-weight:600'>Risk</th>"
+        f"<th style='padding:4px;color:#666;font-weight:600'>Exec</th>"
+        f"<th style='padding:4px 4px 4px 8px;color:#666;font-weight:600'>Conv.</th>"
+        f"</tr></thead>"
+        f"<tbody>{rows_html}</tbody>"
+        f"</table>"
     )
 
 
@@ -2096,6 +2167,7 @@ def generate_email_body(db_path: str = "trading.db", include_visuals: bool = Tru
         rejections = (
             get_rejection_summary(db, run_id) if (not trades_today and run_is_recent) else []
         )
+        funnel_rows = get_signal_funnel(db, run_id) if run_is_recent else []
         zero_streak = get_zero_trade_streak(db) if not trades_today else 0
         strategy_rows = get_strategy_statuses(db)
         fill_summary = get_fill_quality_summary(db)
@@ -2188,6 +2260,12 @@ def generate_email_body(db_path: str = "trading.db", include_visuals: bool = Tru
             _section_title("What's Moving Your Stocks")
             + f'<tr><td style="padding:0 0 12px 0;">{_news_html}</td></tr>'
             if _news_html
+            else ""
+        )
+        + (
+            _section_title("Signal Funnel")
+            + f'<tr><td style="padding:0 0 12px 0;">{build_signal_funnel_section(funnel_rows)}</td></tr>'
+            if funnel_rows
             else ""
         )
         + _section_title("System Status")

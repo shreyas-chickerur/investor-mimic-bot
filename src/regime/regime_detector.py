@@ -235,6 +235,15 @@ class RegimeDetector:
         )
         hmm_regime = self.detect_hmm_regime(market_data) if market_data is not None else "unknown"
 
+        # Detect whether SPY is present in market_data.  When SPY is absent we
+        # can't reliably compute a market-trend regime, so we flag it explicitly.
+        # The execution engine checks this flag and blocks all new BUY entries
+        # rather than silently trading on a potentially stale/wrong regime.
+        spy_present = False
+        if market_data is not None and "symbol" in market_data.columns:
+            spy_rows = market_data[market_data["symbol"] == "SPY"]
+            spy_present = len(spy_rows) >= 5
+
         adjustments = {
             "vix": round(vix, 1),
             "volatility_regime": vol_regime,
@@ -245,6 +254,7 @@ class RegimeDetector:
             "enable_breakout": True,
             "enable_trend_following": True,
             "position_size_multiplier": 1.0,
+            "spy_present": spy_present,
         }
 
         # Adjust based on volatility regime

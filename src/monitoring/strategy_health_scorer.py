@@ -66,7 +66,7 @@ class StrategyHealthScorer:
             Dict with health metrics and score
         """
         # Single shared connection for all three queries — avoids 3 open/close cycles per strategy
-        conn = sqlite3.connect(self.db.db_path)
+        conn = sqlite3.connect(self.db.db_path, timeout=10)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")  # faster concurrent reads
         try:
@@ -129,7 +129,7 @@ class StrategyHealthScorer:
         cutoff = (datetime.now() - timedelta(days=days)).isoformat()
         _own_conn = conn is None
         if _own_conn:
-            conn = sqlite3.connect(self.db.db_path)
+            conn = sqlite3.connect(self.db.db_path, timeout=10)
             conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute(
@@ -150,7 +150,7 @@ class StrategyHealthScorer:
         cutoff = (datetime.now() - timedelta(days=days)).isoformat()
         _own_conn = conn is None
         if _own_conn:
-            conn = sqlite3.connect(self.db.db_path)
+            conn = sqlite3.connect(self.db.db_path, timeout=10)
             conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute(
@@ -171,7 +171,7 @@ class StrategyHealthScorer:
         cutoff = (datetime.now() - timedelta(days=days)).isoformat()
         _own_conn = conn is None
         if _own_conn:
-            conn = sqlite3.connect(self.db.db_path)
+            conn = sqlite3.connect(self.db.db_path, timeout=10)
             conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute(

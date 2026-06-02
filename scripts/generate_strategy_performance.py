@@ -39,7 +39,7 @@ def calculate_sharpe_ratio(returns, risk_free_rate=0.0):
 def get_strategy_performance(db_path="trading.db", days=30):
     """Get comprehensive strategy performance metrics"""
 
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, timeout=10)
     conn.row_factory = sqlite3.Row
 
     # Get all strategies

@@ -78,7 +78,7 @@ def main() -> None:
         paper=PAPER,
     )
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=10)
     bs_positions = get_broker_sync_positions(conn)
     strat_positions = get_strategy_positions(conn)
 
