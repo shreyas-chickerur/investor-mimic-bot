@@ -5,6 +5,7 @@ Runs all strategies independently with separate tracking per strategy
 """
 from __future__ import annotations
 
+import concurrent.futures
 import logging
 import os
 import sys
@@ -284,6 +285,8 @@ class MultiStrategyRunner:
 
         # VIX-based sizing (populated from regime_adjustments in run_all_strategies)
         self._current_vix: float = 18.0
+        # SPY presence gate (populated from regime_adjustments in run_all_strategies)
+        self._spy_missing: bool = False
 
         # Liquidity filter ADV map (populated from market_data in run_all_strategies)
         self._adv_map: dict[str, float] = {}
@@ -385,9 +388,27 @@ class MultiStrategyRunner:
         self.db.save_run_slo_metrics(metrics)
         return metrics
 
+    @staticmethod
+    def _broker_call(fn, *args, timeout_secs: int = 30, **kwargs):
+        """Execute a broker API call with a hard timeout.
+
+        Alpaca-py SDK calls can hang indefinitely on a network partition.
+        Wrapping each call in a ThreadPoolExecutor with a deadline guarantees
+        that a stalled API call raises TimeoutError rather than blocking the
+        entire GHA job for 6 hours.
+        """
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+            future = ex.submit(fn, *args, **kwargs)
+            try:
+                return future.result(timeout=timeout_secs)
+            except concurrent.futures.TimeoutError as exc:
+                raise TimeoutError(
+                    f"Alpaca API call {fn.__name__} timed out after {timeout_secs}s"
+                ) from exc
+
     def _refresh_account_values(self):
         """Refresh account values from Alpaca and sync CashManager to broker cash."""
-        account = self.trading_client.get_account()
+        account = self._broker_call(self.trading_client.get_account)
         self.portfolio_value = float(account.portfolio_value)
         self.cash_available = float(account.cash)
         self.buying_power = float(getattr(account, "buying_power", self.cash_available))
@@ -612,7 +633,7 @@ class MultiStrategyRunner:
         if peak_str:
             try:
                 return float(peak_str)
-            except:
+            except (ValueError, TypeError):
                 pass
         return self.portfolio_value
 
@@ -864,20 +885,6 @@ class MultiStrategyRunner:
             strategy.positions = {}
             strategy.entry_dates = {}
 
-    def _create_strategy_instance(self, strategy_id, name, capital):
-        """Create strategy instance by name; returns None for unknown names."""
-        strategy_map = {
-            "RSI Mean Reversion": RSIMeanReversionStrategy,
-            "ML Momentum": MLMomentumStrategy,
-            "Earnings Drift": EarningsDriftStrategy,
-            "Factor Momentum": FactorMomentumStrategy,
-        }
-
-        strategy_class = strategy_map.get(name)
-        if strategy_class:
-            return strategy_class(strategy_id, capital)
-        return None
-
     def _collect_strategy_health(self, strategies):
         """Collect a lightweight health snapshot for strategy weighting."""
         health_by_strategy = {}
@@ -988,26 +995,6 @@ class MultiStrategyRunner:
                 logger.warning("Earnings calendar refresh failed: %s", result.stderr[:300])
         except Exception as exc:
             logger.warning("Earnings calendar auto-refresh error: %s", exc)
-
-    def _submit_covered_calls(self, symbol: str, shares: int, current_price: float):
-        """Stub: submit a 30-day covered call on a long position (live trading only).
-
-        For each long equity position, this would sell a ~30-delta call with a strike
-        ~5% above current price.  Generates ~1% monthly income while the trade matures.
-
-        Not enabled in paper mode — options trading requires separate Alpaca approval
-        and a different order endpoint (OptionOrderRequest).  Uncomment and wire in once
-        live options permissions are confirmed.
-        """
-        if self.paper_mode:
-            return
-        logger.info(
-            "Covered call opportunity: %s (%d shares @ $%.2f) — "
-            "enable options trading in Alpaca to activate",
-            symbol,
-            shares,
-            current_price,
-        )
 
     def load_market_data(self):
         """Load market data from CSV"""
@@ -1535,6 +1522,16 @@ class MultiStrategyRunner:
         # Store VIX for position sizing — used in _execute_strategy_trades to apply
         # the VIX-based sizing multiplier (smaller positions in high-volatility regimes).
         self._current_vix: float = float(regime_adjustments.get("vix") or 18.0)
+
+        # Block new BUY entries when SPY data is absent.  Without SPY we can't
+        # verify the market trend regime; proceeding in regime-unknown state
+        # risks buying into a crash or bear market without knowing it.
+        self._spy_missing: bool = not regime_adjustments.get("spy_present", True)
+        if self._spy_missing:
+            logger.warning(
+                "SPY data absent from market feed — all new BUY entries will be blocked "
+                "this run; exits and stop-losses still active"
+            )
 
         # Regime-adaptive stop-loss multiplier: wider in low-vol (avoid noise stop-outs),
         # tighter in high-vol (protect against fast moves)
@@ -2317,6 +2314,23 @@ class MultiStrategyRunner:
                         )
                         continue
 
+                    # SPY gate: block new entries when SPY data is absent from the feed.
+                    # Regime detection relies on SPY; trading without it risks entering
+                    # a bear market silently. Existing positions still exit normally.
+                    if getattr(self, "_spy_missing", False):
+                        logger.info("SPY gate: blocking BUY %s — SPY data missing this run", symbol)
+                        self.rejected_signals.append(
+                            {
+                                "strategy": strategy.name,
+                                "symbol": symbol,
+                                "action": action,
+                                "shares": shares,
+                                "price": price,
+                                "reason": "spy_data_missing",
+                            }
+                        )
+                        continue
+
                     # Cross-strategy dedup: block if symbol already held by any strategy.
                     # Each strategy's generate_signals() blocks re-entry for its own
                     # positions, but a second strategy can independently signal the same
@@ -2887,9 +2901,6 @@ class MultiStrategyRunner:
                         )
                     else:
                         logger.warning(f"No ATR available for {symbol}, stop loss not set")
-
-                    # Covered call opportunity (live trading only; no-op in paper mode).
-                    self._submit_covered_calls(symbol, actual_filled_qty, actual_fill_price)
 
                     # BUY opens a position — realized P&L is None until the position is sold
                     signal_id = signal.get("signal_id")
@@ -3786,8 +3797,8 @@ def main():
                 import traceback
 
                 runner.email_notifier.send_error_alert(error_msg, traceback.format_exc())
-            except:
-                pass
+            except Exception:
+                pass  # email failure must never mask the original error
 
         sys.exit(1)
 

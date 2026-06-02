@@ -551,32 +551,17 @@ class TestImprovement8AutoEarningsRefresh:
 
 
 class TestImprovement9CoveredCallsStub:
-    def _make_runner(self, paper_mode: bool):
-        """Return a minimal MultiStrategyRunner-like object with _submit_covered_calls."""
+    """_submit_covered_calls was removed as dead code (it was a no-op stub
+    that did nothing in paper mode and was never wired to any live path).
+    These tests verify the method no longer exists on MultiStrategyRunner."""
+
+    def test_method_removed(self):
+        """Stub was removed — verify it is no longer on MultiStrategyRunner."""
         from src.core import execution_engine as ee
 
-        runner = MagicMock(spec=ee.MultiStrategyRunner)
-        runner.paper_mode = paper_mode
-        runner._submit_covered_calls = ee.MultiStrategyRunner._submit_covered_calls.__get__(runner)
-        return runner
-
-    def test_no_op_in_paper_mode(self):
-        """Covered calls stub must return immediately in paper mode without calling any API."""
-        runner = self._make_runner(paper_mode=True)
-        # Should not raise; stub returns None in paper mode
-        result = runner._submit_covered_calls("AAPL", 100, 180.0)
-        assert result is None, "Paper-mode covered call stub must return None (early exit)"
-
-    def test_logs_opportunity_in_live_mode(self, caplog):
-        """In live mode the stub must log an opportunity message."""
-        import logging
-
-        runner = self._make_runner(paper_mode=False)
-        with caplog.at_level(logging.INFO, logger="src.core.execution_engine"):
-            runner._submit_covered_calls("AAPL", 100, 180.0)
-        assert any(
-            "covered call" in msg.lower() or "AAPL" in msg for msg in caplog.messages
-        ), "Covered call stub must log something in live mode"
+        assert not hasattr(
+            ee.MultiStrategyRunner, "_submit_covered_calls"
+        ), "_submit_covered_calls stub should have been removed as dead code"
 
 
 # ===========================================================================

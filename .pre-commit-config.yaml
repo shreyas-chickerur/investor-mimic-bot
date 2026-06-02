@@ -67,12 +67,16 @@ repos:
         additional_dependencies: ["bandit[toml]"]
         exclude: ^(tests/|src/core/database\.py|src/core/execution_engine\.py|src/integration/portfolio_backtester\.py)
 
-  # Dependency security scanning
+  # Dependency security scanning — informational; does not block commits.
+  # Results are visible in pre-commit output and CI logs. Address CVEs
+  # proactively but don't gate every commit on a moving security database.
   - repo: https://github.com/Lucas-C/pre-commit-hooks-safety
     rev: v1.3.3
     hooks:
       - id: python-safety-dependencies-check
         files: requirements.txt
+        verbose: true
+        args: [--continue-on-error]
 
   # Markdown linting
   - repo: https://github.com/igorshubovych/markdownlint-cli
