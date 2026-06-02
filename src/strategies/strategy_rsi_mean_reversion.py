@@ -34,16 +34,21 @@ class RSIMeanReversionStrategy(TradingStrategy):
             "strategies.rsi_mean_reversion.vwap_proximity_pct", 0.02
         )
 
-        # Legacy attributes for backward compatibility
-        self.rsi_threshold = 35  # entry threshold (< 35 = meaningfully oversold, not just dip)
-        self.rsi_exit = 55  # exit threshold (> 55 = recovery complete)
-        self.hold_days = 20
-        self.max_hold_days = 40  # absolute ceiling even for profitable positions
-        self.profit_target_pct = 0.05  # exit at 5% profit
+        # Exit / hold parameters — pulled from config where available, otherwise use
+        # sensible defaults that match the strategy's mean-reversion thesis.
+        self.rsi_threshold = config.get("strategies.rsi_mean_reversion.rsi_entry_threshold", 35)
+        self.rsi_exit = config.get("strategies.rsi_mean_reversion.rsi_exit_threshold", 55)
+        self.hold_days = config.get("strategies.rsi_mean_reversion.hold_days", 20)
+        self.max_hold_days = config.get("strategies.rsi_mean_reversion.max_hold_days", 40)
+        self.profit_target_pct = config.get("strategies.rsi_mean_reversion.profit_target_pct", 0.05)
         self._partial_exit_done: set = set()
-        self.stop_loss_pct = 0.07  # exit at 7% loss (mean reversion can fail hard)
-        self.let_winners_run_pct = 0.03  # hold past time exit if ≥3% in profit and RSI not extended
-        self.volume_spike_threshold = 1.5  # skip if volume >1.5x avg (capitulation, not reversion)
+        self.stop_loss_pct = config.get("strategies.rsi_mean_reversion.stop_loss_pct", 0.07)
+        self.let_winners_run_pct = config.get(
+            "strategies.rsi_mean_reversion.let_winners_run_pct", 0.03
+        )
+        self.volume_spike_threshold = config.get(
+            "strategies.rsi_mean_reversion.volume_spike_threshold", 1.5
+        )
 
     def generate_signals(self, market_data: pd.DataFrame) -> list[dict]:
         """Generate buy signals for oversold stocks with improved filters."""

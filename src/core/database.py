@@ -581,7 +581,7 @@ class TradingDatabase:
 
         failures = 0
         for status in rows:
-            if status == "FAILED":
+            if status in ("FAILED", "HALTED"):
                 failures += 1
             else:
                 break

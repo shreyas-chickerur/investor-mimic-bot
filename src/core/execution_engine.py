@@ -56,7 +56,7 @@ from src.strategies.strategy_volatility_breakout import VolatilityBreakoutStrate
 from src.utils.config_loader import get_config
 
 # Import new modules for professional-grade system
-from src.utils.email_notifier import EmailNotifier
+from src.utils.email_notifier import EmailNotifier, _bullet_list, _kv_rows, build_alert_html
 from src.utils.execution_costs import ExecutionCostModel
 from src.utils.kill_switch_service import KillSwitchService
 from src.utils.news_sentiment import NewsSignalFilter
@@ -1280,6 +1280,14 @@ class MultiStrategyRunner:
             self.structured_logger.log_kill_switch(
                 reason=", ".join(self.kill_switch.kill_reasons), details={"context": kill_context}
             )
+            # Mark this run as HALTED (not SUCCESS) so consecutive_failures can detect
+            # a persistent kill-switch condition across multiple days.
+            self._set_run_stage(
+                "KILL_SWITCH",
+                "HALTED",
+                error_message=", ".join(self.kill_switch.kill_reasons),
+                completed=True,
+            )
             return []
 
         logger.info("✅ All kill switches passed")
@@ -1646,22 +1654,26 @@ class MultiStrategyRunner:
                     self.funnel_tracker.save_to_database(strategy.strategy_id, strategy.name)
 
                 # Send critical alert
-                disc_html = "".join(f"<li>{d}</li>" for d in discrepancies)
+                n_disc = len(discrepancies)
+                recon_body = (
+                    "<p style='color:#333;margin:0 0 12px'>The trading run was halted because "
+                    "the local database does not match the Alpaca broker state. "
+                    "No orders were submitted.</p>"
+                    + f"<h4 style='margin:0 0 6px;color:#dc3545'>Discrepancies ({n_disc})</h4>"
+                    + _bullet_list(discrepancies)
+                    + "<p style='color:#555;font-size:13px;margin:12px 0 0'>Run "
+                    "<code style='background:#f0f0e8;padding:2px 5px;border-radius:3px'>"
+                    "python3 scripts/sync_broker_state.py</code> or trigger the "
+                    "<em>Sync Database</em> workflow to resolve the drift, "
+                    "then re-run the daily workflow.</p>"
+                )
                 self.email_notifier.send_alert(
-                    "Reconciliation Failure - Trading Blocked",
-                    f"<html><body style='font-family:sans-serif;max-width:600px;margin:0 auto'>"
-                    f"<div style='background:#dc3545;color:#fff;padding:16px 20px;border-radius:8px 8px 0 0'>"
-                    f"<h2 style='margin:0'>🛑 Reconciliation Failure — Trading Blocked</h2></div>"
-                    f"<div style='padding:20px;border:1px solid #dee2e6;border-top:none'>"
-                    f"<p>The trading run was halted because the local database does not match "
-                    f"the Alpaca broker state. No orders were submitted.</p>"
-                    f"<h3 style='color:#dc3545'>Discrepancies ({len(discrepancies)})</h3>"
-                    f"<ul style='color:#333;line-height:1.6'>{disc_html}</ul>"
-                    f"<hr style='border:none;border-top:1px solid #eee'>"
-                    f"<p style='color:#666;font-size:13px'>"
-                    f"Run the sync workflow or <code>python3 scripts/sync_broker_state.py</code> "
-                    f"to resolve the drift, then re-run the daily workflow.</p>"
-                    f"</div></body></html>",
+                    "🛑 Reconciliation Failure — Trading Blocked",
+                    build_alert_html(
+                        "🛑 Reconciliation Failure — Trading Blocked",
+                        recon_body,
+                        accent_color="#dc3545",
+                    ),
                 )
 
                 # Log to structured logger
@@ -2127,23 +2139,40 @@ class MultiStrategyRunner:
 
             # Email alert — strategy freeze is a critical event requiring human awareness
             try:
+                freeze_body = (
+                    f"<p style='color:#333;margin:0 0 12px'>Strategy "
+                    f"<strong>{strategy.name}</strong> has been frozen after losing "
+                    f"<strong>{loss_pct*100:.1f}%</strong> of its allocated capital "
+                    f"(limit: {max_loss*100:.0f}%).</p>"
+                    + _kv_rows(
+                        [
+                            ("Reference capital", f"${reference_capital:,.2f}"),
+                            ("Realized P&L", f"${realized_pnl:+,.2f}"),
+                            ("Unrealized P&L", f"${unrealized_pnl:+,.2f}"),
+                            ("Total loss", f"${-total_pnl:,.2f} ({loss_pct*100:.1f}%)"),
+                            ("Loss limit", f"{max_loss*100:.0f}%"),
+                        ]
+                    )
+                    + (
+                        "<h4 style='margin:16px 0 6px;color:#555'>Capital redistributed to</h4>"
+                        + _bullet_list(
+                            [
+                                line.replace("<li>", "").replace("</li>", "")
+                                for line in redistribution_lines
+                            ]
+                        )
+                        if redistribution_lines
+                        else ""
+                    )
+                    + "<p style='color:#555;font-size:13px;margin:12px 0 0'>"
+                    "No further trades will be placed for this strategy.</p>"
+                )
                 self.email_notifier.send_alert(
-                    subject=f"STRATEGY FROZEN: {strategy.name}",
-                    message=(
-                        f"<h2>Strategy Loss Limit Triggered</h2>"
-                        f"<p>Strategy <strong>{strategy.name}</strong> has been frozen "
-                        f"after losing <strong>{loss_pct*100:.1f}%</strong> of its capital "
-                        f"(limit: {max_loss*100:.0f}%).</p>"
-                        f"<table>"
-                        f"<tr><td>Reference capital</td><td>${reference_capital:,.2f}</td></tr>"
-                        f"<tr><td>Realized P&L</td><td>${realized_pnl:,.2f}</td></tr>"
-                        f"<tr><td>Unrealized P&L</td><td>${unrealized_pnl:,.2f}</td></tr>"
-                        f"<tr><td>Total loss</td><td>${-total_pnl:,.2f} "
-                        f"({loss_pct*100:.1f}%)</td></tr>"
-                        f"</table>"
-                        f"<h3>Capital redistributed to:</h3><ul>"
-                        + "".join(redistribution_lines)
-                        + "</ul><p>No further trades will be placed for this strategy.</p>"
+                    f"⚠️ Strategy Frozen: {strategy.name}",
+                    build_alert_html(
+                        f"⚠️ Strategy Frozen: {strategy.name}",
+                        freeze_body,
+                        accent_color="#e65100",
                     ),
                 )
             except Exception as _email_exc:

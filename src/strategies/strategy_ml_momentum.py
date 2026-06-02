@@ -254,6 +254,7 @@ class MLMomentumStrategy(TradingStrategy):
         for _sym_key, _sym_grp in market_data.groupby("symbol"):
             sym_map[_sym_key] = _sym_grp
 
+        dropped_nan = 0
         for _symbol, sym in sym_map.items():
             if _symbol == "SPY":
                 continue
@@ -276,6 +277,7 @@ class MLMomentumStrategy(TradingStrategy):
 
                 feats = self._extract_row_features(row, history)
                 if any(np.isnan(f) or np.isinf(f) for f in feats):
+                    dropped_nan += 1
                     continue
 
                 row_date = sym.index[i]
@@ -287,6 +289,14 @@ class MLMomentumStrategy(TradingStrategy):
 
                 X_train.append(feats)
                 y_train.append(label)
+
+        if dropped_nan > 0:
+            pct = dropped_nan / max(dropped_nan + len(X_train), 1) * 100
+            logger.warning(
+                "ML: dropped %d training rows with NaN/Inf features (%.1f%% of candidates)",
+                dropped_nan,
+                pct,
+            )
 
         if len(X_train) < 100:
             logger.warning("ML: insufficient training samples (%d), skipping", len(X_train))

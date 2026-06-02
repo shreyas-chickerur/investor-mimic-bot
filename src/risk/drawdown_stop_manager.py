@@ -14,6 +14,8 @@ import logging
 import os
 from datetime import datetime, timedelta
 
+from src.utils.email_notifier import _bullet_list, _kv_rows, build_alert_html
+
 logger = logging.getLogger(__name__)
 
 
@@ -378,65 +380,89 @@ class DrawdownStopManager:
 
     def _send_halt_alert(self, drawdown: float, current_value: float, peak_value: float):
         """Send halt alert email."""
-        subject = f"🛑 TRADING HALT: {drawdown:.2%} Drawdown"
-
-        message = f"""<html><body style="font-family:monospace;white-space:pre-wrap">
-TRADING HALT TRIGGERED
-
-Drawdown: {drawdown:.2%} (threshold: {self.halt_threshold:.1%})
-Current Portfolio: ${current_value:,.2f}
-Peak Portfolio: ${peak_value:,.2f}
-Loss: ${peak_value - current_value:,.2f}
-
-ACTION TAKEN:
-- All new entries HALTED
-- Existing positions will continue to be managed
-- Cooldown period: {self.halt_cooldown_days} trading days
-
-RESUME PROTOCOL:
-1. Wait {self.halt_cooldown_days} trading days
-2. Run automated health checks
-3. If passed: Resume at {self.rampup_sizing_pct:.0%} sizing for {self.rampup_days} days
-4. Then return to normal sizing
-
-No manual intervention required unless health checks fail.
-</body></html>"""
-
-        self.email_notifier._send_email(subject, message, is_html=True)
+        subject = f"🛑 Trading Halt: {drawdown:.2%} Drawdown"
+        body_html = (
+            _kv_rows(
+                [
+                    ("Drawdown", f"{drawdown:.2%}"),
+                    ("Threshold", f"{self.halt_threshold:.1%}"),
+                    ("Current portfolio", f"${current_value:,.2f}"),
+                    ("Peak portfolio", f"${peak_value:,.2f}"),
+                    ("Loss from peak", f"${peak_value - current_value:,.2f}"),
+                    ("Cooldown", f"{self.halt_cooldown_days} trading days"),
+                ]
+            )
+            + "<h4 style='margin:16px 0 6px;color:#555'>Action taken</h4>"
+            + _bullet_list(
+                [
+                    "All new entries halted",
+                    "Existing positions continue to be managed",
+                    f"Cooldown: {self.halt_cooldown_days} trading days",
+                ]
+            )
+            + "<h4 style='margin:16px 0 6px;color:#555'>Resume protocol</h4>"
+            + _bullet_list(
+                [
+                    f"Wait {self.halt_cooldown_days} trading days",
+                    "Automated health checks will run",
+                    f"If passed: resume at {self.rampup_sizing_pct:.0%} sizing "
+                    f"for {self.rampup_days} days",
+                    "Then return to normal sizing",
+                ]
+            )
+            + "<p style='color:#555;font-size:13px;margin:12px 0 0'>"
+            "No manual intervention required unless health checks fail.</p>"
+        )
+        html = build_alert_html(
+            f"🛑 Trading Halt — {drawdown:.2%} Drawdown", body_html, accent_color="#e65100"
+        )
+        self.email_notifier.send_alert(subject, html)
 
     def _send_panic_alert(self, drawdown: float, current_value: float, peak_value: float):
         """Send panic alert email."""
-        subject = f"🚨 PANIC MODE: {drawdown:.2%} Drawdown"
-
+        subject = f"🚨 Panic Mode: {drawdown:.2%} Drawdown"
         flatten_msg = (
-            "YES - All positions will be flattened"
+            "YES — all positions will be flattened"
             if self.flatten_on_panic
-            else "NO - Positions will be managed normally"
+            else "NO — positions will be managed normally"
         )
-
-        message = f"""<html><body style="font-family:monospace;white-space:pre-wrap">
-PANIC MODE TRIGGERED
-
-Drawdown: {drawdown:.2%} (threshold: {self.panic_threshold:.1%})
-Current Portfolio: ${current_value:,.2f}
-Peak Portfolio: ${peak_value:,.2f}
-Loss: ${peak_value - current_value:,.2f}
-
-ACTION TAKEN:
-- All new entries HALTED
-- Flatten all positions: {flatten_msg}
-- Extended cooldown: {self.panic_cooldown_days} trading days
-
-RESUME PROTOCOL:
-1. Wait {self.panic_cooldown_days} trading days
-2. Run automated health checks
-3. If passed: Resume at {self.rampup_sizing_pct:.0%} sizing for {self.rampup_days} days
-4. Then return to normal sizing
-
-IMMEDIATE MANUAL REVIEW RECOMMENDED.
-</body></html>"""
-
-        self.email_notifier._send_email(subject, message, is_html=True)
+        body_html = (
+            _kv_rows(
+                [
+                    ("Drawdown", f"{drawdown:.2%}"),
+                    ("Threshold", f"{self.panic_threshold:.1%}"),
+                    ("Current portfolio", f"${current_value:,.2f}"),
+                    ("Peak portfolio", f"${peak_value:,.2f}"),
+                    ("Loss from peak", f"${peak_value - current_value:,.2f}"),
+                    ("Flatten positions", flatten_msg),
+                    ("Cooldown", f"{self.panic_cooldown_days} trading days"),
+                ]
+            )
+            + "<h4 style='margin:16px 0 6px;color:#555'>Action taken</h4>"
+            + _bullet_list(
+                [
+                    "All new entries halted",
+                    f"Flatten all positions: {flatten_msg}",
+                    f"Extended cooldown: {self.panic_cooldown_days} trading days",
+                ]
+            )
+            + "<h4 style='margin:16px 0 6px;color:#555'>Resume protocol</h4>"
+            + _bullet_list(
+                [
+                    f"Wait {self.panic_cooldown_days} trading days",
+                    "Automated health checks will run",
+                    f"If passed: resume at {self.rampup_sizing_pct:.0%} sizing "
+                    f"for {self.rampup_days} days",
+                    "Then return to normal sizing",
+                ]
+            )
+            + "<p style='color:#c62828;font-weight:600;margin:12px 0 0'>"
+            "⚠️ Immediate manual review recommended.</p>"
+        )
+        html = build_alert_html(
+            f"🚨 Panic Mode — {drawdown:.2%} Drawdown", body_html, accent_color="#b71c1c"
+        )
+        self.email_notifier.send_alert(subject, html)
 
     def should_flatten_positions(self) -> bool:
         """
