@@ -184,3 +184,64 @@ class StopLossManager:
                 f"Ratchet stop for {symbol}: ${new_stop:.2f} "
                 f"(entry ${entry:.2f}, profit {open_profit:+.2f} = {open_profit/atr:.1f}×ATR)"
             )
+
+    def audit_and_repair_stops(
+        self,
+        open_positions: list[dict],
+        current_prices: dict[str, float],
+        fallback_stop_pct: float = 0.07,
+    ) -> list[str]:
+        """Verify every open position has an active stop.  For any orphan (no stop
+        in stop_levels), create a fallback stop using the current ATR stored on the
+        position, or ``avg_price * (1 - fallback_stop_pct)`` if ATR is unavailable.
+
+        Returns a list of symbols where a fallback stop was synthesised.
+        """
+        repaired: list[str] = []
+        for pos in open_positions:
+            symbol = pos.get("symbol", "")
+            if not symbol or symbol in self.stop_levels:
+                continue
+
+            avg_price = float(pos.get("avg_price") or pos.get("entry_price") or 0)
+            atr = float(pos.get("atr") or 0)
+            current_price = current_prices.get(symbol, avg_price)
+
+            if avg_price <= 0:
+                logger.warning(
+                    "Stop-loss audit: %s has no avg_price — cannot create fallback stop", symbol
+                )
+                continue
+
+            if atr > 0:
+                stop_price = max(current_price - self.atr_multiplier * atr, avg_price * 0.50)
+            else:
+                stop_price = avg_price * (1 - fallback_stop_pct)
+
+            stop_price = max(stop_price, 0.01)
+            self.stop_levels[symbol] = stop_price
+            self.entry_prices[symbol] = avg_price
+            self.entry_atrs[symbol] = atr
+            self._persist(symbol)
+            repaired.append(symbol)
+            logger.warning(
+                "Stop-loss audit: synthesised fallback stop for %s at $%.2f "
+                "(avg_price=%.2f, atr=%.4f)",
+                symbol,
+                stop_price,
+                avg_price,
+                atr,
+            )
+
+        if repaired:
+            logger.warning(
+                "Stop-loss audit complete: %d position(s) were missing stops and have been "
+                "assigned fallback levels: %s",
+                len(repaired),
+                repaired,
+            )
+        else:
+            logger.info(
+                "Stop-loss audit: all %d open positions have active stops", len(open_positions)
+            )
+        return repaired

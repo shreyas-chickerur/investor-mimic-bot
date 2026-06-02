@@ -291,6 +291,25 @@ class FactorMomentumStrategy(TradingStrategy):
         if latest_date is None:
             return signals
 
+        # Market regime gate — block new BUY entries in a confirmed downtrend.
+        # Uses the same SPY 50-SMA check as every other strategy in the platform.
+        # Existing positions continue to be managed (profit targets, time exits).
+        _market_uptrend = True
+        if "symbol" in market_data.columns:
+            _spy = market_data[market_data["symbol"] == "SPY"]
+            if len(_spy) >= 50:
+                _spy_close = _spy["close"].values
+                _market_uptrend = float(_spy_close[-1]) > float(np.mean(_spy_close[-50:]))
+            else:
+                logger.debug(
+                    "Factor Momentum: insufficient SPY history for regime check — assuming uptrend"
+                )
+        if not _market_uptrend:
+            logger.info(
+                "Factor Momentum: SPY below 50-SMA (downtrend) — skipping new BUY signals; "
+                "exits still processed"
+            )
+
         # Pre-build symbol→DataFrame lookup once — avoids repeated boolean filter per position
         sym_map = {sym: grp for sym, grp in market_data.groupby("symbol")}  # noqa: C416
 
@@ -356,7 +375,10 @@ class FactorMomentumStrategy(TradingStrategy):
                 if partial_exit:
                     self._partial_exit_done.add(symbol)
 
-        # Only generate new BUY signals if we have capacity
+        # Only generate new BUY signals if market is in uptrend and we have capacity
+        if not _market_uptrend:
+            return signals
+
         current_positions = len(self.positions)
         buy_capacity = (
             self.top_n - current_positions + len([s for s in signals if s["action"] == "SELL"])

@@ -587,6 +587,30 @@ class TradingDatabase:
                 break
         return failures
 
+    def count_day_trades_last_n_days(self, trading_days: int = 5) -> int:
+        """Count PDT day trades (same-symbol buy+sell on the same calendar date) in the
+        last ``trading_days`` trading days (approximated as trading_days * 1.4 calendar days
+        to handle weekends).  Used by the PDT hard-block to enforce the 3-in-5-day rule."""
+        calendar_days = int(trading_days * 1.5) + 1  # safe buffer for weekends/holidays
+        with closing(sqlite3.connect(self.db_path)) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT COUNT(DISTINCT symbol || '_' || trade_date) AS day_trades
+                FROM (
+                    SELECT symbol, DATE(executed_at) AS trade_date
+                    FROM trades
+                    WHERE DATE(executed_at) >= DATE('now', ?)
+                    GROUP BY symbol, DATE(executed_at)
+                    HAVING SUM(CASE WHEN action = 'BUY'  THEN 1 ELSE 0 END) > 0
+                       AND SUM(CASE WHEN action = 'SELL' THEN 1 ELSE 0 END) > 0
+                )
+                """,
+                (f"-{calendar_days} days",),
+            )
+            row = cursor.fetchone()
+        return int(row[0]) if row else 0
+
     def save_run_slo_metrics(self, metrics: dict) -> None:
         """Persist per-run SLO metrics for observability dashboards and audits."""
         with closing(sqlite3.connect(self.db_path)) as conn:

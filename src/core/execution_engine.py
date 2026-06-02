@@ -275,9 +275,12 @@ class MultiStrategyRunner:
         # Set daily start value for risk management
         self.portfolio_risk.set_daily_start_value(self.portfolio_value)
 
-        # PDT guardrail tracking
+        # PDT guardrail tracking (rolling 5-day window including historical from DB)
         self._day_trades_today: list = []
         self._day_trade_count: int = 0
+
+        # Overnight exposure tracking: running total of OPG BUY notional queued this run
+        self._pending_opg_value: float = 0.0
 
         # Track errors and executed trades for email reporting
         self.errors = []
@@ -1250,7 +1253,24 @@ class MultiStrategyRunner:
         self.strategies_cache = strategies
         self.raw_signals_by_strategy = {}
 
-        # CRITICAL: Check kill switches BEFORE any trading
+        # ── DEFENSIVE EXITS ───────────────────────────────────────────────────
+        # Stop-losses must run UNCONDITIONALLY — even when the kill switch or
+        # drawdown halt is active. A portfolio under enough stress to trip a
+        # kill switch is exactly the situation where protective exits matter
+        # most. Skipping them because "trading is halted" would compound losses
+        # rather than contain them.
+        logger.info("=" * 80)
+        logger.info("CHECKING CATASTROPHE STOP LOSSES (pre-kill-switch)")
+        logger.info("=" * 80)
+        positions_to_close = self.check_stop_losses(market_data)
+        if positions_to_close:
+            logger.warning(f"Found {len(positions_to_close)} positions at stop loss")
+            self.execute_stop_loss_exits(positions_to_close)
+        else:
+            logger.info("No stop losses triggered")
+        logger.info("=" * 80)
+
+        # CRITICAL: Check kill switches BEFORE any new entries
         logger.info("=" * 80)
         logger.info("CHECKING KILL SWITCHES")
         logger.info("=" * 80)
@@ -1355,19 +1375,6 @@ class MultiStrategyRunner:
             logger.info("✅ All symbols passed data quality checks")
 
         logger.info("=" * 80)
-
-        # CRITICAL: Check stop losses BEFORE generating new signals
-        logger.info("=" * 80)
-        logger.info("CHECKING CATASTROPHE STOP LOSSES")
-        logger.info("=" * 80)
-        positions_to_close = self.check_stop_losses(market_data)
-
-        if positions_to_close:
-            logger.warning(f"Found {len(positions_to_close)} positions at stop loss")
-            self.execute_stop_loss_exits(positions_to_close)
-        else:
-            logger.info("No stop losses triggered")
-        logger.info("=" * 80)
         self.executed_signals = []
         self.rejected_signals = []
         self.symbols_bought_this_run: set = set()
@@ -1382,6 +1389,23 @@ class MultiStrategyRunner:
         self._news_sentiment_map: dict = {}
         self.alpha_vantage_usage = self._news_filter.get_usage_summary()
         self.reconciliation_discrepancies = []
+
+        # ── STOP-LOSS AUDIT ───────────────────────────────────────────────────
+        # Verify every currently-open position has an active stop-loss level.
+        # Any orphan (position loaded from DB with no stop) gets a fallback stop
+        # synthesised now, before new signals are generated.  market_data is
+        # already quality-filtered so prices are fresh.
+        _current_prices_for_audit = (
+            market_data.groupby("symbol")["close"].last().to_dict() if not market_data.empty else {}
+        )
+        self.stop_loss_manager.audit_and_repair_stops(
+            open_positions=self.db.get_all_open_positions(),
+            current_prices=_current_prices_for_audit,
+        )
+
+        # Reset overnight OPG value counter for this run
+        self._pending_opg_value = 0.0
+
         # Pre-earnings: symbols reporting tomorrow — block new BUY entries
         self._reporting_tomorrow: set = self._get_symbols_reporting_tomorrow()
         if self._reporting_tomorrow:
@@ -2250,6 +2274,28 @@ class MultiStrategyRunner:
                         )
                         continue
 
+                    # ── CRIT-6: Cross-strategy conflict detection ────────────────
+                    # A BUY on a symbol that was already SOLD this run is a conflict:
+                    # one strategy wants to exit while another wants to re-enter.
+                    # The wash-trade guard below blocks it, but log it explicitly so
+                    # the signal funnel shows the correct rejection reason.
+                    if symbol in self.symbols_sold_this_run:
+                        logger.warning(
+                            "CROSS-STRATEGY CONFLICT: %s wants to BUY %s but another "
+                            "strategy already SOLD it this run — BUY suppressed",
+                            strategy.name,
+                            symbol,
+                        )
+                        self.structured_logger.log_event(
+                            "SIGNAL_CONFLICT",
+                            {
+                                "symbol": symbol,
+                                "buying_strategy": strategy.name,
+                                "conflict": "buy_after_sell_same_run",
+                            },
+                            stage="RISK",
+                        )
+
                     # Wash trade prevention: skip if already sold this symbol this run
                     if symbol in self.symbols_sold_this_run:
                         logger.warning(
@@ -2431,6 +2477,79 @@ class MultiStrategyRunner:
                         self.cash_manager.release_cash(strategy.strategy_id, trade_value)
                         continue
 
+                    # ── CRIT-1: Portfolio-level per-symbol concentration cap ──────
+                    # Even though the cross-strategy dedup prevents a second strategy
+                    # from buying a symbol that's already held, a position can grow
+                    # beyond the cap via unrealized P&L.  Block any new BUY that would
+                    # push total exposure in this symbol over the configured threshold.
+                    _sym_cap = self.config.get("risk.max_single_symbol_pct", 0.15)
+                    if self.portfolio_value > 0:
+                        _sym_positions = [
+                            p for p in self.db.get_all_open_positions() if p["symbol"] == symbol
+                        ]
+                        _existing_sym_value = sum(
+                            float(p.get("shares", 0))
+                            * float(p.get("current_price") or p.get("avg_price") or 0)
+                            for p in _sym_positions
+                        )
+                        _order_value = adjusted_shares * price
+                        _total_sym_pct = (_existing_sym_value + _order_value) / self.portfolio_value
+                        if _total_sym_pct > _sym_cap:
+                            logger.warning(
+                                "Symbol concentration cap: %s would be %.1f%% of portfolio "
+                                "(cap %.1f%%) — skipping BUY",
+                                symbol,
+                                _total_sym_pct * 100,
+                                _sym_cap * 100,
+                            )
+                            self.rejected_signals.append(
+                                {
+                                    "strategy": strategy.name,
+                                    "symbol": symbol,
+                                    "action": action,
+                                    "shares": adjusted_shares,
+                                    "price": price,
+                                    "reason": "symbol_concentration_cap",
+                                }
+                            )
+                            self.cash_manager.release_cash(strategy.strategy_id, trade_value)
+                            continue
+
+                    # ── CRIT-4: Overnight exposure cap ───────────────────────────
+                    # Limit the total value of open positions + queued OPG orders
+                    # so we never enter a session with >max_overnight_exposure_pct
+                    # of portfolio exposed to an overnight gap.
+                    _overnight_cap = self.config.get("risk.max_overnight_exposure_pct", 0.85)
+                    if self.portfolio_value > 0:
+                        _open_value = sum(
+                            float(p.get("shares", 0))
+                            * float(p.get("current_price") or p.get("avg_price") or 0)
+                            for p in self.db.get_all_open_positions()
+                        )
+                        _proposed_overnight = (
+                            _open_value + self._pending_opg_value + adjusted_shares * price
+                        ) / self.portfolio_value
+                        if _proposed_overnight > _overnight_cap:
+                            logger.warning(
+                                "Overnight exposure cap: adding %s would put overnight "
+                                "exposure at %.1f%% (cap %.1f%%) — skipping BUY",
+                                symbol,
+                                _proposed_overnight * 100,
+                                _overnight_cap * 100,
+                            )
+                            self.rejected_signals.append(
+                                {
+                                    "strategy": strategy.name,
+                                    "symbol": symbol,
+                                    "action": action,
+                                    "shares": adjusted_shares,
+                                    "price": price,
+                                    "reason": "overnight_exposure_cap",
+                                }
+                            )
+                            self.cash_manager.release_cash(strategy.strategy_id, trade_value)
+                            continue
+
                     # True idempotency gate: check for an existing active intent
                     # for this (strategy, symbol, side) today BEFORE creating a new one.
                     # create_order_intent embeds run_id in the hash, so two runs on the
@@ -2585,6 +2704,7 @@ class MultiStrategyRunner:
                     )
                     self.symbols_bought_this_run.add(symbol)
                     self._held_symbols.add(symbol)  # keep cross-strategy dedup current
+                    self._pending_opg_value += actual_filled_qty * actual_fill_price
 
                     # Update in-memory state with actual filled quantities
                     strategy.add_position(symbol, actual_filled_qty)
@@ -2699,6 +2819,37 @@ class MultiStrategyRunner:
                         strategy.positions.pop(symbol, None)
                         continue
 
+                    # ── CRIT-2: PDT hard block ────────────────────────────────────
+                    # Pattern Day Trader rule: accounts under $25k may not complete
+                    # more than 3 day trades (same-symbol buy+sell on the same calendar
+                    # day) in any rolling 5-business-day window.  Block the SELL if
+                    # executing it would create a 4th day trade this window.
+                    # In our OPG-only model true intraday round-trips are rare, but this
+                    # guard is load-bearing for any future intraday execution path.
+                    _is_round_trip = symbol in self.symbols_bought_this_run
+                    if _is_round_trip:
+                        _hist_dt = self.db.count_day_trades_last_n_days(trading_days=5)
+                        _cur_dt = len(set(self._day_trades_today))
+                        _total_dt = _hist_dt + _cur_dt
+                        if _total_dt >= 3:
+                            logger.warning(
+                                "PDT HARD BLOCK: %s SELL would be day trade #%d in the last "
+                                "5 trading days (limit 3) — skipping to avoid PDT restriction",
+                                symbol,
+                                _total_dt + 1,
+                            )
+                            self.rejected_signals.append(
+                                {
+                                    "strategy": strategy.name,
+                                    "symbol": symbol,
+                                    "action": "SELL",
+                                    "shares": shares,
+                                    "price": price,
+                                    "reason": "pdt_hard_block",
+                                }
+                            )
+                            continue
+
                     # Idempotency gate for SELL: GHA retries would re-submit exit orders,
                     # potentially creating short positions if the first run already sold.
                     existing_sell = self.db.find_active_order_intent_for_today(
@@ -2796,15 +2947,15 @@ class MultiStrategyRunner:
                         except Exception as _ie:
                             logger.warning("Failed to update SELL intent status: %s", _ie)
 
-                    # PDT guardrail: track day trades (buy and sell same symbol same day)
+                    # PDT tracking: record completed round-trip for rolling counter
                     if symbol in self.symbols_bought_this_run:
                         self._day_trades_today.append(symbol)
                         self._day_trade_count = len(set(self._day_trades_today))
-                        if self._day_trade_count >= 3:
-                            logger.warning(
-                                "PDT WARNING: 3 day trades reached — next day trade would trigger "
-                                "PDT restriction on accounts under $25k"
-                            )
+                        logger.info(
+                            "PDT tracker: day trade #%d completed for %s this run",
+                            self._day_trade_count,
+                            symbol,
+                        )
 
                     # Release cash back with actual filled quantities
                     trade_value = actual_fill_price * actual_filled_qty - total_cost
