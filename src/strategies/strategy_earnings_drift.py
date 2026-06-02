@@ -168,10 +168,16 @@ class EarningsDriftStrategy(TradingStrategy):
             volume_ratio = day_volume / avg_volume
             return_magnitude = abs(day_return)
 
-            # Earnings event detection criteria
+            # Earnings event detection criteria.
+            # The absolute return threshold is set higher than min_surprise_return (2%) to
+            # avoid triggering on ex-dividend dates: quarterly dividends typically produce
+            # 0.5–2.5% price moves with a volume spike, which matches the proxy pattern.
+            # Genuine post-earnings surprises are typically ≥3–4%. Using 3.5% here gives
+            # meaningful separation. Calendar-based signals (primary path) are unaffected.
+            _proxy_min_return = max(self.min_surprise_return, 0.035)
             is_volume_spike = volume_ratio >= self.volume_spike_threshold
             is_abnormal_return = return_magnitude >= self.return_threshold_mult * avg_vol
-            is_significant = return_magnitude >= self.min_surprise_return
+            is_significant = return_magnitude >= _proxy_min_return
 
             if is_volume_spike and is_abnormal_return and is_significant:
                 return {

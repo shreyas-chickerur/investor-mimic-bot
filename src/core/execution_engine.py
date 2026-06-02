@@ -206,7 +206,7 @@ class MultiStrategyRunner:
         self.dynamic_allocator = DynamicAllocator(
             total_capital,
             max_allocation_pct=self.config.get("risk.dynamic_max_allocation_pct", 0.35),
-            min_allocation_pct=self.config.get("risk.dynamic_min_allocation_pct", 0.10),
+            min_allocation_pct=self.config.get("risk.dynamic_min_allocation_pct", 0.05),
         )
         slippage_bps = self.config.get("execution.slippage_bps", 5)
         commission = self.config.get("execution.commission_per_share", 0.0)
@@ -281,6 +281,13 @@ class MultiStrategyRunner:
 
         # Overnight exposure tracking: running total of OPG BUY notional queued this run
         self._pending_opg_value: float = 0.0
+
+        # VIX-based sizing (populated from regime_adjustments in run_all_strategies)
+        self._current_vix: float = 18.0
+
+        # Liquidity filter ADV map (populated from market_data in run_all_strategies)
+        self._adv_map: dict[str, float] = {}
+        self._min_adv: float = self.config.get("risk.min_avg_daily_value", 1_000_000)
 
         # Track errors and executed trades for email reporting
         self.errors = []
@@ -1406,6 +1413,39 @@ class MultiStrategyRunner:
         # Reset overnight OPG value counter for this run
         self._pending_opg_value = 0.0
 
+        # ── Survivorship / asset validation ───────────────────────────────────
+        # Validate that the symbols present in market_data are still tradeable
+        # on Alpaca. Delisted, halted, or non-fractionable symbols should be
+        # flagged and excluded from signal generation to avoid order rejections.
+        # This check is best-effort (needs broker credentials); silently skips if
+        # the client is unavailable (e.g., DRY_RUN without Alpaca keys).
+        _live_symbols = set(market_data["symbol"].unique()) if not market_data.empty else set()
+        self._untradeable_symbols: set[str] = set()
+        try:
+            for _sym in list(_live_symbols):
+                try:
+                    _asset = self.trading_client.get_asset(_sym)
+                    if not (_asset.tradable and _asset.status == "active"):
+                        self._untradeable_symbols.add(_sym)
+                        logger.warning(
+                            "Asset validation: %s is not tradeable (status=%s, tradable=%s) "
+                            "— excluding from signal generation",
+                            _sym,
+                            getattr(_asset, "status", "unknown"),
+                            getattr(_asset, "tradable", False),
+                        )
+                except Exception:
+                    pass  # symbol not found or API unavailable — allow by default
+            if self._untradeable_symbols:
+                market_data = market_data[~market_data["symbol"].isin(self._untradeable_symbols)]
+                logger.warning(
+                    "Removed %d untradeable/delisted symbol(s) from market data: %s",
+                    len(self._untradeable_symbols),
+                    sorted(self._untradeable_symbols),
+                )
+        except Exception as _av_exc:
+            logger.debug("Asset validation skipped: %s", _av_exc)
+
         # Pre-earnings: symbols reporting tomorrow — block new BUY entries
         self._reporting_tomorrow: set = self._get_symbols_reporting_tomorrow()
         if self._reporting_tomorrow:
@@ -1450,6 +1490,22 @@ class MultiStrategyRunner:
         # Auto-refresh earnings calendar if stale (> 7 days old).
         self._maybe_refresh_earnings_calendar()
 
+        # Pre-compute 20-day average daily value (ADV) per symbol for liquidity filter.
+        # ADV = avg(volume * close) over last 20 bars. Used in _execute_strategy_trades
+        # to skip illiquid names whose order impact would be disproportionate.
+        _min_adv = self.config.get("risk.min_avg_daily_value", 1_000_000)
+        if "volume" in market_data.columns and "close" in market_data.columns:
+            _dv = market_data.copy()
+            _dv["dollar_volume"] = _dv["volume"] * _dv["close"]
+            self._adv_map: dict[str, float] = (
+                _dv.groupby("symbol")["dollar_volume"]
+                .apply(lambda s: float(s.iloc[-20:].mean()) if len(s) >= 5 else 0.0)
+                .to_dict()
+            )
+        else:
+            self._adv_map = {}
+        self._min_adv = _min_adv
+
         # Refresh open position prices so unrealized P&L is current in the email
         refreshed = self.db.refresh_position_prices(current_prices)
         if refreshed:
@@ -1472,6 +1528,10 @@ class MultiStrategyRunner:
             base_max_heat=self.portfolio_risk.base_max_heat,
         )
         self.portfolio_risk.max_portfolio_heat = regime_adjustments["max_portfolio_heat"]
+
+        # Store VIX for position sizing — used in _execute_strategy_trades to apply
+        # the VIX-based sizing multiplier (smaller positions in high-volatility regimes).
+        self._current_vix: float = float(regime_adjustments.get("vix") or 18.0)
 
         # Regime-adaptive stop-loss multiplier: wider in low-vol (avoid noise stop-outs),
         # tighter in high-vol (protect against fast moves)
@@ -2366,6 +2426,30 @@ class MultiStrategyRunner:
                             )
                             continue
 
+                    # ── Liquidity filter ─────────────────────────────────────────
+                    # Skip symbols whose 20-day average daily dollar volume is below
+                    # the configured minimum. Illiquid names produce wide spreads and
+                    # disproportionate market impact on a ~$100k portfolio.
+                    _adv = self._adv_map.get(symbol, 0.0)
+                    if _adv > 0 and _adv < self._min_adv:
+                        logger.info(
+                            "Liquidity filter: skipping %s — ADV $%.0fk < $%.0fk minimum",
+                            symbol,
+                            _adv / 1000,
+                            self._min_adv / 1000,
+                        )
+                        self.rejected_signals.append(
+                            {
+                                "strategy": strategy.name,
+                                "symbol": symbol,
+                                "action": action,
+                                "shares": shares,
+                                "price": price,
+                                "reason": "liquidity_filter",
+                            }
+                        )
+                        continue  # cash not yet reserved at this stage — no release needed
+
                     # Apply size multiplier from correlation attenuation
                     size_mult = signal.get("size_multiplier", 1.0)
                     # Apply drawdown sizing multiplier (rampup mode)
@@ -2377,7 +2461,26 @@ class MultiStrategyRunner:
                     _conf = max(0.55, min(0.90, float(signal.get("confidence", 0.70))))
                     _t = (_conf - 0.55) / (0.90 - 0.55)
                     conviction_mult = round(0.75 + _t * (1.25 - 0.75), 3)
-                    combined_mult = size_mult * drawdown_mult * strategy_mult * conviction_mult
+                    # ── VIX-based sizing: scale down in high-volatility regimes ──
+                    # Thresholds come from trading_config.yaml vix.* keys.
+                    # Low VIX (<15): slight oversize — tighter spreads, lower impact.
+                    # High VIX (>25): reduce — wider spreads, gap risk increases.
+                    # Crisis (>35): half size — preserve capital.
+                    _vix = getattr(self, "_current_vix", 18.0)
+                    _vix_low = self.config.get("vix.vix_low_threshold", 15)
+                    _vix_high = self.config.get("vix.vix_high_threshold", 25)
+                    _vix_crisis = self.config.get("vix.vix_crisis_threshold", 35)
+                    if _vix > _vix_crisis:
+                        vix_mult = 0.50
+                    elif _vix > _vix_high:
+                        vix_mult = 0.75
+                    elif _vix < _vix_low:
+                        vix_mult = 1.10
+                    else:
+                        vix_mult = 1.00
+                    combined_mult = (
+                        size_mult * drawdown_mult * strategy_mult * conviction_mult * vix_mult
+                    )
                     adjusted_shares = round(shares * combined_mult)
 
                     if adjusted_shares == 0:

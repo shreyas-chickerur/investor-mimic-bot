@@ -20,7 +20,7 @@ class DynamicAllocator:
         total_capital: float,
         lookback_days: int = 60,
         max_allocation_pct: float = 0.35,
-        min_allocation_pct: float = 0.10,
+        min_allocation_pct: float = 0.05,
     ):
         """
         Initialize dynamic allocator

@@ -26,6 +26,8 @@ env:
 jobs:
   daily-execution:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # required for gh release create (DB backup)
 
     steps:
     - name: Checkout code
@@ -182,6 +184,7 @@ jobs:
         fi
 
     - name: Update market data
+      id: update_market_data
       continue-on-error: true
       env:
         ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
@@ -194,6 +197,52 @@ jobs:
             sleep $((attempt * 20))
           fi
         done || echo "⚠️  Market data update failed after 3 attempts — pre-flight will enforce staleness threshold"
+
+    - name: Check data freshness and alert if stale
+      if: always()
+      continue-on-error: true
+      env:
+        SENDER_EMAIL: ${{ secrets.EMAIL_USERNAME }}
+        SENDER_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+        RECIPIENT_EMAIL: ${{ secrets.EMAIL_TO }}
+      run: |
+        python3 - <<'PY'
+        import sys
+        from pathlib import Path
+        from datetime import datetime, timedelta
+
+        data_file = Path("data/training_data.csv")
+        if not data_file.exists():
+            print("⚠️ training_data.csv not found — first run or cold start")
+            sys.exit(0)
+
+        age_hours = (datetime.now() - datetime.fromtimestamp(data_file.stat().st_mtime)).total_seconds() / 3600
+        threshold = 48  # hours; GHA runs daily so >48h means at least one failed update
+
+        if age_hours <= threshold:
+            print(f"✅ Market data is fresh ({age_hours:.1f}h old)")
+            sys.exit(0)
+
+        print(f"⚠️ Market data is STALE: {age_hours:.0f}h old (threshold {threshold}h)")
+        try:
+            from src.utils.email_notifier import EmailNotifier, build_alert_html, _kv_rows
+            body = (
+                _kv_rows([
+                    ("Data age", f"{age_hours:.0f} hours"),
+                    ("Threshold", f"{threshold} hours"),
+                    ("File", str(data_file)),
+                    ("Action needed", "Check Alpha Vantage API key and quota"),
+                ])
+                + "<p style='color:#555;font-size:13px;margin:12px 0 0'>"
+                "Trading will proceed with stale data. Signals may be based on outdated prices.</p>"
+            )
+            html = build_alert_html("⚠️ Market Data Stale", body, accent_color="#e65100")
+            notifier = EmailNotifier()
+            notifier.send_alert("⚠️ Market Data Stale — Action Needed", html)
+            print("Alert email sent")
+        except Exception as e:
+            print(f"Could not send alert: {e}")
+        PY
 
     - name: Update earnings calendar
       continue-on-error: true
@@ -521,6 +570,58 @@ jobs:
           echo "✅ Saved DB snapshot to artifacts/db_snapshots/$SNAPSHOT_NAME"
         else
           echo "⚠️ trading.db not found; skipping DB snapshot"
+        fi
+
+    - name: Off-artifact DB backup to GitHub Releases
+      if: always() && hashFiles('trading.db') != ''
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        # Upload trading.db to a rolling GitHub Release so it survives beyond the
+        # 90-day artifact window and is recoverable even if the artifact is deleted.
+        # Uses a date-stamped tag; releases older than 30 days are pruned to stay tidy.
+        TAG="db-backup-$(date +%Y%m%d)"
+        NOTES="Automated daily backup — $(date +%Y-%m-%d). Paper trading state only."
+
+        # Prune backups older than 30 days (keep last 30 tags)
+        gh release list --limit 100 --json tagName \
+          --jq '.[] | select(.tagName | startswith("db-backup-")) | .tagName' \
+          | tail -n +31 | xargs -I{} gh release delete {} --yes 2>/dev/null || true
+
+        if gh release view "$TAG" &>/dev/null 2>&1; then
+          gh release upload "$TAG" trading.db --clobber
+          echo "✅ Updated existing DB backup release $TAG"
+        else
+          gh release create "$TAG" trading.db \
+            --title "DB Backup $(date +%Y-%m-%d)" \
+            --notes "$NOTES" \
+            --prerelease
+          echo "✅ Created new DB backup release $TAG"
+        fi
+
+    - name: Optional-step failure summary
+      if: always()
+      run: |
+        # Report which optional (continue-on-error) steps produced warnings so they
+        # appear in the GitHub Actions run summary even though they don't fail the job.
+        WARNINGS=()
+        [ "${{ steps.update_market_data.outcome }}" = "failure" ] && \
+          WARNINGS+=("❌ Market data update failed (3 attempts)")
+        [ ! -f data/earnings_calendar.csv ] && \
+          WARNINGS+=("⚠️ Earnings calendar missing")
+        [ ! -f data/ml_model.pkl ] && \
+          WARNINGS+=("⚠️ ML model missing — will retrain from scratch")
+        [ ! -f data/training_data.csv ] && \
+          WARNINGS+=("❌ Training data missing")
+
+        if [ ${#WARNINGS[@]} -eq 0 ]; then
+          echo "✅ All optional steps completed successfully" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "## ⚠️ Optional Step Warnings" >> $GITHUB_STEP_SUMMARY
+          for w in "${WARNINGS[@]}"; do
+            echo "- $w" >> $GITHUB_STEP_SUMMARY
+          done
         fi
 
     - name: Upload artifacts

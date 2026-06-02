@@ -39,6 +39,9 @@ risk:
   # Overnight exposure cap — total OPG-queued + open position value as % of portfolio
   max_overnight_exposure_pct: 0.85  # At most 85% of portfolio value held or queued overnight
 
+  # Liquidity filter — minimum 20-day average daily dollar volume to trade a symbol
+  min_avg_daily_value: 1000000  # $1M ADV minimum (conservative for ~$100k portfolio)
+
   # Per-strategy loss limit
   max_strategy_loss_pct: 0.20  # 20% loss from initial capital triggers strategy freeze
 
@@ -113,7 +116,7 @@ strategies:
     earnings_drift: 0.25       # Capped down from 0.35 — still highest-prior strategy
     ml_momentum: 0.20          # Edge at high-conf only — cap at 20%
     factor_momentum: 0.15      # Re-enabled; live P&L positive but limited sample
-    news_sentiment: 0.15       # Unvalidated — moderate cap
+    news_sentiment: 0.05       # Experimental — VADER threshold rarely met; cap until validated
     ma_crossover: 0.15         # Unvalidated — moderate cap
     volatility_breakout: 0.15  # Unvalidated — moderate cap
 

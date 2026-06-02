@@ -1,0 +1,118 @@
+name: Weekly ML Model Retraining
+
+on:
+  # Monday at 3 AM UTC (Sunday 11 PM ET) — runs before the daily trading execution
+  schedule:
+    - cron: '0 3 * * 1'
+  workflow_dispatch:  # allow manual trigger
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Download latest training data
+      id: download_data
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        ARTIFACT_ID=$(gh api repos/${{ github.repository }}/actions/artifacts \
+          --jq '.artifacts | map(select(.name == "training-data" and .expired == false)) | sort_by(.created_at) | reverse | .[0].id // empty')
+        if [ -n "$ARTIFACT_ID" ]; then
+          gh api repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip > training.zip
+          unzip -o training.zip
+          rm -f training.zip
+          echo "✅ Downloaded training data"
+          echo "rows=$(wc -l < data/training_data.csv)" >> $GITHUB_OUTPUT
+        else
+          echo "⚠️ No training-data artifact found — fetching fresh history"
+          python3 scripts/fetch_historical_data.py
+        fi
+
+    - name: Fetch any missing/stale market data
+      continue-on-error: true
+      env:
+        ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+      run: |
+        python3 scripts/update_daily_data.py || echo "⚠️ Data update failed; proceeding with existing data"
+
+    - name: Retrain ML model and evaluate OOS accuracy
+      run: |
+        python3 - <<'PY'
+        import sys
+        sys.path.insert(0, ".")
+        import pandas as pd
+        from src.strategies.strategy_ml_momentum import MLMomentumStrategy
+
+        data_path = "data/training_data.csv"
+        try:
+            data = pd.read_csv(data_path, index_col="date", parse_dates=True)
+        except Exception as exc:
+            print(f"❌ Could not load training data: {exc}")
+            sys.exit(1)
+
+        print(f"Training on {len(data)} rows, {data['symbol'].nunique()} symbols")
+
+        strategy = MLMomentumStrategy(strategy_id=2, capital=10000)
+        # Force retrain even if a fresh model exists
+        strategy.is_trained = False
+
+        strategy._train_model(data)
+        if not strategy.is_trained:
+            print("❌ Model training failed")
+            sys.exit(1)
+
+        strategy._compute_walk_forward_accuracy(data)
+        strategy._save_model()
+
+        oos = strategy.last_oos_accuracy or 0
+        train_acc = strategy.last_train_accuracy or 0
+        print(f"✅ ML model retrained:")
+        print(f"   OOS accuracy:   {oos:.1f}%")
+        print(f"   Train accuracy: {train_acc:.1f}%")
+
+        if oos < 52.0:
+            print("⚠️ OOS accuracy is near-random (<52%) — model signals will be")
+            print("   automatically scaled down by the accuracy penalty in execution.")
+        elif oos >= 57.0:
+            print("✅ OOS accuracy acceptable — full signal confidence enabled.")
+        else:
+            print(f"ℹ️ OOS accuracy {oos:.1f}% (52–57% range) — partial confidence scaling active.")
+
+        # Write summary to GITHUB_STEP_SUMMARY
+        import os
+        summary_path = os.environ.get("GITHUB_STEP_SUMMARY", "")
+        if summary_path:
+            with open(summary_path, "a") as f:
+                f.write(f"## ML Model Retraining Results\n")
+                f.write(f"| Metric | Value |\n|--------|-------|\n")
+                f.write(f"| OOS Accuracy | {oos:.1f}% |\n")
+                f.write(f"| Train Accuracy | {train_acc:.1f}% |\n")
+                status = "✅ Good" if oos >= 57 else ("⚠️ Near-random" if oos < 52 else "ℹ️ Marginal")
+                f.write(f"| Status | {status} |\n")
+        PY
+
+    - name: Upload retrained model artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ml-model
+        path: data/ml_model.pkl
+        retention-days: 14
+        overwrite: true

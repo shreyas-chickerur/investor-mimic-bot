@@ -504,9 +504,21 @@ class MLMomentumStrategy(TradingStrategy):
 
                 prob_positive = float(self.model.predict_proba([feats])[0][1])
 
+                # Accuracy penalty: when OOS accuracy is near-random (50–57%), scale
+                # down confidence proportionally so position sizing reflects model quality.
+                # Accuracy 57%+ → full confidence. Accuracy 50% → 50% of confidence.
+                # This means near-random models get half-sized positions; a model that
+                # hits 55% OOS accuracy gets 5/7 = 71% of its nominal confidence.
+                _oos = self.last_oos_accuracy  # percent, e.g. 54.5
+                if _oos is not None and _oos < 57.0:
+                    _accuracy_scale = max(0.50, (_oos - 50.0) / 7.0)
+                    prob_positive_effective = prob_positive * _accuracy_scale
+                else:
+                    prob_positive_effective = prob_positive
+
                 # BUY: probability above threshold, and SPY above 50-day SMA.
                 if (
-                    prob_positive > self.min_confidence
+                    prob_positive_effective > self.min_confidence
                     and symbol not in self.positions
                     and market_uptrend
                 ):
@@ -514,6 +526,11 @@ class MLMomentumStrategy(TradingStrategy):
                     if shares <= 0:
                         continue
                     sym_latest_date = str(symbol_data.index[-1])[:10]
+                    _acc_note = (
+                        f" [accuracy-scaled ×{_accuracy_scale:.2f}]"
+                        if _oos is not None and _oos < 57.0
+                        else ""
+                    )
                     buy_candidates.append(
                         {
                             "symbol": symbol,
@@ -521,8 +538,11 @@ class MLMomentumStrategy(TradingStrategy):
                             "shares": shares,
                             "price": price,
                             "value": shares * price,
-                            "confidence": prob_positive,
-                            "reasoning": f"ML prob positive 5d return: {prob_positive * 100:.1f}%",
+                            "confidence": prob_positive_effective,
+                            "reasoning": (
+                                f"ML prob positive 5d return: {prob_positive * 100:.1f}%"
+                                f"{_acc_note}"
+                            ),
                             "atr": atr if atr and atr > 0 else None,
                             "asof_date": sym_latest_date,
                         }
