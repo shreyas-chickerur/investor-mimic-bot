@@ -48,7 +48,7 @@ risk:
   # Correlation filter
   correlation_window: 60  # 60-day rolling correlation
   correlation_short_window: 20  # 20-day short window for regime shifts
-  max_correlation: 0.80  # Reject if correlation > 0.8 (relaxed from 0.7)
+  max_correlation: 0.70  # Reject/attenuate if correlation > 0.70; missing-data prior = 0.4-0.5
 
 # Position Sizing
 position_sizing:
@@ -155,6 +155,20 @@ strategies:
     hold_days: 5
     max_hold_days: 15
     time_exit_bearish_threshold: 0.50
+    # LightGBM hyperparameters — tunable without code changes.
+    # These defaults were chosen to prevent overfitting on ~500 training samples.
+    # num_leaves=15: shallow depth; increase only with significantly more data.
+    # min_child_samples=20: minimum leaf size guard against point-fitting.
+    # subsample/colsample_bytree=0.8: standard bagging factors for variance reduction.
+    # learning_rate=0.03: small step with n_estimators=500 for stable convergence.
+    lgbm:
+      n_estimators: 500
+      learning_rate: 0.03
+      num_leaves: 15
+      min_child_samples: 20
+      subsample: 0.8
+      colsample_bytree: 0.8
+      fallback_n_estimators: 200  # sklearn GradientBoostingClassifier fallback
 
   factor_momentum:
     disabled: false  # Re-enabled: live P&L +$714, 50% win rate (2 closed trades)

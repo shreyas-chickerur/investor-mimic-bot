@@ -54,11 +54,63 @@ class CashManager:
         return True
 
     def release_cash(self, strategy_id: int, amount: float):
-        """Release reserved cash back to strategy"""
-        self.allocated_cash[strategy_id] = self.allocated_cash.get(strategy_id, 0) + amount
+        """Release reserved cash back to strategy.
+
+        Clamps the result to a non-negative balance so double-release calls
+        (e.g. releasing cash that was never reserved) cannot inflate available funds.
+        """
+        new_balance = self.allocated_cash.get(strategy_id, 0) + amount
+        # Clamp: a strategy's available balance must not exceed its total allocation.
+        # Without this clamp, erroneous double-release calls silently inflate buying power.
+        max_allowed = self.total_cash  # conservative upper bound when per-strategy max unknown
+        self.allocated_cash[strategy_id] = max(0.0, min(new_balance, max_allowed))
         self.reserved_cash = max(0.0, self.reserved_cash - amount)
         logger.info(
             f"Released ${amount:.2f} to strategy {strategy_id}, new balance: ${self.allocated_cash[strategy_id]:.2f}"
+        )
+
+    def validate_invariants(self) -> bool:
+        """Check that allocated + reserved ≤ total capital.
+
+        Returns True if the invariant holds; logs a WARNING and returns False if
+        cash has drifted (e.g., due to double-release bugs or mid-run reallocations).
+        """
+        total_allocated = sum(self.allocated_cash.values())
+        total_accounted = total_allocated + self.reserved_cash
+        # Allow a small float tolerance
+        if total_accounted > self.total_cash * 1.001:
+            logger.warning(
+                "CashManager invariant violated: allocated($%.2f) + reserved($%.2f) = $%.2f "
+                "> total($%.2f) — possible double-release or reallocation drift",
+                total_allocated,
+                self.reserved_cash,
+                total_accounted,
+                self.total_cash,
+            )
+            return False
+        return True
+
+    def sync_from_broker(self, broker_cash: float) -> None:
+        """Sync total_cash from the actual broker account balance.
+
+        Called at the start of each run to prevent the in-memory cash model
+        from drifting away from real broker state (e.g., after dividends, fees,
+        or manual adjustments). Scales all per-strategy allocations proportionally.
+        """
+        if broker_cash <= 0:
+            return
+        old_total = self.total_cash
+        if abs(broker_cash - old_total) < 1.0:
+            return  # negligible drift — skip
+        scale = broker_cash / old_total if old_total > 0 else 1.0
+        for sid in self.allocated_cash:
+            self.allocated_cash[sid] = max(0.0, self.allocated_cash[sid] * scale)
+        self.total_cash = broker_cash
+        logger.info(
+            "CashManager synced from broker: $%.2f → $%.2f (scale=%.4f)",
+            old_total,
+            broker_cash,
+            scale,
         )
 
     def set_allocations(

@@ -53,7 +53,11 @@ class CorrelationFilter:
             Correlation coefficient (-1 to 1)
         """
         if symbol1 not in self.price_history or symbol2 not in self.price_history:
-            return 0.0
+            # One or both symbols have no price history at all.  Return a neutral prior
+            # (0.5) rather than 0.0 so new positions don't unconditionally bypass the
+            # filter.  0.0 effectively says "no correlation" which over-allocates to
+            # unknown pairs; 0.5 applies gentle attenuation (size_multiplier ≈ 0.83x).
+            return 0.5
 
         prices1 = self.price_history[symbol1]
         prices2 = self.price_history[symbol2]
@@ -61,7 +65,9 @@ class CorrelationFilter:
         # Need same length
         min_len = min(len(prices1), len(prices2))
         if min_len < 20:  # Need at least 20 days
-            return 0.0
+            # Insufficient history — use conservative prior rather than assuming zero
+            # correlation, which would silently pass the filter for all short-history pairs.
+            return 0.4
 
         prices1 = prices1[-min_len:]
         prices2 = prices2[-min_len:]
@@ -85,7 +91,7 @@ class CorrelationFilter:
             (long_window_corr, short_window_corr)
         """
         if symbol1 not in self.price_history or symbol2 not in self.price_history:
-            return 0.0, 0.0
+            return 0.5, 0.5  # conservative prior — see calculate_correlation comment
 
         prices1 = self.price_history[symbol1]
         prices2 = self.price_history[symbol2]
@@ -102,7 +108,7 @@ class CorrelationFilter:
             )
             long_corr = long_corr if not np.isnan(long_corr) else 0.0
         else:
-            long_corr = 0.0
+            long_corr = 0.4  # conservative prior when insufficient long-window history
 
         # Short window correlation (regime shift detection)
         if min_len >= self.short_window:
@@ -115,9 +121,9 @@ class CorrelationFilter:
                 if len(returns1_short) > 0
                 else 0.0
             )
-            short_corr = short_corr if not np.isnan(short_corr) else 0.0
+            short_corr = short_corr if not np.isnan(short_corr) else 0.4
         else:
-            short_corr = 0.0
+            short_corr = 0.4  # conservative prior when insufficient short-window history
 
         return long_corr, short_corr
 

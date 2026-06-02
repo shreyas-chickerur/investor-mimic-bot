@@ -86,24 +86,41 @@ class MLMomentumStrategy(TradingStrategy):
         )
         self.entry_dates = {}
 
+        # Hyperparameters loaded from config so they can be tuned without code changes.
+        # Defaults chosen to prevent overfitting on the ~500-sample training set:
+        #   num_leaves=15  — shallow tree; more leaves = more capacity but higher overfit risk
+        #   min_child_samples=20 — minimum leaf size; guards against fitting individual noise points
+        #   subsample=0.8  — row sampling reduces variance (standard bagging factor)
+        #   learning_rate=0.03 — small step size compensated by n_estimators=500
+        _lgbm_cfg = config.get("strategies.ml_momentum.lgbm", {}) or {}
+        _n_est = _lgbm_cfg.get("n_estimators", 500)
+        _lr = _lgbm_cfg.get("learning_rate", 0.03)
+        _num_leaves = _lgbm_cfg.get("num_leaves", 15)
+        _min_child = _lgbm_cfg.get("min_child_samples", 20)
+        _subsample = _lgbm_cfg.get("subsample", 0.8)
+        _colsample = _lgbm_cfg.get("colsample_bytree", 0.8)
+        self._lgbm_params = {
+            "n_estimators": _n_est,
+            "learning_rate": _lr,
+            "num_leaves": _num_leaves,
+            "min_child_samples": _min_child,
+            "subsample": _subsample,
+            "colsample_bytree": _colsample,
+        }
+
         if _LGBM_AVAILABLE:
             self.model = lgb.LGBMClassifier(
-                n_estimators=500,
-                learning_rate=0.03,
-                num_leaves=15,  # shallow — prevents overfitting on ~500 train samples
-                min_child_samples=20,  # equivalent to min_samples_leaf
-                subsample=0.8,
-                colsample_bytree=0.8,
+                **self._lgbm_params,
                 class_weight="balanced",
                 random_state=42,
-                verbose=-1,  # suppress LightGBM training output
+                verbose=-1,
             )
         else:
             self.model = _FallbackGBT(
-                n_estimators=200,
+                n_estimators=_lgbm_cfg.get("fallback_n_estimators", 200),
                 max_depth=3,
-                learning_rate=0.05,
-                subsample=0.8,
+                learning_rate=_lr,
+                subsample=_subsample,
                 min_samples_leaf=10,
                 random_state=42,
             )
@@ -393,12 +410,18 @@ class MLMomentumStrategy(TradingStrategy):
 
             if _LGBM_AVAILABLE:
                 fold_model = lgb.LGBMClassifier(
-                    n_estimators=500,
-                    learning_rate=0.03,
-                    num_leaves=15,
-                    min_child_samples=20,
-                    subsample=0.8,
-                    colsample_bytree=0.8,
+                    **getattr(
+                        self,
+                        "_lgbm_params",
+                        {
+                            "n_estimators": 500,
+                            "learning_rate": 0.03,
+                            "num_leaves": 15,
+                            "min_child_samples": 20,
+                            "subsample": 0.8,
+                            "colsample_bytree": 0.8,
+                        },
+                    ),
                     class_weight="balanced",
                     random_state=42,
                     verbose=-1,
