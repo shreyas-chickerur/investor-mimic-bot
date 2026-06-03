@@ -1999,7 +1999,9 @@ class MultiStrategyRunner:
                         )
                         logger.info(f"  After news filter: {len(signals)} signals")
 
-                        # Log signals to database
+                        # Log signals to database — also persist sentiment score/multiplier
+                        # so the dashboard signal explorer can show accurate historical values
+                        # without re-fetching news at export time.
                         signal_ids = []
                         for signal in signals:
                             signal_id = self.db.log_signal(
@@ -2012,6 +2014,32 @@ class MultiStrategyRunner:
                             )
                             signal_ids.append(signal_id)
                             signal["signal_id"] = signal_id
+                            # Persist sentiment so the snapshot can read it back
+                            _sym = signal.get("symbol", "")
+                            _sent = self._news_sentiment_map.get(_sym, {})
+                            _score = (
+                                float(_sent.get("score", 0.5)) if isinstance(_sent, dict) else 0.5
+                            )
+                            try:
+                                from src.utils.news_sentiment import (
+                                    BOOST_MULT,
+                                    NEGATIVE_THRESHOLD,
+                                    POSITIVE_THRESHOLD,
+                                    SUPPRESS_MULT,
+                                )
+
+                                if _score > POSITIVE_THRESHOLD:
+                                    _mult = f"×{BOOST_MULT}"
+                                elif _score < NEGATIVE_THRESHOLD:
+                                    _mult = f"×{SUPPRESS_MULT}"
+                                else:
+                                    _mult = "×1.00"
+                                self.db._conn_execute(
+                                    "UPDATE signals SET sentiment_score=?, sentiment_multiplier=? WHERE id=?",
+                                    (_score, _mult, signal_id),
+                                )
+                            except Exception:
+                                pass
 
                         # FUNNEL STAGE 4: Risk/cash limits (tracked in _execute_strategy_trades)
                         # Sort: SELL signals always execute before BUYs so exits are never

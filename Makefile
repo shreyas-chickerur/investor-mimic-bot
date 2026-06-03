@@ -4,7 +4,8 @@
 	report analyze backtest metrics email-test signals-check news-test \
 	validate verify check-broker check-health debug-signal import-check \
 	clean clean-all clean-cache format lint type-check \
-	dev-setup dev-test dev-run
+	dev-setup dev-test dev-run \
+	web-mock web-mock-healthy web-mock-recovered web-mock-needs-action web-export web-validate
 
 # Default target
 .DEFAULT_GOAL := help
@@ -27,6 +28,14 @@ help:
 	@echo "  make init             Initialize database schema"
 	@echo "  make setup            Full setup (install + init + fetch-data)"
 	@echo "  make check-health     Verify imports and system health"
+	@echo ""
+	@echo "$(GREEN)🌐 WEB DASHBOARD$(NC)"
+	@echo "  make web-export       Export latest.json from live DB"
+	@echo "  make web-validate     Validate latest.json against schema"
+	@echo "  make web-mock         Export all 3 mock health states"
+	@echo "  make web-mock-healthy         Mock: healthy state"
+	@echo "  make web-mock-recovered       Mock: auto-recovered state"
+	@echo "  make web-mock-needs-action    Mock: needs-action state"
 	@echo ""
 	@echo "$(GREEN)🚀 TRADING$(NC)"
 	@echo "  make run              Execute trading (paper mode)"
@@ -366,3 +375,45 @@ dev-test: clean-cache test-unit
 
 dev-run: clean-cache run-dry
 	@echo "$(GREEN)✅ Development run complete$(NC)"
+
+# ============================================================================
+# WEB DASHBOARD — snapshot export + validation
+# ============================================================================
+
+web-export:
+	@echo "$(BLUE)📤 Exporting live snapshot...$(NC)"
+	@mkdir -p web/public/data/history
+	@python3 scripts/export_snapshot.py
+	@echo "$(GREEN)✅ Snapshot exported$(NC)"
+
+web-validate:
+	@echo "$(BLUE)🔍 Validating snapshot schema...$(NC)"
+	@python3 scripts/validate_snapshot.py
+	@echo "$(GREEN)✅ Schema valid$(NC)"
+
+web-mock-healthy:
+	@echo "$(BLUE)🟢 Generating HEALTHY mock snapshot...$(NC)"
+	@mkdir -p web/public/data/history
+	@python3 scripts/export_snapshot.py --mock healthy
+	@python3 scripts/validate_snapshot.py
+	@echo "$(GREEN)✅ healthy$(NC)"
+
+web-mock-recovered:
+	@echo "$(BLUE)🟡 Generating AUTO-RECOVERED mock snapshot...$(NC)"
+	@mkdir -p web/public/data/history
+	@python3 scripts/export_snapshot.py --mock auto-recovered
+	@python3 scripts/validate_snapshot.py
+	@echo "$(GREEN)✅ auto-recovered$(NC)"
+
+web-mock-needs-action:
+	@echo "$(BLUE)🔴 Generating NEEDS-ACTION mock snapshot...$(NC)"
+	@mkdir -p web/public/data/history
+	@python3 scripts/export_snapshot.py --mock needs-action
+	@python3 scripts/validate_snapshot.py
+	@echo "$(GREEN)✅ needs-action$(NC)"
+
+web-mock: web-mock-healthy web-mock-recovered web-mock-needs-action
+	@echo ""
+	@echo "$(GREEN)✅ All three mock health states generated and validated.$(NC)"
+	@echo "$(BLUE)   web/public/data/latest.json      ← needs-action (last written)$(NC)"
+	@echo "$(BLUE)   web/public/data/history/         ← all three dated copies$(NC)"

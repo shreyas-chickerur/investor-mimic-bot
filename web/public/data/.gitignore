@@ -1,0 +1,5 @@
+# Snapshot files are published to the `data` branch, not committed to main.
+# This prevents Vercel from serving stale snapshots bundled at build time.
+# The app reads latest.json via fetch() with ISR revalidation.
+*.json
+!.gitignore
