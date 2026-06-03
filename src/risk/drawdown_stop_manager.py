@@ -256,7 +256,29 @@ class DrawdownStopManager:
         }
 
         self.db.set_system_state("drawdown_stop_state", json.dumps(state_data))
-        logger.info(f"Drawdown state set to {state}, cooldown until {cooldown_end.date()}")
+        logger.info(
+            "Drawdown state: NORMAL → %s (drawdown=%.2f%%, cooldown until %s)",
+            state,
+            drawdown * 100,
+            cooldown_end.date(),
+        )
+
+        # Structured log event for observability dashboards
+        try:
+            from src.utils.structured_logger import StructuredLogger
+
+            # Use a transient logger (no persistent run_id needed for state events)
+            _sl = StructuredLogger(run_id="DRAWDOWN_STATE_MGR")
+            threshold = self.halt_threshold if state == "HALT" else self.panic_threshold
+            _sl.log_drawdown_state_change(
+                old_state="NORMAL",
+                new_state=state,
+                drawdown_pct=drawdown,
+                threshold_pct=threshold,
+                cooldown_end=cooldown_end.isoformat(),
+            )
+        except Exception:  # nosec B110
+            pass  # structured logging is best-effort; never block a state transition
 
     def _set_rampup_state(self):
         """Set rampup state after cooldown."""

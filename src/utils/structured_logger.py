@@ -20,6 +20,7 @@ class StructuredLogger:
     EVENT_TYPES = [
         "SIGNAL_GENERATED",
         "SIGNAL_REJECTED",
+        "SIGNAL_CONFLICT",
         "ORDER_INTENT_CREATED",
         "ORDER_SUBMITTED",
         "ORDER_FILLED",
@@ -28,6 +29,10 @@ class StructuredLogger:
         "KILL_SWITCH_TRIGGERED",
         "STRATEGY_DISABLED",
         "RISK_LIMIT_HIT",
+        "REGIME_CHANGE",
+        "DRAWDOWN_STATE_CHANGE",
+        "STOP_LOSS_NEAR_MISS",
+        "COOLDOWN_STATUS",
         "ERROR",
     ]
 
@@ -150,4 +155,80 @@ class StructuredLogger:
             "KILL_SWITCH_TRIGGERED",
             {"reason": reason, "details": details or {}},
             stage="KILL_SWITCH",
+        )
+
+    def log_regime_change(
+        self,
+        old_regime: str,
+        new_regime: str,
+        vix: float,
+        affected_strategies: list[str],
+        details: dict | None = None,
+    ):
+        """Log when the detected market regime changes."""
+        self.log_event(
+            "REGIME_CHANGE",
+            {
+                "old_regime": old_regime,
+                "new_regime": new_regime,
+                "vix": vix,
+                "affected_strategies": affected_strategies,
+                **(details or {}),
+            },
+            stage="REGIME",
+        )
+
+    def log_drawdown_state_change(
+        self,
+        old_state: str,
+        new_state: str,
+        drawdown_pct: float,
+        threshold_pct: float,
+        cooldown_end: str | None = None,
+    ):
+        """Log when drawdown manager transitions between states (NORMAL/HALT/PANIC/RAMPUP)."""
+        self.log_event(
+            "DRAWDOWN_STATE_CHANGE",
+            {
+                "old_state": old_state,
+                "new_state": new_state,
+                "drawdown_pct": round(drawdown_pct * 100, 2),
+                "threshold_pct": round(threshold_pct * 100, 2),
+                "cooldown_end": cooldown_end,
+            },
+            stage="DRAWDOWN",
+        )
+
+    def log_stop_loss_near_miss(
+        self, symbol: str, current_price: float, stop_price: float, atr: float, days_near: int = 1
+    ):
+        """Log when a position is within 1 ATR of its stop (early-warning signal)."""
+        distance = current_price - stop_price
+        self.log_event(
+            "STOP_LOSS_NEAR_MISS",
+            {
+                "current_price": round(current_price, 4),
+                "stop_price": round(stop_price, 4),
+                "distance_to_stop": round(distance, 4),
+                "atr": round(atr, 4),
+                "distance_in_atrs": round(distance / atr, 2) if atr > 0 else None,
+                "consecutive_days_near": days_near,
+            },
+            symbol=symbol,
+            stage="RISK",
+        )
+
+    def log_cooldown_status(
+        self, state: str, cooldown_end: str | None, resume_at: str | None, days_remaining: int
+    ):
+        """Log ongoing cooldown state so operators know when trading resumes."""
+        self.log_event(
+            "COOLDOWN_STATUS",
+            {
+                "state": state,
+                "cooldown_end": cooldown_end,
+                "resume_at": resume_at,
+                "days_remaining": days_remaining,
+            },
+            stage="DRAWDOWN",
         )
