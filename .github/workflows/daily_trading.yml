@@ -343,8 +343,6 @@ jobs:
         ENABLE_BROKER_RECONCILIATION: 'true'
         DATA_MAX_AGE_HOURS: '144'
         TRADING_DISABLED: 'false'
-        SENTRY_DSN: ${{ secrets.SENTRY_DSN }}  # optional — leave unset to disable Sentry
-        ENVIRONMENT: 'paper'
       run: |
         chmod +x scripts/run_trading.sh
         ./scripts/run_trading.sh
