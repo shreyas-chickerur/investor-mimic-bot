@@ -44,13 +44,21 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 SCHEMA_VERSION = 1
 INITIAL_CAPITAL = 100_000.0  # confirmed: all paper accounts start at $100 k
 SMALL_SAMPLE_TRADES = 20  # guard for winRatePct / profitFactor
-SMALL_SAMPLE_RETURNS = 20  # guard for Sharpe / Sortino
+SMALL_SAMPLE_RETURNS = 60  # guard for Sharpe / Sortino / volatility
+# 60 days = ~3 months; the industry minimum for a statistically meaningful
+# Sharpe. The 22-day series at launch produced Sharpe=-2.5 with SE≈0.21 —
+# too noisy to display honestly. Keep null until the series is robust.
+SHARPE_MIN_VARIANCE = 0.0005  # annualised vol floor (~5% ann); flat series
+# with near-zero variance produce extreme / meaningless Sharpe values.
 DATA_BRANCH_SUBPATH = "web/public/data"
 
 DB_PATH = Path("trading.db")
 TRAINING_CSV = Path("data/training_data.csv")
 OUTPUT_DIR = Path("web/public/data")
 HISTORY_DIR = OUTPUT_DIR / "history"
+# Mock output is fully isolated from real history — different directory.
+MOCK_OUTPUT_DIR = OUTPUT_DIR / "mock"
+MOCK_HISTORY_DIR = MOCK_OUTPUT_DIR / "history"
 
 # ---------------------------------------------------------------------------
 # Per-strategy hard-coded metadata (not in DB)
@@ -259,6 +267,12 @@ def _sharpe(returns: list[float]) -> float | None:
     stdev = statistics.pstdev(returns)
     if stdev == 0:
         return None
+    # Variance floor: if annualised vol is below SHARPE_MIN_VARIANCE the series
+    # is too flat to produce a meaningful Sharpe (near-zero denominator →
+    # extreme values from noise).  Return null so the UI shows "—" instead.
+    ann_vol = stdev * (252**0.5)
+    if ann_vol < SHARPE_MIN_VARIANCE:
+        return None
     return _null(round((mean / stdev) * (252**0.5), 4))
 
 
@@ -268,6 +282,10 @@ def _sortino(returns: list[float]) -> float | None:
     import statistics
 
     mean = statistics.mean(returns)
+    stdev = statistics.pstdev(returns)
+    ann_vol = stdev * (252**0.5)
+    if ann_vol < SHARPE_MIN_VARIANCE:
+        return None
     downside = [r for r in returns if r < 0]
     if not downside:
         return None
@@ -298,7 +316,10 @@ def _volatility(returns: list[float]) -> float | None:
     import statistics
 
     stdev = statistics.pstdev(returns)
-    return _null(round(stdev * (252**0.5) * 100, 4))
+    ann_vol = stdev * (252**0.5)
+    if ann_vol < SHARPE_MIN_VARIANCE:
+        return None
+    return _null(round(ann_vol * 100, 4))
 
 
 def _profit_factor(pnl_list: list[float]) -> float | None:
@@ -1683,8 +1704,18 @@ def main() -> None:
     parser.add_argument("--gh-repo", default=os.environ.get("GITHUB_REPOSITORY", ""))
     args = parser.parse_args()
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    HISTORY_DIR.mkdir(parents=True, exist_ok=True)
+    # Mock output writes to web/public/data/mock/ — completely isolated from the
+    # real history/ directory.  Running make web-mock can never pollute the real
+    # history or trigger an accidental data-branch commit.
+    if args.mock:
+        out_dir = MOCK_OUTPUT_DIR
+        hist_dir = MOCK_HISTORY_DIR
+    else:
+        out_dir = OUTPUT_DIR
+        hist_dir = HISTORY_DIR
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    hist_dir.mkdir(parents=True, exist_ok=True)
 
     if args.mock:
         snapshot = _build_mock(args.mock)
@@ -1727,8 +1758,8 @@ def main() -> None:
 
     trading_date = snapshot["meta"]["tradingDate"]
 
-    latest_path = OUTPUT_DIR / "latest.json"
-    history_path = HISTORY_DIR / f"{trading_date}.json"
+    latest_path = out_dir / "latest.json"
+    history_path = hist_dir / f"{trading_date}.json"
 
     json_str = json.dumps(snapshot, indent=2, default=str)
 
