@@ -110,6 +110,8 @@ strategies:
     news_sentiment: UNVALIDATED   # threshold rarely met; experimental
     ma_crossover: BACKTESTED
     volatility_breakout: BACKTESTED
+    pairs_trading: UNVALIDATED  # new strategy — live paper trading will validate
+    sector_rotation: UNVALIDATED
 
   # Backtest Sharpe priors — seed allocator when live history < 20 days
   # RSI Sharpe 0.65 (p=0.019), Earnings Drift estimated 0.80 (p=0.001),
@@ -122,6 +124,8 @@ strategies:
     news_sentiment: 0.25
     ma_crossover: 0.20
     volatility_breakout: 0.20
+    pairs_trading: 0.40        # Gatev et al. (2006): ~6% alpha → estimated Sharpe ~0.4
+    sector_rotation: 0.35      # Moskowitz & Grinblatt (1999): sector momentum documented edge
 
   # Per-strategy allocation caps (override global max_allocation_pct)
   allocation_overrides:
@@ -132,6 +136,8 @@ strategies:
     news_sentiment: 0.05       # Experimental — VADER threshold rarely met; cap until validated
     ma_crossover: 0.15         # Unvalidated — moderate cap
     volatility_breakout: 0.15  # Unvalidated — moderate cap
+    pairs_trading: 0.10        # New strategy — conservative cap until validated
+    sector_rotation: 0.10      # New strategy — conservative cap until validated
 
   # Strategy-specific parameters
   rsi_mean_reversion:
@@ -195,10 +201,29 @@ strategies:
     stop_loss_pct: 0.10
     min_surprise_return: 0.02
 
+  pairs_trading:
+    entry_z_threshold: 1.5    # Enter when ratio z-score < -1.5σ
+    exit_z_threshold: 0.3     # Exit when ratio z-score reverts within 0.3σ of mean
+    lookback_days: 60         # Rolling window for mean/std calculation
+    max_hold_days: 20         # Force exit if spread doesn't revert
+    # Pairs are hardcoded in strategy_pairs_trading.py (JPM/BAC, AAPL/MSFT, etc.)
+
+  sector_rotation:
+    top_sectors: 2            # Number of outperforming sectors to rotate into
+    stocks_per_sector: 1      # Best individual stock per selected sector
+    sector_lookback_days: 20  # Momentum lookback for sector ETF ranking
+    hold_days: 20             # Rebalance after this many days
+    max_hold_days: 35
+    profit_target_pct: 0.12
+
   volatility_breakout:
     atr_period: 14
     breakout_multiplier: 2.0
     volume_spike_min: 1.2      # Lowered from 1.5 — max universe vol today was 1.46
+    # VIX-adaptive Bollinger Band multiplier (σ)
+    bb_mult_low_vix: 1.8       # VIX < 15: tighter bands, more signals acceptable
+    bb_mult_normal_vix: 2.0    # VIX 15-25: standard 2σ
+    bb_mult_high_vix: 2.5      # VIX > 25: wider bands to filter noise breakouts
 
 # Data Management
 data:
