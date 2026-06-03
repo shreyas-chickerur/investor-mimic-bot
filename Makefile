@@ -393,27 +393,25 @@ web-validate:
 
 web-mock-healthy:
 	@echo "$(BLUE)🟢 Generating HEALTHY mock snapshot...$(NC)"
-	@mkdir -p web/public/data/history
 	@python3 scripts/export_snapshot.py --mock healthy
-	@python3 scripts/validate_snapshot.py
-	@echo "$(GREEN)✅ healthy$(NC)"
+	@python3 scripts/validate_snapshot.py --file web/public/data/mock/latest.json
+	@echo "$(GREEN)✅ healthy  →  web/public/data/mock/$(NC)"
 
 web-mock-recovered:
 	@echo "$(BLUE)🟡 Generating AUTO-RECOVERED mock snapshot...$(NC)"
-	@mkdir -p web/public/data/history
 	@python3 scripts/export_snapshot.py --mock auto-recovered
-	@python3 scripts/validate_snapshot.py
-	@echo "$(GREEN)✅ auto-recovered$(NC)"
+	@python3 scripts/validate_snapshot.py --file web/public/data/mock/latest.json
+	@echo "$(GREEN)✅ auto-recovered  →  web/public/data/mock/$(NC)"
 
 web-mock-needs-action:
 	@echo "$(BLUE)🔴 Generating NEEDS-ACTION mock snapshot...$(NC)"
-	@mkdir -p web/public/data/history
 	@python3 scripts/export_snapshot.py --mock needs-action
-	@python3 scripts/validate_snapshot.py
-	@echo "$(GREEN)✅ needs-action$(NC)"
+	@python3 scripts/validate_snapshot.py --file web/public/data/mock/latest.json
+	@echo "$(GREEN)✅ needs-action  →  web/public/data/mock/$(NC)"
 
 web-mock: web-mock-healthy web-mock-recovered web-mock-needs-action
 	@echo ""
 	@echo "$(GREEN)✅ All three mock health states generated and validated.$(NC)"
-	@echo "$(BLUE)   web/public/data/latest.json      ← needs-action (last written)$(NC)"
-	@echo "$(BLUE)   web/public/data/history/         ← all three dated copies$(NC)"
+	@echo "$(BLUE)   web/public/data/mock/latest.json    ← needs-action (last written)$(NC)"
+	@echo "$(BLUE)   web/public/data/mock/history/       ← all three dated copies$(NC)"
+	@echo "$(BLUE)   web/public/data/                    ← UNTOUCHED (real data stays clean)$(NC)"
