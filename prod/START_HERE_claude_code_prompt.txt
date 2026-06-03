@@ -1,0 +1,23 @@
+Read the following files in this folder before writing any code:
+  - CLAUDE_CODE_PROD_PROMPT.md            (the full build spec — your instructions)
+  - reference/snapshot.types.ts            (the data contract — binding)
+  - reference/design-tokens.ts             (exact colors/fonts/visual rules — binding)
+  - reference/glossary.ts                  (plain-English tooltip definitions)
+  - reference/MimicDashboard.reference.jsx (the approved VISUAL reference — match it)
+
+Then build the production Investor Mimic web dashboard exactly as CLAUDE_CODE_PROD_PROMPT.md
+specifies, in the investor-mimic-bot repository, replacing the Streamlit dashboard.
+
+Work in phases and DO NOT skip Phase 0. Start now with PHASE 0 ONLY:
+  1. Read the source files the prompt lists (src/monitoring, src/regime, src/risk,
+     src/utils/news_sentiment, src/strategies, the SQLite schema, dashboard/,
+     and .github/workflows/daily_trading.yml).
+  2. Produce a field-by-field mapping from snapshot.types.ts to real code/data sources.
+  3. List every field you CANNOT source, with your proposed resolution.
+  4. STOP and wait for my approval before writing any code.
+
+Hard rules to honor throughout (also in the prompt): no secrets or live broker in the
+frontend (read a read-only JSON snapshot only); no auth, no real-time, no trade controls;
+TypeScript strict; match the visual reference (do not redesign); use a portal-based
+popover library for all tooltips; don't modify the trading system itself — only add the
+snapshot export step and the web app.

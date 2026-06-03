@@ -499,6 +499,17 @@ class TradingDatabase:
             except Exception:
                 pass  # column already exists — migration is idempotent
 
+            # Sentiment per signal — persisted so the dashboard explorer can show
+            # accurate historical sentiment scores without re-fetching at export time.
+            for col_sql in [
+                "ALTER TABLE signals ADD COLUMN sentiment_score REAL",
+                "ALTER TABLE signals ADD COLUMN sentiment_multiplier TEXT",
+            ]:
+                try:
+                    cursor.execute(col_sql)
+                except Exception:
+                    pass  # column already exists — migration is idempotent
+
             # Immutable trade audit log — append-only ledger for compliance.
             # Triggers prevent DELETE so every executed trade is permanently recorded.
             cursor.execute(
@@ -2006,6 +2017,15 @@ class TradingDatabase:
             result = cursor.fetchone()
 
         return result[0] if result else None
+
+    def _conn_execute(self, sql: str, params: tuple = ()) -> None:
+        """Fire-and-forget UPDATE/INSERT — best-effort, never raises."""
+        try:
+            with closing(sqlite3.connect(self.db_path, timeout=5)) as conn:
+                conn.execute(sql, params)
+                conn.commit()
+        except Exception:
+            pass
 
     def set_system_state(self, key: str, value: str):
         """
