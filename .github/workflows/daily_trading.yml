@@ -282,6 +282,56 @@ jobs:
         echo "=== Signal Generation Health Check ==="
         python3 scripts/monitor_signal_health.py || echo "Health check completed with warnings"
 
+    - name: Pre-trading health gate
+      env:
+        ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+        ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+      run: |
+        echo "=== Pre-trading health gate ==="
+        python3 - <<'PY'
+        import sys, os
+        from pathlib import Path
+        from datetime import datetime, timedelta
+
+        failures = []
+
+        # 1. DB exists and has required tables
+        if not Path("trading.db").exists():
+            failures.append("❌ trading.db missing")
+        else:
+            import sqlite3
+            with sqlite3.connect("trading.db", timeout=10) as c:
+                tables = {r[0] for r in c.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()}
+            for t in ["trades", "positions", "order_intents", "broker_state"]:
+                if t not in tables:
+                    failures.append(f"❌ DB table missing: {t}")
+
+        # 2. Market data is reasonably fresh (< 72 h on trading days)
+        data_file = Path("data/training_data.csv")
+        if not data_file.exists():
+            failures.append("❌ training_data.csv missing")
+        else:
+            age_h = (datetime.now() - datetime.fromtimestamp(data_file.stat().st_mtime)).total_seconds() / 3600
+            if age_h > 72:
+                failures.append(f"⚠️  Market data is {age_h:.0f}h old (soft warning — trading continues)")
+
+        # 3. Required env vars / secrets present
+        for var in ["ALPACA_API_KEY", "ALPACA_SECRET_KEY"]:
+            if not os.getenv(var, ""):
+                failures.append(f"❌ Secret missing: {var}")
+
+        hard_failures = [f for f in failures if f.startswith("❌")]
+        for msg in failures:
+            print(msg)
+
+        if hard_failures:
+            print(f"\n{len(hard_failures)} hard failure(s) — aborting trading run")
+            sys.exit(1)
+        print("✅ Pre-trading health gate passed")
+        PY
+
     - name: Run trading with pre-flight checks
       env:
         ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}

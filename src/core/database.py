@@ -499,6 +499,62 @@ class TradingDatabase:
             except Exception:
                 pass  # column already exists — migration is idempotent
 
+            # Immutable trade audit log — append-only ledger for compliance.
+            # Triggers prevent DELETE so every executed trade is permanently recorded.
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS trade_audit_log (
+                    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_type   TEXT NOT NULL,
+                    run_id       TEXT,
+                    strategy_id  INTEGER,
+                    symbol       TEXT,
+                    action       TEXT,
+                    shares       REAL,
+                    exec_price   REAL,
+                    order_id     TEXT,
+                    logged_at    TEXT DEFAULT CURRENT_TIMESTAMP,
+                    payload_json TEXT
+                )
+                """
+            )
+            cursor.execute(
+                """
+                CREATE TRIGGER IF NOT EXISTS trg_trade_audit_insert
+                AFTER INSERT ON trades
+                BEGIN
+                    INSERT INTO trade_audit_log
+                        (event_type, run_id, strategy_id, symbol, action,
+                         shares, exec_price, order_id, payload_json)
+                    VALUES (
+                        'INSERT', NEW.run_id, NEW.strategy_id, NEW.symbol,
+                        NEW.action, NEW.shares, NEW.exec_price, NEW.order_id,
+                        json_object(
+                            'run_id', NEW.run_id, 'strategy_id', NEW.strategy_id,
+                            'symbol', NEW.symbol, 'action', NEW.action,
+                            'shares', NEW.shares, 'exec_price', NEW.exec_price,
+                            'order_id', NEW.order_id, 'executed_at', NEW.executed_at
+                        )
+                    );
+                END
+                """
+            )
+            cursor.execute(
+                """
+                CREATE TRIGGER IF NOT EXISTS trg_trade_audit_delete
+                BEFORE DELETE ON trades
+                BEGIN
+                    INSERT INTO trade_audit_log
+                        (event_type, symbol, action, shares, exec_price, order_id)
+                    VALUES (
+                        'DELETE_BLOCKED', OLD.symbol, OLD.action,
+                        OLD.shares, OLD.exec_price, OLD.order_id
+                    );
+                    SELECT RAISE(ABORT, 'trades table is immutable — DELETE not allowed');
+                END
+                """
+            )
+
             conn.commit()
 
     def upsert_run_state(

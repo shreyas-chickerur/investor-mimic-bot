@@ -12,6 +12,7 @@ Invoked via: python3 src/core/execution_engine.py  (which imports this)
 from __future__ import annotations
 
 import logging
+import os
 import sys
 import time
 from datetime import datetime
@@ -22,8 +23,34 @@ from src.monitoring.artifact_writer import DailyArtifactWriter, create_artifact_
 logger = logging.getLogger(__name__)
 
 
+def _init_sentry() -> None:
+    """Initialise Sentry error tracking if SENTRY_DSN is set.
+
+    Completely optional — when the env var is absent or sentry-sdk is not
+    installed, this is a no-op.  Set the secret in GitHub repo settings to
+    enable crash reporting in GHA runs.
+    """
+    dsn = os.getenv("SENTRY_DSN", "")
+    if not dsn:
+        return
+    try:
+        import sentry_sdk  # optional dep (pyproject.toml [monitoring])
+
+        sentry_sdk.init(
+            dsn=dsn,
+            traces_sample_rate=0.0,  # no performance tracing; errors only
+            environment=os.getenv("ENVIRONMENT", "paper"),
+        )
+        logger.info(
+            "Sentry error tracking initialised (environment=%s)", os.getenv("ENVIRONMENT", "paper")
+        )
+    except ImportError:
+        logger.debug("sentry-sdk not installed — install with: pip install sentry-sdk")
+
+
 def main():
     """Main execution"""
+    _init_sentry()
     start_time = time.time()
     print("=" * 80)
     print("MULTI-STRATEGY TRADING SYSTEM")
