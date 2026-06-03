@@ -555,7 +555,79 @@ class TradingDatabase:
                 """
             )
 
+            # In-house error tracking: persistent log of unhandled exceptions.
+            # Replaces Sentry for crash visibility; queryable alongside trade data.
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS error_log (
+                    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                    run_id       TEXT,
+                    error_type   TEXT NOT NULL,
+                    message      TEXT NOT NULL,
+                    stack_trace  TEXT,
+                    context_json TEXT,
+                    alert_sent   INTEGER DEFAULT 0,
+                    occurred_at  TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_error_log_run ON error_log(run_id)")
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_error_log_type ON error_log(error_type, occurred_at)"
+            )
+
             conn.commit()
+
+    def record_error(
+        self,
+        error_type: str,
+        message: str,
+        stack_trace: str = "",
+        context: dict | None = None,
+        alert_sent: bool = False,
+    ) -> int:
+        """Persist an unhandled exception to the error_log table.
+
+        Returns the new row id so the caller can update alert_sent later.
+        """
+        import json as _json
+
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO error_log
+                    (run_id, error_type, message, stack_trace, context_json, alert_sent)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    self.run_id,
+                    error_type,
+                    message[:2000],  # cap to avoid huge DB rows
+                    stack_trace[:8000],
+                    _json.dumps(context or {}),
+                    1 if alert_sent else 0,
+                ),
+            )
+            conn.commit()
+            return cursor.lastrowid or 0
+
+    def get_recent_errors(self, hours: int = 24) -> list[dict]:
+        """Return errors from the last N hours (for daily digest / status report)."""
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT error_type, message, occurred_at, alert_sent
+                FROM error_log
+                WHERE occurred_at >= datetime('now', ?)
+                ORDER BY occurred_at DESC
+                LIMIT 50
+                """,
+                (f"-{hours} hours",),
+            )
+            return [dict(r) for r in cursor.fetchall()]
 
     def upsert_run_state(
         self,

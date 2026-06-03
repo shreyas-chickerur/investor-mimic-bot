@@ -12,7 +12,6 @@ Invoked via: python3 src/core/execution_engine.py  (which imports this)
 from __future__ import annotations
 
 import logging
-import os
 import sys
 import time
 from datetime import datetime
@@ -23,34 +22,8 @@ from src.monitoring.artifact_writer import DailyArtifactWriter, create_artifact_
 logger = logging.getLogger(__name__)
 
 
-def _init_sentry() -> None:
-    """Initialise Sentry error tracking if SENTRY_DSN is set.
-
-    Completely optional — when the env var is absent or sentry-sdk is not
-    installed, this is a no-op.  Set the secret in GitHub repo settings to
-    enable crash reporting in GHA runs.
-    """
-    dsn = os.getenv("SENTRY_DSN", "")
-    if not dsn:
-        return
-    try:
-        import sentry_sdk  # optional dep (pyproject.toml [monitoring])
-
-        sentry_sdk.init(
-            dsn=dsn,
-            traces_sample_rate=0.0,  # no performance tracing; errors only
-            environment=os.getenv("ENVIRONMENT", "paper"),
-        )
-        logger.info(
-            "Sentry error tracking initialised (environment=%s)", os.getenv("ENVIRONMENT", "paper")
-        )
-    except ImportError:
-        logger.debug("sentry-sdk not installed — install with: pip install sentry-sdk")
-
-
 def main():
     """Main execution"""
-    _init_sentry()
     start_time = time.time()
     print("=" * 80)
     print("MULTI-STRATEGY TRADING SYSTEM")
@@ -60,6 +33,14 @@ def main():
 
     try:
         runner = MultiStrategyRunner()
+
+        # Activate in-house error tracker immediately after the runner is up.
+        # sys.excepthook is now pointed at our handler: any unhandled exception
+        # from this point forward is persisted to error_log and emailed.
+        from src.utils.error_tracker import init_error_tracker
+
+        init_error_tracker(runner.db, runner.email_notifier)
+
         runner._set_run_stage("LOAD_DATA", "RUNNING")
 
         # Load market data with validation
@@ -249,19 +230,32 @@ def main():
         runner._set_run_stage("COMPLETE", "SUCCESS", completed=True)
 
     except Exception as e:
+        import traceback as _tb
+
         error_msg = f"Fatal error: {e}"
+        stack = _tb.format_exc()
         logger.error(error_msg, exc_info=True)
         print(f"\n❌ FATAL ERROR: {e}")
         if runner:
             runner._set_run_stage("FAILED", "FAILED", error_message=error_msg, completed=True)
 
-        # Send error alert
-        if runner:
-            try:
-                import traceback
+        # Route through in-house error tracker (persists + emails styled alert).
+        # Falls back to the plain send_error_alert if tracker not yet initialised.
+        try:
+            from src.utils.error_tracker import capture as _capture
 
-                runner.email_notifier.send_error_alert(error_msg, traceback.format_exc())
-            except Exception:  # nosec B110
-                pass  # email failure must never mask the original error
+            _capture(
+                error_type=type(e).__name__,
+                message=str(e),
+                stack_trace=stack,
+                context={"run_id": getattr(runner, "run_id", "UNKNOWN")} if runner else None,
+            )
+        except Exception:  # nosec B110
+            # Tracker failed — try raw email as last resort
+            if runner:
+                try:
+                    runner.email_notifier.send_error_alert(error_msg, stack)
+                except Exception:  # nosec B110
+                    pass
 
         sys.exit(1)
