@@ -51,7 +51,9 @@ from src.strategies.strategy_factor_momentum import _SECTOR_MAP, FactorMomentumS
 from src.strategies.strategy_ma_crossover import MACrossoverStrategy
 from src.strategies.strategy_ml_momentum import MLMomentumStrategy
 from src.strategies.strategy_news_sentiment import NewsSentimentStrategy
+from src.strategies.strategy_pairs_trading import PairsTradingStrategy
 from src.strategies.strategy_rsi_mean_reversion import RSIMeanReversionStrategy
+from src.strategies.strategy_sector_rotation import SectorRotationStrategy
 from src.strategies.strategy_volatility_breakout import VolatilityBreakoutStrategy
 from src.utils.config_loader import get_config
 
@@ -107,6 +109,16 @@ CANONICAL_STRATEGY_SPECS = [
         "Volatility Breakout",
         "Bollinger Band upper breakout with 1.5x volume surge confirmation",
         VolatilityBreakoutStrategy,
+    ),
+    (
+        "Pairs Trading",
+        "Statistical pairs mean-reversion: buy lagging leg when spread z-score < -1.5σ",
+        PairsTradingStrategy,
+    ),
+    (
+        "Sector Rotation",
+        "Explicit sector momentum rotation: top-2 sectors by 20d return, best stock each",
+        SectorRotationStrategy,
     ),
 ]
 

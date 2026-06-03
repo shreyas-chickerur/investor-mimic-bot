@@ -206,6 +206,21 @@ def _score_title(title: str) -> float:
     return _score_title_keywords(title)
 
 
+def _score_with_description(title: str, description: str) -> float:
+    """Score title + article description/summary together.
+
+    RSS <description> fields contain a 1-3 sentence article snippet that often
+    contradicts an attention-grabbing headline.  Combining both gives a more
+    accurate sentiment signal.  The title gets 60% weight (editorial intent)
+    and the description gets 40% weight (article body context).
+    """
+    title_score = _score_title(title)
+    if not description or not description.strip():
+        return title_score
+    desc_score = _score_title(description.strip())
+    return round(0.60 * title_score + 0.40 * desc_score, 4)
+
+
 def _fetch_via_google_rss(symbol: str, max_articles: int = 15) -> list[dict]:
     """
     Fetch articles via Google News RSS (no auth, no rate limit, stdlib XML).
@@ -253,9 +268,18 @@ def _fetch_via_google_rss(symbol: str, max_articles: int = 15) -> list[dict]:
                 except (TypeError, ValueError):
                     pub_dt = None
 
+            # Capture RSS <description> — typically a 1-3 sentence article snippet.
+            # Stripping HTML tags to get plain text for VADER scoring.
+            raw_desc = (item.findtext("description") or "").strip()
+            # Remove simple HTML tags from the description snippet
+            import re as _re
+
+            description = _re.sub(r"<[^>]+>", " ", raw_desc).strip()
+
             articles.append(
                 {
                     "title": title,
+                    "description": description,
                     "source": source or "Google News",
                     "link": link,
                     "pub_dt": pub_dt.isoformat() if pub_dt else None,
@@ -348,9 +372,10 @@ def fetch_symbol_news(symbol: str, max_articles: int = 15) -> dict:
         if not articles:
             return {**_NEUTRAL_CONTEXT, "headlines": [], "articles": []}
 
-        # Score sentiment per surviving article
+        # Score sentiment: use title + description (RSS snippet) when available
+        # for a more accurate signal than headline-only scoring.
         for art in articles:
-            art["sentiment"] = _score_title(art["title"])
+            art["sentiment"] = _score_with_description(art["title"], art.get("description", ""))
 
         # Composite rank: quality dominates, sentiment magnitude is the tie-breaker.
         # This pushes substantive earnings/guidance/upgrade stories above

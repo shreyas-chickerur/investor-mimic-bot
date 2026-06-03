@@ -586,6 +586,50 @@ jobs:
           echo "=== Skipping per-strategy backtest (runs Mondays only, today is day $DAY) ==="
         fi
 
+    - name: Walk-forward OOS validation summary
+      if: always()
+      continue-on-error: true
+      run: |
+        # Surface per-strategy OOS backtest results in GITHUB_STEP_SUMMARY
+        # so they are visible on the Actions run page without downloading artifacts.
+        python3 - <<'PY'
+        import os, sqlite3
+        from pathlib import Path
+
+        summary = os.environ.get("GITHUB_STEP_SUMMARY", "")
+        if not summary:
+            raise SystemExit(0)
+
+        db = Path("trading.db")
+        if not db.exists():
+            raise SystemExit(0)
+
+        with sqlite3.connect(str(db), timeout=10) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute("""
+                SELECT strategy_name,
+                       COUNT(*) AS trades,
+                       ROUND(100.0 * SUM(CASE WHEN gross_pnl > 0 THEN 1 ELSE 0 END) / COUNT(*), 1) AS win_rate,
+                       ROUND(SUM(gross_pnl), 2) AS total_pnl,
+                       ROUND(AVG(gross_pnl_pct) * 100, 2) AS avg_return_pct
+                FROM trade_pnl_detail
+                GROUP BY strategy_name
+                ORDER BY total_pnl DESC
+            """).fetchall()
+
+        with open(summary, "a") as f:
+            f.write("## Strategy P&L (all live paper trades)\n")
+            f.write("| Strategy | Trades | Win % | Total P&L | Avg Return |\n")
+            f.write("|----------|--------|-------|-----------|------------|\n")
+            for r in rows:
+                f.write(
+                    f"| {r['strategy_name']} | {r['trades']} | {r['win_rate']}% "
+                    f"| ${r['total_pnl']:,.2f} | {r['avg_return_pct']}% |\n"
+                )
+            if not rows:
+                f.write("_No closed trades yet._\n")
+        PY
+
     - name: Generate strategy performance report
       if: always() && steps.check_execution.outputs.executed == 'true'
       continue-on-error: true
