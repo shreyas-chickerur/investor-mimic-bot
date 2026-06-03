@@ -132,10 +132,16 @@ jobs:
         find scripts/ -name "*.py" -exec python -m py_compile {} \;
         echo "✅ All scripts compile successfully"
 
+    - name: Lint GitHub Actions workflow YAML files
+      run: |
+        pip install yamllint --quiet
+        echo "=== Linting workflow YAML files ==="
+        yamllint -c .yamllint.yml .github/workflows/*.yml && echo "✅ All workflow YAMLs are valid"
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: "3.8"
+        python-version: "3.11"
 
     - name: Install dependencies
       run: |
