@@ -176,7 +176,13 @@ class KillSwitchService:
         try:
             self.email_notifier.send_alert(subject, html)
         except Exception as e:
-            logger.error(f"Failed to send kill switch alert: {e}")
+            # CRITICAL: operator must know trading is halted even if email fails
+            logger.critical(
+                "CRITICAL: kill switch fired but alert email FAILED to send — "
+                "manual check required. Reason: %s. Email error: %s",
+                reason,
+                e,
+            )
 
     def get_status(self) -> dict:
         """Get kill switch status"""

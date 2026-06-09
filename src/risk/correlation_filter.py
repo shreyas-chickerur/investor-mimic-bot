@@ -72,14 +72,18 @@ class CorrelationFilter:
         prices1 = prices1[-min_len:]
         prices2 = prices2[-min_len:]
 
-        # Calculate returns
-        returns1 = np.diff(prices1) / prices1[:-1]
-        returns2 = np.diff(prices2) / prices2[:-1]
+        # Calculate returns; suppress divide-by-zero warning from zero prices
+        with np.errstate(divide="ignore", invalid="ignore"):
+            returns1 = np.diff(prices1) / prices1[:-1]
+            returns2 = np.diff(prices2) / prices2[:-1]
 
-        # Calculate correlation
+        # Drop inf/nan pairs (zero prices or data errors) before correlation
+        mask = np.isfinite(returns1) & np.isfinite(returns2)
+        returns1, returns2 = returns1[mask], returns2[mask]
+
         if len(returns1) > 0 and len(returns2) > 0:
             corr = float(np.corrcoef(returns1, returns2)[0, 1])
-            return corr if not np.isnan(corr) else 0.0
+            return corr if np.isfinite(corr) else 0.0
 
         return 0.0
 
@@ -101,12 +105,15 @@ class CorrelationFilter:
         if min_len >= self.correlation_window:
             p1_long = prices1[-self.correlation_window :]
             p2_long = prices2[-self.correlation_window :]
-            returns1_long = np.diff(p1_long) / p1_long[:-1]
-            returns2_long = np.diff(p2_long) / p2_long[:-1]
+            with np.errstate(divide="ignore", invalid="ignore"):
+                r1l = np.diff(p1_long) / p1_long[:-1]
+                r2l = np.diff(p2_long) / p2_long[:-1]
+            mask_l = np.isfinite(r1l) & np.isfinite(r2l)
+            returns1_long, returns2_long = r1l[mask_l], r2l[mask_l]
             long_corr = (
                 np.corrcoef(returns1_long, returns2_long)[0, 1] if len(returns1_long) > 0 else 0.0
             )
-            long_corr = long_corr if not np.isnan(long_corr) else 0.0
+            long_corr = long_corr if np.isfinite(long_corr) else 0.0
         else:
             long_corr = 0.4  # conservative prior when insufficient long-window history
 
@@ -114,14 +121,17 @@ class CorrelationFilter:
         if min_len >= self.short_window:
             p1_short = prices1[-self.short_window :]
             p2_short = prices2[-self.short_window :]
-            returns1_short = np.diff(p1_short) / p1_short[:-1]
-            returns2_short = np.diff(p2_short) / p2_short[:-1]
+            with np.errstate(divide="ignore", invalid="ignore"):
+                r1s = np.diff(p1_short) / p1_short[:-1]
+                r2s = np.diff(p2_short) / p2_short[:-1]
+            mask_s = np.isfinite(r1s) & np.isfinite(r2s)
+            returns1_short, returns2_short = r1s[mask_s], r2s[mask_s]
             short_corr = (
                 np.corrcoef(returns1_short, returns2_short)[0, 1]
                 if len(returns1_short) > 0
                 else 0.0
             )
-            short_corr = short_corr if not np.isnan(short_corr) else 0.4
+            short_corr = short_corr if np.isfinite(short_corr) else 0.4
         else:
             short_corr = 0.4  # conservative prior when insufficient short-window history
 

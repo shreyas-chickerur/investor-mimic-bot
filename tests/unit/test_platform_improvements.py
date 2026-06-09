@@ -64,10 +64,10 @@ def tmp_db(tmp_path):
             (
                 sid,
                 "Test",
-                "AAPL",
-                "r1",
+                f"SYM{i:02d}",  # unique symbol per trade to satisfy UNIQUE constraint
+                f"r{i:04d}",  # unique sell_run_id per trade
                 "2026-01-01",
-                "2026-01-15",
+                f"2026-01-{(i % 28) + 1:02d}",  # spread across different dates
                 100,
                 102 if win else 98.5,
                 100,
@@ -238,7 +238,7 @@ class TestKellyRebalancing:
             "VALUES ('Sparse','desc',1000,1000)"
         )
         sparse_id = conn.execute("SELECT id FROM strategies WHERE name='Sparse'").fetchone()[0]
-        for _ in range(5):
+        for j in range(5):
             conn.execute(
                 "INSERT INTO trade_pnl_detail "
                 "(strategy_id, strategy_name, symbol, sell_run_id, entry_date, exit_date, "
@@ -247,10 +247,10 @@ class TestKellyRebalancing:
                 (
                     sparse_id,
                     "Sparse",
-                    "AAPL",
-                    "r",
+                    f"SP{j:02d}",  # unique symbol
+                    f"sparse_r{j:04d}",  # unique sell_run_id
                     "2026-01-01",
-                    "2026-01-15",
+                    f"2026-01-{j + 1:02d}",  # unique exit_date
                     100,
                     102,
                     10,

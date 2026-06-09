@@ -85,11 +85,23 @@ class StopLossManager:
         multiplier: float | None = None,
     ):
         """Set initial stop. ``multiplier`` overrides the default for regime sensitivity."""
-        if not (atr and atr > 0):
-            logger.warning(f"No ATR available for {symbol}, no stop loss set")
+        if not (entry_price and entry_price > 0):
+            logger.warning(
+                "Cannot set stop loss for %s: invalid entry_price=%s", symbol, entry_price
+            )
             return
+        if not (atr and atr > 0):
+            # Fallback: 7% of entry price keeps positions protected even without ATR data.
+            atr = entry_price * 0.07
+            logger.warning(
+                "No ATR for %s — using 7%% fallback stop (ATR=%.2f from entry=%.2f)",
+                symbol,
+                atr,
+                entry_price,
+            )
         mult = multiplier if multiplier is not None else self.atr_multiplier
-        stop_price = max(entry_price - (mult * atr), 0.01)  # floor at $0.01
+        # Floor at 50% of entry so we never place a stop near $0 (would be rejected by broker)
+        stop_price = max(entry_price - (mult * atr), entry_price * 0.50)
         self.stop_levels[symbol] = stop_price
         self.entry_prices[symbol] = entry_price
         self.entry_atrs[symbol] = atr

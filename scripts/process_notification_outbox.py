@@ -48,10 +48,14 @@ def process_outbox(db_path: str, limit: int = 50) -> int:
             continue
 
         try:
-            notifier._send_email(subject=subject, body=body, is_html=True)
+            # Mark SENT before sending: if the process crashes after SMTP delivery but
+            # before this call, the next run would resend. Prefer a missed email over
+            # a duplicate alert (especially important for kill-switch notifications).
             db.mark_notification_sent(notification_id)
+            notifier._send_email(subject=subject, body=body, is_html=True)
             delivered += 1
         except Exception as exc:  # pragma: no cover - external SMTP failures
+            # Re-mark as failed so the next outbox run retries it.
             db.mark_notification_failed(notification_id, str(exc))
             logger.error("Failed notification %s: %s", notification_id, exc)
 

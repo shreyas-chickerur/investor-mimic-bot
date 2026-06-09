@@ -315,14 +315,23 @@ class MultiStrategyRunner:
         self.initial_portfolio_value = self.portfolio_value
         self.peak_portfolio_value = self._get_peak_portfolio_value()
         _cpnl = self.db.get_system_state("cumulative_pnl")
-        self.cumulative_pnl = float(_cpnl) if _cpnl else 0.0
+        try:
+            self.cumulative_pnl = float(_cpnl) if _cpnl else 0.0
+        except (ValueError, TypeError):
+            logger.warning("Corrupted cumulative_pnl in DB (%r) — resetting to 0.0", _cpnl)
+            self.cumulative_pnl = 0.0
         _mdd = self.db.get_system_state("max_drawdown")
-        self.max_drawdown = float(_mdd) if _mdd else 0.0
+        try:
+            self.max_drawdown = float(_mdd) if _mdd else 0.0
+        except (ValueError, TypeError):
+            logger.warning("Corrupted max_drawdown in DB (%r) — resetting to 0.0", _mdd)
+            self.max_drawdown = 0.0
 
         # Initialize signal tracking so artifact generation never hits AttributeError
         # when kill switch fires before run_all_strategies reaches its init block
         self.executed_signals = []
         self.rejected_signals = []
+        self.raw_signals_by_strategy = {}
         self.symbols_bought_this_run: set = set()
         self.symbols_sold_this_run: set = set()
         self._held_symbols: set = set()

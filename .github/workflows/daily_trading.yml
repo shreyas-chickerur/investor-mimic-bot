@@ -546,6 +546,13 @@ jobs:
           echo "remaining=0"    >> $GITHUB_OUTPUT
         fi
 
+    - name: Checkpoint WAL before re-upload (post auto-sync)
+      if: always() && steps.auto_sync.outputs.synced == 'true'
+      run: |
+        if ! sqlite3 trading.db "PRAGMA wal_checkpoint(TRUNCATE);"; then
+          echo "⚠️ WARNING: WAL checkpoint failed after auto-sync"
+        fi
+
     - name: Re-upload synced database
       if: always() && steps.auto_sync.outputs.synced == 'true'
       uses: actions/upload-artifact@v4
