@@ -587,7 +587,7 @@ def _build_portfolio(conn: sqlite3.Connection, spy_data: dict, trading_date: str
         _pct(today_snap["daily_pnl_pct"]) if today_snap and today_snap["daily_pnl_pct"] else 0.0
     )
     exposure_pct = (
-        _null(round(float(today_snap["heat_pct"]) * 100, 2))
+        _null(round(float(today_snap["heat_pct"]), 2))
         if today_snap and today_snap["heat_pct"]
         else 0.0
     )
@@ -864,6 +864,7 @@ def _build_positions(conn: sqlite3.Connection) -> list[dict]:
         FROM positions p
         JOIN strategies st ON p.strategy_id = st.id
         WHERE p.shares > 0
+          AND st.name NOT IN ('BROKER_SYNC')
         ORDER BY p.symbol
         """
     ).fetchall()
@@ -1156,9 +1157,20 @@ def _build_analytics(conn: sqlite3.Connection) -> dict:
     window = 30
     for i in range(window - 1, len(dates_ret)):
         window_rets = [r for _, r in dates_ret[i - window + 1 : i + 1]]
-        s = _sharpe(window_rets)
-        if s is not None:
-            rolling_sharpe.append({"date": dates_ret[i][0], "sharpe": s})
+        # Use a local Sharpe that accepts shorter windows for rolling display.
+        # Portfolio-level Sharpe (header stat) requires 60 pts; rolling uses 30.
+        if len(window_rets) < window:
+            continue
+        import statistics as _stat
+
+        _mean = _stat.mean(window_rets)
+        _std = _stat.pstdev(window_rets)
+        _ann_vol = _std * (252**0.5)
+        if _std == 0 or _ann_vol < SHARPE_MIN_VARIANCE:
+            continue
+        _sr = _null(round((_mean / _std) * (252**0.5), 4))
+        if _sr is not None:
+            rolling_sharpe.append({"date": dates_ret[i][0], "sharpe": _sr})
 
     # Monthly returns
     monthly: dict[str, list[float]] = {}
@@ -1498,31 +1510,42 @@ def _build_mock(health_state: str) -> dict:
         },
     ]
 
+    # Mock stats per strategy — realistic variation so the UI looks live
+    _mock_stats: dict[str, dict] = {
+        "RSI Mean Reversion": {"ret": 2.3, "trades": 12, "health": 72, "status": "ACTIVE"},
+        "ML Momentum": {"ret": 8.4, "trades": 17, "health": 82, "status": "ACTIVE"},
+        "Earnings Drift": {"ret": 3.1, "trades": 5, "health": 60, "status": "WATCHING"},
+        "Factor Momentum": {"ret": 5.1, "trades": 8, "health": 78, "status": "ACTIVE"},
+        "News Sentiment": {"ret": 1.4, "trades": 3, "health": 55, "status": "WATCHING"},
+        "MA Crossover": {"ret": 4.2, "trades": 6, "health": 68, "status": "ACTIVE"},
+        "Volatility Breakout": {"ret": 6.7, "trades": 4, "health": 65, "status": "ACTIVE"},
+    }
     strats = []
-    for nm in ["RSI Mean Reversion", "ML Momentum", "Earnings Drift", "Factor Momentum"]:
+    alloc_pct = round(100.0 / len(_mock_stats), 1)
+    for nm, ms in _mock_stats.items():
         meta = STRATEGY_META[nm]
         strats.append(
             {
                 "key": meta["key"],
                 "name": nm,
-                "allocationPct": 22.0,
-                "returnPct": 8.4
-                if nm == "ML Momentum"
-                else (5.1 if nm == "Factor Momentum" else 2.3),
-                "sharpe": 1.31,
-                "sortino": 1.88,
-                "profitFactor": 1.54,
+                "allocationPct": alloc_pct,
+                "returnPct": ms["ret"],
+                "sharpe": 1.31 if ms["trades"] >= 10 else None,
+                "sortino": 1.88 if ms["trades"] >= 10 else None,
+                "profitFactor": 1.54 if ms["trades"] >= 5 else None,
                 "maxDrawdownPct": 6.4,
-                "tradesCount": 47,
-                "winRatePct": 61.0,
+                "tradesCount": ms["trades"],
+                "winRatePct": 61.0 if ms["trades"] >= 20 else None,
                 "holdPeriod": meta["holdPeriod"],
-                "healthScore": 82,
+                "healthScore": ms["health"],
                 "edgeTechnical": meta["edgeTechnical"],
                 "edgePlain": meta["edgePlain"],
                 "factorProfile": meta["factorProfile"],
                 "backtestSharpe": BACKTEST_SHARPE_PRIORS.get(nm),
-                "status": "ACTIVE",
-                "note": None,
+                "status": ms["status"],
+                "note": f"Win rate available after 20 closed trades ({ms['trades']} so far)"
+                if ms["trades"] < 20
+                else None,
             }
         )
 
@@ -1537,8 +1560,8 @@ def _build_mock(health_state: str) -> dict:
         },
         "portfolio": {
             "totalValue": 107_294.0,
-            "cash": 22_108.0,
-            "positionsCount": 6,
+            "cash": 96_804.0,
+            "positionsCount": 1,
             "todayChangeUsd": 1_961.0,
             "todayChangePct": 1.86,
             "allTimePnlUsd": 7_294.0,
@@ -1554,7 +1577,7 @@ def _build_mock(health_state: str) -> dict:
             "closedTradesCount": 47,
             "regime": "NORMAL",
             "heatCapPct": 40,
-            "exposurePct": 31.0,
+            "exposurePct": 9.8,
         },
         "equityCurve": base_curve,
         "strategies": strats,
@@ -1651,7 +1674,7 @@ def _build_mock(health_state: str) -> dict:
                 for i in range(20)
             ],
             "monthlyReturns": [
-                {"month": "2026-04", "returnPct": 3.1},
+                {"month": "2026-04", "returnPct": -1.4},
                 {"month": "2026-05", "returnPct": 4.2},
             ],
             "returnDistribution": [
@@ -1668,14 +1691,24 @@ def _build_mock(health_state: str) -> dict:
                 ]
             ],
             "strategyCorrelation": {
-                "labels": ["ML Momentum", "Factor Momentum"],
-                "matrix": [[1.0, 0.22], [0.22, 1.0]],
+                "labels": ["RSI Mean Rev.", "ML Momentum", "Earnings Drift", "Factor Mom."],
+                "matrix": [
+                    [1.00, 0.18, 0.25, 0.14],
+                    [0.18, 1.00, 0.31, 0.22],
+                    [0.25, 0.31, 1.00, 0.19],
+                    [0.14, 0.22, 0.19, 1.00],
+                ],
             },
             "backtestVsLive": [
-                {"strategy": "ML Momentum", "backtestSharpe": 0.30, "liveSharpe": 1.31}
+                {
+                    "strategy": nm,
+                    "backtestSharpe": BACKTEST_SHARPE_PRIORS.get(nm),
+                    "liveSharpe": 1.31 if ms["trades"] >= 10 else None,
+                }
+                for nm, ms in _mock_stats.items()
             ],
             "bestMonth": {"month": "2026-05", "returnPct": 4.2},
-            "worstMonth": {"month": "2026-04", "returnPct": 3.1},
+            "worstMonth": {"month": "2026-04", "returnPct": -1.4},
         },
         "health": {
             "markers": markers,
