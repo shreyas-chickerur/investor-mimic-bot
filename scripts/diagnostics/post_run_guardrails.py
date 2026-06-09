@@ -93,11 +93,17 @@ def main() -> int:
         by_name = {r["strategy_name"]: r for r in funnel_rows}
         missing = [s for s in CANONICAL_STRATEGIES if s not in by_name]
         if missing:
-            # If reconciliation failed for this run, trading was blocked before
-            # strategies could run.  The execution engine now writes zero-count
-            # funnel rows in that case, but guard against the window where old
-            # code produced no rows at all by downgrading to a warning instead
-            # of a critical failure when reconciliation is the known blocker.
+            # Check run_state for HALTED status — kill-switch runs return before
+            # strategies execute and produce no funnel rows. That is expected and
+            # should not be flagged as a critical failure.
+            run_state_rows = query_rows(
+                conn,
+                "SELECT status FROM run_state WHERE run_id = ? LIMIT 1",
+                (report["latest_run_id"],),
+            )
+            run_halted = run_state_rows and run_state_rows[0]["status"] == "HALTED"
+
+            # Reconciliation failure is also a known blocker.
             recon_rows = query_rows(
                 conn,
                 """
@@ -110,7 +116,12 @@ def main() -> int:
                 (report["latest_run_id"],),
             )
             recon_failed = recon_rows and recon_rows[0]["reconciliation_status"] == "FAIL"
-            if recon_failed:
+
+            if run_halted:
+                report["warnings"].append(
+                    f"signal_funnel rows missing for {missing} — trading was halted by kill switch"
+                )
+            elif recon_failed:
                 report["warnings"].append(
                     f"signal_funnel rows missing for {missing} — trading was blocked by reconciliation failure"
                 )

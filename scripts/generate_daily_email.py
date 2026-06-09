@@ -1959,11 +1959,13 @@ def build_golive_section(db_path: str, recon_status: str, data_stale: bool) -> s
         rp = _q1(
             db,
             """
-            SELECT COUNT(*) AS total,
-                   SUM(CASE WHEN reconciliation_status='PASS' THEN 1 ELSE 0 END) AS passes
+            SELECT COUNT(DISTINCT run_id) AS total,
+                   COUNT(DISTINCT CASE WHEN reconciliation_status='PASS' THEN run_id END) AS passes
             FROM broker_state
             WHERE snapshot_type IN ('RECONCILIATION','RECONCILIATION_RETRY','END')
               AND created_at >= date('now', '-30 days')
+              AND run_id NOT IN ('AUTO_SYNC', '', 'UNKNOWN')
+              AND run_id IS NOT NULL
         """,
         )
         recon_total = int(rp.get("total") or 0)
@@ -1979,7 +1981,7 @@ def build_golive_section(db_path: str, recon_status: str, data_stale: bool) -> s
     # 5 go-live criteria
     MIN_TRADES = 20
     MIN_DAYS = 30
-    MAX_DD_THRESHOLD = 0.15
+    MAX_DD_THRESHOLD = 15.0  # percentage — max_drawdown stored as pct (e.g. 1.87 = 1.87%)
     MIN_RECON_RATE = 0.90
 
     # Pace estimate: use actual closed-trade rate instead of hardcoded "2/week"
@@ -2024,9 +2026,9 @@ def build_golive_section(db_path: str, recon_status: str, data_stale: bool) -> s
             else None,
         },
         {
-            "label": f"Max drawdown < {int(MAX_DD_THRESHOLD * 100)}%",
+            "label": f"Max drawdown < {MAX_DD_THRESHOLD:.0f}%",
             "ok": max_dd < MAX_DD_THRESHOLD,
-            "actual": f"{max_dd:.2%}",
+            "actual": f"{max_dd:.2f}%",
             "fix": "Review strategy risk limits and position sizing"
             if max_dd >= MAX_DD_THRESHOLD
             else None,

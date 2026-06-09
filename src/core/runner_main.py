@@ -60,13 +60,19 @@ def main():
         slo_metrics = runner.emit_slo_metrics(start_time, signals, pnl_metrics)
 
         print("\n" + "=" * 80)
-        print(f"✅ EXECUTION COMPLETE - {len(signals)} trades executed")
+        if runner.kill_switch.is_killed:
+            print("🛑 KILL SWITCH HALTED - 0 trades executed")
+        else:
+            print(f"✅ EXECUTION COMPLETE - {len(signals)} trades executed")
         print("=" * 80)
-        runner._set_run_stage(
-            "EXECUTION_COMPLETE",
-            "SUCCESS",
-            metadata={"trades_executed": len(signals), "slo": slo_metrics},
-        )
+
+        # Don't overwrite HALTED status with SUCCESS — the kill switch already set it.
+        if not runner.kill_switch.is_killed:
+            runner._set_run_stage(
+                "EXECUTION_COMPLETE",
+                "SUCCESS",
+                metadata={"trades_executed": len(signals), "slo": slo_metrics},
+            )
 
         # Send email summary
         positions_data: list = []
@@ -226,8 +232,11 @@ def main():
             logger.error(f"Failed to write daily artifact: {e}")
             runner._set_run_stage("ARTIFACTS", "FAILED", error_message=str(e))
 
-        logger.info("Multi-strategy execution completed successfully")
-        runner._set_run_stage("COMPLETE", "SUCCESS", completed=True)
+        if runner.kill_switch.is_killed:
+            logger.info("Multi-strategy execution completed (halted by kill switch)")
+        else:
+            logger.info("Multi-strategy execution completed successfully")
+            runner._set_run_stage("COMPLETE", "SUCCESS", completed=True)
 
     except Exception as e:
         import traceback as _tb
