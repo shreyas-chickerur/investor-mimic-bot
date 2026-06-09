@@ -426,7 +426,8 @@ class TradingDatabase:
                     exit_reason TEXT,
                     is_winner INTEGER,
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (strategy_id) REFERENCES strategies(id)
+                    FOREIGN KEY (strategy_id) REFERENCES strategies(id),
+                    UNIQUE(strategy_id, symbol, sell_run_id, exit_date)
                 )
             """
             )
@@ -1079,7 +1080,7 @@ class TradingDatabase:
 
             cursor.execute(
                 """
-                INSERT INTO trade_pnl_detail
+                INSERT OR IGNORE INTO trade_pnl_detail
                 (strategy_id, strategy_name, symbol, buy_run_id, sell_run_id,
                  entry_date, exit_date, entry_price, exit_price, shares,
                  gross_pnl, gross_pnl_pct, hold_days, exit_reason, is_winner, tax_treatment)

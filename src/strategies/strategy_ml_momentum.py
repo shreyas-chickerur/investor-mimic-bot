@@ -164,7 +164,20 @@ class MLMomentumStrategy(TradingStrategy):
                 return False
             with open(_MODEL_PATH, "rb") as f:
                 payload = pickle.load(f)  # nosec B301
-            self.model = payload["model"]
+            loaded_model = payload["model"]
+
+            # Guard: if the saved model expects a different number of features than
+            # _FEATURE_NAMES, predictions would be silently wrong. Force retrain.
+            saved_n = getattr(loaded_model, "n_features_in_", None)
+            if saved_n is not None and saved_n != len(_FEATURE_NAMES):
+                logger.warning(
+                    "ML model feature mismatch: saved n_features=%d, current=%d — retraining",
+                    saved_n,
+                    len(_FEATURE_NAMES),
+                )
+                return False
+
+            self.model = loaded_model
             self.is_trained = payload.get("is_trained", True)
             self._train_date = payload.get("train_date", "")
             self.last_feature_importances = payload.get("feature_importances", {})

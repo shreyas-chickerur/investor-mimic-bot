@@ -318,10 +318,13 @@ class TestStopLossManager:
         assert mgr.check_stop_loss("AAPL", current_price=144.0)
         assert mgr.check_stop_loss("AAPL", current_price=145.0)
 
-    def test_stop_not_set_without_atr(self):
+    def test_fallback_stop_set_when_atr_zero(self):
+        # ATR=0 must use a 7% fallback so positions are never unprotected.
         mgr = StopLossManager(atr_multiplier=2.5)
         mgr.set_stop_loss("AAPL", entry_price=150.0, atr=0)
-        assert "AAPL" not in mgr.stop_levels
+        assert "AAPL" in mgr.stop_levels, "Stop must be set even without ATR"
+        stop = mgr.stop_levels["AAPL"]
+        assert 75.0 <= stop < 150.0, f"Fallback stop {stop} outside expected range"
 
     def test_ratchet_stop_moves_to_entry_at_1x_atr_profit(self):
         mgr = StopLossManager(atr_multiplier=2.5, breakeven_atr=1.0, lock_atr=2.0)

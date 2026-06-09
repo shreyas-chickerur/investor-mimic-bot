@@ -52,7 +52,8 @@ class NewsSentimentStrategy(TradingStrategy):
         self.max_candidates = cfg.get("strategies.news_sentiment.max_candidates", _MAX_CANDIDATES)
         self.min_ret5d = cfg.get("strategies.news_sentiment.min_ret5d", -0.02)
         self.entry_dates: dict = {}
-        self._provider = NewsSentimentProvider(max_workers=8, per_symbol_timeout=5.0)
+        _timeout = cfg.get("strategies.news_sentiment.per_symbol_timeout", 3.0)
+        self._provider = NewsSentimentProvider(max_workers=8, per_symbol_timeout=_timeout)
         self._sentiment_cache: dict = {}
 
     def _spy_above_sma50(self, market_data: pd.DataFrame) -> bool:
@@ -130,8 +131,12 @@ class NewsSentimentStrategy(TradingStrategy):
             sentiment_map = self._provider.fetch_batch(candidates)
             self._sentiment_cache.update(sentiment_map)
         except Exception as exc:
-            logger.warning("NewsSentiment: batch fetch failed: %s — using neutral", exc)
-            sentiment_map = {}
+            # Fall back to cached scores so held positions still get exit checks,
+            # and log at ERROR so slow/broken news API is visible in the run log.
+            logger.error(
+                "NewsSentiment: batch fetch failed (%s) — using cached/neutral scores", exc
+            )
+            sentiment_map = dict(self._sentiment_cache)  # use last-known scores
 
         for symbol in candidates:
             sym_data = sym_map.get(symbol)
