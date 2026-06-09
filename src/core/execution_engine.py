@@ -3478,8 +3478,19 @@ class MultiStrategyRunner:
                         f"short_sell_{symbol}", self.trading_client.submit_order, order_data
                     )
 
-                    # Store as negative position so position management recognises it as short
-                    self._update_position_record(strategy.strategy_id, symbol, -shares, price)
+                    # Store as negative position (short). Cannot use _update_position_record
+                    # here because it deletes the row when new_shares <= 0, which is the
+                    # correct behaviour for closing longs but wrong for opening shorts.
+                    # Write directly via update_position (UPSERT) so the negative share
+                    # count is persisted correctly.
+                    self.db.update_position(
+                        strategy_id=strategy.strategy_id,
+                        symbol=symbol,
+                        shares=-shares,
+                        avg_price=price,
+                        current_price=price,
+                        entry_date=self.asof_date,
+                    )
 
                     trade_record = {
                         "strategy": strategy.name,

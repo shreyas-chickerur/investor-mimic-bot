@@ -863,7 +863,7 @@ def _build_positions(conn: sqlite3.Connection) -> list[dict]:
                st.name as strategy_name, p.strategy_id
         FROM positions p
         JOIN strategies st ON p.strategy_id = st.id
-        WHERE p.shares > 0
+        WHERE p.shares != 0
           AND st.name NOT IN ('BROKER_SYNC')
         ORDER BY p.symbol
         """
