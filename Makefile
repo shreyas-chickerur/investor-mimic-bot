@@ -5,7 +5,8 @@
 	validate verify check-broker check-health debug-signal import-check \
 	clean clean-all clean-cache format lint type-check \
 	dev-setup dev-test dev-run \
-	web-mock web-mock-healthy web-mock-recovered web-mock-needs-action web-export web-validate
+	web-mock web-mock-healthy web-mock-recovered web-mock-needs-action web-export web-validate \
+	web-dev web-dev-live snapshot snapshot-mock
 
 # Default target
 .DEFAULT_GOAL := help
@@ -30,12 +31,13 @@ help:
 	@echo "  make check-health     Verify imports and system health"
 	@echo ""
 	@echo "$(GREEN)🌐 WEB DASHBOARD$(NC)"
+	@echo "  make web-dev          Run dev server with mock data (http://localhost:3000)"
+	@echo "  make web-dev-live     Run dev server with live snapshot data"
 	@echo "  make web-export       Export latest.json from live DB"
 	@echo "  make web-validate     Validate latest.json against schema"
 	@echo "  make web-mock         Export all 3 mock health states"
-	@echo "  make web-mock-healthy         Mock: healthy state"
-	@echo "  make web-mock-recovered       Mock: auto-recovered state"
-	@echo "  make web-mock-needs-action    Mock: needs-action state"
+	@echo "  make snapshot         Print live snapshot summary (text)"
+	@echo "  make snapshot-mock    Print mock snapshot summary (text)"
 	@echo ""
 	@echo "$(GREEN)🚀 TRADING$(NC)"
 	@echo "  make run              Execute trading (paper mode)"
@@ -415,3 +417,21 @@ web-mock: web-mock-healthy web-mock-recovered web-mock-needs-action
 	@echo "$(BLUE)   web/public/data/mock/latest.json    ← needs-action (last written)$(NC)"
 	@echo "$(BLUE)   web/public/data/mock/history/       ← all three dated copies$(NC)"
 	@echo "$(BLUE)   web/public/data/                    ← UNTOUCHED (real data stays clean)$(NC)"
+
+web-dev: web-mock-healthy
+	@echo "$(BLUE)🌐 Starting dev server with MOCK data...$(NC)"
+	@echo "$(YELLOW)   Open http://localhost:3000$(NC)"
+	@cd web && NEXT_PUBLIC_SNAPSHOT_URL=http://localhost:3000/data/mock/latest.json npm run dev
+
+web-dev-live:
+	@echo "$(BLUE)🌐 Starting dev server with LIVE data (from web/public/data/latest.json)...$(NC)"
+	@echo "$(YELLOW)   Open http://localhost:3000$(NC)"
+	@cd web && NEXT_PUBLIC_SNAPSHOT_URL=http://localhost:3000/data/latest.json npm run dev
+
+snapshot:
+	@echo "$(BLUE)📊 Current live snapshot summary:$(NC)"
+	@python3 scripts/read_snapshot.py
+
+snapshot-mock:
+	@echo "$(BLUE)📊 Mock snapshot summary:$(NC)"
+	@python3 scripts/read_snapshot.py --mock
