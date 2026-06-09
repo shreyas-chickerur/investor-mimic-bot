@@ -6,7 +6,7 @@
 	clean clean-all clean-cache format lint type-check \
 	dev-setup dev-test dev-run \
 	web-mock web-mock-healthy web-mock-recovered web-mock-needs-action web-export web-validate \
-	web-dev web-dev-live snapshot snapshot-mock
+	web-dev web-dev-live snapshot snapshot-mock expect-check
 
 # Default target
 .DEFAULT_GOAL := help
@@ -38,6 +38,7 @@ help:
 	@echo "  make web-mock         Export all 3 mock health states"
 	@echo "  make snapshot         Print live snapshot summary (text)"
 	@echo "  make snapshot-mock    Print mock snapshot summary (text)"
+	@echo "  make expect-check     Run post-run expectation checks (paste output to Claude)"
 	@echo ""
 	@echo "$(GREEN)🚀 TRADING$(NC)"
 	@echo "  make run              Execute trading (paper mode)"
@@ -389,3 +390,7 @@ snapshot:
 snapshot-mock:
 	@echo "$(BLUE)📊 Mock snapshot summary:$(NC)"
 	@python3 scripts/read_snapshot.py --mock
+
+expect-check:
+	@echo "$(BLUE)🔍 Post-run expectation check (paste output to Claude if something went wrong):$(NC)"
+	@python3 scripts/post_run_expect.py --db trading.db --no-email || true

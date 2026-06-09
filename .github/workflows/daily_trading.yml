@@ -455,6 +455,20 @@ jobs:
           --status-file /tmp/run_status.txt \
           --out artifacts/diagnostics/post_run_guardrails.json
 
+    - name: Post-run expectation check
+      if: always()
+      continue-on-error: true
+      env:
+        SENDER_EMAIL: ${{ secrets.EMAIL_USERNAME }}
+        SENDER_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+        RECIPIENT_EMAIL: ${{ secrets.EMAIL_TO }}
+      run: |
+        echo "=== Post-run Expectation Check ==="
+        python3 scripts/post_run_expect.py \
+          --db trading.db \
+          --out artifacts/diagnostics/expect_check.json
+        echo "Exit code: $?"
+
     - name: Paper trading validation report
       if: always()
       continue-on-error: true
