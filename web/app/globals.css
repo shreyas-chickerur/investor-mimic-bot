@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Design-token CSS variables ─────────────────────────────────────────── */
+:root {
+  --bg:       #08090d;
+  --panel:    #0e1118;
+  --panel2:   #0a1119;
+  --glass2:   rgba(255,255,255,0.02);
+  --line:     rgba(255,255,255,0.08);
+  --line2:    rgba(255,255,255,0.05);
+  --text:     #f0f2f5;
+  --sec:      #aab3c0;
+  --muted:    #6b7585;
+  --lime:     #d4ff3f;
+  --cyan:     #4dd0ff;
+  --mag:      #ff5da2;
+  --amber:    #ffb84d;
+  --violet:   #b794ff;
+  --green:    #5fe39a;
+  --red:      #ff6b7d;
+  --font-display: 'Bricolage Grotesque', 'Manrope', system-ui, sans-serif;
+  --font-body:    'Manrope', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+}
+
+/* ── Base resets ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100dvh;
+}
+.mono { font-family: var(--font-mono); }
+
+/* ── Scrollbars ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+/* ── Focus rings ─────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Animations ──────────────────────────────────────────────────────────── */
+@keyframes rise  { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+@keyframes grow  { from { transform:scaleX(0); } to { transform:scaleX(1); } }
+@keyframes fade  { from { opacity:0; } to { opacity:1; } }
+@keyframes popover-in { from { opacity:0; transform:scale(0.95); } to { opacity:1; transform:scale(1); } }
+
+.animate-rise  { animation: rise  0.4s ease both; }
+.animate-grow  { animation: grow  0.6s ease both; }
+.animate-fade  { animation: fade  0.3s ease both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise, .animate-grow, .animate-fade { animation: none !important; }
+  * { transition-duration:0.01ms !important; animation-duration:0.01ms !important; }
+}
+
+/* ── Reusable classes ────────────────────────────────────────────────────── */
+.nav-active {
+  background: var(--lime);
+  color: var(--bg) !important;
+  box-shadow: 0 0 24px -6px var(--lime);
+}
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+}
+.chip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 7px;
+}
+.trow:hover { background: rgba(255,255,255,0.03); }
+.tscroll { overflow-x: auto; }
