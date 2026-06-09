@@ -1987,6 +1987,25 @@ class MultiStrategyRunner:
 
                     self.raw_signals_by_strategy[strategy.name] = list(signals) if signals else []
 
+                    # Pre-funnel dedup: drop BUY signals for symbols already bought or
+                    # held this run. Without this, two strategies can both pass the
+                    # correlation/risk filters for the same symbol — the second one wastes
+                    # funnel capacity even though it is always rejected at execution time.
+                    if signals:
+                        _before_dedup = len(signals)
+                        signals = [
+                            s
+                            for s in signals
+                            if s.get("action") != "BUY" or s.get("symbol") not in self._held_symbols
+                        ]
+                        _deduped = _before_dedup - len(signals)
+                        if _deduped:
+                            logger.info(
+                                "%s: %d BUY signal(s) pre-filtered (symbol already held/bought)",
+                                strategy.name,
+                                _deduped,
+                            )
+
                     if signals and len(signals) > 0:
                         print(f"✅ Generated {len(signals)} signals")
 
@@ -2693,6 +2712,43 @@ class MultiStrategyRunner:
                     ) = self.cost_model.calculate_execution_price(price, "BUY", adjusted_shares)
                     trade_value = exec_price * adjusted_shares + total_cost
 
+                    # Buying-power hard cap: the cash_manager tracks strategy-level
+                    # allocations but the broker's buying_power is the true ceiling.
+                    # Silently scale down rather than letting Alpaca reject the order.
+                    if exec_price > 0 and trade_value > self.buying_power:
+                        capped_shares = max(0, int(self.buying_power / exec_price))
+                        if capped_shares < adjusted_shares:
+                            logger.info(
+                                "Buying-power cap: %s %d→%d shares "
+                                "(order $%.0f > buying_power $%.0f)",
+                                symbol,
+                                adjusted_shares,
+                                capped_shares,
+                                trade_value,
+                                self.buying_power,
+                            )
+                            adjusted_shares = capped_shares
+                        if adjusted_shares == 0:
+                            self.rejected_signals.append(
+                                {
+                                    "strategy": strategy.name,
+                                    "symbol": symbol,
+                                    "action": action,
+                                    "shares": shares,
+                                    "price": price,
+                                    "reason": "buying_power_exhausted",
+                                }
+                            )
+                            continue
+                        # Recompute trade_value with the capped share count
+                        (
+                            exec_price,
+                            slippage_cost,
+                            commission_cost,
+                            total_cost,
+                        ) = self.cost_model.calculate_execution_price(price, "BUY", adjusted_shares)
+                        trade_value = exec_price * adjusted_shares + total_cost
+
                     if not self.cash_manager.reserve_cash(strategy.strategy_id, trade_value):
                         logger.warning(
                             f"Skipping {symbol} - insufficient cash for strategy {strategy.strategy_id}"
@@ -3394,6 +3450,128 @@ class MultiStrategyRunner:
                             )
                         except Exception:
                             pass
+
+            # ── SHORT_SELL: open a new short position (sell symbol we don't hold) ──────
+            # Used exclusively by PairsTradingStrategy for the leading leg.
+            # Alpaca paper trading treats a SELL on an unowned symbol as a short.
+            elif action == "SHORT_SELL" and shares > 0:
+                try:
+                    # Don't short a symbol that's already long in any strategy
+                    if symbol in self._held_symbols:
+                        logger.info(
+                            "SHORT_SELL %s skipped — already held long by another strategy",
+                            symbol,
+                        )
+                        continue
+
+                    _typical = getattr(self, "_typical_prices", {}).get(symbol, price)
+                    _limit_price = round(_typical * 0.99, 2)  # 1% buffer below open
+
+                    order_data = LimitOrderRequest(
+                        symbol=symbol,
+                        qty=shares,
+                        side=OrderSide.SELL,
+                        time_in_force=TimeInForce.OPG,
+                        limit_price=_limit_price,
+                    )
+                    order = self.dry_run.execute_broker_operation(
+                        f"short_sell_{symbol}", self.trading_client.submit_order, order_data
+                    )
+
+                    # Store as negative position so position management recognises it as short
+                    self._update_position_record(strategy.strategy_id, symbol, -shares, price)
+
+                    trade_record = {
+                        "strategy": strategy.name,
+                        "symbol": symbol,
+                        "shares": shares,
+                        "price": price,
+                        "action": "SHORT_SELL",
+                        "order_id": order.id,
+                    }
+                    executed.append(trade_record)
+                    self.executed_trades.append(trade_record)
+                    self.executed_signals.append(trade_record)
+                    logger.info(
+                        "SHORT_SELL %s: %d shares @ limit $%.2f (order %s)",
+                        symbol,
+                        shares,
+                        _limit_price,
+                        order.id,
+                    )
+                except Exception as e:
+                    logger.error("Failed to SHORT_SELL %s: %s", symbol, e)
+
+            # ── BUY_TO_COVER: close an existing short position ──────────────────────────
+            elif action == "BUY_TO_COVER" and shares > 0:
+                try:
+                    existing_pos = self.db.get_position(strategy.strategy_id, symbol)
+                    if not existing_pos or float(existing_pos.get("shares", 0)) >= 0:
+                        logger.info("BUY_TO_COVER %s skipped — no short position found", symbol)
+                        continue
+
+                    short_shares = abs(float(existing_pos["shares"]))
+                    cover_qty = int(min(shares, short_shares))
+                    if cover_qty <= 0:
+                        continue
+
+                    _typical = getattr(self, "_typical_prices", {}).get(symbol, price)
+                    _limit_price = round(_typical * 1.01, 2)  # 1% buffer above open
+
+                    order_data = LimitOrderRequest(
+                        symbol=symbol,
+                        qty=cover_qty,
+                        side=OrderSide.BUY,
+                        time_in_force=TimeInForce.OPG,
+                        limit_price=_limit_price,
+                    )
+                    order = self.dry_run.execute_broker_operation(
+                        f"buy_to_cover_{symbol}", self.trading_client.submit_order, order_data
+                    )
+
+                    # Closing a short: record P&L (profit if price fell since entry)
+                    entry_short_price = float(existing_pos.get("avg_price") or price)
+                    short_pnl = (entry_short_price - price) * cover_qty
+                    try:
+                        self.db.log_trade_pnl(
+                            strategy_id=strategy.strategy_id,
+                            strategy_name=strategy.name,
+                            symbol=symbol,
+                            sell_run_id=self.run_id,
+                            entry_price=entry_short_price,
+                            exit_price=price,
+                            shares=cover_qty,
+                            exit_reason=signal.get("reasoning", "BUY_TO_COVER"),
+                        )
+                    except Exception as _pnl_e:
+                        logger.warning(
+                            "log_trade_pnl failed for short cover %s: %s", symbol, _pnl_e
+                        )
+
+                    # Remove the short position from DB
+                    self._update_position_record(strategy.strategy_id, symbol, cover_qty, price)
+
+                    trade_record = {
+                        "strategy": strategy.name,
+                        "symbol": symbol,
+                        "shares": cover_qty,
+                        "price": price,
+                        "action": "BUY_TO_COVER",
+                        "order_id": order.id,
+                    }
+                    executed.append(trade_record)
+                    self.executed_trades.append(trade_record)
+                    self.executed_signals.append(trade_record)
+                    logger.info(
+                        "BUY_TO_COVER %s: %d shares @ limit $%.2f | short P&L $%.2f (order %s)",
+                        symbol,
+                        cover_qty,
+                        _limit_price,
+                        short_pnl,
+                        order.id,
+                    )
+                except Exception as e:
+                    logger.error("Failed to BUY_TO_COVER %s: %s", symbol, e)
 
         return executed, total_exposure
 
