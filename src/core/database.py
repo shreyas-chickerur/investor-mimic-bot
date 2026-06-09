@@ -982,7 +982,7 @@ class TradingDatabase:
             drawdown_pct = (peak_value - portfolio_value) / peak_value if peak_value else 0.0
 
             # Count actual open positions rather than hardcoding 0
-            cursor.execute("SELECT COUNT(*) FROM positions WHERE shares > 0")
+            cursor.execute("SELECT COUNT(*) FROM positions WHERE shares != 0")
             num_open_positions_row = cursor.fetchone()
             num_open_positions = num_open_positions_row[0] if num_open_positions_row else 0
 

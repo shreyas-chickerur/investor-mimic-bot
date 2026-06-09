@@ -527,7 +527,7 @@ jobs:
         con = sqlite3.connect('trading.db'); con.row_factory = sqlite3.Row
         rows = con.execute(
             "SELECT symbol, SUM(shares) qty FROM positions "
-            "WHERE shares > 0 GROUP BY symbol"
+            "WHERE shares != 0 GROUP BY symbol"
         ).fetchall()
         local = {r['symbol']: {'qty': float(r['qty']), 'avg_price': 0.0} for r in rows}
         ok, disc = r.reconcile_daily(local, float(broker.get('cash', 0)))
