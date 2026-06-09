@@ -437,6 +437,13 @@ class TradingDatabase:
             cursor.execute(
                 "CREATE INDEX IF NOT EXISTS idx_trade_pnl_exit ON trade_pnl_detail(exit_date)"
             )
+            # Dedup guard: CREATE UNIQUE INDEX works on existing tables (unlike UNIQUE in schema).
+            # INSERT OR IGNORE respects this index even on DBs created before the column constraint
+            # was added, so the protection applies to downloaded artifacts too.
+            cursor.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_trade_pnl_no_dup "
+                "ON trade_pnl_detail(strategy_id, symbol, sell_run_id, exit_date)"
+            )
 
             cursor.execute(
                 """
