@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-Strategy: Statistical Pairs Trading (Mean-Reversion)
+Strategy: Statistical Pairs Trading (Market-Neutral)
 
 Exploits the temporary divergence of price ratios between cointegrated stock
 pairs. When the ratio deviates significantly from its rolling mean (measured
-in standard deviations), we buy the underperformer and wait for convergence.
+in standard deviations), we buy the underperformer and short the outperformer
+simultaneously.
 
 Academic basis:
   Gatev, Goetzmann & Rouwenhorst (2006) — "Pairs Trading: Performance of a
@@ -12,11 +13,12 @@ Academic basis:
   equity pairs with long-term cointegration.
 
 Implementation:
-  - Long-only (no short selling in paper mode)
-  - When ratio z-score < -entry_threshold: buy the lagging stock in the pair
-    (the denominator stock is outperforming, creating a long opportunity in
-    the numerator)
-  - Exit when ratio returns to within exit_threshold σ of mean
+  - Market-neutral: simultaneously LONG the lagging leg + SHORT the leading leg
+  - When ratio z-score < -entry_threshold:
+      BUY numerator (lagging) + SHORT_SELL denominator (outperforming)
+  - Exit when ratio returns to within exit_threshold σ of mean:
+      SELL numerator (close long) + BUY_TO_COVER denominator (close short)
+  - Alpaca paper accounts support short selling natively; no special config needed
 
 Universe pairs (selected for known cointegration within the existing universe):
   JPM / BAC   — large-cap US banks, same macro drivers
@@ -67,7 +69,7 @@ class PairsTradingStrategy(TradingStrategy):
         self.pairs: list[tuple[str, str]] = _DEFAULT_PAIRS
         self.entry_dates: dict = {}
         # Track which pairs are currently held so we don't double-enter
-        self._active_pairs: dict[str, str] = {}  # num → denom
+        self._active_pairs: dict[str, str] = {}  # num → denom (long leg → short leg)
 
     def _spy_above_sma50(self, market_data: pd.DataFrame) -> bool:
         """Market uptrend gate."""
@@ -132,6 +134,7 @@ class PairsTradingStrategy(TradingStrategy):
                 exit_reason = f"Max hold {self.max_hold_days}d reached"
 
             if exit_reason:
+                # Close the long leg
                 signals.append(
                     {
                         "symbol": symbol,
@@ -140,10 +143,25 @@ class PairsTradingStrategy(TradingStrategy):
                         "price": price,
                         "value": self.positions[symbol] * price,
                         "confidence": 0.85,
-                        "reasoning": f"Pairs exit: {exit_reason}",
+                        "reasoning": f"Pairs exit (long leg): {exit_reason}",
                         "asof_date": latest_date,
                     }
                 )
+                # Close the short leg (buy to cover the denominator short)
+                if denom in sym_map:
+                    denom_price = float(sym_map[denom].iloc[-1]["close"])
+                    signals.append(
+                        {
+                            "symbol": denom,
+                            "action": "BUY_TO_COVER",
+                            "shares": self.positions[symbol],  # same share count as long
+                            "price": denom_price,
+                            "value": self.positions[symbol] * denom_price,
+                            "confidence": 0.85,
+                            "reasoning": f"Pairs exit (short leg cover): {exit_reason}",
+                            "asof_date": latest_date,
+                        }
+                    )
                 self._active_pairs.pop(symbol, None)
 
         if not market_uptrend:
@@ -162,17 +180,23 @@ class PairsTradingStrategy(TradingStrategy):
             if z is None:
                 continue
 
-            # BUY the numerator when it has underperformed (negative z-score)
-            # and the spread has diverged past the entry threshold
+            # BUY the numerator (lagging) + SHORT_SELL the denominator (leading)
+            # when the spread has diverged past the entry threshold.
             if z < -self.entry_threshold:
                 price = float(sym_map[num].iloc[-1]["close"])
+                denom_price = float(sym_map[denom].iloc[-1]["close"])
                 atr = sym_map[num].iloc[-1].get("atr_20", None)
                 if atr is not None and pd.isna(atr):
                     atr = None
-                shares = self.calculate_position_size(price, atr=atr, max_position_pct=0.08)
+                shares = self.calculate_position_size(price, atr=atr, max_position_pct=0.04)
                 if shares <= 0:
                     continue
                 confidence = min(0.85, 0.50 + abs(z) * 0.10)
+                reasoning = (
+                    f"Pairs entry: {num}/{denom} ratio z={z:.2f} < "
+                    f"-{self.entry_threshold} (mean-reversion setup)"
+                )
+                # Long the lagging leg
                 signals.append(
                     {
                         "symbol": num,
@@ -181,11 +205,22 @@ class PairsTradingStrategy(TradingStrategy):
                         "price": price,
                         "value": shares * price,
                         "confidence": confidence,
-                        "reasoning": (
-                            f"Pairs entry: {num}/{denom} ratio z={z:.2f} < "
-                            f"-{self.entry_threshold} (mean-reversion setup)"
-                        ),
+                        "reasoning": f"{reasoning} — LONG leg",
                         "atr": atr,
+                        "asof_date": latest_date,
+                    }
+                )
+                # Short the leading leg (equal notional value makes the trade market-neutral)
+                denom_shares = max(1, int((shares * price) / denom_price))
+                signals.append(
+                    {
+                        "symbol": denom,
+                        "action": "SHORT_SELL",
+                        "shares": denom_shares,
+                        "price": denom_price,
+                        "value": denom_shares * denom_price,
+                        "confidence": confidence,
+                        "reasoning": f"{reasoning} — SHORT leg",
                         "asof_date": latest_date,
                     }
                 )
