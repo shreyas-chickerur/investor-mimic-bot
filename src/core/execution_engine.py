@@ -357,6 +357,13 @@ class MultiStrategyRunner:
         self._set_run_stage("TRADING", "RUNNING")
         try:
             signals = self.run_all_strategies(market_data)
+            # If the kill switch fired, run_all_strategies already set the stage to HALTED.
+            # Do NOT overwrite that with SUCCESS — it would hide kill-switch runs from
+            # get_consecutive_failed_runs() and make them look like healthy executions.
+            if self.kill_switch.is_killed:
+                pnl_metrics = self.update_pnl_metrics()
+                self.verify_order_statuses()
+                return signals, pnl_metrics
             self._set_run_stage("TRADING", "SUCCESS", metadata={"signals": len(signals)})
         except Exception as exc:
             self._set_run_stage("TRADING", "FAILED", error_message=str(exc))
@@ -1302,9 +1309,10 @@ class MultiStrategyRunner:
         logger.info("=" * 80)
 
         # Compute current drawdown from peak as a decimal fraction (0.05 = 5%).
-        # max_drawdown is stored as a percentage (e.g. 1.777 = 1.777%) so divide by 100.
-        # Use current portfolio value vs peak, not historical max drawdown, so a recovered
-        # drawdown doesn't permanently trip the kill switch.
+        # max_drawdown in the DB is stored as a percentage (e.g. 1.777 = 1.777%) and must
+        # NOT be used here directly — the kill switch threshold is 0.05 (5% decimal).
+        # Computing from live portfolio values ensures a recovered drawdown won't permanently
+        # trip the switch.
         _current_dd = (
             (self.peak_portfolio_value - self.portfolio_value) / self.peak_portfolio_value
             if self.peak_portfolio_value > 0
@@ -1326,6 +1334,21 @@ class MultiStrategyRunner:
             self.structured_logger.log_kill_switch(
                 reason=", ".join(self.kill_switch.kill_reasons), details={"context": kill_context}
             )
+            # Persist a KILL_SWITCH snapshot so the run appears in broker_state monitoring.
+            # Uses values already fetched in __init__ — no extra API call needed.
+            try:
+                self.db.save_broker_state(
+                    snapshot_date=self.asof_date,
+                    snapshot_type="KILL_SWITCH",
+                    cash=self.cash_available,
+                    portfolio_value=self.portfolio_value,
+                    buying_power=self.buying_power,
+                    positions=[],
+                    reconciliation_status="SKIPPED",
+                    discrepancies=[],
+                )
+            except Exception as _ks_exc:
+                logger.warning("Failed to save kill_switch broker_state snapshot: %s", _ks_exc)
             # Mark this run as HALTED (not SUCCESS) so consecutive_failures can detect
             # a persistent kill-switch condition across multiple days.
             self._set_run_stage(
