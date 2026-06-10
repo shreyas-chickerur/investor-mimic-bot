@@ -1,5 +1,5 @@
 .PHONY: help install install-news setup init fetch-data update-data sync-broker clean-data diagnose diagnose-local \
-	run run-dry dashboard logs shell status close-positions \
+	run run-dry logs shell status close-positions \
 	test test-unit test-integration test-component test-functional test-coverage test-watch \
 	report analyze backtest metrics email-test signals-check news-test \
 	validate verify check-broker check-health debug-signal import-check \
@@ -45,7 +45,6 @@ help:
 	@echo "  make run-dry          Dry run — no orders submitted"
 	@echo "  make signals-check    Preview today's signals without trading"
 	@echo "  make status           One-stop system status dashboard"
-	@echo "  make dashboard        Launch Streamlit dashboard"
 	@echo "  make logs             View last 50 log lines"
 	@echo "  make close-positions  Close all open positions (emergency)"
 	@echo ""
@@ -132,11 +131,6 @@ run-dry:
 	@echo "$(BLUE)🧪 Running in DRY RUN mode (no actual trades)...$(NC)"
 	@set -a && source .env && set +a && export DRY_RUN=true && python3 src/core/execution_engine.py
 	@echo "$(GREEN)✅ Dry run complete$(NC)"
-
-dashboard:
-	@echo "$(BLUE)📊 Starting Streamlit dashboard...$(NC)"
-	@echo "$(YELLOW)🌐 Open http://localhost:8501 in your browser$(NC)"
-	@cd dashboard && streamlit run app.py --server.port 8501
 
 logs:
 	@echo "$(BLUE)📋 Recent trading logs:$(NC)"

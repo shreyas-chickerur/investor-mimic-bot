@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - Platform hardening after the June 2026 outage (2026-06-10/11)
+
+- **Outage root causes**: removed the invalid step-level `permissions:` block that
+  made GitHub reject daily_trading.yml entirely (no runs fired, no alerts); the
+  kill-switch unit-mismatch fix from June 2 finally deployed (runs Jun 3–9 executed
+  stale unpushed code and halted daily with a phantom "186.7% drawdown").
+- **Short selling correctness** (pairs trading): direction-aware stop losses (stop
+  ABOVE entry, BUY_TO_COVER exit), short P&L sign fixed in trade_pnl_detail (new
+  `direction` column), partial covers no longer corrupt the entry price, pair state
+  rebuilt across daily restarts (multi-day pairs previously could never exit),
+  covers sized by the actual short (not the long leg), orphan-short sweep,
+  dashboard/export support (side=COVER, direction field, sign-correct P&L).
+- **Ops**: allow-list final health gate (only SUCCESS/MARKET_CLOSED pass — UNKNOWN
+  previously slipped through), STARTED status written first, ONE staleness knob
+  (DATA_MAX_AGE_HOURS=80 + last-completed-NYSE-session calendar check replaces
+  three conflicting thresholds), diagnostic step outcomes feed the gate, alert
+  emails only for critical/high severity via the notification outbox, Python 3.11
+  everywhere, API health check daily, actionlint in CI.
+- **DB**: migrations now dedup trade_pnl_detail before creating the unique index
+  (a populated artifact with duplicates would have killed the run); populated
+  legacy-DB migration test gates all future schema changes.
+
+### Added - Diagnosability layer (2026-06-11)
+
+- `artifacts/run_health.json` + `run_history` table: one consolidated
+  GREEN/YELLOW/RED verdict per run with every check, persisted across runs.
+- `make diagnose`: fetches the latest run's artifacts and prints triage,
+  including the 0-second "workflow file unparseable" outage signature.
+- Recurring-failure escalation: a check failing 3 consecutive runs prefixes
+  email subjects with `[RECURRING: <check>]`.
+- `CLAUDE.md` runbook: failure-mode playbooks, first commands, conventions.
+- End-to-end DRY_RUN smoke test (full pipeline, every CI push + weekly).
+- Workflow tripwire tests (YAML parse, step-key schema, gate invariants).
+
 ### Added - Platform Improvements A–G (2026-05-22)
 
 - **A — Equal capital normalization**: Capital now normalized each run as
