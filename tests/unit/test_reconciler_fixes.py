@@ -8,29 +8,29 @@ Tests for reconciler bug-fixes:
 """
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch, PropertyMock
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.risk.broker_reconciler import BrokerReconciler
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_reconciler():
     """Return a BrokerReconciler with a mocked TradingClient."""
-    with patch.dict("os.environ", {
-        "ALPACA_API_KEY": "test_key",
-        "ALPACA_SECRET_KEY": "test_secret",
-        "ALPACA_PAPER": "true",
-    }):
+    with patch.dict(
+        "os.environ",
+        {
+            "ALPACA_API_KEY": "test_key",  # pragma: allowlist secret
+            "ALPACA_SECRET_KEY": "test_secret",  # pragma: allowlist secret
+            "ALPACA_PAPER": "true",
+        },
+    ):
         rec = BrokerReconciler(email_notifier=None)
     rec.client = MagicMock()
     return rec
@@ -55,6 +55,7 @@ def _make_account(cash: float):
 # ---------------------------------------------------------------------------
 # 1. Qty tolerance: fractional share strings and small diffs pass
 # ---------------------------------------------------------------------------
+
 
 class TestQtyTolerance:
     def test_fractional_qty_string_does_not_raise(self):
@@ -92,6 +93,7 @@ class TestQtyTolerance:
 # 2. Cash tolerance: 1.5% should now pass, 3% should still fail
 # ---------------------------------------------------------------------------
 
+
 class TestCashTolerance:
     def test_cash_within_2pct_passes(self):
         """1.5% cash drift must not flag a discrepancy."""
@@ -126,6 +128,7 @@ class TestCashTolerance:
 # 3. No duplicate phantom-position discrepancies
 # ---------------------------------------------------------------------------
 
+
 class TestNoDuplicatePhantoms:
     def test_untracked_broker_position_reported_once(self):
         """A position in broker but not in local should appear exactly once."""
@@ -146,9 +149,9 @@ class TestNoDuplicatePhantoms:
         )
 
         nvda_discs = [d for d in discrepancies if "NVDA" in d]
-        assert len(nvda_discs) == 1, (
-            f"Expected 1 NVDA discrepancy (was 2 before fix), got {len(nvda_discs)}: {nvda_discs}"
-        )
+        assert (
+            len(nvda_discs) == 1
+        ), f"Expected 1 NVDA discrepancy (was 2 before fix), got {len(nvda_discs)}: {nvda_discs}"
 
     def test_two_untracked_positions_each_reported_once(self):
         """Each of two phantom positions should appear exactly once, not twice."""
@@ -174,12 +177,14 @@ class TestNoDuplicatePhantoms:
 # 4. Regime dict now includes 'vix'
 # ---------------------------------------------------------------------------
 
+
 class TestRegimeAdjustmentsIncludesVix:
     def test_vix_present_in_regime_adjustments(self):
         """get_regime_adjustments must include 'vix' so execution_engine can persist it."""
-        from src.regime.regime_detector import RegimeDetector
-        import pandas as pd
         import numpy as np
+        import pandas as pd
+
+        from src.regime.regime_detector import RegimeDetector
 
         rd = RegimeDetector()
         dates = pd.date_range("2023-01-01", periods=100, freq="B")
@@ -198,6 +203,52 @@ class TestRegimeAdjustmentsIncludesVix:
             "normal": "NORMAL",
             "high_volatility": "HIGH_VOL",
         }
-        for vol, expected in vol_to_classification.items():
+        for _vol, expected in vol_to_classification.items():
             assert expected in ("LOW_VOL", "NORMAL", "HIGH_VOL")
             assert expected != "UNKNOWN"
+
+
+# ---------------------------------------------------------------------------
+# 5. Short positions (negative qty) reconcile correctly
+# ---------------------------------------------------------------------------
+
+
+class TestShortPositionReconciliation:
+    def test_matching_short_passes(self):
+        """Broker reports shorts as negative qty; an in-sync short is clean."""
+        rec = _make_reconciler()
+        rec.client.get_all_positions.return_value = [
+            _make_broker_position("BAC", "-25", 40.0),
+        ]
+        local = {"BAC": {"qty": -25.0, "avg_price": 40.0}}
+        discs = rec._reconcile_positions(local)
+        assert discs == [], f"Expected no discrepancies, got: {discs}"
+
+    def test_short_within_tolerance_passes(self):
+        rec = _make_reconciler()
+        rec.client.get_all_positions.return_value = [
+            _make_broker_position("BAC", "-25.3", 40.0),
+        ]
+        local = {"BAC": {"qty": -25.0, "avg_price": 40.0}}
+        discs = rec._reconcile_positions(local)
+        assert discs == [], f"Expected no discrepancies, got: {discs}"
+
+    def test_short_drift_is_flagged(self):
+        """-25 local vs -30 broker is meaningful drift on a short — must flag."""
+        rec = _make_reconciler()
+        rec.client.get_all_positions.return_value = [
+            _make_broker_position("BAC", "-30", 40.0),
+        ]
+        local = {"BAC": {"qty": -25.0, "avg_price": 40.0}}
+        discs = rec._reconcile_positions(local)
+        assert len(discs) == 1 and "Quantity mismatch" in discs[0]
+
+    def test_sign_flip_is_flagged_loudly(self):
+        """Local short vs broker LONG is the worst case — must never pass."""
+        rec = _make_reconciler()
+        rec.client.get_all_positions.return_value = [
+            _make_broker_position("BAC", "25", 40.0),
+        ]
+        local = {"BAC": {"qty": -25.0, "avg_price": 40.0}}
+        discs = rec._reconcile_positions(local)
+        assert len(discs) == 1 and "Quantity mismatch" in discs[0]

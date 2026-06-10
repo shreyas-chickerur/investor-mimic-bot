@@ -860,6 +860,7 @@ class MultiStrategyRunner:
 
         try:
             positions = {}
+            short_positions = {}
             entry_dates = {}
             entry_prices = {}
             for position in self.db.get_positions(strategy.strategy_id):
@@ -871,11 +872,22 @@ class MultiStrategyRunner:
                     avg_price = position.get("avg_price") or position.get("entry_price")
                     if avg_price:
                         entry_prices[symbol] = float(avg_price)
+                elif shares < 0:
+                    # Short legs (pairs trading) — strategies need these to size
+                    # BUY_TO_COVER exits and to sweep orphaned shorts.
+                    short_positions[symbol] = abs(shares)
+                    avg_price = position.get("avg_price") or position.get("entry_price")
+                    if avg_price:
+                        entry_prices[symbol] = float(avg_price)
 
             strategy.positions = positions
+            strategy.short_positions = short_positions
             strategy.entry_dates = entry_dates
             strategy.entry_prices = entry_prices
-            logger.info(f"  Loaded {len(positions)} positions for {strategy.name}")
+            logger.info(
+                f"  Loaded {len(positions)} long / {len(short_positions)} short "
+                f"positions for {strategy.name}"
+            )
 
             # Restore partial-exit state so cross-run tranche logic is consistent.
             for sym in list(positions.keys()):

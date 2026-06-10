@@ -19,7 +19,10 @@ class TradingStrategy(ABC):
         self.name = name
         self.capital = capital
         self.initial_capital = capital
-        self.positions: dict[str, float] = {}  # {symbol: shares}
+        self.positions: dict[str, float] = {}  # {symbol: shares} — long legs only
+        # {symbol: abs(shares)} for short positions (negative shares in the DB).
+        # Restored by the engine each run; only pairs trading opens shorts today.
+        self.short_positions: dict[str, float] = {}
         self.entry_dates: dict[str, object] = {}
         self.entry_prices: dict[str, float] = {}
         self.trade_history: list[dict] = []

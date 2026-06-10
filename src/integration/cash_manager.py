@@ -17,12 +17,17 @@ class CashManager:
         self.total_cash = total_cash
         self.num_strategies = num_strategies
         self.allocated_cash = {}
+        # Ceiling for release_cash: a strategy can never be released back above
+        # its own allocation, so double-release bugs surface as a clamp warning
+        # instead of silently handing one strategy the whole portfolio.
+        self.max_allocation: dict[int, float] = {}
         self.reserved_cash = 0.0
 
         # Allocate cash equally to strategies
         cash_per_strategy = total_cash / num_strategies
         for i in range(1, num_strategies + 1):
             self.allocated_cash[i] = cash_per_strategy
+            self.max_allocation[i] = cash_per_strategy
 
         logger.info(
             f"Cash Manager initialized: ${total_cash:,.2f} total, ${cash_per_strategy:,.2f} per strategy"
@@ -60,9 +65,19 @@ class CashManager:
         (e.g. releasing cash that was never reserved) cannot inflate available funds.
         """
         new_balance = self.allocated_cash.get(strategy_id, 0) + amount
-        # Clamp: a strategy's available balance must not exceed its total allocation.
-        # Without this clamp, erroneous double-release calls silently inflate buying power.
-        max_allowed = self.total_cash  # conservative upper bound when per-strategy max unknown
+        # Clamp: a strategy's available balance must not exceed ITS OWN allocation
+        # (not the whole portfolio). Without this, double-release calls silently
+        # inflate one strategy's buying power up to total capital.
+        max_allowed = self.max_allocation.get(strategy_id, self.total_cash)
+        if new_balance > max_allowed + 0.01:
+            logger.warning(
+                "release_cash clamp: strategy %s release of $%.2f would exceed its "
+                "allocation ($%.2f > $%.2f) — likely a double release; truncating",
+                strategy_id,
+                amount,
+                new_balance,
+                max_allowed,
+            )
         self.allocated_cash[strategy_id] = max(0.0, min(new_balance, max_allowed))
         self.reserved_cash = max(0.0, self.reserved_cash - amount)
         logger.info(
@@ -105,6 +120,8 @@ class CashManager:
         scale = broker_cash / old_total if old_total > 0 else 1.0
         for sid in self.allocated_cash:
             self.allocated_cash[sid] = max(0.0, self.allocated_cash[sid] * scale)
+        for sid in self.max_allocation:
+            self.max_allocation[sid] = max(0.0, self.max_allocation[sid] * scale)
         self.total_cash = broker_cash
         logger.info(
             "CashManager synced from broker: $%.2f → $%.2f (scale=%.4f)",
@@ -128,6 +145,7 @@ class CashManager:
         """
         self.total_cash = sum(allocations.values())
         self.allocated_cash = {}
+        self.max_allocation = {}
         self.reserved_cash = 0.0
 
         exposures = exposures or {}
@@ -136,6 +154,7 @@ class CashManager:
             min_cash = max(allocation * min_cash_pct, 0)
             available = max(allocation - exposure, min_cash)
             self.allocated_cash[strategy_id] = available
+            self.max_allocation[strategy_id] = allocation
             self.reserved_cash += max(exposure, allocation - available)
 
         logger.info("Updated cash allocations per strategy")
