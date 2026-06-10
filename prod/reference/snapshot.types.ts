@@ -15,7 +15,8 @@
 export type Regime = "LOW_VOL" | "NORMAL" | "HIGH_VOL";
 export type SentimentLabel = "BULLISH" | "NEUTRAL" | "BEARISH";
 export type SignalStatus = "EXECUTED" | "FILTERED" | "DEFERRED";
-export type TradeSide = "BUY" | "SELL";
+export type TradeSide = "BUY" | "SELL" | "COVER";
+export type PositionDirection = "long" | "short";
 
 export interface Snapshot {
   meta: {
@@ -81,6 +82,7 @@ export interface Snapshot {
   positions: Array<{
     symbol: string;
     strategy: string;
+    direction?: PositionDirection; // absent in pre-2026-06 snapshots = long
     shares: number;
     value: number;
     costBasis: number;

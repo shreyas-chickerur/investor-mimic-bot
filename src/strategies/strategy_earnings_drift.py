@@ -269,6 +269,7 @@ class EarningsDriftStrategy(TradingStrategy):
                             "confidence": exit_confidence,
                             "reasoning": exit_reason,
                             "partial_exit": partial_exit,
+                            "asof_date": sym_latest_date,
                         }
                     )
                     if partial_exit:

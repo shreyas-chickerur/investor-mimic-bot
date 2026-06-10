@@ -878,14 +878,18 @@ def _build_positions(conn: sqlite3.Connection) -> list[dict]:
         sym = r["symbol"]
         shares = float(r["shares"])
         avg_price = float(r["avg_price"])
+        is_short = shares < 0
         current_price = float(r["current_price"]) if r["current_price"] else avg_price
         cost_basis = _null(round(shares * avg_price, 2))
         value = _null(round(shares * current_price, 2))
-        unreal_pct = (
-            _null(round((current_price - avg_price) / avg_price * 100, 4))
-            if avg_price > 0
-            else None
-        )
+        # A short profits when price falls below the short-sale entry.
+        # The dollar fallback (value - cost_basis) is sign-correct for both
+        # directions because shares is signed.
+        if avg_price > 0:
+            raw_pct = (avg_price - current_price) if is_short else (current_price - avg_price)
+            unreal_pct = _null(round(raw_pct / avg_price * 100, 4))
+        else:
+            unreal_pct = None
         unreal_usd = _null(
             round(float(r["unrealized_pnl"]) if r["unrealized_pnl"] else (value - cost_basis), 2)
         )
@@ -903,15 +907,16 @@ def _build_positions(conn: sqlite3.Connection) -> list[dict]:
         # Price sparkline
         spark = _price_spark(sym, 20)
 
-        # Last BUY signal confidence + reasoning
+        # Last entry signal confidence + reasoning (BUY for longs, SHORT_SELL for shorts)
+        entry_signal_type = "SHORT_SELL" if is_short else "BUY"
         sig_row = conn.execute(
             """
             SELECT s.confidence, s.reasoning
             FROM signals s
-            WHERE s.strategy_id=? AND s.symbol=? AND s.signal_type='BUY'
+            WHERE s.strategy_id=? AND s.symbol=? AND s.signal_type=?
             ORDER BY s.generated_at DESC LIMIT 1
             """,
-            (r["strategy_id"], sym),
+            (r["strategy_id"], sym, entry_signal_type),
         ).fetchone()
         confidence = (
             _null(float(sig_row["confidence"])) if sig_row and sig_row["confidence"] else None
@@ -971,6 +976,7 @@ def _build_positions(conn: sqlite3.Connection) -> list[dict]:
             {
                 "symbol": sym,
                 "strategy": r["strategy_name"],
+                "direction": "short" if is_short else "long",
                 "shares": _null(round(shares, 4)),
                 "value": value,
                 "costBasis": cost_basis,
@@ -998,7 +1004,7 @@ def _build_trades(conn: sqlite3.Connection) -> list[dict]:
     rows = conn.execute(
         """
         SELECT symbol, strategy_name, entry_price, exit_price,
-               gross_pnl_pct, gross_pnl, shares, exit_reason, exit_date
+               gross_pnl_pct, gross_pnl, shares, exit_reason, exit_date, direction
         FROM trade_pnl_detail
         ORDER BY exit_date DESC
         LIMIT 200
@@ -1006,12 +1012,14 @@ def _build_trades(conn: sqlite3.Connection) -> list[dict]:
     ).fetchall()
     result = []
     for r in rows:
+        # direction column added 2026-06-11; NULL on rows recorded before then = long
+        direction = r["direction"] or "long"
         result.append(
             {
                 "date": str(r["exit_date"])[:10],
                 "symbol": r["symbol"],
                 "strategy": r["strategy_name"] or "",
-                "side": "SELL",
+                "side": "COVER" if direction == "short" else "SELL",
                 "shares": _null(round(float(r["shares"]), 4)),
                 "entry": _null(round(float(r["entry_price"]), 4)),
                 "exit": _null(round(float(r["exit_price"]), 4)),
@@ -1585,6 +1593,7 @@ def _build_mock(health_state: str) -> dict:
             {
                 "symbol": "NVDA",
                 "strategy": "ML Momentum",
+                "direction": "long",
                 "shares": 12.0,
                 "value": 10_490.0,
                 "costBasis": 9_878.0,
@@ -1607,6 +1616,28 @@ def _build_mock(health_state: str) -> dict:
                             "score": 0.74,
                         }
                     ],
+                },
+            },
+            {
+                "symbol": "BAC",
+                "strategy": "Pairs Trading",
+                "direction": "short",
+                "shares": -25.0,
+                "value": -963.75,
+                "costBasis": -977.5,
+                "unrealizedPlPct": 1.41,
+                "unrealizedPlUsd": 13.75,
+                "beta": 1.1,
+                "atrStop": 42.5,
+                "sentimentScore": 0.5,
+                "sentimentLabel": "NEUTRAL",
+                "detail": {
+                    "priceSpark": [39.4, 39.2, 39.0, 38.9, 38.7, 38.6, 38.6, 38.55],
+                    "confidence": 0.72,
+                    "sentimentMultiplier": "×1.00",
+                    "whyHeld": "Pairs entry: JPM/BAC ratio z=-2.20 — SHORT leg",
+                    "lots": [],
+                    "news": [],
                 },
             },
         ],

@@ -165,8 +165,13 @@ def _validate_positions(errors: Errors, snap: dict) -> None:
         return
     for i, p in enumerate(positions):
         path = f"positions[{i}]({p.get('symbol','?')})"
-        for key in ["symbol", "strategy", "sentimentLabel"]:
+        for key in ["symbol", "strategy", "sentimentLabel", "direction"]:
             _require(errors, path, p, key, str)
+        _str_enum(errors, f"{path}.direction", p.get("direction"), {"long", "short"})
+        # Negative shares are valid (short positions) but must be flagged as such
+        if isinstance(p.get("shares"), (int, float)) and p["shares"] < 0:
+            if p.get("direction") != "short":
+                errors.append(f"{path}: negative shares but direction != 'short'")
         for key in [
             "shares",
             "value",
@@ -205,7 +210,7 @@ def _validate_trades(errors: Errors, snap: dict) -> None:
         path = f"trades[{i}]"
         for key in ["date", "symbol", "strategy", "exitReason"]:
             _require(errors, path, t, key, str)
-        _str_enum(errors, f"{path}.side", t.get("side"), {"BUY", "SELL"})
+        _str_enum(errors, f"{path}.side", t.get("side"), {"BUY", "SELL", "COVER"})
         for key in ["shares", "entry", "exit", "realizedPlPct", "realizedPlUsd"]:
             if key not in t:
                 errors.append(f"{path}.{key}: MISSING")

@@ -116,12 +116,66 @@ class PairsTradingStrategy(TradingStrategy):
         sym_map = {sym: grp for sym, grp in market_data.groupby("symbol")}
         latest_date = market_data.index[-1] if len(market_data) > 0 else None
 
+        # Rebuild the num→denom pair map from held positions. _active_pairs is
+        # in-memory only and strategies are re-instantiated every daily run, so
+        # without this reconstruction multi-day pairs could NEVER exit (the
+        # lookup below would always miss).
+        for pair_num, pair_den in self.pairs:
+            if pair_num in self.positions and pair_num not in self._active_pairs:
+                self._active_pairs[pair_num] = pair_den
+
+        # --- Orphan-short sweep: a short whose long partner is gone (e.g. the
+        # long leg was stopped out, or the pairs universe changed) has no exit
+        # path of its own — force a cover.
+        paired_shorts = set(self._active_pairs.values())
+        for short_sym, short_qty in self.short_positions.items():
+            if short_sym in paired_shorts:
+                continue
+            if short_sym not in sym_map:
+                logger.error(
+                    "PAIRS_ORPHAN_SHORT: %s (%.0f shares) has no paired long and no "
+                    "market data today — will retry cover next run",
+                    short_sym,
+                    short_qty,
+                )
+                continue
+            cover_price = float(sym_map[short_sym].iloc[-1]["close"])
+            logger.warning(
+                "PAIRS_ORPHAN_SHORT: covering %s (%.0f shares) — no paired long position",
+                short_sym,
+                short_qty,
+            )
+            signals.append(
+                {
+                    "symbol": short_sym,
+                    "action": "BUY_TO_COVER",
+                    "shares": short_qty,
+                    "price": cover_price,
+                    "value": short_qty * cover_price,
+                    "confidence": 0.9,
+                    "reasoning": "Orphan short cleanup: paired long leg no longer held",
+                    "asof_date": latest_date,
+                }
+            )
+
         # --- Exits for held positions ---
         for symbol in list(self.positions.keys()):
             if symbol not in sym_map:
                 continue
             denom = self._active_pairs.get(symbol)
             if denom is None:
+                continue
+            if denom not in sym_map:
+                # Defer the ENTIRE pair exit: selling only the long leg would
+                # orphan the short with no strategy-level exit path. Data gaps
+                # are transient; both legs exit together on the next run.
+                logger.error(
+                    "PAIRS_ORPHAN_SHORT risk: no market data for short leg %s — "
+                    "deferring exit of pair %s/%s to next run",
+                    denom,
+                    symbol,
+                    denom,
+                )
                 continue
             days_held = self.get_days_held(symbol, latest_date)
             price = float(sym_map[symbol].iloc[-1]["close"])
@@ -147,21 +201,22 @@ class PairsTradingStrategy(TradingStrategy):
                         "asof_date": latest_date,
                     }
                 )
-                # Close the short leg (buy to cover the denominator short)
-                if denom in sym_map:
-                    denom_price = float(sym_map[denom].iloc[-1]["close"])
-                    signals.append(
-                        {
-                            "symbol": denom,
-                            "action": "BUY_TO_COVER",
-                            "shares": self.positions[symbol],  # same share count as long
-                            "price": denom_price,
-                            "value": self.positions[symbol] * denom_price,
-                            "confidence": 0.85,
-                            "reasoning": f"Pairs exit (short leg cover): {exit_reason}",
-                            "asof_date": latest_date,
-                        }
-                    )
+                # Close the short leg with the ACTUAL short size — the legs are
+                # sized by equal notional, so the share counts differ.
+                denom_price = float(sym_map[denom].iloc[-1]["close"])
+                cover_shares = self.short_positions.get(denom, self.positions[symbol])
+                signals.append(
+                    {
+                        "symbol": denom,
+                        "action": "BUY_TO_COVER",
+                        "shares": cover_shares,
+                        "price": denom_price,
+                        "value": cover_shares * denom_price,
+                        "confidence": 0.85,
+                        "reasoning": f"Pairs exit (short leg cover): {exit_reason}",
+                        "asof_date": latest_date,
+                    }
+                )
                 self._active_pairs.pop(symbol, None)
 
         if not market_uptrend:
