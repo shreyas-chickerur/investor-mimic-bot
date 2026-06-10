@@ -347,77 +347,6 @@ jobs:
         chmod +x scripts/run_trading.sh
         ./scripts/run_trading.sh
 
-    # ── DASHBOARD SNAPSHOT EXPORT ──────────────────────────────────────────
-    # Runs after trading, before email. Writes latest.json (read-only, no
-    # secrets) then commits it to the `data` branch so the Vercel site can
-    # fetch it via ISR without exposing any broker credentials.
-    - name: Export dashboard snapshot
-      if: always()
-      continue-on-error: true
-      env:
-        GITHUB_RUN_NUMBER: ${{ github.run_number }}
-        GITHUB_REPOSITORY: ${{ github.repository }}
-        RECON_STATUS: ${{ steps.check_reconciliation.outputs.status }}
-        SYNC_OK: ${{ steps.auto_sync.outputs.sync_ok }}
-        DRIFT_RESOLVED: ${{ steps.verify_sync.outputs.resolved }}
-        DRIFT_REMAINING: ${{ steps.verify_sync.outputs.remaining }}
-      run: |
-        mkdir -p web/public/data/history
-        python3 scripts/export_snapshot.py \
-          --recon-status "${RECON_STATUS:-UNKNOWN}" \
-          --sync-ok "${SYNC_OK:-}" \
-          --drift-resolved "${DRIFT_RESOLVED:-}" \
-          --drift-remaining "${DRIFT_REMAINING:-0}" \
-          --gh-repo "$GITHUB_REPOSITORY"
-
-    - name: Validate snapshot schema
-      if: always()
-      continue-on-error: true
-      run: |
-        python3 scripts/validate_snapshot.py
-
-    - name: Publish snapshot to data branch
-      if: always() && hashFiles('web/public/data/latest.json') != ''
-      continue-on-error: true
-      env:
-        GH_TOKEN: ${{ github.token }}
-      run: |
-        # Bot-commit latest.json (and history/<date>.json) to the `data` branch.
-        # Vercel reads the raw GitHub URL of this branch with ISR revalidate: 3600.
-        # Nothing secret ever reaches the public URL — just a read-only JSON file.
-        git config user.name  "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-
-        TRADING_DATE=$(python3 -c "
-        import json, sys
-        d = json.load(open('web/public/data/latest.json'))
-        print(d['meta']['tradingDate'])
-        " 2>/dev/null || echo "unknown")
-
-        # Use a git worktree so we don't disturb the main checkout
-        WORK=$(mktemp -d)
-        if git fetch origin data 2>/dev/null; then
-          git worktree add "$WORK" origin/data 2>/dev/null || git worktree add -b data "$WORK" origin/data
-        else
-          # First time: create orphan data branch
-          git worktree add --orphan -b data "$WORK"
-        fi
-
-        mkdir -p "$WORK/web/public/data/history"
-        cp web/public/data/latest.json "$WORK/web/public/data/latest.json"
-        cp web/public/data/latest.json "$WORK/web/public/data/history/${TRADING_DATE}.json"
-
-        cd "$WORK"
-        git add web/public/data/latest.json "web/public/data/history/${TRADING_DATE}.json"
-        if git diff --staged --quiet; then
-          echo "No snapshot changes to commit (trading_date=${TRADING_DATE})"
-        else
-          git commit -m "snapshot: ${TRADING_DATE} [skip ci]"
-          git push origin HEAD:data
-          echo "✅ Snapshot committed to data branch (trading_date=${TRADING_DATE})"
-        fi
-        git worktree remove --force "$WORK"
-
     - name: Process notification outbox
       if: always()
       env:
@@ -573,6 +502,79 @@ jobs:
         path: trading.db
         retention-days: 90
         overwrite: true
+
+    # ── DASHBOARD SNAPSHOT EXPORT ──────────────────────────────────────────
+    # Runs after reconciliation/auto-sync (whose step outputs it reads — placing
+    # it any earlier would always yield RECON_STATUS=UNKNOWN) and before the
+    # email. Writes latest.json (read-only, no secrets) then commits it to the
+    # `data` branch so the Vercel site can fetch it via ISR without exposing
+    # any broker credentials.
+    - name: Export dashboard snapshot
+      if: always()
+      continue-on-error: true
+      env:
+        GITHUB_RUN_NUMBER: ${{ github.run_number }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        RECON_STATUS: ${{ steps.check_reconciliation.outputs.status }}
+        SYNC_OK: ${{ steps.auto_sync.outputs.sync_ok }}
+        DRIFT_RESOLVED: ${{ steps.verify_sync.outputs.resolved }}
+        DRIFT_REMAINING: ${{ steps.verify_sync.outputs.remaining }}
+      run: |
+        mkdir -p web/public/data/history
+        python3 scripts/export_snapshot.py \
+          --recon-status "${RECON_STATUS:-UNKNOWN}" \
+          --sync-ok "${SYNC_OK:-}" \
+          --drift-resolved "${DRIFT_RESOLVED:-}" \
+          --drift-remaining "${DRIFT_REMAINING:-0}" \
+          --gh-repo "$GITHUB_REPOSITORY"
+
+    - name: Validate snapshot schema
+      if: always()
+      continue-on-error: true
+      run: |
+        python3 scripts/validate_snapshot.py
+
+    - name: Publish snapshot to data branch
+      if: always() && hashFiles('web/public/data/latest.json') != ''
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        # Bot-commit latest.json (and history/<date>.json) to the `data` branch.
+        # Vercel reads the raw GitHub URL of this branch with ISR revalidate: 3600.
+        # Nothing secret ever reaches the public URL — just a read-only JSON file.
+        git config user.name  "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+        TRADING_DATE=$(python3 -c "
+        import json, sys
+        d = json.load(open('web/public/data/latest.json'))
+        print(d['meta']['tradingDate'])
+        " 2>/dev/null || echo "unknown")
+
+        # Use a git worktree so we don't disturb the main checkout
+        WORK=$(mktemp -d)
+        if git fetch origin data 2>/dev/null; then
+          git worktree add "$WORK" origin/data 2>/dev/null || git worktree add -b data "$WORK" origin/data
+        else
+          # First time: create orphan data branch
+          git worktree add --orphan -b data "$WORK"
+        fi
+
+        mkdir -p "$WORK/web/public/data/history"
+        cp web/public/data/latest.json "$WORK/web/public/data/latest.json"
+        cp web/public/data/latest.json "$WORK/web/public/data/history/${TRADING_DATE}.json"
+
+        cd "$WORK"
+        git add web/public/data/latest.json "web/public/data/history/${TRADING_DATE}.json"
+        if git diff --staged --quiet; then
+          echo "No snapshot changes to commit (trading_date=${TRADING_DATE})"
+        else
+          git commit -m "snapshot: ${TRADING_DATE} [skip ci]"
+          git push origin HEAD:data
+          echo "✅ Snapshot committed to data branch (trading_date=${TRADING_DATE})"
+        fi
+        git worktree remove --force "$WORK"
 
     - name: Validate system invariants
       if: steps.check_execution.outputs.executed == 'true'

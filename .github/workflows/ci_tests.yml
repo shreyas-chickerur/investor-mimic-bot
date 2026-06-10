@@ -45,7 +45,9 @@ jobs:
 
     - name: Run functional tests
       run: |
-        python -m pytest tests/functional/ -v --tb=short --junitxml=test-results/functional.xml
+        # Functional tests are auto-marked "slow" (tests/functional/conftest.py) and
+        # pytest.ini excludes slow by default — clear addopts so they actually run here.
+        python -m pytest tests/functional/ -o addopts="" -v --tb=short --junitxml=test-results/functional.xml
 
     - name: Run full suite with coverage
       run: |
