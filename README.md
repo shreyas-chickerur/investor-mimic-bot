@@ -69,7 +69,6 @@ make run-dry       # Dry run — generate signals only, no orders
 make status        # One-stop dashboard: positions, P&L, strategy weights
 make signals-check # Preview today's signals before market close
 make metrics       # Detailed multi-strategy performance report
-make dashboard     # Streamlit visual dashboard (localhost:8501)
 make logs          # Tail last 50 lines of execution log
 ```
 
@@ -161,7 +160,6 @@ investor-mimic-bot/
 │   └── resend_email.yml    # Manual email resend
 ├── config/
 │   └── trading_config.yaml # All strategy + risk parameters
-├── dashboard/              # Streamlit visual dashboard
 ├── data/                   # Market data (gitignored — stored as CI artifact)
 ├── scripts/                # Utility and maintenance scripts
 ├── src/
