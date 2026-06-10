@@ -515,6 +515,18 @@ class TradingDatabase:
             except Exception:
                 pass  # column already exists — migration is idempotent
 
+            # Direction columns for short-selling support (pairs trading):
+            # stop_loss_state needs it so a short's stop (above entry) survives
+            # restarts; trade_pnl_detail needs it so short P&L keeps the right sign.
+            for col_sql in [
+                "ALTER TABLE stop_loss_state ADD COLUMN direction TEXT DEFAULT 'long'",
+                "ALTER TABLE trade_pnl_detail ADD COLUMN direction TEXT DEFAULT 'long'",
+            ]:
+                try:
+                    cursor.execute(col_sql)
+                except Exception:
+                    pass  # column already exists — migration is idempotent
+
             # Sentiment per signal — persisted so the dashboard explorer can show
             # accurate historical sentiment scores without re-fetching at export time.
             for col_sql in [
@@ -1047,13 +1059,22 @@ class TradingDatabase:
         entry_date: str = None,
         exit_reason: str = None,
         tax_treatment: str = None,
+        direction: str = "long",
     ):
-        """Record matched buy→sell P&L for win-rate and profit-factor tracking."""
+        """Record matched entry→exit P&L for win-rate and profit-factor tracking.
+
+        ``direction="short"`` flips the P&L: a short profits when the exit
+        (cover) price is BELOW the entry (short-sale) price.
+        """
         with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
 
-            gross_pnl = (exit_price - entry_price) * shares
-            gross_pnl_pct = (exit_price - entry_price) / entry_price if entry_price else 0.0
+            if direction == "short":
+                gross_pnl = (entry_price - exit_price) * shares
+                gross_pnl_pct = (entry_price - exit_price) / entry_price if entry_price else 0.0
+            else:
+                gross_pnl = (exit_price - entry_price) * shares
+                gross_pnl_pct = (exit_price - entry_price) / entry_price if entry_price else 0.0
             exit_date = datetime.now().strftime("%Y-%m-%d")
             hold_days = None
             if entry_date:
@@ -1074,32 +1095,40 @@ class TradingDatabase:
                 except Exception:
                     pass
 
-            # Look up buy_run_id from trades table
+            # Look up the entry run id from the trades table (the SHORT_SELL row
+            # is the entry for a short; BUY is the entry for a long).
+            entry_action = "SHORT_SELL" if direction == "short" else "BUY"
             cursor.execute(
-                "SELECT run_id FROM trades WHERE strategy_id=? AND symbol=? AND action='BUY' ORDER BY executed_at DESC LIMIT 1",
-                (strategy_id, symbol),
+                "SELECT run_id FROM trades WHERE strategy_id=? AND symbol=? AND action=? ORDER BY executed_at DESC LIMIT 1",
+                (strategy_id, symbol, entry_action),
             )
             buy_row = cursor.fetchone()
             buy_run_id = buy_row[0] if buy_row else None
 
             # FIFO-match against tax lots to determine LTCG/STCG treatment.
             # Falls back to hold_days-based heuristic when lot data is absent.
+            # Short sales are always short-term gains regardless of hold time
+            # (IRS rule), and tax lots only track BUYs — skip FIFO entirely.
             if tax_treatment is None:
-                fifo_result = self.fifo_match_sell(strategy_id, symbol, shares, exit_price)
-                if fifo_result != "MIXED":
-                    tax_treatment = fifo_result
-                elif hold_days is not None:
-                    tax_treatment = "LTCG" if hold_days >= 365 else "STCG"
-                else:
+                if direction == "short":
                     tax_treatment = "STCG"
+                else:
+                    fifo_result = self.fifo_match_sell(strategy_id, symbol, shares, exit_price)
+                    if fifo_result != "MIXED":
+                        tax_treatment = fifo_result
+                    elif hold_days is not None:
+                        tax_treatment = "LTCG" if hold_days >= 365 else "STCG"
+                    else:
+                        tax_treatment = "STCG"
 
             cursor.execute(
                 """
                 INSERT OR IGNORE INTO trade_pnl_detail
                 (strategy_id, strategy_name, symbol, buy_run_id, sell_run_id,
                  entry_date, exit_date, entry_price, exit_price, shares,
-                 gross_pnl, gross_pnl_pct, hold_days, exit_reason, is_winner, tax_treatment)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 gross_pnl, gross_pnl_pct, hold_days, exit_reason, is_winner,
+                 tax_treatment, direction)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
                 (
                     strategy_id,
@@ -1118,6 +1147,7 @@ class TradingDatabase:
                     exit_reason,
                     1 if gross_pnl > 0 else 0,
                     tax_treatment,
+                    direction,
                 ),
             )
             conn.commit()
@@ -2065,17 +2095,23 @@ class TradingDatabase:
             conn.commit()
 
     def save_stop_loss(
-        self, symbol: str, stop_price: float, entry_price: float, entry_atr: float
+        self,
+        symbol: str,
+        stop_price: float,
+        entry_price: float,
+        entry_atr: float,
+        direction: str = "long",
     ) -> None:
         """Persist a stop-loss level so it survives across daily runs."""
         with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                INSERT OR REPLACE INTO stop_loss_state (symbol, stop_price, entry_price, entry_atr, updated_at)
-                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                INSERT OR REPLACE INTO stop_loss_state
+                    (symbol, stop_price, entry_price, entry_atr, direction, updated_at)
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             """,
-                (symbol, stop_price, entry_price, entry_atr),
+                (symbol, stop_price, entry_price, entry_atr, direction),
             )
             conn.commit()
 
@@ -2083,10 +2119,17 @@ class TradingDatabase:
         """Return persisted stop-loss levels keyed by symbol."""
         with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT symbol, stop_price, entry_price, entry_atr FROM stop_loss_state")
+            cursor.execute(
+                "SELECT symbol, stop_price, entry_price, entry_atr, direction FROM stop_loss_state"
+            )
             rows = cursor.fetchall()
         return {
-            row[0]: {"stop_price": row[1], "entry_price": row[2], "entry_atr": row[3]}
+            row[0]: {
+                "stop_price": row[1],
+                "entry_price": row[2],
+                "entry_atr": row[3],
+                "direction": row[4] or "long",
+            }
             for row in rows
         }
 

@@ -38,6 +38,10 @@ class StopLossManager:
         self.stop_levels: dict[str, float] = {}
         self.entry_prices: dict[str, float] = {}
         self.entry_atrs: dict[str, float] = {}
+        # "long" (stop below entry, triggers on fall) or "short" (stop above
+        # entry, triggers on rise). Shorts get a catastrophe stop only — no
+        # trailing/ratchet in v1, since pairs trades exit on spread reversion.
+        self.directions: dict[str, str] = {}
 
         if self.db is not None:
             self._load_from_db()
@@ -58,6 +62,7 @@ class StopLossManager:
                 self.stop_levels[symbol] = data["stop_price"]
                 self.entry_prices[symbol] = data["entry_price"]
                 self.entry_atrs[symbol] = data["entry_atr"]
+                self.directions[symbol] = data.get("direction", "long")
             if rows:
                 logger.info("Restored %d stop-loss levels from DB: %s", len(rows), list(rows))
         except Exception as e:
@@ -73,6 +78,7 @@ class StopLossManager:
                 self.stop_levels[symbol],
                 self.entry_prices[symbol],
                 self.entry_atrs.get(symbol, 0.0),
+                self.directions.get(symbol, "long"),
             )
         except Exception as e:
             logger.warning("Could not persist stop loss for %s: %s", symbol, e)
@@ -83,8 +89,13 @@ class StopLossManager:
         entry_price: float,
         atr: float,
         multiplier: float | None = None,
+        direction: str = "long",
     ):
-        """Set initial stop. ``multiplier`` overrides the default for regime sensitivity."""
+        """Set initial stop. ``multiplier`` overrides the default for regime sensitivity.
+
+        ``direction="short"`` places the stop ABOVE entry (loss = price rising),
+        capped at entry*1.50 to mirror the long-side 50% floor.
+        """
         if not (entry_price and entry_price > 0):
             logger.warning(
                 "Cannot set stop loss for %s: invalid entry_price=%s", symbol, entry_price
@@ -100,16 +111,25 @@ class StopLossManager:
                 entry_price,
             )
         mult = multiplier if multiplier is not None else self.atr_multiplier
-        # Floor at 50% of entry so we never place a stop near $0 (would be rejected by broker)
-        stop_price = max(entry_price - (mult * atr), entry_price * 0.50)
+        if direction == "short":
+            # Cap at +50% so a missing/garbage ATR can't disable the stop entirely
+            stop_price = min(entry_price + (mult * atr), entry_price * 1.50)
+        else:
+            # Floor at 50% of entry so we never place a stop near $0 (would be rejected by broker)
+            stop_price = max(entry_price - (mult * atr), entry_price * 0.50)
         self.stop_levels[symbol] = stop_price
         self.entry_prices[symbol] = entry_price
         self.entry_atrs[symbol] = atr
+        self.directions[symbol] = direction
         self._persist(symbol)
         logger.info(
-            f"Stop loss set for {symbol}: ${stop_price:.2f} "
+            f"Stop loss set for {symbol} ({direction}): ${stop_price:.2f} "
             f"({mult:.1f}x ATR from ${entry_price:.2f})"
         )
+
+    def get_direction(self, symbol: str) -> str:
+        """Direction of the tracked stop for a symbol ('long' when unknown)."""
+        return self.directions.get(symbol, "long")
 
     def check_stop_loss(self, symbol: str, current_price: float) -> bool:
         """
@@ -126,10 +146,13 @@ class StopLossManager:
             return False
 
         stop_price = self.stop_levels[symbol]
+        direction = self.directions.get(symbol, "long")
 
-        if current_price <= stop_price:
+        hit = current_price >= stop_price if direction == "short" else current_price <= stop_price
+        if hit:
             logger.warning(
-                f"STOP LOSS HIT: {symbol} at ${current_price:.2f} " f"(stop: ${stop_price:.2f})"
+                f"STOP LOSS HIT ({direction}): {symbol} at ${current_price:.2f} "
+                f"(stop: ${stop_price:.2f})"
             )
             return True
 
@@ -140,6 +163,7 @@ class StopLossManager:
         self.stop_levels.pop(symbol, None)
         self.entry_prices.pop(symbol, None)
         self.entry_atrs.pop(symbol, None)
+        self.directions.pop(symbol, None)
         if self.db is not None:
             try:
                 self.db.delete_stop_loss(symbol)
@@ -152,7 +176,13 @@ class StopLossManager:
         return self.stop_levels.get(symbol, 0.0)
 
     def update_trailing_stop(self, symbol: str, current_price: float, atr: float):
-        """Legacy chandelier trailing — stop = price − mult×ATR. Stops only move up."""
+        """Legacy chandelier trailing — stop = price − mult×ATR. Stops only move up.
+
+        Long-only: shorts keep their catastrophe stop (raising it would loosen
+        protection, lowering it is a different mechanism not implemented in v1).
+        """
+        if self.directions.get(symbol, "long") == "short":
+            return
         if symbol not in self.stop_levels or not atr or atr <= 0:
             return
         new_stop = max(current_price - (self.atr_multiplier * atr), 0.01)
@@ -167,7 +197,10 @@ class StopLossManager:
         * +breakeven_atr (default 1×ATR) of profit → stop ratchets up to entry.
         * +lock_atr     (default 2×ATR) of profit → stop ratchets up to entry + 1×ATR.
         Stops never move down. Falls back to chandelier trailing for further gains.
+        Long-only: shorts keep their catastrophe stop (see update_trailing_stop).
         """
+        if self.directions.get(symbol, "long") == "short":
+            return
         if symbol not in self.stop_levels or not atr or atr <= 0:
             return
         entry = self.entry_prices.get(symbol)
@@ -218,6 +251,7 @@ class StopLossManager:
             avg_price = float(pos.get("avg_price") or pos.get("entry_price") or 0)
             atr = float(pos.get("atr") or 0)
             current_price = current_prices.get(symbol, avg_price)
+            direction = "short" if float(pos.get("shares") or 0) < 0 else "long"
 
             if avg_price <= 0:
                 logger.warning(
@@ -225,7 +259,12 @@ class StopLossManager:
                 )
                 continue
 
-            if atr > 0:
+            if direction == "short":
+                if atr > 0:
+                    stop_price = min(current_price + self.atr_multiplier * atr, avg_price * 1.50)
+                else:
+                    stop_price = avg_price * (1 + fallback_stop_pct)
+            elif atr > 0:
                 stop_price = max(current_price - self.atr_multiplier * atr, avg_price * 0.50)
             else:
                 stop_price = avg_price * (1 - fallback_stop_pct)
@@ -234,12 +273,14 @@ class StopLossManager:
             self.stop_levels[symbol] = stop_price
             self.entry_prices[symbol] = avg_price
             self.entry_atrs[symbol] = atr
+            self.directions[symbol] = direction
             self._persist(symbol)
             repaired.append(symbol)
             logger.warning(
-                "Stop-loss audit: synthesised fallback stop for %s at $%.2f "
+                "Stop-loss audit: synthesised fallback stop for %s (%s) at $%.2f "
                 "(avg_price=%.2f, atr=%.4f)",
                 symbol,
+                direction,
                 stop_price,
                 avg_price,
                 atr,
