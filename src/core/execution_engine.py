@@ -1138,7 +1138,11 @@ class MultiStrategyRunner:
                 )
             elif stop_price and atr > 0:
                 # Near-miss detection: position within 1 ATR of stop → early warning
-                distance = current_price - stop_price
+                # (for shorts the stop sits ABOVE price, so the distance flips)
+                if self.stop_loss_manager.get_direction(symbol) == "short":
+                    distance = stop_price - current_price
+                else:
+                    distance = current_price - stop_price
                 if 0 < distance <= atr:
                     logger.warning(
                         "Stop-loss near-miss: %s at $%.2f, stop at $%.2f "
@@ -1165,33 +1169,41 @@ class MultiStrategyRunner:
             try:
                 symbol = position["symbol"]
                 shares = abs(position["shares"])
+                # Negative shares = short position: the protective exit is a
+                # buy-to-cover (price rose through the stop), not a SELL.
+                is_short = float(position["shares"]) < 0
+                exit_action = "BUY_TO_COVER" if is_short else "SELL"
+                order_side = OrderSide.BUY if is_short else OrderSide.SELL
 
                 if shares <= 0:
                     logger.warning("Skipping stop-loss exit for %s: shares=%s", symbol, shares)
                     self.stop_loss_manager.remove_stop_loss(symbol)
                     continue
 
-                # Short-prevention guard: a double-exit (stop-loss fired twice, or race
-                # between stop-loss and strategy exit) would submit a SELL with 0 broker
-                # shares and create a short position. Verify the DB still shows shares > 0.
+                # Double-exit guard (stop-loss fired twice, or race between stop-loss
+                # and strategy exit). For longs the DB must still show shares > 0 or a
+                # second SELL would create an accidental short; for shorts it must
+                # still show shares < 0 or a second BUY would open an accidental long.
                 local_pos = self.db.get_position(position["strategy_id"], symbol)
                 local_shares = float(local_pos["shares"]) if local_pos else 0.0
-                if local_shares <= 0:
+                already_exited = local_shares >= 0 if is_short else local_shares <= 0
+                if already_exited:
                     logger.warning(
-                        f"Skipping stop-loss SELL {symbol} - DB shows {local_shares} shares "
-                        "(already exited or double-exit prevented)"
+                        f"Skipping stop-loss {exit_action} {symbol} - DB shows {local_shares} "
+                        "shares (already exited or double-exit prevented)"
                     )
                     self.stop_loss_manager.remove_stop_loss(symbol)
                     continue
 
                 # Idempotency guard: GHA retries must not re-submit stop-loss exits
-                # that already completed in a prior run (would create a short).
+                # that already completed in a prior run.
                 existing_stop_intent = self.db.find_active_order_intent_for_today(
-                    position["strategy_id"], symbol, "SELL"
+                    position["strategy_id"], symbol, exit_action
                 )
                 if existing_stop_intent:
                     logger.warning(
-                        "Idempotency guard: stop-loss SELL %s already %s today (intent %s) — skipping",
+                        "Idempotency guard: stop-loss %s %s already %s today (intent %s) — skipping",
+                        exit_action,
                         symbol,
                         existing_stop_intent["status"],
                         existing_stop_intent["intent_id"],
@@ -1199,14 +1211,14 @@ class MultiStrategyRunner:
                     self.stop_loss_manager.remove_stop_loss(symbol)
                     continue
                 stop_intent_id = self.db.create_order_intent(
-                    position["strategy_id"], symbol, "SELL", shares
+                    position["strategy_id"], symbol, exit_action, shares
                 )
 
-                logger.info(f"Executing stop loss exit: SELL {shares} {symbol}")
+                logger.info(f"Executing stop loss exit: {exit_action} {shares} {symbol}")
 
                 # Create market order to close position - DAY fills immediately during market hours
                 order_data = MarketOrderRequest(
-                    symbol=symbol, qty=shares, side=OrderSide.SELL, time_in_force=TimeInForce.DAY
+                    symbol=symbol, qty=shares, side=order_side, time_in_force=TimeInForce.DAY
                 )
 
                 order = self.dry_run.execute_broker_operation(
@@ -1220,7 +1232,7 @@ class MultiStrategyRunner:
                     strategy_id=position["strategy_id"],
                     signal_id=None,
                     symbol=symbol,
-                    action="SELL",
+                    action=exit_action,
                     shares=shares,
                     requested_price=exit_price,
                     exec_price=exit_price,
@@ -1232,11 +1244,18 @@ class MultiStrategyRunner:
                 # CRITICAL: Zero out the local DB position so reconciliation sees
                 # broker=0 and DB=0 (previously this was missing, causing every
                 # stop-loss to produce a guaranteed reconciliation mismatch).
-                self._update_position_record(position["strategy_id"], symbol, -shares, exit_price)
+                # For a short the position is negative, so covering is a POSITIVE delta.
+                position_delta = shares if is_short else -shares
+                self._update_position_record(
+                    position["strategy_id"], symbol, position_delta, exit_price
+                )
 
-                # Release cash back to the pool so other strategies see correct capacity
-                exit_proceeds = exit_price * shares
-                self.cash_manager.release_cash(position["strategy_id"], exit_proceeds)
+                if not is_short:
+                    # Release cash back to the pool so other strategies see correct
+                    # capacity. Shorts never reserved cash at entry (the short-sale
+                    # proceeds are not credited), so there is nothing to release.
+                    exit_proceeds = exit_price * shares
+                    self.cash_manager.release_cash(position["strategy_id"], exit_proceeds)
 
                 # Record matched P&L so stop-loss exits appear in win-rate and profit-factor
                 entry_price_sl = float(
@@ -1253,6 +1272,7 @@ class MultiStrategyRunner:
                             exit_price=exit_price,
                             shares=shares,
                             exit_reason="STOP_LOSS",
+                            direction="short" if is_short else "long",
                         )
                     except Exception as _sl_pnl_exc:
                         logger.warning(
@@ -3504,6 +3524,14 @@ class MultiStrategyRunner:
                         entry_date=self.asof_date,
                     )
 
+                    # Catastrophe stop for the short: sits ABOVE entry, fires if the
+                    # shorted leg rallies. Without this, a runaway short has no
+                    # protective exit between daily z-score checks. The manager falls
+                    # back to a 7%-of-entry stop when the signal carries no ATR.
+                    self.stop_loss_manager.set_stop_loss(
+                        symbol, price, float(signal.get("atr") or 0), direction="short"
+                    )
+
                     trade_record = {
                         "strategy": strategy.name,
                         "symbol": symbol,
@@ -3564,7 +3592,9 @@ class MultiStrategyRunner:
                             entry_price=entry_short_price,
                             exit_price=price,
                             shares=cover_qty,
+                            entry_date=existing_pos.get("entry_date"),
                             exit_reason=signal.get("reasoning", "BUY_TO_COVER"),
+                            direction="short",
                         )
                     except Exception as _pnl_e:
                         logger.warning(
@@ -3573,6 +3603,12 @@ class MultiStrategyRunner:
 
                     # Remove the short position from DB
                     self._update_position_record(strategy.strategy_id, symbol, cover_qty, price)
+
+                    # Fully covered → release the catastrophe stop and the
+                    # cross-strategy hold so the symbol is tradable again.
+                    if cover_qty >= short_shares:
+                        self.stop_loss_manager.remove_stop_loss(symbol)
+                        self._held_symbols.discard(symbol)
 
                     trade_record = {
                         "strategy": strategy.name,
@@ -3688,7 +3724,19 @@ class MultiStrategyRunner:
     def _update_position_record(
         self, strategy_id, symbol, shares_delta, exec_price, entry_date=None, atr=None
     ):
-        """Persist position updates for reconciliation."""
+        """Persist position updates for reconciliation.
+
+        Long positions (current_shares >= 0): positive deltas are buys (weighted
+        avg_price recalculated), negative deltas are sells (avg unchanged),
+        reaching <= 0 deletes the row.
+
+        Short positions (current_shares < 0): positive deltas are COVERS — the
+        short's entry price must stay fixed (recalculating it would corrupt
+        P&L on partial covers), reaching exactly 0 deletes the row, and a cover
+        larger than the short is clamped to flat rather than silently flipping
+        the book long (the broker order was sized from this same record, so a
+        crossover means our state is wrong — log it loudly).
+        """
         existing = self.db.get_position(strategy_id, symbol)
         if existing:
             current_shares = float(existing["shares"])
@@ -3697,7 +3745,39 @@ class MultiStrategyRunner:
             current_shares = 0.0
             current_avg = 0.0
 
+        is_short = current_shares < 0
         new_shares = current_shares + shares_delta
+
+        if is_short:
+            if new_shares > 0:
+                logger.error(
+                    "Position crossover prevented: %s short %.1f + delta %.1f would go "
+                    "long %.1f — clamping to flat. Local state may be out of sync.",
+                    symbol,
+                    current_shares,
+                    shares_delta,
+                    new_shares,
+                )
+                new_shares = 0.0
+            if new_shares == 0:
+                self.db.delete_position(strategy_id, symbol)
+                return
+            # Covers keep the original short entry price; adding to the short
+            # (more negative) recalculates the weighted average entry.
+            if shares_delta < 0:
+                total_cost = current_avg * abs(current_shares) + exec_price * abs(shares_delta)
+                avg_price = total_cost / abs(new_shares)
+            else:
+                avg_price = current_avg
+            self.db.update_position(
+                strategy_id=strategy_id,
+                symbol=symbol,
+                shares=new_shares,
+                avg_price=avg_price,
+                current_price=exec_price,
+            )
+            return
+
         if new_shares <= 0:
             self.db.delete_position(strategy_id, symbol)
             return

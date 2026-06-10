@@ -601,10 +601,11 @@ class TestOrderTimingOPG:
         after market close are queued or rejected by Alpaca.  OPG (market-on-
         open) orders execute at the next session's open — the correct workflow.
 
-        Note: stop-loss SELLs legitimately use TimeInForce.DAY because they
+        Note: stop-loss exits legitimately use TimeInForce.DAY because they
         execute intraday during market hours when the stop is triggered (the
-        bot polls during the session). DAY usage is therefore allowed but
-        only in SELL contexts; any DAY in a BUY block would be a bug.
+        bot polls during the session). That covers SELLs closing longs AND
+        BUYs covering shorts (side=order_side in execute_stop_loss_exits).
+        DAY in a new-entry BUY block would be a bug.
         """
         engine_src = Path("src/core/execution_engine.py").read_text()
         lines = engine_src.splitlines()
@@ -613,10 +614,14 @@ class TestOrderTimingOPG:
                 continue
             # Look backwards up to 8 lines for the OrderSide on this request
             window = "\n".join(lines[max(0, i - 8) : i + 1])
-            assert "OrderSide.SELL" in window or "side=OrderSide.SELL" in window, (
+            assert (
+                "OrderSide.SELL" in window
+                or "side=OrderSide.SELL" in window
+                or "side=order_side" in window  # stop-loss exit: SELL long / BUY-to-cover short
+            ), (
                 f"execution_engine.py line {i+1} uses TimeInForce.DAY without a "
-                f"nearby OrderSide.SELL — BUY orders must use OPG to execute at "
-                f"next market open. Context:\n{window}"
+                f"nearby defensive-exit OrderSide — new-entry BUY orders must use "
+                f"OPG to execute at next market open. Context:\n{window}"
             )
 
     def test_execution_engine_uses_opg(self):

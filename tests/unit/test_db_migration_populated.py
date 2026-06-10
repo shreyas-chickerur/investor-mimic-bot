@@ -126,6 +126,15 @@ def test_migration_applies_cleanly_to_populated_legacy_db(legacy_db):
     # New columns exist with defaults
     assert "tax_treatment" in _columns(legacy_db, "trade_pnl_detail")
     assert "sentiment_score" in _columns(legacy_db, "signals")
+    assert "direction" in _columns(legacy_db, "trade_pnl_detail")
+    assert "direction" in _columns(legacy_db, "stop_loss_state")
+
+    # Pre-existing rows get the long default
+    with sqlite3.connect(legacy_db) as conn:
+        assert (
+            conn.execute("SELECT direction FROM stop_loss_state WHERE symbol='UNH'").fetchone()[0]
+            == "long"
+        )
 
     # Pre-existing data preserved
     assert _count(legacy_db, "SELECT COUNT(*) FROM positions") == 2
