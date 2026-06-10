@@ -333,6 +333,9 @@ def send_alert(report: dict) -> None:
             accent_color=severity_color,
         )
         notifier = EmailNotifier()
+        if not notifier.enabled:
+            print("[warn] email credentials not configured — alert not sent", file=sys.stderr)
+            return
         notifier.send_alert(f"⚠️ Trading run expectations failed ({report['trading_date']})", html)
         print("Alert email sent")
     except Exception as exc:
