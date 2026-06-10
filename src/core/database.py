@@ -440,6 +440,14 @@ class TradingDatabase:
             # Dedup guard: CREATE UNIQUE INDEX works on existing tables (unlike UNIQUE in schema).
             # INSERT OR IGNORE respects this index even on DBs created before the column constraint
             # was added, so the protection applies to downloaded artifacts too.
+            # Pre-existing duplicate rows (written before the index existed) would make the
+            # CREATE UNIQUE INDEX itself fail and abort the trading run — collapse them to the
+            # earliest row first.
+            cursor.execute(
+                "DELETE FROM trade_pnl_detail WHERE id NOT IN ("
+                "  SELECT MIN(id) FROM trade_pnl_detail"
+                "  GROUP BY strategy_id, symbol, sell_run_id, exit_date)"
+            )
             cursor.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_trade_pnl_no_dup "
                 "ON trade_pnl_detail(strategy_id, symbol, sell_run_id, exit_date)"
