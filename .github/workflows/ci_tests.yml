@@ -39,7 +39,9 @@ jobs:
 
     - name: Run integration tests
       run: |
-        python -m pytest tests/integration/ -v --tb=short --junitxml=test-results/integration.xml
+        # Integration tests are auto-marked "slow" (tests/integration/conftest.py) and
+        # pytest.ini excludes slow by default — clear addopts so they actually run here.
+        python -m pytest tests/integration/ -o addopts="" -v --tb=short --junitxml=test-results/integration.xml
 
     - name: Run functional tests
       run: |
@@ -137,6 +139,16 @@ jobs:
         pip install yamllint --quiet
         echo "=== Linting workflow YAML files ==="
         yamllint -c .yamllint.yml .github/workflows/*.yml && echo "✅ All workflow YAMLs are valid"
+
+    - name: Validate workflow schema with actionlint
+      run: |
+        # yamllint only checks YAML syntax — it cannot catch GitHub Actions schema
+        # errors (e.g. step-level `permissions:`), which make GitHub reject the whole
+        # workflow file so scheduled/dispatched runs silently stop firing.
+        echo "=== actionlint (GHA schema validation) ==="
+        bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+        ./actionlint -shellcheck= -pyflakes= -color
+        echo "✅ All workflow files pass GHA schema validation"
 
     - name: Set up Python
       uses: actions/setup-python@v5

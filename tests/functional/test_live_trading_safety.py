@@ -211,16 +211,14 @@ class TestDataQualityChecker:
         shutil.rmtree(temp_dir)
 
     def test_empty_data_blocks_all(self, temp_dir):
-        """Test empty data blocks all trading."""
+        """Test empty data aborts the trading run entirely."""
         import pandas as pd
 
         checker = DataQualityChecker(temp_dir)
 
         empty_df = pd.DataFrame()
-        blocked, report = checker.check_data_quality(empty_df, datetime.now())
-
-        assert "EMPTY_DATA" in report["issues"]
-        assert report["symbols_checked"] == 0
+        with pytest.raises(ValueError, match="Market data is empty"):
+            checker.check_data_quality(empty_df, datetime.now())
 
     def test_stale_data_detection(self, temp_dir):
         """Test stale data is detected and blocked."""
@@ -304,12 +302,13 @@ class TestDataQualityChecker:
 
         checker = DataQualityChecker(temp_dir)
 
-        # Create data with price outlier
+        # Blocking requires >=2 extreme (>75%) returns in the last 30 days —
+        # a single adjusted-price artifact must not remove a symbol from trading.
         data = pd.DataFrame(
             {
                 "symbol": ["AAPL"] * 100,
                 "date": [datetime.now()] * 100,
-                "close": [150.0] * 99 + [10000.0],  # Outlier
+                "close": [150.0] * 98 + [10000.0, 150.0],  # Two extreme jumps
                 "rsi": [50.0] * 100,
                 "sma_20": [145.0] * 100,
                 "sma_50": [140.0] * 100,
@@ -584,6 +583,10 @@ class TestStrategyHealthScoring:
 
         db = Mock()
         db.db_path = tmp.name
+        # Mirror TradingDatabase.get_strategy_pnl_stats empty-state shape
+        db.get_strategy_pnl_stats = Mock(
+            return_value={"trades": 0, "win_rate": None, "avg_win_pct": None, "avg_loss_pct": None}
+        )
         yield db
         os.unlink(tmp.name)
 

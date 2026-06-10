@@ -379,8 +379,6 @@ jobs:
     - name: Publish snapshot to data branch
       if: always() && hashFiles('web/public/data/latest.json') != ''
       continue-on-error: true
-      permissions:
-        contents: write
       env:
         GH_TOKEN: ${{ github.token }}
       run: |

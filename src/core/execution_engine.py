@@ -2936,6 +2936,12 @@ class MultiStrategyRunner:
                         f"submit_order_{symbol}", self.trading_client.submit_order, order_data
                     )
 
+                    # A submitted order consumes broker buying power even while queued
+                    # (OPG), so the per-order cap above must see the reduced ceiling for
+                    # every subsequent order in this run — otherwise several individually
+                    # capped orders can collectively oversubscribe buying power.
+                    self.buying_power = max(0.0, self.buying_power - trade_value)
+
                     # Update intent status
                     self.db.update_order_intent_status(intent_id, "SUBMITTED", str(order.id))
 
@@ -3477,6 +3483,12 @@ class MultiStrategyRunner:
                     order = self.dry_run.execute_broker_operation(
                         f"short_sell_{symbol}", self.trading_client.submit_order, order_data
                     )
+
+                    # Shorts consume buying power too, and the symbol must join
+                    # _held_symbols so a later strategy's BUY this run doesn't get
+                    # netted against the short at the broker.
+                    self.buying_power = max(0.0, self.buying_power - shares * price)
+                    self._held_symbols.add(symbol)
 
                     # Store as negative position (short). Cannot use _update_position_record
                     # here because it deletes the row when new_shares <= 0, which is the
