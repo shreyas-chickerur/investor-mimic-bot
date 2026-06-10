@@ -1,4 +1,4 @@
-.PHONY: help install install-news setup init fetch-data update-data sync-broker clean-data \
+.PHONY: help install install-news setup init fetch-data update-data sync-broker clean-data diagnose diagnose-local \
 	run run-dry dashboard logs shell status close-positions \
 	test test-unit test-integration test-component test-functional test-coverage test-watch \
 	report analyze backtest metrics email-test signals-check news-test \
@@ -394,3 +394,11 @@ snapshot-mock:
 expect-check:
 	@echo "$(BLUE)🔍 Post-run expectation check (paste output to Claude if something went wrong):$(NC)"
 	@python3 scripts/post_run_expect.py --db trading.db --no-email || true
+
+diagnose:
+	@echo "$(BLUE)🩺 Platform diagnosis (fetches latest run artifacts via gh)...$(NC)"
+	@python3 scripts/diagnose.py --fetch
+
+diagnose-local:
+	@echo "$(BLUE)🩺 Platform diagnosis (local trading.db only)...$(NC)"
+	@python3 scripts/diagnose.py --no-gha

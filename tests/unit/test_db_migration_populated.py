@@ -129,6 +129,14 @@ def test_migration_applies_cleanly_to_populated_legacy_db(legacy_db):
     assert "direction" in _columns(legacy_db, "trade_pnl_detail")
     assert "direction" in _columns(legacy_db, "stop_loss_state")
 
+    # run_history table (2026-06-11) exists after migration
+    with sqlite3.connect(legacy_db) as conn:
+        tables = {
+            r[0]
+            for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        }
+    assert "run_history" in tables
+
     # Pre-existing rows get the long default
     with sqlite3.connect(legacy_db) as conn:
         assert (
