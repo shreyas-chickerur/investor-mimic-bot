@@ -13,8 +13,19 @@ echo ""
 # Navigate to project root
 cd "$(dirname "$0")/.."
 
-# Set default environment variables if not set
-export DATA_VALIDATOR_MAX_AGE_HOURS="${DATA_VALIDATOR_MAX_AGE_HOURS:-144}"
+# Status file protocol: STARTED -> MARKET_CLOSED | PREFLIGHT_FAILED |
+# EXECUTING -> SUCCESS | EXECUTION_FAILED. Written FIRST so a crash anywhere
+# in this script still leaves a status behind — a missing file (UNKNOWN in
+# the workflow) now unambiguously means this script never ran, and the final
+# health gate fails on anything that isn't SUCCESS or MARKET_CLOSED.
+# RUN_STATUS_FILE is overridable for tests.
+RUN_STATUS_FILE="${RUN_STATUS_FILE:-/tmp/run_status.txt}"
+echo "STARTED" > "$RUN_STATUS_FILE"
+
+# Set default environment variables if not set.
+# DATA_VALIDATOR_MAX_AGE_HOURS derives from the single workflow-level
+# DATA_MAX_AGE_HOURS knob when present, so staleness has ONE threshold.
+export DATA_VALIDATOR_MAX_AGE_HOURS="${DATA_VALIDATOR_MAX_AGE_HOURS:-${DATA_MAX_AGE_HOURS:-80}}"
 export ALPACA_PAPER="${ALPACA_PAPER:-true}"
 export DRY_RUN="${DRY_RUN:-false}"
 
@@ -32,7 +43,7 @@ echo "$PREFLIGHT_OUTPUT"
 
 # Check if market was closed (expected skip)
 if echo "$PREFLIGHT_OUTPUT" | grep -q "MARKET CLOSED\|Market closed"; then
-    echo "MARKET_CLOSED" > /tmp/run_status.txt
+    echo "MARKET_CLOSED" > "$RUN_STATUS_FILE"
     echo ""
     echo "================================================================================"
     echo "⏸️  RUN SKIPPED - Market closed (expected)"
@@ -43,7 +54,7 @@ fi
 
 # Check exit code for other failures
 if [ $PREFLIGHT_EXIT -ne 0 ]; then
-    echo "PREFLIGHT_FAILED" > /tmp/run_status.txt
+    echo "PREFLIGHT_FAILED" > "$RUN_STATUS_FILE"
     echo ""
     echo "================================================================================"
     echo "❌ PRE-FLIGHT CHECKS FAILED"
@@ -53,7 +64,7 @@ if [ $PREFLIGHT_EXIT -ne 0 ]; then
 fi
 
 # Pre-flight passed, execute trading
-echo "EXECUTING" > /tmp/run_status.txt
+echo "EXECUTING" > "$RUN_STATUS_FILE"
 echo ""
 echo "================================================================================"
 echo "EXECUTING TRADING SYSTEM"
@@ -69,10 +80,10 @@ echo ""
 echo "================================================================================"
 if [ $EXIT_CODE -eq 0 ]; then
     echo "✅ TRADING RUN COMPLETED SUCCESSFULLY"
-    echo "SUCCESS" > /tmp/run_status.txt
+    echo "SUCCESS" > "$RUN_STATUS_FILE"
 else
     echo "❌ TRADING RUN FAILED (exit code: $EXIT_CODE)"
-    echo "EXECUTION_FAILED" > /tmp/run_status.txt
+    echo "EXECUTION_FAILED" > "$RUN_STATUS_FILE"
 fi
 echo "================================================================================"
 echo "Finished: $(date)"

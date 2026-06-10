@@ -46,52 +46,11 @@ def check_market_open() -> bool:
             print(f"⏸️  Market closed: Weekend ({now.strftime('%A')})")
             return False
 
-        # Basic holiday check (major US market holidays 2025-2028)
-        us_market_holidays = {
-            # 2025
-            "2025-01-01",
-            "2025-01-20",
-            "2025-02-17",
-            "2025-04-18",
-            "2025-05-26",
-            "2025-07-04",
-            "2025-09-01",
-            "2025-11-27",
-            "2025-12-25",
-            # 2026
-            "2026-01-01",
-            "2026-01-19",
-            "2026-02-16",
-            "2026-04-03",
-            "2026-05-25",
-            "2026-07-03",
-            "2026-09-07",
-            "2026-11-26",
-            "2026-12-25",
-            # 2027
-            "2027-01-01",
-            "2027-01-18",
-            "2027-02-15",
-            "2027-04-02",
-            "2027-05-31",
-            "2027-07-05",
-            "2027-09-06",
-            "2027-11-25",
-            "2027-12-27",
-            # 2028
-            "2028-01-01",
-            "2028-01-17",
-            "2028-02-21",
-            "2028-04-14",
-            "2028-05-29",
-            "2028-07-04",
-            "2028-09-04",
-            "2028-11-23",
-            "2028-12-25",
-        }
+        # Holiday check — shared set, also used by the data-freshness helper
+        from src.validation.data_freshness import US_MARKET_HOLIDAYS
 
         today = now.strftime("%Y-%m-%d")
-        if today in us_market_holidays:
+        if today in US_MARKET_HOLIDAYS:
             print(f"⏸️  Market closed: Holiday ({today})")
             return False
 
@@ -123,12 +82,24 @@ def check_data_freshness() -> bool:
         age_hours = (now - latest_date).total_seconds() / 3600
         age_days = age_hours / 24
 
-        # Get threshold from environment (default 288 hours = 12 days to handle holiday periods)
-        max_age_hours = int(os.getenv("DATA_VALIDATOR_MAX_AGE_HOURS", "288"))
+        # Single staleness knob: DATA_VALIDATOR_MAX_AGE_HOURS derives from
+        # DATA_MAX_AGE_HOURS in run_trading.sh. Holiday/weekend gaps are
+        # covered by the last-completed-session check in is_fresh, so this
+        # no longer needs a huge 12-day default.
+        from src.validation.data_freshness import DEFAULT_MAX_AGE_HOURS, is_fresh
 
-        if age_hours <= max_age_hours:
+        max_age_hours = int(
+            os.getenv(
+                "DATA_VALIDATOR_MAX_AGE_HOURS",
+                os.getenv("DATA_MAX_AGE_HOURS", str(DEFAULT_MAX_AGE_HOURS)),
+            )
+        )
+
+        fresh, reason = is_fresh(latest_date.to_pydatetime(), now, max_age_hours)
+        if fresh:
             print(
-                f"✅ Data fresh: {age_days:.1f} days old (latest: {latest_date.strftime('%Y-%m-%d')})"
+                f"✅ Data fresh: {age_days:.1f} days old (latest: "
+                f"{latest_date.strftime('%Y-%m-%d')}) — {reason}"
             )
             return True
         else:

@@ -292,14 +292,26 @@ def format_report(report: dict) -> str:
     return "\n".join(lines)
 
 
-def send_alert(report: dict) -> None:
-    """Send HTML alert email if any expectations failed."""
-    failures = [r for r in report["results"] if not r["passed"]]
+def send_alert(report: dict, db_path: str = "trading.db") -> None:
+    """Queue an HTML alert for critical/high expectation failures.
+
+    Alert policy (user decision 2026-06-10): medium-severity failures stay in
+    the JSON artifact and daily digest only — a standalone email per quiet-day
+    "0 signals" check was pure noise. Delivery goes through the notification
+    outbox so this script has no SMTP side effects (the workflow's outbox
+    processor sends it).
+    """
+    failures = [
+        r for r in report["results"] if not r["passed"] and r["severity"] in ("critical", "high")
+    ]
     if not failures:
+        medium = [r for r in report["results"] if not r["passed"]]
+        if medium:
+            print(f"{len(medium)} medium-severity failure(s) — recorded in JSON, no email")
         return
 
     try:
-        from src.utils.email_notifier import EmailNotifier, _bullet_list, _kv_rows, build_alert_html
+        from src.utils.email_notifier import _bullet_list, _kv_rows, build_alert_html
 
         severity_color = "#dc3545"  # red for critical, orange for high
         if not any(r["severity"] == "critical" for r in failures):
@@ -332,14 +344,18 @@ def send_alert(report: dict) -> None:
             body,
             accent_color=severity_color,
         )
-        notifier = EmailNotifier()
-        if not notifier.enabled:
-            print("[warn] email credentials not configured — alert not sent", file=sys.stderr)
-            return
-        notifier.send_alert(f"⚠️ Trading run expectations failed ({report['trading_date']})", html)
-        print("Alert email sent")
+        from src.core.database import TradingDatabase
+
+        db = TradingDatabase(db_path=db_path)
+        db.enqueue_notification(
+            "email",
+            "alert",
+            f"⚠️ Trading run expectations failed ({report['trading_date']})",
+            html,
+        )
+        print("Alert queued to notification outbox")
     except Exception as exc:
-        print(f"[warn] could not send alert email: {exc}", file=sys.stderr)
+        print(f"[warn] could not queue alert email: {exc}", file=sys.stderr)
 
 
 # ---------------------------------------------------------------------------
@@ -373,9 +389,9 @@ def main() -> int:
     out_path.write_text(json.dumps(report, indent=2))
     print(f"\nSaved: {out_path}")
 
-    # Send alert if anything failed
+    # Queue alert for critical/high failures (medium = JSON + digest only)
     if not args.no_email and not report["all_ok"]:
-        send_alert(report)
+        send_alert(report, db_path=args.db)
 
     # Exit codes: 0=all ok, 1=critical failure, 2=high failure only
     if report["critical_failures"] > 0:
