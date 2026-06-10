@@ -496,6 +496,38 @@ jobs:
           echo "remaining=0"    >> $GITHUB_OUTPUT
         fi
 
+    # ── RUN HEALTH: single source of truth ─────────────────────────────────
+    # Consolidates status file + expectations + guardrails + reconciliation
+    # into artifacts/run_health.json AND a run_history DB row (so the row is
+    # captured by BOTH database upload paths below). Detects checks that
+    # failed >=3 consecutive runs and escalates them into email subjects.
+    - name: Build run health report
+      id: run_health
+      if: always()
+      continue-on-error: true  # overall verdict re-checked by the final gate
+      env:
+        RECON_STATUS: ${{ steps.check_reconciliation.outputs.status }}
+        DRIFT_RESOLVED: ${{ steps.verify_sync.outputs.resolved }}
+      run: |
+        python3 scripts/diagnostics/build_run_health.py \
+          --db trading.db \
+          --status-file /tmp/run_status.txt \
+          --expectations artifacts/diagnostics/expect_check.json \
+          --guardrails artifacts/diagnostics/post_run_guardrails.json \
+          --recon-status "${RECON_STATUS:-}" \
+          --drift-resolved "${DRIFT_RESOLVED:-}" \
+          --out artifacts/run_health.json
+
+    - name: Upload run health artifact
+      if: always()
+      continue-on-error: true
+      uses: actions/upload-artifact@v4
+      with:
+        name: run-health
+        path: artifacts/run_health.json
+        retention-days: 90
+        overwrite: true
+
     - name: Checkpoint WAL before re-upload (post auto-sync)
       if: always() && steps.auto_sync.outputs.synced == 'true'
       run: |
@@ -908,7 +940,7 @@ jobs:
         server_port: 587
         username: ${{ secrets.EMAIL_USERNAME }}
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: "📊 Daily Trading Digest - ${{ steps.runtime_date.outputs.today }}"
+        subject: "${{ steps.run_health.outputs.recurring == 'true' && format('🔁 [RECURRING: {0}] ', steps.run_health.outputs.recurring_checks) || '' }}📊 Daily Trading Digest - ${{ steps.runtime_date.outputs.today }}"
         to: ${{ secrets.EMAIL_TO }}
         from: Trading System
         html_body: file:///tmp/daily_email.html
@@ -1009,9 +1041,20 @@ jobs:
         [ "${{ steps.export_snapshot.outcome }}" = "failure" ]      && FAILED_STEPS="$FAILED_STEPS export_snapshot"
         [ "${{ steps.validate_snapshot.outcome }}" = "failure" ]    && FAILED_STEPS="$FAILED_STEPS validate_snapshot"
         [ "${{ steps.publish_snapshot.outcome }}" = "failure" ]     && FAILED_STEPS="$FAILED_STEPS publish_snapshot"
+        [ "${{ steps.run_health.outcome }}" = "failure" ]           && FAILED_STEPS="$FAILED_STEPS run_health"
         if [ -n "$FAILED_STEPS" ]; then
           echo "❌ Health gate failed: non-blocking step(s) failed:$FAILED_STEPS"
           exit 1
+        fi
+
+        # Consolidated verdict: run_health.json is the single source of truth
+        # (RED = a critical check failed; YELLOW passes but is reported).
+        OVERALL="${{ steps.run_health.outputs.overall }}"
+        if [ "$OVERALL" = "RED" ]; then
+          echo "❌ Health gate failed: run_health overall=RED (see run-health artifact)"
+          exit 1
+        elif [ "$OVERALL" = "YELLOW" ]; then
+          echo "🟡 Health gate: run_health overall=YELLOW — passing, but check the digest"
         fi
 
         echo "✅ Final health gate passed"
@@ -1169,7 +1212,7 @@ jobs:
         server_port: 587
         username: ${{ secrets.EMAIL_USERNAME }}
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: "❌ Daily Trading Workflow Failed (UNEXPECTED) - ${{ steps.runtime_date.outputs.today }}"
+        subject: "${{ steps.run_health.outputs.recurring == 'true' && format('🔁 [RECURRING: {0}] ', steps.run_health.outputs.recurring_checks) || '' }}❌ Daily Trading Workflow Failed (UNEXPECTED) - ${{ steps.runtime_date.outputs.today }}"
         to: ${{ secrets.EMAIL_TO }}
         from: Trading System
         html_body: |

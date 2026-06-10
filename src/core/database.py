@@ -223,6 +223,31 @@ class TradingDatabase:
                 "CREATE INDEX IF NOT EXISTS idx_run_state_updated_at ON run_state(updated_at)"
             )
 
+            # One-row-per-run health summary — the cross-run memory that lets
+            # `make diagnose` (and Claude Code) spot RECURRING failures in
+            # seconds instead of re-deriving them from logs. Written by
+            # scripts/diagnostics/build_run_health.py at the end of each run
+            # and persisted via the trading-database artifact.
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS run_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    run_id TEXT NOT NULL UNIQUE,
+                    run_date TEXT NOT NULL,
+                    overall TEXT NOT NULL,
+                    status TEXT,
+                    failed_checks_json TEXT,
+                    portfolio_value REAL,
+                    n_orders INTEGER,
+                    data_freshness_hours REAL,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            """
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_run_history_date ON run_history(run_date)"
+            )
+
             # Notification outbox (decouples runtime from delivery side effects)
             cursor.execute(
                 """
