@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -104,14 +104,18 @@ class DataValidator:
             age_hours = (now_utc - latest_date_naive).total_seconds() / 3600
 
             max_age_hours = int(os.getenv("DATA_VALIDATOR_MAX_AGE_HOURS", "288"))
-            if latest_date_naive.date() < expected_latest_date or age_hours > max_age_hours:
-                expected_date = (datetime.now() - timedelta(hours=max_age_hours)).strftime(
-                    "%Y-%m-%d"
-                )
+            # Two independent failure modes — report the one that actually fired
+            # (the old combined message claimed an age-limit breach even when
+            # only the trading-session check failed, which misled diagnosis).
+            if age_hours > max_age_hours:
                 errors.append(
-                    "Data is "
-                    f"{age_hours:.1f} hours old (max: {max_age_hours}); "
-                    f"expected at least {expected_date}"
+                    f"Data is {age_hours:.1f} hours old "
+                    f"(max: {max_age_hours}h via DATA_VALIDATOR_MAX_AGE_HOURS)"
+                )
+            elif latest_date_naive.date() < expected_latest_date:
+                errors.append(
+                    f"Data ends {latest_date_naive.date()} but the last completed "
+                    f"trading session is {expected_latest_date} — a session is missing"
                 )
 
             # Check required columns

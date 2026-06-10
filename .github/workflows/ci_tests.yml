@@ -5,6 +5,12 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main]
+  schedule:
+    # Weekly safety net: the functional suite includes the end-to-end DRY_RUN
+    # smoke test, so engine breakage surfaces on quiet weeks with no pushes
+    # (Sunday 09:00 UTC, before Monday's trading run).
+    - cron: '0 9 * * 0'
+  workflow_dispatch:
 
 env:
   PYTHON_VERSION: "3.11"
