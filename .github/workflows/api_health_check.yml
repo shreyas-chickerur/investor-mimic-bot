@@ -2,12 +2,13 @@ name: API Key Health Check
 
 on:
   schedule:
-    # Runs every Monday at 8 AM UTC (before market open)
-    - cron: '0 8 * * 1'
+    # Runs every weekday at 8 AM UTC. Was Mondays-only, which left a
+    # Tuesday-onset outage undetected for nearly a week (June 2026 incident).
+    - cron: '0 8 * * 1-5'
   workflow_dispatch:  # Allow manual trigger at any time
 
 env:
-  PYTHON_VERSION: "3.8"
+  PYTHON_VERSION: "3.11"
 
 jobs:
   api-health-check:
