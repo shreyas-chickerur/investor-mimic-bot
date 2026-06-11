@@ -66,7 +66,6 @@ def _make_data(
             "price_to_sma20": np.full(n, 1.01),
             "price_to_sma50": np.full(n, 1.02),
             "adx": np.full(n, 25.0),
-            "future_return_5d": np.where(np.arange(n) % 2 == 0, 0.01, -0.01),
             "sma_100": close * 0.95,  # below close → uptrend
         },
         index=dates,
@@ -103,7 +102,6 @@ def _add_spy(market_data: pd.DataFrame, spy_above_sma: bool = True) -> pd.DataFr
             "price_to_sma20": np.full(100, 1.02),
             "price_to_sma50": np.full(100, 1.03),
             "adx": np.full(100, 22.0),
-            "future_return_5d": np.full(100, 0.005),
             "sma_100": spy_close * 0.94,
         },
         index=dates,
@@ -410,7 +408,6 @@ class TestImprovement6SpyGate:
                 "price_to_sma20": 1.01,
                 "price_to_sma50": 1.01,
                 "adx": 20.0,
-                "future_return_5d": 0.005,
                 "sma_100": 395.0,
             },
             index=dates,

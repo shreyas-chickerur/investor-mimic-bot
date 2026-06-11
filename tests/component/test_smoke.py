@@ -62,7 +62,6 @@ def _synthetic_market_data(symbols=None, n_days=60) -> pd.DataFrame:
                     "bb_upper": price * 1.02,
                     "bb_lower": price * 0.98,
                     "bb_middle": price,
-                    "future_return_5d": rng.uniform(-0.05, 0.05),
                 }
             )
     df = pd.DataFrame(rows)
