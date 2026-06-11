@@ -155,3 +155,41 @@ class TradingStrategy(ABC):
             asof_ts = asof_ts.tz_localize(None)
         days_held = int((asof_ts - entry_ts).days)
         return max(days_held, 0)
+
+    def evaluate_time_exit(
+        self,
+        symbol: str,
+        asof_date,
+        *,
+        in_profit: bool,
+        thesis_intact: bool,
+        min_hold_days: int = 0,
+        soft_hold_days: int | None = None,
+        max_hold_days: int | None = None,
+        hold_winner: bool = False,
+    ) -> str | None:
+        """Shared time-exit policy: min-hold → signal-decay at the soft
+        horizon → hard ceiling.
+
+        Replaces the per-strategy "hard dump at hold_days" pattern that
+        force-realized losses on positions whose thesis was still intact
+        (e.g. ML Momentum's synchronized day-5 exits, RSI MR's day-20 dump).
+
+        Returns an exit-reason string, or None to keep holding:
+        - before min_hold_days: never a time exit;
+        - at/after max_hold_days: always exit (absolute ceiling);
+        - at/after soft_hold_days: exit if the thesis is gone; exit a winner
+          unless hold_winner (let-winners-run / LTCG deferral); a LOSING
+          position with an intact thesis holds until the ceiling.
+        """
+        days_held = self.get_days_held(symbol, asof_date)
+        if max_hold_days is not None and days_held >= max_hold_days:
+            return f"Held {days_held}d (max ceiling)"
+        if days_held < max(min_hold_days, 0):
+            return None
+        if soft_hold_days is not None and days_held >= soft_hold_days:
+            if not thesis_intact:
+                return f"Held {days_held}d, thesis no longer valid"
+            if in_profit and not hold_winner:
+                return f"Held {days_held}d in profit"
+        return None

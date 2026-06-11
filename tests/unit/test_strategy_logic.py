@@ -164,18 +164,21 @@ class TestRSIMeanReversionFixes:
         assert len(sells) == 1
         assert "mean reversion complete" in sells[0]["reasoning"].lower()
 
-    def test_sell_on_time_exit(self):
+    def test_sell_on_max_hold_ceiling(self):
+        """Phase-4 policy: with the thesis intact (RSI < exit) and no profit
+        data, the position holds past the soft horizon and exits only at the
+        absolute max_hold ceiling."""
         s = RSIMeanReversionStrategy(1, 25_000)
         data = _make_symbol_data("AAPL", rsi_val=45.0, n=100)
         data["rsi"] = 45.0  # Below rsi_exit=55 threshold
 
         s.positions["AAPL"] = 10
-        s.entry_dates["AAPL"] = data.index[-1] - timedelta(days=25)  # held 25 days
+        s.entry_dates["AAPL"] = data.index[-1] - timedelta(days=45)  # past max_hold 40
 
         signals = s.generate_signals(data)
         sells = [x for x in signals if x["action"] == "SELL"]
         assert len(sells) == 1
-        assert "time" in sells[0]["reasoning"].lower()
+        assert "ceiling" in sells[0]["reasoning"].lower()
 
 
 # ===========================================================================
@@ -231,15 +234,29 @@ class TestFactorMomentumRanking:
             "LOW", 0
         ), "HIGH momentum stock should rank above LOW momentum stock"
 
-    def test_sell_after_hold_period(self):
+    def test_top_ranked_loser_holds_past_soft_horizon(self):
+        """Phase-4 rank hysteresis: a held name still in the top band (here
+        the only symbol = rank 1) with no profit is NOT calendar-liquidated
+        at hold_days — it holds until the max ceiling."""
         s = FactorMomentumStrategy(1, 25_000)
         data = _make_symbol_data("SYM00", n=80)
         s.positions["SYM00"] = 10
-        s.entry_dates["SYM00"] = data.index[-1] - timedelta(days=25)  # held 25d
+        s.entry_dates["SYM00"] = data.index[-1] - timedelta(days=25)  # held 25d, soft=20
+
+        signals = s.generate_signals(data)
+        sells = [x for x in signals if x["action"] == "SELL" and x["symbol"] == "SYM00"]
+        assert len(sells) == 0
+
+    def test_sell_at_max_hold_ceiling(self):
+        s = FactorMomentumStrategy(1, 25_000)
+        data = _make_symbol_data("SYM00", n=80)
+        s.positions["SYM00"] = 10
+        s.entry_dates["SYM00"] = data.index[-1] - timedelta(days=40)  # past max_hold 35
 
         signals = s.generate_signals(data)
         sells = [x for x in signals if x["action"] == "SELL" and x["symbol"] == "SYM00"]
         assert len(sells) == 1
+        assert "ceiling" in sells[0]["reasoning"]
 
 
 # ===========================================================================

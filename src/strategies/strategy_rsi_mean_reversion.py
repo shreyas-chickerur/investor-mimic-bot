@@ -40,6 +40,7 @@ class RSIMeanReversionStrategy(TradingStrategy):
         self.rsi_exit = config.get("strategies.rsi_mean_reversion.rsi_exit_threshold", 55)
         self.hold_days = config.get("strategies.rsi_mean_reversion.hold_days", 20)
         self.max_hold_days = config.get("strategies.rsi_mean_reversion.max_hold_days", 40)
+        self.min_hold_days = config.get("strategies.rsi_mean_reversion.min_hold_days", 0)
         self.profit_target_pct = config.get("strategies.rsi_mean_reversion.profit_target_pct", 0.05)
         self._partial_exit_done: set = set()
         self.stop_loss_pct = config.get("strategies.rsi_mean_reversion.stop_loss_pct", 0.07)
@@ -152,27 +153,32 @@ class RSIMeanReversionStrategy(TradingStrategy):
                         )
                         partial_exit = True
 
-                # Tax-aware time exit: extend hold to cross the 1-year LTCG threshold.
-                # When a profitable position is approaching the 1-year mark
-                # (≈250+ days), defer the time-based exit so the gain qualifies
-                # for long-term capital gains treatment.
+                # Time exit via the shared min/soft/max policy. The thesis for
+                # mean reversion is "RSI has not yet reverted" (rsi < rsi_exit
+                # is guaranteed here — line above exits otherwise), so a LOSING
+                # position holds to the max ceiling instead of being dumped at
+                # hold_days. Winners are held past the soft horizon when the
+                # let-winners-run or LTCG-deferral conditions apply.
                 in_profit = (
                     entry_price is not None and entry_price > 0 and price > float(entry_price)
                 )
                 approaching_ltcg = 250 <= days_held < 370
-                if exit_reason is None and days_held >= self.hold_days:
-                    if (
-                        entry_price
-                        and entry_price > 0
-                        and days_held < self.max_hold_days
-                        and (price - entry_price) / entry_price >= self.let_winners_run_pct
-                        and rsi < self.rsi_exit
-                    ):
-                        pass  # still healthy — keep holding
-                    elif approaching_ltcg and in_profit:
-                        pass  # defer exit to capture long-term capital gains rate
-                    else:
-                        exit_reason = f"Held {days_held}d >= {self.hold_days}d (time-based exit)"
+                _winner_running = bool(
+                    entry_price
+                    and entry_price > 0
+                    and (price - entry_price) / entry_price >= self.let_winners_run_pct
+                )
+                if exit_reason is None:
+                    exit_reason = self.evaluate_time_exit(
+                        symbol,
+                        latest_date,
+                        in_profit=in_profit,
+                        thesis_intact=rsi < self.rsi_exit,
+                        min_hold_days=self.min_hold_days,
+                        soft_hold_days=self.hold_days,
+                        max_hold_days=self.max_hold_days,
+                        hold_winner=_winner_running or (approaching_ltcg and in_profit),
+                    )
 
                 if exit_reason:
                     signals.append(
