@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed - Strategy edge overhaul: evidence-driven strategy mix (2026-06-11)
+
+Full quant pass — see `docs/research/EVIDENCE_2026-06.md` for all numbers and
+`docs/research/EVIDENCE_RUNBOOK.md` for the re-validation procedure.
+
+- **Research harness made trustworthy first**: production-parity backtester
+  (gates/stops/ratchet from trading_config.yaml — the legacy 0.60 confidence
+  floor / 3-buys-day / 10d-cooldown / 5x-static-stop divergences invalidated
+  prior results); ML leakage fixes (future_* label columns hard-rejected,
+  purged+embargoed walk-forward); fixed the silently-null drawdown gate.
+- **Evidence run** (36 symbols × 15yr primary + 43 × 2yr recent-regime,
+  production-parity, ~19 OOS windows): six strategies PASS all gates
+  (Factor Momentum 1.16 Sharpe / Volatility Breakout 1.17 / MA Crossover
+  1.19 / RSI MR 0.64 / Earnings Drift 0.59 / new Dual Momentum 1.20).
+- **Disabled by evidence**: ML Momentum (purged-OOS near-random on 91/91
+  training windows), Pairs Trading (0/5 pairs pass cointegration/half-life —
+  spreads mean-revert over 100–194 days vs the 20-day max hold), News
+  Sentiment (fetches LIVE RSS in backtests → lookahead artifacts; offline-
+  unvalidatable). Their open positions wind down automatically (engine
+  inactive-strategy sweep, OPG exits).
+- **Added: Dual Momentum** (12-1 cross-sectional + absolute momentum filter,
+  Antonacci) — best profit factor in the lineup (15y PF 2.06, 2y PF 2.84);
+  enabled at a 15% probation cap after passing the same gates.
+- **Exit overhaul**: shared min/soft/max time-exit policy in strategy_base —
+  losers with intact theses hold to the ceiling instead of being dumped at
+  hold_days (the pattern that realized most of ML's live losses); Factor
+  Momentum/Sector Rotation get rank/sector hysteresis instead of calendar
+  liquidation.
+- **Config**: `backtest_sharpe_priors` are now MEASURED 15y parity Sharpes;
+  `allocation_overrides` re-tiered by evidence (FM 0.30 top cap, probation
+  tiers at 0.10–0.15); `validation_status` honest (ML downgraded from its
+  incorrect OOS_VALIDATED).
+- Propagation: CashManager keyed by actual strategy IDs + real-equity base;
+  DRY_RUN smoke derives its strategy count from config; backtester lookback
+  widened to 400 calendar days for the 252-day momentum window.
+
 ### Fixed - Platform hardening after the June 2026 outage (2026-06-10/11)
 
 - **Outage root causes**: removed the invalid step-level `permissions:` block that

@@ -1,6 +1,7 @@
 # CLAUDE.md — operations guide for this repo
 
-Paper-trading bot: 8 strategies, Alpaca paper API, one trading run per day.
+Paper-trading bot: 7 OOS-validated strategies (3 disabled by evidence — see
+`docs/research/EVIDENCE_2026-06.md`), Alpaca paper API, one trading run per day.
 This file is the triage manual. **If something is broken, start at
 "First commands" below — do not start by reading code.**
 
@@ -12,9 +13,11 @@ This file is the triage manual. **If something is broken, start at
    (`scripts/setup_database.py`) → syncs broker state → updates market data → runs `scripts/run_trading.sh`.
 3. `run_trading.sh` writes a status file (`STARTED → MARKET_CLOSED | PREFLIGHT_FAILED | EXECUTING → SUCCESS |
    EXECUTION_FAILED`), runs pre-flight checks, then `src/core/execution_engine.py` (`MultiStrategyRunner`).
-4. The engine: stop-losses first (unconditional, direction-aware) → kill switches → 8 strategies generate signals →
-   regime/correlation/risk funnel → OPG limit orders at next open. Longs = positive shares; shorts (pairs trading only)
-   = negative shares.
+4. The engine: stop-losses first (unconditional, direction-aware) → inactive-strategy wind-down → kill switches →
+   enabled strategies (config `strategies.<name>.disabled`) generate signals → regime/correlation/risk funnel → OPG
+   limit orders at next open → cash sweep parks idle cash in SPY. Strategy enable/capital decisions come from OOS
+   evidence (`docs/research/EVIDENCE_RUNBOOK.md`, quarterly). Longs = positive shares; shorts = negative shares
+   (pairs trading, currently disabled).
 5. Reconciliation compares DB positions vs Alpaca; drift triggers auto-sync + retry.
 6. `build_run_health.py` consolidates everything into `artifacts/run_health.json` + a `run_history` DB row; the final
    health gate passes only GREEN/YELLOW.
