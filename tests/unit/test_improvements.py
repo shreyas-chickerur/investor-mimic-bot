@@ -10,12 +10,10 @@ Unit tests for IMPROVEMENTS batch:
 """
 from __future__ import annotations
 
-import sys
 import csv
-import tempfile
+import sys
 from pathlib import Path
-from typing import List, Dict
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
@@ -28,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _spy_data(n: int = 120) -> pd.DataFrame:
     """Build minimal multi-symbol DataFrame with SPY included."""
     np.random.seed(42)
@@ -38,7 +37,7 @@ def _spy_data(n: int = 120) -> pd.DataFrame:
         price = 400.0 if sym == "SPY" else 150.0
         close = price + np.cumsum(np.random.randn(n) * 0.5)
         close = np.maximum(close, 1.0)
-        for i, d in enumerate(dates):
+        for i in range(len(dates)):
             rows.append(
                 {
                     "symbol": sym,
@@ -70,7 +69,6 @@ def _spy_data(n: int = 120) -> pd.DataFrame:
                     "revenue_growth": 0.05,
                     "profit_margin": 0.15,
                     "beta": 1.0,
-                    "future_return_5d": 0.01 if i % 2 == 0 else -0.01,
                 }
             )
     df = pd.DataFrame(rows)
@@ -81,6 +79,7 @@ def _spy_data(n: int = 120) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 # B1 – Trailing ATR stop activation
 # ---------------------------------------------------------------------------
+
 
 class TestTrailingAtrActivation:
     """B1: update_trailing_stop() must be called inside check_stop_losses()."""
@@ -134,13 +133,14 @@ class TestTrailingAtrActivation:
 # A1 – LightGBM / GradientBoosting upgrade
 # ---------------------------------------------------------------------------
 
+
 class TestLightGBMUpgrade:
     """A1: ML Momentum now uses LightGBM (or sklearn fallback)."""
 
     @pytest.mark.unit
     def test_model_is_lgbm_or_fallback(self):
         """Verify the model attribute is LGBMClassifier or the sklearn fallback."""
-        from src.strategies.strategy_ml_momentum import MLMomentumStrategy, _LGBM_AVAILABLE
+        from src.strategies.strategy_ml_momentum import _LGBM_AVAILABLE, MLMomentumStrategy
 
         strat = MLMomentumStrategy(strategy_id=1, capital=25000)
         model_type = type(strat.model).__name__
@@ -174,7 +174,7 @@ class TestLightGBMUpgrade:
     @pytest.mark.unit
     def test_get_description_reflects_backend(self):
         """get_description() must mention LightGBM (or fallback)."""
-        from src.strategies.strategy_ml_momentum import MLMomentumStrategy, _LGBM_AVAILABLE
+        from src.strategies.strategy_ml_momentum import _LGBM_AVAILABLE, MLMomentumStrategy
 
         strat = MLMomentumStrategy(strategy_id=1, capital=25000)
         desc = strat.get_description()
@@ -187,6 +187,7 @@ class TestLightGBMUpgrade:
 # ---------------------------------------------------------------------------
 # A2 – HMM regime detection
 # ---------------------------------------------------------------------------
+
 
 class TestHMMRegimeDetection:
     """A2: detect_hmm_regime() returns 'bull', 'bear', or 'unknown'."""
@@ -264,9 +265,9 @@ class TestHMMRegimeDetection:
         from src.regime.regime_detector import RegimeDetector
 
         rd = RegimeDetector()
-        with patch.object(rd, "detect_hmm_regime", return_value="bull"), \
-             patch.object(rd, "detect_volatility_regime", return_value="normal"), \
-             patch.object(rd, "detect_trend_regime", return_value="weak_trend"):
+        with patch.object(rd, "detect_hmm_regime", return_value="bull"), patch.object(
+            rd, "detect_volatility_regime", return_value="normal"
+        ), patch.object(rd, "detect_trend_regime", return_value="weak_trend"):
             adj = rd.get_regime_adjustments(vix=18.0, market_data=_spy_data(n=60))
         assert adj["enable_mean_reversion"] is True
 
@@ -287,6 +288,7 @@ class TestHMMRegimeDetection:
 # ---------------------------------------------------------------------------
 # B2 – Pre-earnings BUY guard
 # ---------------------------------------------------------------------------
+
 
 class TestPreEarningsGuard:
     """B2: _get_symbols_reporting_tomorrow() + BUY suppression."""
@@ -345,6 +347,7 @@ class TestPreEarningsGuard:
 # C1 – Limit-order pricing
 # ---------------------------------------------------------------------------
 
+
 class TestLimitOrderPricing:
     """C1: BUY limit = price*1.001, SELL limit = price*0.999."""
 
@@ -377,19 +380,23 @@ class TestLimitOrderPricing:
 # C3 – Conviction-based sizing multiplier
 # ---------------------------------------------------------------------------
 
+
 class TestConvictionSizingMultiplier:
     """C3: conviction_mult = max(0.5, min(1.0, confidence))."""
 
     @pytest.mark.unit
-    @pytest.mark.parametrize("confidence,expected_mult", [
-        (0.50, 0.50),   # minimum floor
-        (0.52, 0.52),
-        (0.65, 0.65),
-        (0.80, 0.80),
-        (1.00, 1.00),   # maximum cap
-        (1.50, 1.00),   # clamped at 1.0
-        (0.00, 0.50),   # clamped at 0.5
-    ])
+    @pytest.mark.parametrize(
+        "confidence,expected_mult",
+        [
+            (0.50, 0.50),  # minimum floor
+            (0.52, 0.52),
+            (0.65, 0.65),
+            (0.80, 0.80),
+            (1.00, 1.00),  # maximum cap
+            (1.50, 1.00),  # clamped at 1.0
+            (0.00, 0.50),  # clamped at 0.5
+        ],
+    )
     def test_conviction_clamp(self, confidence: float, expected_mult: float):
         mult = max(0.5, min(1.0, float(confidence)))
         assert mult == pytest.approx(expected_mult)
@@ -397,7 +404,7 @@ class TestConvictionSizingMultiplier:
     @pytest.mark.unit
     def test_missing_confidence_defaults_to_0_7(self):
         """No confidence key → default 0.7 → mult = 0.7."""
-        signal: Dict = {"symbol": "AAPL", "action": "BUY", "shares": 100}
+        signal: dict = {"symbol": "AAPL", "action": "BUY", "shares": 100}
         mult = max(0.5, min(1.0, float(signal.get("confidence", 0.7))))
         assert mult == pytest.approx(0.7)
 
@@ -414,6 +421,7 @@ class TestConvictionSizingMultiplier:
 # ---------------------------------------------------------------------------
 # B4 – ML risk-off overlay
 # ---------------------------------------------------------------------------
+
 
 class TestMLRiskOffOverlay:
     """B4: ≥3 ML SELL signals triggers risk-off; suppresses non-ML BUYs."""

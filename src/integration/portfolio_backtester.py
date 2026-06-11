@@ -32,6 +32,11 @@ class PortfolioBacktester:
         max_positions_per_strategy: int = 5,
         max_correlation: float = 0.80,
         min_hold_days: int = 2,
+        cooldown_days: int = 10,
+        min_buy_confidence: float = 0.60,
+        max_daily_buys: int = 3,
+        breakeven_atr: float | None = None,
+        lock_atr: float | None = None,
     ):
         self.initial_capital = initial_capital
         self.slippage_bps = slippage_bps
@@ -42,6 +47,37 @@ class PortfolioBacktester:
         self.max_positions_per_strategy = max_positions_per_strategy
         self.max_correlation = max_correlation
         self.min_hold_days = min_hold_days
+        self.cooldown_days = cooldown_days
+        self.min_buy_confidence = min_buy_confidence
+        self.max_daily_buys = max_daily_buys
+        # Production ratchet (stop_loss_manager.update_ratchet_stop): None disables
+        self.breakeven_atr = breakeven_atr
+        self.lock_atr = lock_atr
+
+    @classmethod
+    def from_config(cls, config, initial_capital: float = 100000) -> PortfolioBacktester:
+        """Production-parity backtester: gates and stops sourced from the SAME
+        trading_config.yaml the live engine reads.
+
+        The legacy defaults diverge from production in ways that invalidate
+        evidence: a 0.60 confidence floor and 3-buys/day cap that production
+        doesn't have, a 10-day re-entry cooldown, and a 5.0x static ATR stop
+        vs production's 2.5x with breakeven/lock ratchet. Parity mode removes
+        the synthetic gates and replicates the production stop geometry.
+        """
+        return cls(
+            initial_capital=initial_capital,
+            slippage_bps=float(config.get("execution.slippage_bps", 5.0)),
+            commission_per_share=float(config.get("execution.commission_per_share", 0.0)),
+            max_portfolio_heat=float(config.get("risk.max_portfolio_heat", 0.40)),
+            max_daily_loss_pct=float(config.get("risk.max_daily_loss_pct", 0.05)),
+            stop_loss_atr_mult=float(config.get("risk.stop_loss_atr_multiplier", 2.5)),
+            cooldown_days=0,
+            min_buy_confidence=0.0,
+            max_daily_buys=10_000,  # production gates on funnel/risk, not a daily cap
+            breakeven_atr=float(config.get("risk.trailing_breakeven_atr", 1.0)),
+            lock_atr=float(config.get("risk.trailing_lock_atr", 2.0)),
+        )
 
     # ------------------------------------------------------------------
     # Walk-forward driver
@@ -93,9 +129,9 @@ class PortfolioBacktester:
             return {"error": "Not enough data for even one window"}
 
         # Continuous simulation state
-        cash = self.initial_capital
-        positions = {}  # carried across windows
-        stop_levels = {}
+        cash: float = self.initial_capital
+        positions: dict = {}  # carried across windows
+        stop_levels: dict = {}
         cooldowns = {}  # {symbol: last_sell_date} — prevent re-entry churn
         equity_curve = []
         all_trades = []
@@ -204,6 +240,24 @@ class PortfolioBacktester:
                     continue
                 price = float(sym_row.iloc[0]["close"])
                 days_held = (date - positions[sym]["entry_date"]).days
+                # Production-parity ratchet (stop_loss_manager.update_ratchet_stop):
+                # +breakeven_atr profit → stop to entry; +lock_atr → entry + 1 ATR,
+                # then chandelier extends. Stops never move down.
+                if (
+                    self.breakeven_atr is not None
+                    and sym in stop_levels
+                    and positions[sym].get("atr", 0) > 0
+                ):
+                    entry = positions[sym]["entry_price"]
+                    atr = positions[sym]["atr"]
+                    open_profit = price - entry
+                    new_stop = stop_levels[sym]
+                    if self.lock_atr is not None and open_profit >= self.lock_atr * atr:
+                        new_stop = max(new_stop, entry + atr)
+                        new_stop = max(new_stop, price - self.stop_loss_atr_mult * atr)
+                    elif open_profit >= self.breakeven_atr * atr:
+                        new_stop = max(new_stop, entry)
+                    stop_levels[sym] = new_stop
                 if (
                     sym in stop_levels
                     and price <= stop_levels[sym]
@@ -284,25 +338,24 @@ class PortfolioBacktester:
                     strat.entry_dates.pop(sym, None)
                 cooldowns[sym] = date  # prevent immediate re-entry
 
-            # -- Process BUY signals (high confidence only, cooldown, max 2/day) --
-            cooldown_days = 10
-            min_buy_confidence = 0.60
-            max_daily_buys = 3
+            # -- Process BUY signals (gates are constructor params; parity mode
+            #    disables the synthetic confidence floor / daily cap / cooldown) --
             buy_sigs = sorted(
                 [
                     s
                     for s in all_signals
                     if s.get("action") == "BUY"
-                    and s.get("confidence", 0) >= min_buy_confidence
+                    and s.get("confidence", 0) >= self.min_buy_confidence
                     and s["symbol"] not in positions
                     and (
-                        s["symbol"] not in cooldowns
-                        or (date - cooldowns[s["symbol"]]).days >= cooldown_days
+                        self.cooldown_days <= 0
+                        or s["symbol"] not in cooldowns
+                        or (date - cooldowns[s["symbol"]]).days >= self.cooldown_days
                     )
                 ],
                 key=lambda s: s.get("confidence", 0),
                 reverse=True,
-            )[:max_daily_buys]
+            )[: self.max_daily_buys]
 
             pos_value = self._mark_to_market(positions, day_data)
             portfolio_value = cash + pos_value
@@ -398,9 +451,9 @@ class PortfolioBacktester:
         strategies: list,
         starting_capital: float,
     ) -> dict:
-        cash = starting_capital
-        positions = {}  # {symbol: {shares, entry_price, entry_date, atr, strategy}}
-        stop_levels = {}  # {symbol: stop_price}
+        cash: float = starting_capital
+        positions: dict = {}  # {symbol: {shares, entry_price, entry_date, atr, strategy}}
+        stop_levels: dict = {}  # {symbol: stop_price}
         equity_curve = []
         trades = []
         day_start_value = starting_capital

@@ -78,9 +78,6 @@ def _make_ohlcv(
     rsi_series = np.full(n, rsi_val, dtype=float)
     rsi_series[-2] = rsi_val - 1.0  # default slope = +1
 
-    # Alternate future returns so ML model gets both classes
-    future_rets = np.where(np.arange(n) % 2 == 0, 0.01, -0.01)
-
     return pd.DataFrame(
         {
             "symbol": symbol,
@@ -108,8 +105,8 @@ def _make_ohlcv(
             "sma_20": close * 0.99,
             "sma_50": close * 0.98,
             "adx": np.full(n, 25.0),
-            "future_return_5d": future_rets,
-            "future_return_20d": future_rets * 2,
+            # NOTE: no future_* columns — ML training now hard-rejects them
+            # (leakage guard); labels derive from the close path itself.
         },
         index=dates,
     )

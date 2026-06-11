@@ -128,6 +128,8 @@ class MLMomentumStrategy(TradingStrategy):
         self._train_date: str = ""  # track when model was last trained
         self.last_feature_importances: dict = {}
         self.last_oos_accuracy: float | None = None
+        self.last_purged_count: int = 0
+        self.last_train_max_label_date = None
         self.last_train_accuracy: float | None = None
 
     # ------------------------------------------------------------------
@@ -269,11 +271,30 @@ class MLMomentumStrategy(TradingStrategy):
                 spy_ret_idx[dates[i]] = (arr[i + 5] - arr[i]) / arr[i]
         return spy_ret_idx
 
+    LABEL_HORIZON_DAYS = 5
+
+    @staticmethod
+    def _reject_future_columns(market_data: pd.DataFrame) -> None:
+        """Refuse to train on any pre-computed forward-looking column.
+
+        A future_return_5d column computed upstream is lookahead waiting to
+        happen (no way to verify its alignment at train time). Labels must be
+        derived here, from closes only, where the horizon arithmetic is
+        auditable. Fail loud — silently ignoring the column would let a data
+        pipeline change reintroduce leakage without any signal.
+        """
+        leaky = [c for c in market_data.columns if str(c).startswith("future_")]
+        if leaky:
+            raise ValueError(
+                f"ML training input contains forward-looking column(s) {leaky} — "
+                "remove them; labels are computed internally from closes"
+            )
+
     def _train_model(self, market_data: pd.DataFrame):
-        """Train on historical data using pre-computed future_return_5d when available."""
+        """Train on historical data; labels derived from closes only (no future_* columns)."""
+        self._reject_future_columns(market_data)
         X_train = []
         y_train = []
-        use_precomputed = "future_return_5d" in market_data.columns
 
         spy_ret_idx = self._build_spy_return_index(market_data)
         spy_available = len(spy_ret_idx) > 0
@@ -285,25 +306,31 @@ class MLMomentumStrategy(TradingStrategy):
             sym_map[_sym_key] = _sym_grp
 
         dropped_nan = 0
+        horizon = self.LABEL_HORIZON_DAYS
+        self.last_train_max_label_date = None
         for _symbol, sym in sym_map.items():
             if _symbol == "SPY":
                 continue
             if len(sym) < 60:
                 continue
 
-            for i in range(50, len(sym) - 5):
+            # By construction every label window [i, i+horizon] lies inside the
+            # provided history — no row's label can peek past the data end
+            # (i.e., past the caller's asof date).
+            for i in range(50, len(sym) - horizon):
                 row = sym.iloc[i]
                 history = sym.iloc[max(0, i - 50) : i + 1]
 
-                if use_precomputed:
-                    future_ret = row.get("future_return_5d", np.nan)
-                    if pd.isna(future_ret):
-                        continue
-                    future_ret = float(future_ret)
-                else:
-                    future_ret = (sym.iloc[i + 5]["close"] - sym.iloc[i]["close"]) / sym.iloc[i][
-                        "close"
-                    ]
+                entry_close = sym.iloc[i]["close"]
+                if not entry_close or entry_close <= 0:
+                    continue
+                future_ret = (sym.iloc[i + horizon]["close"] - entry_close) / entry_close
+                label_end_date = sym.index[i + horizon]
+                if (
+                    self.last_train_max_label_date is None
+                    or label_end_date > self.last_train_max_label_date
+                ):
+                    self.last_train_max_label_date = label_end_date
 
                 feats = self._extract_row_features(row, history)
                 if any(np.isnan(f) or np.isinf(f) for f in feats):
@@ -338,10 +365,9 @@ class MLMomentumStrategy(TradingStrategy):
         self.is_trained = True
         pos_rate = y_arr.mean()
         logger.info(
-            "ML trained on %d samples (%.1f%% positive, precomputed=%s, beta_adjusted=%s)",
+            "ML trained on %d samples (%.1f%% positive, beta_adjusted=%s)",
             len(y_arr),
             pos_rate * 100,
-            use_precomputed,
             spy_available,
         )
 
@@ -362,11 +388,18 @@ class MLMomentumStrategy(TradingStrategy):
             )
 
     def _compute_walk_forward_accuracy(self, market_data: pd.DataFrame) -> None:
-        """Estimate out-of-sample accuracy via a single walk-forward split."""
+        """Estimate OOS accuracy via a purged walk-forward split.
+
+        5-day labels straddling a naive 2/3 split boundary leak validation
+        information into training and inflate the reported accuracy — which
+        then gates LIVE confidence scaling. Purge: drop training rows whose
+        label window crosses the boundary. Embargo: validation starts a full
+        horizon after the boundary (López de Prado, Advances in Financial ML).
+        """
         try:
+            self._reject_future_columns(market_data)
             spy_ret_idx = self._build_spy_return_index(market_data)
             spy_available = len(spy_ret_idx) > 0
-            use_precomputed = "future_return_5d" in market_data.columns
 
             all_rows: list[tuple] = []  # (date, features, label)
 
@@ -380,19 +413,16 @@ class MLMomentumStrategy(TradingStrategy):
                 if len(sym) < 60:
                     continue
 
-                for i in range(50, len(sym) - 5):
+                for i in range(50, len(sym) - self.LABEL_HORIZON_DAYS):
                     row = sym.iloc[i]
                     history = sym.iloc[max(0, i - 50) : i + 1]
 
-                    if use_precomputed:
-                        future_ret = row.get("future_return_5d", np.nan)
-                        if pd.isna(future_ret):
-                            continue
-                        future_ret = float(future_ret)
-                    else:
-                        future_ret = (sym.iloc[i + 5]["close"] - sym.iloc[i]["close"]) / sym.iloc[
-                            i
-                        ]["close"]
+                    entry_close = sym.iloc[i]["close"]
+                    if not entry_close or entry_close <= 0:
+                        continue
+                    future_ret = (
+                        sym.iloc[i + self.LABEL_HORIZON_DAYS]["close"] - entry_close
+                    ) / entry_close
 
                     feats = self._extract_row_features(row, history)
                     if any(np.isnan(f) or np.isinf(f) for f in feats):
@@ -411,10 +441,28 @@ class MLMomentumStrategy(TradingStrategy):
                 return
 
             all_rows.sort(key=lambda r: r[0])
-            split = int(len(all_rows) * 2 / 3)
 
-            train_rows = all_rows[:split]
-            val_rows = all_rows[split:]
+            # Purged split: train ends a full label horizon BEFORE the
+            # boundary; validation starts a full horizon AFTER it.
+            horizon = self.LABEL_HORIZON_DAYS
+            unique_dates = sorted({r[0] for r in all_rows})
+            if len(unique_dates) <= 4 * horizon:
+                logger.debug("ML walk-forward skipped: too few dates for purged split")
+                return
+            split_idx = int(len(unique_dates) * 2 / 3)
+            purge_start = unique_dates[max(0, split_idx - horizon)]
+            embargo_end = unique_dates[min(len(unique_dates) - 1, split_idx + horizon)]
+
+            train_rows = [r for r in all_rows if r[0] < purge_start]
+            val_rows = [r for r in all_rows if r[0] > embargo_end]
+            self.last_purged_count = len(all_rows) - len(train_rows) - len(val_rows)
+            if len(train_rows) < 100 or len(val_rows) < 50:
+                logger.debug(
+                    "ML walk-forward skipped: %d train / %d val after purge",
+                    len(train_rows),
+                    len(val_rows),
+                )
+                return
 
             X_tr = np.array([r[1] for r in train_rows])
             y_tr = np.array([r[2] for r in train_rows])
@@ -457,10 +505,12 @@ class MLMomentumStrategy(TradingStrategy):
             self.last_oos_accuracy = float(np.mean(val_preds == y_val)) * 100
 
             logger.info(
-                "ML walk-forward OOS accuracy: %.1f%% (train: %.1f%%) — %d samples validated",
+                "ML purged walk-forward OOS accuracy: %.1f%% (train: %.1f%%) — "
+                "%d validated, %d purged/embargoed at the boundary",
                 self.last_oos_accuracy,
                 self.last_train_accuracy,
                 len(val_rows),
+                self.last_purged_count,
             )
 
             if self.last_oos_accuracy < 52.0:

@@ -49,7 +49,7 @@ repos:
     rev: v1.7.1
     hooks:
       - id: mypy
-        additional_dependencies: [types-requests]
+        additional_dependencies: [types-requests, types-PyYAML]
         # follow-imports=silent: type-check the staged file but don't surface
         # pre-existing errors in transitively imported modules.
         # database.py and execution_engine.py have large pre-existing type backlogs

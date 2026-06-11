@@ -42,8 +42,6 @@ def _make_symbol_data(
     close = np.maximum(close, 1.0)
     rsi_series = np.full(n, rsi_val, dtype=float)
     rsi_series[-2] = rsi_val - 1.0  # slope = +1 on last bar by default
-    # Alternate future returns so the ML model gets both classes
-    future_rets = np.where(np.arange(n) % 2 == 0, 0.01, -0.01)
     df = pd.DataFrame(
         {
             "symbol": symbol,
@@ -67,7 +65,6 @@ def _make_symbol_data(
             "price_to_sma20": np.full(n, 1.01),
             "price_to_sma50": np.full(n, 1.02),
             "adx": np.full(n, 25.0),
-            "future_return_5d": future_rets,
         },
         index=dates,
     )
@@ -288,14 +285,19 @@ class TestMLMomentumFixes:
         assert s.model.max_depth == 3, "max_depth must be 3 to prevent overfitting"
         assert s.model.subsample == 0.8, "subsample must be 0.8 for stochastic GBM"
 
-    def test_training_uses_precomputed_future_returns(self, ml_strategy_and_data):
-        """If future_return_5d column exists, training should use it."""
+    def test_training_rejects_precomputed_future_returns(self, ml_strategy_and_data):
+        """Forward-looking columns are leakage — training must refuse them.
+
+        (Inverted from the original test: pre-computed future_return_5d used
+        to be the preferred label source, which is unverifiable lookahead.
+        Labels are now derived internally from closes only.)
+        """
         s, data = ml_strategy_and_data
-        assert "future_return_5d" in data.columns
-        positives = (data["future_return_5d"] > 0.005).sum()
-        negatives = (data["future_return_5d"] <= 0.005).sum()
-        assert positives > 0 and negatives > 0, "Fixture must have both classes"
-        assert s.is_trained, "Model should train successfully on multi-symbol data"
+        assert s.is_trained, "Model should train successfully on clean multi-symbol data"
+        leaky = data.copy()
+        leaky["future_return_5d"] = 0.01
+        with pytest.raises(ValueError, match="forward-looking"):
+            s._train_model(leaky)
 
     def test_generates_signals_after_training(self, ml_strategy_and_data):
         s, data = ml_strategy_and_data
