@@ -1,0 +1,1650 @@
+{
+  "meta": {
+    "generatedAt": "2026-06-11T05:55:18.237522Z",
+    "tradingDate": "2026-06-11",
+    "runId": "20260611_055503_7ml7",
+    "runNumber": 206,
+    "paper": true,
+    "schemaVersion": 1
+  },
+  "portfolio": {
+    "totalValue": 96176.47,
+    "cash": 92107.25,
+    "positionsCount": 9,
+    "todayChangeUsd": -9.55,
+    "todayChangePct": -0.0099,
+    "allTimePnlUsd": -3823.53,
+    "allTimePnlPct": -3.8235,
+    "spyTodayPct": -1.5766,
+    "vsSpyPct": 1.5667,
+    "sharpe": null,
+    "sortino": null,
+    "maxDrawdownPct": 1.8664,
+    "volatilityPct": null,
+    "winRatePct": null,
+    "profitFactor": null,
+    "closedTradesCount": 19,
+    "regime": "NORMAL",
+    "heatCapPct": 40,
+    "exposurePct": 4.23
+  },
+  "equityCurve": [
+    {
+      "date": "2026-04-30",
+      "value": 97855.08,
+      "spy": 100000.0
+    },
+    {
+      "date": "2026-05-01",
+      "value": 97506.25,
+      "spy": 100276.9
+    },
+    {
+      "date": "2026-05-04",
+      "value": 96609.74,
+      "spy": 99909.55
+    },
+    {
+      "date": "2026-05-05",
+      "value": 97009.51,
+      "spy": 100711.05
+    },
+    {
+      "date": "2026-05-06",
+      "value": 97607.02,
+      "spy": 102110.87
+    },
+    {
+      "date": "2026-05-07",
+      "value": 97701.93,
+      "spy": 101797.79
+    },
+    {
+      "date": "2026-05-08",
+      "value": 97491.26,
+      "spy": 102638.24
+    },
+    {
+      "date": "2026-05-11",
+      "value": 96246.03,
+      "spy": 102872.01
+    },
+    {
+      "date": "2026-05-12",
+      "value": 96662.39,
+      "spy": 102716.17
+    },
+    {
+      "date": "2026-05-14",
+      "value": 97386.69,
+      "spy": 104106.25
+    },
+    {
+      "date": "2026-05-15",
+      "value": 96159.29,
+      "spy": 102853.92
+    },
+    {
+      "date": "2026-05-18",
+      "value": 96235.98,
+      "spy": 102781.57
+    },
+    {
+      "date": "2026-05-19",
+      "value": 96340.04,
+      "spy": 102096.96
+    },
+    {
+      "date": "2026-05-20",
+      "value": 96075.35,
+      "spy": 103143.35
+    },
+    {
+      "date": "2026-05-21",
+      "value": 96088.88,
+      "spy": 103347.9
+    },
+    {
+      "date": "2026-05-22",
+      "value": 96086.79,
+      "spy": 103754.21
+    },
+    {
+      "date": "2026-05-23",
+      "value": 96105.71,
+      "spy": 103754.21
+    },
+    {
+      "date": "2026-05-24",
+      "value": 96105.71,
+      "spy": 103754.21
+    },
+    {
+      "date": "2026-05-25",
+      "value": 96105.71,
+      "spy": 103754.21
+    },
+    {
+      "date": "2026-05-26",
+      "value": 96086.79,
+      "spy": 104442.99
+    },
+    {
+      "date": "2026-05-27",
+      "value": 96091.52,
+      "spy": 104424.9
+    },
+    {
+      "date": "2026-05-28",
+      "value": 96091.85,
+      "spy": 105000.97
+    },
+    {
+      "date": "2026-05-29",
+      "value": 96115.72,
+      "spy": 105262.57
+    },
+    {
+      "date": "2026-05-30",
+      "value": 96087.6,
+      "spy": 105262.57
+    },
+    {
+      "date": "2026-05-31",
+      "value": 96087.6,
+      "spy": 105262.57
+    },
+    {
+      "date": "2026-06-01",
+      "value": 96082.31,
+      "spy": 105549.22
+    },
+    {
+      "date": "2026-06-02",
+      "value": 96081.21,
+      "spy": 105692.54
+    },
+    {
+      "date": "2026-06-03",
+      "value": 96046.01,
+      "spy": 104950.88
+    },
+    {
+      "date": "2026-06-04",
+      "value": 96028.69,
+      "spy": 105347.45
+    },
+    {
+      "date": "2026-06-05",
+      "value": 96097.59,
+      "spy": 102628.5
+    },
+    {
+      "date": "2026-06-06",
+      "value": 96123.02,
+      "spy": 102628.5
+    },
+    {
+      "date": "2026-06-07",
+      "value": 96123.02,
+      "spy": 102628.5
+    },
+    {
+      "date": "2026-06-08",
+      "value": 96124.34,
+      "spy": 102860.88
+    },
+    {
+      "date": "2026-06-09",
+      "value": 96143.0,
+      "spy": 102558.93
+    },
+    {
+      "date": "2026-06-10",
+      "value": 96186.02,
+      "spy": 100942.03
+    },
+    {
+      "date": "2026-06-11",
+      "value": 96176.47,
+      "spy": 100942.03
+    }
+  ],
+  "strategies": [
+    {
+      "key": "rsi_mean_reversion",
+      "name": "RSI Mean Reversion",
+      "allocationPct": 20.31,
+      "returnPct": null,
+      "sharpe": null,
+      "sortino": null,
+      "profitFactor": null,
+      "maxDrawdownPct": null,
+      "tradesCount": 0,
+      "winRatePct": null,
+      "holdPeriod": "\u226420d",
+      "healthScore": 90,
+      "edgeTechnical": "RSI(14) < 35 with positive slope; uptrend gate (SMA-100); exits RSI > 55 OR 20-day hold. 2.5\u00d7 ATR stop, volume-spike filter.",
+      "edgePlain": "Buys stocks that dropped too fast, betting they bounce back.",
+      "factorProfile": {
+        "momentum": 15,
+        "quality": 40,
+        "reversion": 95,
+        "volume": 50,
+        "volatility": 80
+      },
+      "backtestSharpe": 0.65,
+      "status": "WATCHING",
+      "note": "No activity in 30d (0 signals, 0 trades) \u2014 event-driven silence or new deployment"
+    },
+    {
+      "key": "ml_momentum",
+      "name": "ML Momentum",
+      "allocationPct": 9.37,
+      "returnPct": -1.374,
+      "sharpe": null,
+      "sortino": null,
+      "profitFactor": null,
+      "maxDrawdownPct": 24.4406,
+      "tradesCount": 17,
+      "winRatePct": null,
+      "holdPeriod": "5d",
+      "healthScore": 35,
+      "edgeTechnical": "LightGBM on 12 OHLCV+indicator features; calibrated P(5-day gain). SPY 50-SMA gate; accuracy-scaled confidence when OOS < 57%.",
+      "edgePlain": "An AI model picks the stocks most likely to rise over the next week.",
+      "factorProfile": {
+        "momentum": 90,
+        "quality": 55,
+        "reversion": 20,
+        "volume": 70,
+        "volatility": 55
+      },
+      "backtestSharpe": 0.3,
+      "status": "WATCHING",
+      "note": "No trades in past 7 days"
+    },
+    {
+      "key": "earnings_drift",
+      "name": "Earnings Drift",
+      "allocationPct": 25.0,
+      "returnPct": null,
+      "sharpe": null,
+      "sortino": null,
+      "profitFactor": null,
+      "maxDrawdownPct": null,
+      "tradesCount": 0,
+      "winRatePct": null,
+      "holdPeriod": "\u226440d",
+      "healthScore": 70,
+      "edgeTechnical": "Post-earnings announcement drift (PEAD). Primary: earnings calendar. Fallback: volume > 1.3\u00d7 + abnormal return > 3.5%. 20% target / 10% stop.",
+      "edgePlain": "Rides the wave after a company posts strong earnings.",
+      "factorProfile": {
+        "momentum": 70,
+        "quality": 50,
+        "reversion": 20,
+        "volume": 90,
+        "volatility": 60
+      },
+      "backtestSharpe": 0.8,
+      "status": "WATCHING",
+      "note": "Low trade count: 3 in 30d (need 5)"
+    },
+    {
+      "key": "factor_momentum",
+      "name": "Factor Momentum",
+      "allocationPct": 7.81,
+      "returnPct": 2.4054,
+      "sharpe": null,
+      "sortino": null,
+      "profitFactor": null,
+      "maxDrawdownPct": 8.3308,
+      "tradesCount": 2,
+      "winRatePct": null,
+      "holdPeriod": "20d",
+      "healthScore": 100,
+      "edgeTechnical": "Cross-sectional rank: 60d momentum (25%), quality proxy (15%), mean-reversion (10%), volume confirmation (10%), excess SPY (15%), sector RS (10%), fundamentals (15% optional). Top 3.",
+      "edgePlain": "Ranks all stocks and buys the 3 strongest all-around performers.",
+      "factorProfile": {
+        "momentum": 80,
+        "quality": 70,
+        "reversion": 40,
+        "volume": 55,
+        "volatility": 40
+      },
+      "backtestSharpe": 0.25,
+      "status": "ACTIVE",
+      "note": "Low trade count: 2 closed trades (need 5+ for full scoring)"
+    },
+    {
+      "key": "news_sentiment",
+      "name": "News Sentiment",
+      "allocationPct": 5.0,
+      "returnPct": null,
+      "sharpe": null,
+      "sortino": null,
+      "profitFactor": null,
+      "maxDrawdownPct": null,
+      "tradesCount": 0,
+      "winRatePct": null,
+      "holdPeriod": "7d",
+      "healthScore": 100,
+      "edgeTechnical": "Google News RSS + VADER. Buys when compound score > 0.60 with uptrend gate; exits when score drops or 7-day hold expires.",
+      "edgePlain": "Buys stocks with strongly positive recent news, exits when the buzz fades.",
+      "factorProfile": {
+        "momentum": 50,
+        "quality": 30,
+        "reversion": 15,
+        "volume": 35,
+        "volatility": 30
+      },
+      "backtestSharpe": 0.25,
+      "status": "ACTIVE",
+      "note": "Low trade count: 0 closed trades (need 5+ for full scoring)"
+    },
+    {
+      "key": "ma_crossover",
+      "name": "MA Crossover",
+      "allocationPct": 6.25,
+      "returnPct": null,
+      "sharpe": null,
+      "sortino": null,
+      "profitFactor": null,
+      "maxDrawdownPct": null,
+      "tradesCount": 0,
+      "winRatePct": null,
+      "holdPeriod": "30d",
+      "healthScore": 60,
+      "edgeTechnical": "Golden cross (SMA-20 > SMA-50) with ADX > 20 trend-quality filter and volume confirmation (ratio > 0.3). 5-day lookback window.",
+      "edgePlain": "Follows stocks whose short-term average price is rising above the longer-term average.",
+      "factorProfile": {
+        "momentum": 85,
+        "quality": 45,
+        "reversion": 5,
+        "volume": 60,
+        "volatility": 45
+      },
+      "backtestSharpe": 0.2,
+      "status": "ACTIVE",
+      "note": "Low trade count: 4 in 30d (need 5)"
+    },
+    {
+      "key": "volatility_breakout",
+      "name": "Volatility Breakout",
+      "allocationPct": 6.25,
+      "returnPct": null,
+      "sharpe": null,
+      "sortino": null,
+      "profitFactor": null,
+      "maxDrawdownPct": null,
+      "tradesCount": 0,
+      "winRatePct": null,
+      "holdPeriod": "15d",
+      "healthScore": 70,
+      "edgeTechnical": "Price closes above the VIX-adaptive Bollinger Band upper (1.8\u20132.5\u03c3) with \u2265 1.2\u00d7 volume spike and positive 5d return. Exits at BB-middle.",
+      "edgePlain": "Buys stocks that break decisively upward on high volume.",
+      "factorProfile": {
+        "momentum": 75,
+        "quality": 35,
+        "reversion": 10,
+        "volume": 85,
+        "volatility": 70
+      },
+      "backtestSharpe": 0.2,
+      "status": "WATCHING",
+      "note": "Low trade count: 2 in 30d (need 5)"
+    },
+    {
+      "key": "pairs_trading",
+      "name": "Pairs Trading",
+      "allocationPct": 10.0,
+      "returnPct": null,
+      "sharpe": null,
+      "sortino": null,
+      "profitFactor": null,
+      "maxDrawdownPct": null,
+      "tradesCount": 0,
+      "winRatePct": null,
+      "holdPeriod": "20d",
+      "healthScore": 90,
+      "edgeTechnical": "Statistical mean-reversion on 5 cointegrated pairs (JPM/BAC, AAPL/MSFT, XOM/CVX, V/MA, ABBV/MRK). Buys lagging leg when ratio z-score < \u22121.5\u03c3.",
+      "edgePlain": "Buys a stock that has fallen behind its closest peer, betting the gap closes.",
+      "factorProfile": {
+        "momentum": 15,
+        "quality": 45,
+        "reversion": 90,
+        "volume": 20,
+        "volatility": 60
+      },
+      "backtestSharpe": 0.4,
+      "status": "WATCHING",
+      "note": "No activity in 30d (0 signals, 0 trades) \u2014 event-driven silence or new deployment"
+    },
+    {
+      "key": "sector_rotation",
+      "name": "Sector Rotation",
+      "allocationPct": 10.0,
+      "returnPct": null,
+      "sharpe": null,
+      "sortino": null,
+      "profitFactor": null,
+      "maxDrawdownPct": null,
+      "tradesCount": 0,
+      "winRatePct": null,
+      "holdPeriod": "20d",
+      "healthScore": 50,
+      "edgeTechnical": "Ranks 7 sector ETFs by 20-day momentum; selects top 2. Buys the highest-momentum individual stock in each winning sector.",
+      "edgePlain": "Rotates into the sectors of the market that are currently leading.",
+      "factorProfile": {
+        "momentum": 75,
+        "quality": 50,
+        "reversion": 25,
+        "volume": 40,
+        "volatility": 45
+      },
+      "backtestSharpe": 0.35,
+      "status": "WATCHING",
+      "note": "Low trade count: 1 in 30d (need 5)"
+    }
+  ],
+  "positions": [
+    {
+      "symbol": "JPM",
+      "strategy": "Sector Rotation",
+      "direction": "long",
+      "shares": 9.0,
+      "value": 2782.26,
+      "costBasis": 2783.65,
+      "unrealizedPlPct": -0.05,
+      "unrealizedPlUsd": -1.39,
+      "beta": 0.696,
+      "atrStop": 294.2703,
+      "sentimentScore": 0.4866,
+      "sentimentLabel": "NEUTRAL",
+      "detail": {
+        "priceSpark": [
+          300.25,
+          299.91,
+          297.81,
+          300.73,
+          295.7,
+          301.98,
+          303.0,
+          306.38,
+          306.74,
+          299.28,
+          296.73,
+          299.31,
+          296.58,
+          300.96,
+          300.85,
+          310.89,
+          312.37,
+          311.11,
+          312.7,
+          309.14
+        ],
+        "confidence": 0.632723924001551,
+        "sentimentMultiplier": "\u00d71.00",
+        "whyHeld": "Sector rotation: XLF rank #2 (+1.3% 20d), JPM 20d ret +1.4%",
+        "lots": [
+          {
+            "date": "2026-06-10",
+            "shares": 9.0,
+            "price": 309.2946
+          }
+        ],
+        "news": [
+          {
+            "headline": "JPMorgan Chase & Co. (JPM) Stock Moves -1.12%: What You Should Know",
+            "source": "Yahoo Finance",
+            "score": 0.5
+          },
+          {
+            "headline": "JPMorgan Chase (JPM) offers $3.45M callable notes due 2036, 5.225% coupon",
+            "source": "Stock Titan",
+            "score": 0.5
+          },
+          {
+            "headline": "JPMorgan Chase & Co (JPM) on Deals Lookout Amid Tokenized Fund Push",
+            "source": "Yahoo Finance",
+            "score": 0.5
+          }
+        ]
+      }
+    },
+    {
+      "symbol": "KO",
+      "strategy": "Factor Momentum",
+      "direction": "long",
+      "shares": 37.0,
+      "value": 3092.83,
+      "costBasis": 3094.38,
+      "unrealizedPlPct": -0.05,
+      "unrealizedPlUsd": -1.55,
+      "beta": -0.24,
+      "atrStop": 79.8645,
+      "sentimentScore": 0.6127,
+      "sentimentLabel": "NEUTRAL",
+      "detail": {
+        "priceSpark": [
+          80.26,
+          80.45,
+          80.82,
+          81.2,
+          81.92,
+          81.55,
+          81.17,
+          81.48,
+          80.46,
+          81.62,
+          80.41,
+          79.01,
+          78.64,
+          78.41,
+          78.76,
+          76.82,
+          79.48,
+          79.54,
+          81.34,
+          83.59
+        ],
+        "confidence": 0.9900000000000001,
+        "sentimentMultiplier": "\u00d71.00",
+        "whyHeld": "Factor rank score 0.831 (top 2)",
+        "lots": [
+          {
+            "date": "2026-06-10",
+            "shares": 37.0,
+            "price": 83.6318
+          }
+        ],
+        "news": [
+          {
+            "headline": "After Earnings, Is Coca-Cola Stock a Buy, a Sell, or Fairly Valued?",
+            "source": "Morningstar",
+            "score": 0.7202
+          },
+          {
+            "headline": "KO Stock Extends Rally: Coca-Cola Is Morgan Stanley\u2019s Top Beverage Bet Ahead Of FIFA World Cup",
+            "source": "Yahoo Finance",
+            "score": 0.6591
+          },
+          {
+            "headline": "KO Stock Extends Rally: Coca-Cola Is Morgan Stanley\u2019s Top Beverage Bet Ahead Of FIFA World Cup",
+            "source": "Stocktwits",
+            "score": 0.6591
+          }
+        ]
+      }
+    },
+    {
+      "symbol": "LLY",
+      "strategy": "Factor Momentum",
+      "direction": "long",
+      "shares": 3.0,
+      "value": 3409.11,
+      "costBasis": 3410.81,
+      "unrealizedPlPct": -0.05,
+      "unrealizedPlUsd": -1.7,
+      "beta": 0.731,
+      "atrStop": 1047.631,
+      "sentimentScore": 0.5728,
+      "sentimentLabel": "NEUTRAL",
+      "detail": {
+        "priceSpark": [
+          1015.75,
+          1004.9699,
+          1004.92,
+          988.09,
+          1021.41,
+          1018.87,
+          1041.65,
+          1065.0,
+          1064.74,
+          1082.92,
+          1126.8,
+          1105.0,
+          1082.2,
+          1064.15,
+          1078.78,
+          1125.27,
+          1131.42,
+          1149.15,
+          1144.68,
+          1136.37
+        ],
+        "confidence": 0.9900000000000001,
+        "sentimentMultiplier": "\u00d71.00",
+        "whyHeld": "Factor rank score 0.918 (top 2)",
+        "lots": [
+          {
+            "date": "2026-06-10",
+            "shares": 3.0,
+            "price": 1136.9382
+          }
+        ],
+        "news": [
+          {
+            "headline": "Why Is Lilly Stock Growing Like A Silicon Valley Tech Darling?",
+            "source": "Yahoo Finance",
+            "score": 0.8953
+          },
+          {
+            "headline": "\u2018This Is Compelling\u2019: Citi Pounds the Table on Eli Lilly (LLY) Stock",
+            "source": "TipRanks",
+            "score": 0.5
+          },
+          {
+            "headline": "Why Eli Lilly (LLY) Stock Is Up Today",
+            "source": "Yahoo Finance",
+            "score": 0.5
+          }
+        ]
+      }
+    },
+    {
+      "symbol": "MA",
+      "strategy": "News Sentiment",
+      "direction": "long",
+      "shares": 2.0,
+      "value": 978.16,
+      "costBasis": 978.65,
+      "unrealizedPlPct": -0.05,
+      "unrealizedPlUsd": -0.49,
+      "beta": 0.173,
+      "atrStop": 461.7921,
+      "sentimentScore": 0.6286,
+      "sentimentLabel": "BULLISH",
+      "detail": {
+        "priceSpark": [
+          490.64,
+          489.94,
+          494.2,
+          505.79,
+          499.7,
+          498.04,
+          499.62,
+          498.54,
+          493.01,
+          495.04,
+          493.75,
+          493.98,
+          495.25,
+          477.68,
+          471.55,
+          481.76,
+          491.08,
+          485.67,
+          495.24,
+          489.08
+        ],
+        "confidence": 0.7861975000000002,
+        "sentimentMultiplier": "\u00d71.15",
+        "whyHeld": "Positive news sentiment score 0.63: Mastercard Faces US$38b Fee Settlement While Shares Flagged As Undervalued | news +0.63",
+        "lots": [
+          {
+            "date": "2026-06-10",
+            "shares": 2.0,
+            "price": 489.3245
+          }
+        ],
+        "news": [
+          {
+            "headline": "Mastercard Faces US$38b Fee Settlement While Shares Flagged As Undervalued",
+            "source": "Yahoo Finance",
+            "score": 0.648
+          },
+          {
+            "headline": "Mastercard Launches Agent Pay for Machines to Unlock Super-Fast, Always-On Payments",
+            "source": "Stock Titan",
+            "score": 0.4486
+          },
+          {
+            "headline": "Can Mastercard Benefit From the Launch of Mi Clip Wallet?",
+            "source": "The Globe and Mail",
+            "score": 0.7294
+          }
+        ]
+      }
+    },
+    {
+      "symbol": "MRK",
+      "strategy": "MA Crossover",
+      "direction": "long",
+      "shares": 16.0,
+      "value": 1905.44,
+      "costBasis": 1906.39,
+      "unrealizedPlPct": -0.05,
+      "unrealizedPlUsd": -0.95,
+      "beta": 0.379,
+      "atrStop": 111.3393,
+      "sentimentScore": 0.5937,
+      "sentimentLabel": "NEUTRAL",
+      "detail": {
+        "priceSpark": [
+          113.45,
+          113.41,
+          111.38,
+          112.56,
+          114.24,
+          113.0,
+          115.88,
+          122.41,
+          119.72,
+          120.24,
+          119.89,
+          118.72,
+          115.17,
+          115.65,
+          114.7,
+          120.26,
+          120.79,
+          119.52,
+          119.6,
+          119.09
+        ],
+        "confidence": 0.6715084875169647,
+        "sentimentMultiplier": "\u00d71.00",
+        "whyHeld": "Golden cross: SMA20 (116.98) > SMA50 (116.21), ADX 28.8",
+        "lots": [
+          {
+            "date": "2026-06-10",
+            "shares": 16.0,
+            "price": 119.1495
+          }
+        ],
+        "news": [
+          {
+            "headline": "Merck Stock Zooms Closer To A Breakout On 'A New Chapter' In Cancer",
+            "source": "Investor's Business Daily",
+            "score": 0.1702
+          },
+          {
+            "headline": "Five-Year Tally: Merck Stock Delivers $47 Bil Gain",
+            "source": "Trefis",
+            "score": 0.7633
+          },
+          {
+            "headline": "Merck Stock Moves Above 50-Day SMA: Assessing Its Investment Case",
+            "source": "Yahoo! Finance Canada",
+            "score": 0.5
+          }
+        ]
+      }
+    },
+    {
+      "symbol": "PEP",
+      "strategy": "News Sentiment",
+      "direction": "long",
+      "shares": 5.0,
+      "value": 721.6,
+      "costBasis": 721.96,
+      "unrealizedPlPct": -0.05,
+      "unrealizedPlUsd": -0.36,
+      "beta": -0.122,
+      "atrStop": 136.8145,
+      "sentimentScore": 0.6125,
+      "sentimentLabel": "NEUTRAL",
+      "detail": {
+        "priceSpark": [
+          149.27,
+          148.67,
+          149.12,
+          149.06,
+          150.37,
+          149.29,
+          148.85,
+          150.57,
+          145.68,
+          147.74,
+          146.29,
+          144.19,
+          141.52,
+          140.5344,
+          141.0689,
+          140.6829,
+          141.92,
+          140.68,
+          142.78,
+          144.32
+        ],
+        "confidence": 0.6393750000000004,
+        "sentimentMultiplier": "\u00d71.00",
+        "whyHeld": "Positive news sentiment score 0.61: PepsiCo Stock Forecast 2026: Q1 EPS Beat and a PFNA Volume Inflection Point to R",
+        "lots": [
+          {
+            "date": "2026-06-10",
+            "shares": 5.0,
+            "price": 144.3922
+          }
+        ],
+        "news": [
+          {
+            "headline": "PepsiCo Stock Forecast 2026: Q1 EPS Beat and a PFNA Volume Inflection Point to Recovery",
+            "source": "TIKR.com",
+            "score": 0.5
+          },
+          {
+            "headline": "PepsiCo (PEP) Valuation Check After Recent Share Price Pullback And Mixed Fair Value Signals",
+            "source": "simplywall.st",
+            "score": 0.8548
+          },
+          {
+            "headline": "Is It Time To Reconsider PepsiCo (PEP) After The Recent 9% Share Price Pullback",
+            "source": "Yahoo Finance",
+            "score": 0.648
+          }
+        ]
+      }
+    },
+    {
+      "symbol": "UNH",
+      "strategy": "Factor Momentum",
+      "direction": "long",
+      "shares": 3.0,
+      "value": 1222.38,
+      "costBasis": 1148.16,
+      "unrealizedPlPct": 6.4639,
+      "unrealizedPlUsd": 74.22,
+      "beta": 0.353,
+      "atrStop": 391.7382,
+      "sentimentScore": 0.543,
+      "sentimentLabel": "NEUTRAL",
+      "detail": {
+        "priceSpark": [
+          401.16,
+          399.09,
+          393.85,
+          391.13,
+          389.24,
+          383.3,
+          382.48,
+          388.47,
+          376.86,
+          384.01,
+          382.53,
+          380.31,
+          379.86,
+          377.92,
+          377.0,
+          396.47,
+          399.47,
+          406.57,
+          413.0,
+          407.46
+        ],
+        "confidence": 0.9900000000000001,
+        "sentimentMultiplier": "\u00d71.00",
+        "whyHeld": "Factor rank score 0.906 (top 3)",
+        "lots": [
+          {
+            "date": "2026-05-27",
+            "shares": 5.0,
+            "price": 377.0484
+          },
+          {
+            "date": "2026-05-28",
+            "shares": 5.0,
+            "price": 384.202
+          },
+          {
+            "date": "2026-05-29",
+            "shares": 6.0,
+            "price": 382.7213
+          }
+        ],
+        "news": [
+          {
+            "headline": "UnitedHealth Just Raised Its Dividend 5%. Why You Should Buy UNH Stock Here.",
+            "source": "Barchart",
+            "score": 0.5
+          },
+          {
+            "headline": "UNH STOCK BREAKING NEWS - UNITEDHEALTH GROUP INC STOCK | UNH STOCK Victoria Swarovski (1FBc5OP5WO)",
+            "source": "Fathom Journal",
+            "score": 0.5
+          },
+          {
+            "headline": "UnitedHealth Group (UNH) Stock Moves -1.28%: What You Should Know",
+            "source": "Yahoo Finance Singapore",
+            "score": 0.5
+          }
+        ]
+      }
+    },
+    {
+      "symbol": "VZ",
+      "strategy": "News Sentiment",
+      "direction": "long",
+      "shares": 25.0,
+      "value": 1173.75,
+      "costBasis": 1200.85,
+      "unrealizedPlPct": -2.2567,
+      "unrealizedPlUsd": -27.1,
+      "beta": -0.201,
+      "atrStop": 45.9462,
+      "sentimentScore": 0.6316,
+      "sentimentLabel": "BULLISH",
+      "detail": {
+        "priceSpark": [
+          47.21,
+          47.06,
+          46.37,
+          46.76,
+          47.74,
+          47.82,
+          48.27,
+          48.35,
+          48.49,
+          48.24,
+          48.01,
+          47.81,
+          47.73,
+          47.87,
+          46.65,
+          44.87,
+          45.37,
+          45.44,
+          45.78,
+          46.95
+        ],
+        "confidence": 0.909549375,
+        "sentimentMultiplier": "\u00d71.15",
+        "whyHeld": "Positive news sentiment score 0.66: Verizon Communications Inc. (VZ) Announces Approval of 2026 Long-Term Incentive  | news +0.66",
+        "lots": [
+          {
+            "date": "2026-05-29",
+            "shares": 40.0,
+            "price": 48.034
+          }
+        ],
+        "news": [
+          {
+            "headline": "Verizon: A Good Defensive Play In Times Of Market Exuberance",
+            "source": "Seeking Alpha",
+            "score": 0.8298
+          },
+          {
+            "headline": "VZ vs. ASTS: Which Connectivity Stock is the Better Buy?",
+            "source": "Yahoo! Finance Canada",
+            "score": 0.7306
+          },
+          {
+            "headline": "Verizon (VZ) EVP Kyle Malady awarded 135.7 phantom stock units in cash-settled plan",
+            "source": "Stock Titan",
+            "score": 0.7009
+          }
+        ]
+      }
+    }
+  ],
+  "trades": [
+    {
+      "date": "2026-05-21",
+      "symbol": "XLV",
+      "strategy": "ML Momentum",
+      "side": "SELL",
+      "shares": 11.0,
+      "entry": 145.7929,
+      "exit": 148.0759,
+      "realizedPlPct": 1.566,
+      "realizedPlUsd": 25.11,
+      "exitReason": "ML bearish (40%) | news +0.69"
+    },
+    {
+      "date": "2026-05-18",
+      "symbol": "AMD",
+      "strategy": "Factor Momentum",
+      "side": "SELL",
+      "shares": 1.0,
+      "entry": 459.0194,
+      "exit": 420.7795,
+      "realizedPlPct": -8.3308,
+      "realizedPlUsd": -38.24,
+      "exitReason": "Stop-loss: -8.3% loss (limit -8%)"
+    },
+    {
+      "date": "2026-05-18",
+      "symbol": "UNH",
+      "strategy": "ML Momentum",
+      "side": "SELL",
+      "shares": 5.0,
+      "entry": 396.5382,
+      "exit": 390.8845,
+      "realizedPlPct": -1.4258,
+      "realizedPlUsd": -28.27,
+      "exitReason": "Held 6d"
+    },
+    {
+      "date": "2026-05-18",
+      "symbol": "TSLA",
+      "strategy": "ML Momentum",
+      "side": "SELL",
+      "shares": 2.0,
+      "entry": 445.2225,
+      "exit": 409.785,
+      "realizedPlPct": -7.9595,
+      "realizedPlUsd": -70.87,
+      "exitReason": "Held 7d"
+    },
+    {
+      "date": "2026-05-18",
+      "symbol": "NVDA",
+      "strategy": "ML Momentum",
+      "side": "SELL",
+      "shares": 4.0,
+      "entry": 219.5497,
+      "exit": 222.2088,
+      "realizedPlPct": 1.2112,
+      "realizedPlUsd": 10.64,
+      "exitReason": "Held 7d"
+    },
+    {
+      "date": "2026-05-18",
+      "symbol": "AMD",
+      "strategy": "ML Momentum",
+      "side": "SELL",
+      "shares": 8.0,
+      "entry": 455.4616,
+      "exit": 420.7795,
+      "realizedPlPct": -7.6147,
+      "realizedPlUsd": -277.46,
+      "exitReason": "Held 10d"
+    },
+    {
+      "date": "2026-05-12",
+      "symbol": "XLK",
+      "strategy": "ML Momentum",
+      "side": "SELL",
+      "shares": 13.0,
+      "entry": 170.1184,
+      "exit": 175.1224,
+      "realizedPlPct": 2.9415,
+      "realizedPlUsd": 65.05,
+      "exitReason": "Held 5d"
+    },
+    {
+      "date": "2026-05-12",
+      "symbol": "NFLX",
+      "strategy": "ML Momentum",
+      "side": "SELL",
+      "shares": 24.0,
+      "entry": 88.3141,
+      "exit": 87.6162,
+      "realizedPlPct": -0.7903,
+      "realizedPlUsd": -16.75,
+      "exitReason": "Held 5d"
+    },
+    {
+      "date": "2026-05-12",
+      "symbol": "AAPL",
+      "strategy": "ML Momentum",
+      "side": "SELL",
+      "shares": 16.0,
+      "entry": 287.7247,
+      "exit": 294.6526,
+      "realizedPlPct": 2.4078,
+      "realizedPlUsd": 110.85,
+      "exitReason": "Held 5d"
+    },
+    {
+      "date": "2026-05-11",
+      "symbol": "ABT",
+      "strategy": "ML Momentum",
+      "side": "SELL",
+      "shares": 22.0,
+      "entry": 84.3421,
+      "exit": 82.5087,
+      "realizedPlPct": -2.1738,
+      "realizedPlUsd": -40.34,
+      "exitReason": "ML bearish (35%)"
+    },
+    {
+      "date": "2026-05-11",
+      "symbol": "GOOGL",
+      "strategy": "ML Momentum",
+      "side": "SELL",
+      "shares": 5.0,
+      "entry": 398.239,
+      "exit": 388.4457,
+      "realizedPlPct": -2.4592,
+      "realizedPlUsd": -48.97,
+      "exitReason": "Held 5d"
+    },
+    {
+      "date": "2026-05-06",
+      "symbol": "AMD",
+      "strategy": "Factor Momentum",
+      "side": "SELL",
+      "shares": 10.0,
+      "entry": 345.9776,
+      "exit": 421.1793,
+      "realizedPlPct": 21.736,
+      "realizedPlUsd": 752.02,
+      "exitReason": "Profit target: 21.8% gain (target 12%)"
+    },
+    {
+      "date": "2026-05-06",
+      "symbol": "NFLX",
+      "strategy": "ML Momentum",
+      "side": "SELL",
+      "shares": 18.0,
+      "entry": 92.106,
+      "exit": 88.2259,
+      "realizedPlPct": -4.2127,
+      "realizedPlUsd": -69.84,
+      "exitReason": "Held 5d"
+    },
+    {
+      "date": "2026-05-06",
+      "symbol": "DHR",
+      "strategy": "ML Momentum",
+      "side": "SELL",
+      "shares": 9.0,
+      "entry": 175.2376,
+      "exit": 174.7126,
+      "realizedPlPct": -0.2996,
+      "realizedPlUsd": -4.72,
+      "exitReason": "Held 5d"
+    },
+    {
+      "date": "2026-05-05",
+      "symbol": "VZ",
+      "strategy": "ML Momentum",
+      "side": "SELL",
+      "shares": 36.0,
+      "entry": 48.054,
+      "exit": 47.3313,
+      "realizedPlPct": -1.5039,
+      "realizedPlUsd": -26.02,
+      "exitReason": "Held 5d"
+    },
+    {
+      "date": "2026-05-05",
+      "symbol": "UNH",
+      "strategy": "ML Momentum",
+      "side": "SELL",
+      "shares": 12.0,
+      "entry": 369.4447,
+      "exit": 363.5681,
+      "realizedPlPct": -1.5907,
+      "realizedPlUsd": -70.52,
+      "exitReason": "Held 5d"
+    },
+    {
+      "date": "2026-05-05",
+      "symbol": "GOOGL",
+      "strategy": "ML Momentum",
+      "side": "SELL",
+      "shares": 5.0,
+      "entry": 384.9924,
+      "exit": 388.2358,
+      "realizedPlPct": 0.8425,
+      "realizedPlUsd": 16.22,
+      "exitReason": "Held 5d"
+    },
+    {
+      "date": "2026-05-05",
+      "symbol": "ABT",
+      "strategy": "ML Momentum",
+      "side": "SELL",
+      "shares": 16.0,
+      "entry": 90.8354,
+      "exit": 87.1264,
+      "realizedPlPct": -4.0832,
+      "realizedPlUsd": -59.34,
+      "exitReason": "Held 5d"
+    },
+    {
+      "date": "2026-05-04",
+      "symbol": "AVGO",
+      "strategy": "ML Momentum",
+      "side": "SELL",
+      "shares": 3.0,
+      "entry": 417.6387,
+      "exit": 416.2918,
+      "realizedPlPct": -0.3225,
+      "realizedPlUsd": -4.04,
+      "exitReason": "ML bearish (34%)"
+    }
+  ],
+  "signals": {
+    "funnel": [
+      {
+        "stage": "Candidates scanned",
+        "count": 10,
+        "note": "Total signals generated by all strategies"
+      },
+      {
+        "stage": "Passed regime gate",
+        "count": 6,
+        "note": "4 blocked by regime/strategy-disabled filter"
+      },
+      {
+        "stage": "Survived correlation filter",
+        "count": 6,
+        "note": "All passed"
+      },
+      {
+        "stage": "Passed risk checks",
+        "count": 6,
+        "note": "All passed"
+      },
+      {
+        "stage": "Executed",
+        "count": 6,
+        "note": "All executed"
+      }
+    ],
+    "explorer": [
+      {
+        "symbol": "JPM",
+        "strategy": "Sector Rotation",
+        "confidence": 0.6327,
+        "sentimentScore": 0.4866,
+        "multiplier": "\u00d71.00",
+        "status": "EXECUTED",
+        "reason": "Sector rotation: XLF rank #2 (+1.3% 20d), JPM 20d ret +1.4%"
+      },
+      {
+        "symbol": "MRK",
+        "strategy": "MA Crossover",
+        "confidence": 0.6715,
+        "sentimentScore": 0.5937,
+        "multiplier": "\u00d71.00",
+        "status": "EXECUTED",
+        "reason": "Golden cross: SMA20 (116.98) > SMA50 (116.21), ADX 28.8"
+      },
+      {
+        "symbol": "PEP",
+        "strategy": "News Sentiment",
+        "confidence": 0.6394,
+        "sentimentScore": 0.6125,
+        "multiplier": "\u00d71.00",
+        "status": "EXECUTED",
+        "reason": "Positive news sentiment score 0.61: PepsiCo Stock Forecast 2026: Q1 EPS Beat and a PFNA Volume Inflection Point to R"
+      },
+      {
+        "symbol": "MA",
+        "strategy": "News Sentiment",
+        "confidence": 0.7862,
+        "sentimentScore": 0.6286,
+        "multiplier": "\u00d71.15",
+        "status": "EXECUTED",
+        "reason": "Positive news sentiment score 0.63: Mastercard Faces US$38b Fee Settlement While Shares Flagged As Undervalued | news +0.63"
+      },
+      {
+        "symbol": "KO",
+        "strategy": "Factor Momentum",
+        "confidence": 0.99,
+        "sentimentScore": 0.6127,
+        "multiplier": "\u00d71.00",
+        "status": "EXECUTED",
+        "reason": "Factor rank score 0.831 (top 2)"
+      },
+      {
+        "symbol": "LLY",
+        "strategy": "Factor Momentum",
+        "confidence": 0.99,
+        "sentimentScore": 0.5728,
+        "multiplier": "\u00d71.00",
+        "status": "EXECUTED",
+        "reason": "Factor rank score 0.918 (top 2)"
+      }
+    ]
+  },
+  "analytics": {
+    "drawdown": [
+      {
+        "date": "2026-04-30",
+        "ddPct": 0.0
+      },
+      {
+        "date": "2026-05-01",
+        "ddPct": -0.3565
+      },
+      {
+        "date": "2026-05-04",
+        "ddPct": -1.2726
+      },
+      {
+        "date": "2026-05-05",
+        "ddPct": -0.8641
+      },
+      {
+        "date": "2026-05-06",
+        "ddPct": -0.2535
+      },
+      {
+        "date": "2026-05-07",
+        "ddPct": -0.1565
+      },
+      {
+        "date": "2026-05-08",
+        "ddPct": -0.3718
+      },
+      {
+        "date": "2026-05-11",
+        "ddPct": -1.6443
+      },
+      {
+        "date": "2026-05-12",
+        "ddPct": -1.2188
+      },
+      {
+        "date": "2026-05-14",
+        "ddPct": -0.4787
+      },
+      {
+        "date": "2026-05-15",
+        "ddPct": -1.733
+      },
+      {
+        "date": "2026-05-18",
+        "ddPct": -1.6546
+      },
+      {
+        "date": "2026-05-19",
+        "ddPct": -1.5482
+      },
+      {
+        "date": "2026-05-20",
+        "ddPct": -1.8187
+      },
+      {
+        "date": "2026-05-21",
+        "ddPct": -1.8049
+      },
+      {
+        "date": "2026-05-22",
+        "ddPct": -1.807
+      },
+      {
+        "date": "2026-05-23",
+        "ddPct": -1.7877
+      },
+      {
+        "date": "2026-05-24",
+        "ddPct": -1.7877
+      },
+      {
+        "date": "2026-05-25",
+        "ddPct": -1.7877
+      },
+      {
+        "date": "2026-05-26",
+        "ddPct": -1.807
+      },
+      {
+        "date": "2026-05-27",
+        "ddPct": 1.8022
+      },
+      {
+        "date": "2026-05-28",
+        "ddPct": 1.8019
+      },
+      {
+        "date": "2026-05-29",
+        "ddPct": 1.7775
+      },
+      {
+        "date": "2026-05-30",
+        "ddPct": -1.8062
+      },
+      {
+        "date": "2026-05-31",
+        "ddPct": -1.8062
+      },
+      {
+        "date": "2026-06-01",
+        "ddPct": -1.8116
+      },
+      {
+        "date": "2026-06-02",
+        "ddPct": -1.8128
+      },
+      {
+        "date": "2026-06-03",
+        "ddPct": -1.8487
+      },
+      {
+        "date": "2026-06-04",
+        "ddPct": -1.8664
+      },
+      {
+        "date": "2026-06-05",
+        "ddPct": 1.796
+      },
+      {
+        "date": "2026-06-06",
+        "ddPct": -1.77
+      },
+      {
+        "date": "2026-06-07",
+        "ddPct": -1.77
+      },
+      {
+        "date": "2026-06-08",
+        "ddPct": -1.7687
+      },
+      {
+        "date": "2026-06-09",
+        "ddPct": 1.7496
+      },
+      {
+        "date": "2026-06-10",
+        "ddPct": -1.7056
+      },
+      {
+        "date": "2026-06-11",
+        "ddPct": 1.7154
+      }
+    ],
+    "rollingSharpe": [
+      {
+        "date": "2026-06-05",
+        "sharpe": -2.1794
+      },
+      {
+        "date": "2026-06-06",
+        "sharpe": -2.171
+      },
+      {
+        "date": "2026-06-07",
+        "sharpe": -1.7447
+      },
+      {
+        "date": "2026-06-08",
+        "sharpe": -0.646
+      },
+      {
+        "date": "2026-06-09",
+        "sharpe": -1.2268
+      },
+      {
+        "date": "2026-06-10",
+        "sharpe": -2.1166
+      },
+      {
+        "date": "2026-06-11",
+        "sharpe": -1.971
+      }
+    ],
+    "monthlyReturns": [
+      {
+        "month": "2026-04",
+        "returnPct": 0.0198
+      },
+      {
+        "month": "2026-05",
+        "returnPct": -1.7899
+      },
+      {
+        "month": "2026-06",
+        "returnPct": 0.0597
+      }
+    ],
+    "returnDistribution": [
+      {
+        "bucket": "-10%+",
+        "count": 0
+      },
+      {
+        "bucket": "-8%",
+        "count": 1
+      },
+      {
+        "bucket": "-6%",
+        "count": 2
+      },
+      {
+        "bucket": "-4%",
+        "count": 2
+      },
+      {
+        "bucket": "-2%",
+        "count": 2
+      },
+      {
+        "bucket": "0%",
+        "count": 6
+      },
+      {
+        "bucket": "2%",
+        "count": 3
+      },
+      {
+        "bucket": "4%",
+        "count": 2
+      },
+      {
+        "bucket": "6%",
+        "count": 0
+      },
+      {
+        "bucket": "8%",
+        "count": 0
+      },
+      {
+        "bucket": "10%+",
+        "count": 1
+      }
+    ],
+    "strategyCorrelation": {
+      "labels": [
+        "Factor Momentum",
+        "ML Momentum"
+      ],
+      "matrix": [
+        [
+          1.0,
+          null
+        ],
+        [
+          null,
+          1.0
+        ]
+      ]
+    },
+    "backtestVsLive": [
+      {
+        "strategy": "Earnings Drift",
+        "backtestSharpe": 0.8,
+        "liveSharpe": null
+      },
+      {
+        "strategy": "Factor Momentum",
+        "backtestSharpe": 0.25,
+        "liveSharpe": null
+      },
+      {
+        "strategy": "MA Crossover",
+        "backtestSharpe": 0.2,
+        "liveSharpe": null
+      },
+      {
+        "strategy": "ML Momentum",
+        "backtestSharpe": 0.3,
+        "liveSharpe": null
+      },
+      {
+        "strategy": "News Sentiment",
+        "backtestSharpe": 0.25,
+        "liveSharpe": null
+      },
+      {
+        "strategy": "Pairs Trading",
+        "backtestSharpe": 0.4,
+        "liveSharpe": null
+      },
+      {
+        "strategy": "RSI Mean Reversion",
+        "backtestSharpe": 0.65,
+        "liveSharpe": null
+      },
+      {
+        "strategy": "Sector Rotation",
+        "backtestSharpe": 0.35,
+        "liveSharpe": null
+      },
+      {
+        "strategy": "Volatility Breakout",
+        "backtestSharpe": 0.2,
+        "liveSharpe": null
+      }
+    ],
+    "bestMonth": {
+      "month": "2026-06",
+      "returnPct": 0.0597
+    },
+    "worstMonth": {
+      "month": "2026-05",
+      "returnPct": -1.7899
+    }
+  },
+  "health": {
+    "markers": [
+      {
+        "key": "broker",
+        "label": "Broker Reconciliation",
+        "ok": true,
+        "detail": "Broker positions match database",
+        "autoAttempted": false,
+        "autoResolved": false,
+        "remaining": 0
+      },
+      {
+        "key": "data",
+        "label": "Market Data",
+        "ok": true,
+        "detail": "Market data is current"
+      },
+      {
+        "key": "quality",
+        "label": "System Quality",
+        "ok": true,
+        "detail": "System running normally"
+      },
+      {
+        "key": "breaker",
+        "label": "Circuit Breaker",
+        "ok": true,
+        "detail": "No circuit breaker active"
+      },
+      {
+        "key": "correlation",
+        "label": "Correlation Filter",
+        "ok": true,
+        "detail": "Correlation filter operating normally"
+      },
+      {
+        "key": "regime",
+        "label": "Regime: NORMAL",
+        "ok": true,
+        "neutral": true,
+        "detail": "Current market regime: NORMAL. Always counts as healthy."
+      }
+    ],
+    "syncWorkflowUrl": "https://github.com/shreyas-chickerur/investor-mimic-bot/actions/workflows/sync_database.yml"
+  }
+}
