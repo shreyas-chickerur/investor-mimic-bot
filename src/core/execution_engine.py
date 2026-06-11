@@ -189,8 +189,13 @@ class MultiStrategyRunner:
         # Initialize professional-grade modules with config
         self.email_notifier = EmailNotifier(outbox_writer=self.db.enqueue_notification)
         self.data_validator = DataValidator()
-        total_capital = max(self.portfolio_value, self.buying_power)
-        self.cash_manager = CashManager(total_capital, num_strategies=len(CANONICAL_STRATEGY_SPECS))
+        # Real equity only — buying_power is the 4x day-trade margin ceiling
+        # (same phantom-capital bug as the allocator). The initial equal-split
+        # buckets are placeholders; set_allocations() re-keys them by actual
+        # strategy IDs once initialize_strategies() has run.
+        self.cash_manager = CashManager(
+            self.portfolio_value, num_strategies=len(CANONICAL_STRATEGY_SPECS)
+        )
 
         # Portfolio risk manager - load from config
         max_heat = self.config.get("risk.max_portfolio_heat", 0.30)
@@ -215,8 +220,10 @@ class MultiStrategyRunner:
         )
 
         self.regime_detector = RegimeDetector()
+        # Placeholder base; _allocator_capital_base() re-derives it (deployed %
+        # of real equity, never buying power) at the start of every run.
         self.dynamic_allocator = DynamicAllocator(
-            total_capital,
+            self.portfolio_value,
             max_allocation_pct=self.config.get("risk.dynamic_max_allocation_pct", 0.35),
             min_allocation_pct=self.config.get("risk.dynamic_min_allocation_pct", 0.05),
         )
@@ -1343,6 +1350,16 @@ class MultiStrategyRunner:
         else:
             logger.info("No stop losses triggered")
         logger.info("=" * 80)
+
+        # Wind down positions stranded by disabled strategies. A disabled
+        # strategy is filtered out of initialize_strategies() entirely, so its
+        # open positions would otherwise NEVER receive exit signals — only the
+        # catastrophe stop layer would ever close them. Like stop-losses, this
+        # reduces exposure, so it runs before the kill-switch gate.
+        try:
+            self._winddown_inactive_strategy_positions(strategies, market_data)
+        except Exception as _wd_exc:
+            logger.error("Strategy wind-down failed (non-fatal): %s", _wd_exc)
 
         # CRITICAL: Check kill switches BEFORE any new entries
         logger.info("=" * 80)
@@ -4022,6 +4039,127 @@ class MultiStrategyRunner:
                 symbol,
                 limit_price,
                 shortfall,
+            )
+
+    def _winddown_inactive_strategy_positions(self, strategies, market_data) -> None:
+        """Exit positions held by strategies that are no longer active.
+
+        Emits OPG SELL (longs) / BUY-to-cover (shorts) for every open position
+        whose strategy is not in the active set and is not BROKER_SYNC or the
+        Cash Sweep sleeve. Without this, flipping `disabled: true` on a
+        strategy strands its inventory forever (it never gets exit signals).
+        """
+        import sqlite3 as _sqlite3
+
+        active_ids = {s.strategy_id for s in strategies}
+        protected = {"BROKER_SYNC", self.SWEEP_STRATEGY_NAME}
+
+        conn = _sqlite3.connect(self.db.db_path, timeout=10)
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT p.strategy_id, p.symbol, p.shares, p.avg_price, p.entry_date, s.name
+                FROM positions p JOIN strategies s ON p.strategy_id = s.id
+                WHERE p.shares != 0
+                """
+            )
+            rows = cur.fetchall()
+        finally:
+            conn.close()
+
+        orphans = [r for r in rows if r[0] not in active_ids and r[5] not in protected]
+        if not orphans:
+            return
+
+        # Latest close per symbol from today's market data
+        last_close: dict[str, float] = {}
+        if "symbol" in market_data.columns:
+            for _sym, grp in market_data.groupby("symbol"):
+                try:
+                    last_close[_sym] = float(grp["close"].iloc[-1])
+                except Exception:
+                    continue
+
+        logger.warning(
+            "Strategy wind-down: %d position(s) held by inactive strategies: %s",
+            len(orphans),
+            [(r[5], r[1], r[2]) for r in orphans],
+        )
+
+        for sid, symbol, shares, avg_price, entry_date, strat_name in orphans:
+            price = last_close.get(symbol)
+            if not price or price <= 0:
+                logger.warning(
+                    "Wind-down deferred for %s (%s): no market data today", symbol, strat_name
+                )
+                continue
+            is_short = shares < 0
+            qty = abs(float(shares))
+            side = OrderSide.BUY if is_short else OrderSide.SELL
+            side_str = "BUY" if is_short else "SELL"
+            # Liquidity-taking limit: generous 1% buffer so the OPG fills
+            limit_price = round(price * (1.01 if is_short else 0.99), 2)
+
+            if self.db.find_active_order_intent_for_today(sid, symbol, side_str):
+                logger.info("Wind-down %s %s already submitted today — skipping", side_str, symbol)
+                continue
+            intent_id = self.db.create_order_intent(sid, symbol, side_str, qty)
+            order_data = LimitOrderRequest(
+                symbol=symbol,
+                qty=qty,
+                side=side,
+                time_in_force=TimeInForce.OPG,
+                limit_price=limit_price,
+            )
+            order = self.dry_run.execute_broker_operation(
+                f"submit_order_winddown_{symbol}", self.trading_client.submit_order, order_data
+            )
+            self.db.update_order_intent_status(intent_id, "SUBMITTED", str(order.id))
+            if self.paper_mode:
+                self.db.update_order_intent_status(
+                    intent_id, "FILLED", broker_order_id=str(order.id)
+                )
+            direction = "short" if is_short else "long"
+            pnl = (avg_price - limit_price) * qty if is_short else (limit_price - avg_price) * qty
+            self.db.log_trade(
+                sid,
+                None,
+                symbol,
+                side_str,
+                qty,
+                price,
+                limit_price,
+                0.0,
+                0.0,
+                str(order.id),
+                pnl=pnl,
+            )
+            try:
+                self.db.log_trade_pnl(
+                    sid,
+                    strat_name,
+                    symbol,
+                    self.run_id,
+                    entry_price=float(avg_price),
+                    exit_price=limit_price,
+                    shares=qty,
+                    entry_date=entry_date,
+                    exit_reason="strategy wind-down (disabled)",
+                    direction=direction,
+                )
+            except Exception as _pnl_exc:
+                logger.warning("Wind-down P&L logging failed for %s: %s", symbol, _pnl_exc)
+            # Positive delta covers a short; negative delta sells a long
+            self._update_position_record(sid, symbol, qty if is_short else -qty, limit_price)
+            logger.info(
+                "Wind-down: %s %.0f %s @ limit %.2f (%s, %s)",
+                side_str,
+                qty,
+                symbol,
+                limit_price,
+                strat_name,
+                direction,
             )
 
     def _allocator_capital_base(self) -> float:
