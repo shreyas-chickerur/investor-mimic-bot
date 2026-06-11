@@ -33,8 +33,8 @@ jobs:
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        ARTIFACT_ID=$(gh api repos/${{ github.repository }}/actions/artifacts \
-          --jq '.artifacts | map(select(.name == "training-data" and .expired == false)) | sort_by(.created_at) | reverse | .[0].id // empty')
+        ARTIFACT_ID=$(gh api "repos/${{ github.repository }}/actions/artifacts?name=training-data&per_page=100" \
+          --jq '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | reverse | .[0].id // empty')
         if [ -n "$ARTIFACT_ID" ]; then
           gh api repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip > training.zip
           unzip -o training.zip

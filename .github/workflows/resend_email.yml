@@ -34,8 +34,8 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         ARTIFACT_ID=$(gh api \
-          repos/${{ github.repository }}/actions/artifacts \
-          --jq '[.artifacts[] | select(.name=="trading-database") | select(.expired==false)] | sort_by(.created_at) | last | .id')
+          "repos/${{ github.repository }}/actions/artifacts?name=trading-database&per_page=100" \
+          --jq '[.artifacts[] | select(.expired==false)] | sort_by(.created_at) | last | .id')
         if [ -n "$ARTIFACT_ID" ] && [ "$ARTIFACT_ID" != "null" ]; then
           echo "Downloading artifact $ARTIFACT_ID"
           gh api repos/${{ github.repository }}/actions/artifacts/${ARTIFACT_ID}/zip \
