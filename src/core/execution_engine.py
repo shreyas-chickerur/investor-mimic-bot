@@ -46,6 +46,7 @@ from src.risk.broker_reconciler import BrokerReconciler
 from src.risk.correlation_filter import CorrelationFilter
 from src.risk.drawdown_stop_manager import DrawdownStopManager
 from src.risk.portfolio_risk_manager import PortfolioRiskManager
+from src.strategies.strategy_dual_momentum import DualMomentumStrategy
 from src.strategies.strategy_earnings_drift import EarningsDriftStrategy
 from src.strategies.strategy_factor_momentum import _SECTOR_MAP, FactorMomentumStrategy
 from src.strategies.strategy_ma_crossover import MACrossoverStrategy
@@ -119,6 +120,11 @@ CANONICAL_STRATEGY_SPECS = [
         "Sector Rotation",
         "Explicit sector momentum rotation: top-2 sectors by 20d return, best stock each",
         SectorRotationStrategy,
+    ),
+    (
+        "Dual Momentum",
+        "12-1 cross-sectional momentum with absolute momentum filter (Antonacci)",
+        DualMomentumStrategy,
     ),
 ]
 

@@ -287,7 +287,10 @@ class PortfolioBacktester:
                     cooldowns[sym] = date
 
             # -- Generate signals --
-            lookback_start = date - timedelta(days=210)
+            # 400 calendar days ≈ 270 trading days: enough for the 252-day
+            # 12-1 dual-momentum lookback; other strategies tail() shorter
+            # windows from precomputed indicator columns, so this is additive.
+            lookback_start = date - timedelta(days=400)
             historical = market_data[
                 (market_data.index >= lookback_start) & (market_data.index <= date)
             ]
@@ -509,7 +512,7 @@ class PortfolioBacktester:
                         del strat.positions[sym]
 
             # -- Generate signals (use last 150 days of available data) --
-            lookback_start = date - timedelta(days=210)  # extra buffer for indicators
+            lookback_start = date - timedelta(days=400)  # covers 252d dual-momentum lookback
             historical = test_data[(test_data.index >= lookback_start) & (test_data.index <= date)]
 
             all_signals = []

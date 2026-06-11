@@ -102,42 +102,41 @@ strategies:
   # BACKTESTED   : full-period in-sample backtest only (overfitting risk)
   # PAPER_VALIDATED : live paper-trading results confirm edge
   # OOS_VALIDATED   : walk-forward out-of-sample accuracy verified
+  # Statuses set by the 2026-06 evidence run — docs/research/EVIDENCE_2026-06.md
   validation_status:
-    rsi_mean_reversion: BACKTESTED
-    earnings_drift: BACKTESTED
-    ml_momentum: OOS_VALIDATED    # walk-forward accuracy gate enforced at runtime
-    factor_momentum: PAPER_VALIDATED
-    news_sentiment: UNVALIDATED   # threshold rarely met; experimental
-    ma_crossover: BACKTESTED
-    volatility_breakout: BACKTESTED
-    pairs_trading: UNVALIDATED  # new strategy — live paper trading will validate
-    sector_rotation: UNVALIDATED
+    rsi_mean_reversion: OOS_VALIDATED   # 15y Sharpe 0.64, PF 1.43
+    earnings_drift: OOS_VALIDATED       # 15y Sharpe 0.59, PF 1.40 (DD 23.7% — monitor)
+    ml_momentum: UNVALIDATED            # purged-OOS near-random x91 windows — DISABLED
+    factor_momentum: OOS_VALIDATED      # 15y Sharpe 1.16, PF 1.67; live +$714
+    news_sentiment: UNVALIDATED         # offline-unvalidatable (live RSS) — DISABLED
+    ma_crossover: OOS_VALIDATED         # 15y Sharpe 1.19 but 2y 0.33 — probation cap
+    volatility_breakout: OOS_VALIDATED  # 15y Sharpe 1.17, 94.7% windows positive
+    pairs_trading: UNVALIDATED          # 0/5 pairs cointegrated/tradeable — DISABLED
+    sector_rotation: UNVALIDATED        # 2y only, 25 trades < 30 gate — probation cap
+    dual_momentum: OOS_VALIDATED        # 15y Sharpe 1.20, PF 2.06; 2y Sharpe 1.45
 
-  # Backtest Sharpe priors — seed allocator when live history < 20 days
-  # RSI Sharpe 0.65 (p=0.019), Earnings Drift estimated 0.80 (p=0.001),
-  # ML Momentum 0.30 (edge only at high conf), Factor Momentum 0.0 (no edge)
+  # Backtest Sharpe priors — seed allocator when live history < 20 days.
+  # MEASURED 15y production-parity OOS Sharpes (docs/research/EVIDENCE_2026-06.md);
+  # sector_rotation is a judgment value (15y untestable, 2y under-sampled).
   backtest_sharpe_priors:
-    rsi_mean_reversion: 0.65
-    earnings_drift: 0.80
-    ml_momentum: 0.30
-    factor_momentum: 0.25
-    news_sentiment: 0.25
-    ma_crossover: 0.20
-    volatility_breakout: 0.20
-    pairs_trading: 0.40        # Gatev et al. (2006): ~6% alpha → estimated Sharpe ~0.4
-    sector_rotation: 0.35      # Moskowitz & Grinblatt (1999): sector momentum documented edge
+    rsi_mean_reversion: 0.64
+    earnings_drift: 0.59
+    factor_momentum: 1.16
+    ma_crossover: 1.19
+    volatility_breakout: 1.17
+    sector_rotation: 0.50
+    dual_momentum: 1.20
 
   # Per-strategy allocation caps (override global max_allocation_pct)
+  # Tiering from the 2026-06 evidence run (docs/research/EVIDENCE_2026-06.md)
   allocation_overrides:
-    rsi_mean_reversion: 0.25   # Capped down from 0.40 — prior Sharpe doesn't warrant 40%
-    earnings_drift: 0.25       # Capped down from 0.35 — still highest-prior strategy
-    ml_momentum: 0.20          # Edge at high-conf only — cap at 20%
-    factor_momentum: 0.15      # Re-enabled; live P&L positive but limited sample
-    news_sentiment: 0.05       # Experimental — VADER threshold rarely met; cap until validated
-    ma_crossover: 0.15         # Unvalidated — moderate cap
-    volatility_breakout: 0.15  # Unvalidated — moderate cap
-    pairs_trading: 0.10        # New strategy — conservative cap until validated
-    sector_rotation: 0.10      # New strategy — conservative cap until validated
+    factor_momentum: 0.30      # strongest combined evidence (15y 1.16 / 2y 1.76, live +$714)
+    earnings_drift: 0.25       # PASS, but 15y DD 23.7% near the limit — monitor
+    rsi_mean_reversion: 0.25   # PASS both horizons
+    dual_momentum: 0.15        # new, OOS-validated (best PF) — probation cap first quarter
+    volatility_breakout: 0.15  # PASS both horizons; weak prior → probation cap
+    ma_crossover: 0.10         # PASS 15y but FAILED the 2y recent regime (Sharpe 0.33)
+    sector_rotation: 0.10      # 25 trades < 30 gate — probation until sample accrues
 
   # Strategy-specific parameters
   rsi_mean_reversion:
@@ -155,12 +154,14 @@ strategies:
     cross_lookback: 5          # Accept golden cross within last 5 trading days
 
   news_sentiment:
+    disabled: true  # 2026-06 evidence: offline-unvalidatable (live RSS lookahead in backtests)
     buy_threshold: 0.60    # Lowered from 0.68; VADER compound >0.36 was rarely met
     sell_threshold: 0.38
     hold_days: 7
     max_hold_days: 14
 
   ml_momentum:
+    disabled: true  # 2026-06 evidence: purged-OOS accuracy near-random on 91/91 windows
     lookback_days: 60
     min_confidence: 0.65
     feature_count: 12
@@ -202,11 +203,21 @@ strategies:
     min_surprise_return: 0.02
 
   pairs_trading:
+    disabled: true  # 2026-06 evidence: 0/5 pairs pass cointegration/half-life/PF gates
     entry_z_threshold: 1.5    # Enter when ratio z-score < -1.5σ
     exit_z_threshold: 0.3     # Exit when ratio z-score reverts within 0.3σ of mean
     lookback_days: 60         # Rolling window for mean/std calculation
     max_hold_days: 20         # Force exit if spread doesn't revert
     # Pairs are hardcoded in strategy_pairs_trading.py (JPM/BAC, AAPL/MSFT, etc.)
+
+  dual_momentum:
+    disabled: false  # 2026-06 evidence: 15y Sharpe 1.20 / PF 2.06; 2y Sharpe 1.45
+    lookback_days: 252        # 12-month momentum window
+    skip_days: 21             # skip the most recent month (short-term reversal)
+    top_n: 5
+    min_hold_days: 5
+    soft_hold_days: 35
+    max_hold_days: 70
 
   sector_rotation:
     top_sectors: 2            # Number of outperforming sectors to rotate into

@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import pandas as pd
 
 from src.integration.portfolio_backtester import PortfolioBacktester
+from src.strategies.strategy_dual_momentum import DualMomentumStrategy
 from src.strategies.strategy_earnings_drift import EarningsDriftStrategy
 from src.strategies.strategy_factor_momentum import FactorMomentumStrategy
 from src.strategies.strategy_ma_crossover import MACrossoverStrategy
@@ -144,6 +145,7 @@ def main():
         VolatilityBreakoutStrategy,
         NewsSentimentStrategy,
         SectorRotationStrategy,
+        DualMomentumStrategy,
     ]
     if args.exclude:
         ALL_STRATEGY_CLASSES = [
