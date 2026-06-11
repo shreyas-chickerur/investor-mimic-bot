@@ -624,6 +624,42 @@ jobs:
         fi
         git worktree remove --force "$WORK"
 
+    - name: Back up database to data branch
+      id: backup_db
+      if: always() && hashFiles('trading.db') != ''
+      continue-on-error: true  # outcome feeds the final health gate
+      run: |
+        # The trading-database artifact (90-day retention) is otherwise the
+        # ONLY copy of all state — a quiet period or retention change loses
+        # everything. A plain-text SQL dump is committed daily: git's delta
+        # compression makes append-mostly dumps nearly free, and history
+        # keeps every prior day. Restore: sqlite3 new.db < db/trading.sql
+        git config user.name  "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        sqlite3 trading.db "PRAGMA wal_checkpoint(TRUNCATE);" || true
+
+        WORK=$(mktemp -d)
+        if git fetch origin data 2>/dev/null; then
+          git worktree add "$WORK" origin/data
+        else
+          git worktree add --orphan -b data "$WORK"
+        fi
+
+        mkdir -p "$WORK/db"
+        sqlite3 trading.db .dump > "$WORK/db/trading.sql"
+
+        cd "$WORK"
+        git add db/trading.sql
+        if git diff --staged --quiet; then
+          echo "No DB changes to back up"
+        else
+          git commit -m "db backup: $(date -u +%F) [skip ci]"
+          git push origin HEAD:data
+          echo "✅ Database backed up to data branch ($(wc -c < db/trading.sql) bytes)"
+        fi
+        cd - > /dev/null
+        git worktree remove --force "$WORK"
+
     - name: Validate system invariants
       if: steps.check_execution.outputs.executed == 'true'
       continue-on-error: true
@@ -1045,6 +1081,7 @@ jobs:
         [ "${{ steps.export_snapshot.outcome }}" = "failure" ]      && FAILED_STEPS="$FAILED_STEPS export_snapshot"
         [ "${{ steps.validate_snapshot.outcome }}" = "failure" ]    && FAILED_STEPS="$FAILED_STEPS validate_snapshot"
         [ "${{ steps.publish_snapshot.outcome }}" = "failure" ]     && FAILED_STEPS="$FAILED_STEPS publish_snapshot"
+        [ "${{ steps.backup_db.outcome }}" = "failure" ]            && FAILED_STEPS="$FAILED_STEPS backup_db"
         [ "${{ steps.run_health.outcome }}" = "failure" ]           && FAILED_STEPS="$FAILED_STEPS run_health"
         if [ -n "$FAILED_STEPS" ]; then
           echo "❌ Health gate failed: non-blocking step(s) failed:$FAILED_STEPS"
