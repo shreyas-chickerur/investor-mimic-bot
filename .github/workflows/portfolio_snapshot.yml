@@ -6,6 +6,15 @@ on:
     - cron: '5 1 * * *'
   workflow_dispatch:
 
+# Share the trading run's concurrency group: this workflow downloads and
+# re-uploads the trading-database artifact, and GitHub's native cron can
+# drift hours (the 01:05 schedule fired at 05:44 on 2026-06-11, straight
+# into the 05:45 trading window). Queueing prevents the two workflows from
+# racing on the DB artifact — last upload would silently win.
+concurrency:
+  group: daily-trading-execution
+  cancel-in-progress: false
+
 env:
   PYTHON_VERSION: "3.11"
 
@@ -32,8 +41,8 @@ jobs:
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        ARTIFACT_ID=$(gh api repos/${{ github.repository }}/actions/artifacts \
-          --jq '.artifacts | map(select(.name == "trading-database" and .expired == false)) | sort_by(.created_at) | reverse | .[0].id // empty')
+        ARTIFACT_ID=$(gh api "repos/${{ github.repository }}/actions/artifacts?name=trading-database&per_page=100" \
+          --jq '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | reverse | .[0].id // empty')
         if [ -n "$ARTIFACT_ID" ]; then
           gh api repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip > trading-db.zip
           unzip -o trading-db.zip

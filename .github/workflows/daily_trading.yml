@@ -63,9 +63,10 @@ jobs:
         GH_TOKEN: ${{ github.token }}
       run: |
         echo "=== Downloading latest trading-database artifact ==="
-        # List recent artifacts named trading-database, get the most recent one
-        ARTIFACT_ID=$(gh api repos/${{ github.repository }}/actions/artifacts \
-          --jq '.artifacts | map(select(.name == "trading-database" and .expired == false)) | sort_by(.created_at) | reverse | .[0].id // empty')
+        # Server-side name filter: the unfiltered endpoint returns only the
+        # first 30 artifacts and CI churn can push trading-database off page 1
+        ARTIFACT_ID=$(gh api "repos/${{ github.repository }}/actions/artifacts?name=trading-database&per_page=100" \
+          --jq '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | reverse | .[0].id // empty')
 
         if [ -n "$ARTIFACT_ID" ]; then
           echo "Found artifact ID: $ARTIFACT_ID"
@@ -131,8 +132,8 @@ jobs:
         ALPHA_VANTAGE_PREMIUM: ${{ secrets.ALPHA_VANTAGE_PREMIUM }}
       run: |
         echo "=== Downloading latest training-data artifact ==="
-        ARTIFACT_ID=$(gh api repos/${{ github.repository }}/actions/artifacts \
-          --jq '.artifacts | map(select(.name == "training-data" and .expired == false)) | sort_by(.created_at) | reverse | .[0].id // empty')
+        ARTIFACT_ID=$(gh api "repos/${{ github.repository }}/actions/artifacts?name=training-data&per_page=100" \
+          --jq '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | reverse | .[0].id // empty')
         if [ -n "$ARTIFACT_ID" ]; then
           echo "Found artifact ID: $ARTIFACT_ID"
           gh api repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip > training-data.zip
