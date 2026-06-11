@@ -222,7 +222,10 @@ class TestFactorMomentumStrategy:
             assert "Factor rank" in sig["reasoning"]
 
     def test_sell_after_hold_period(self):
-        """Should sell positions after hold_days."""
+        """Should sell positions after hold_days. SYM00 is the lowest-momentum
+        name in the fixture, so past the soft horizon the rank-hysteresis
+        thesis is gone (not in the top 2*top_n band) -> rotate out; if it
+        ranks well it exits at the absolute ceiling instead."""
         strat = FactorMomentumStrategy(1, 25000)
         strat.positions["SYM00"] = 10
         strat.entry_dates["SYM00"] = pd.Timestamp("2024-01-01")
@@ -230,7 +233,8 @@ class TestFactorMomentumStrategy:
         signals = strat.generate_signals(df)
         sell_signals = [s for s in signals if s["action"] == "SELL" and s["symbol"] == "SYM00"]
         assert len(sell_signals) == 1
-        assert "rebalance" in sell_signals[0]["reasoning"].lower()
+        reasoning = sell_signals[0]["reasoning"].lower()
+        assert "thesis" in reasoning or "ceiling" in reasoning
 
     def test_no_sell_before_hold_period(self):
         """Should NOT sell positions before hold_days."""

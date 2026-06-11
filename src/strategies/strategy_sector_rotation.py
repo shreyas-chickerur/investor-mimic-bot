@@ -58,6 +58,7 @@ class SectorRotationStrategy(TradingStrategy):
         self.sector_lookback: int = sr_cfg.get("sector_lookback_days", 20)
         self.hold_days: int = sr_cfg.get("hold_days", 20)
         self.max_hold_days: int = sr_cfg.get("max_hold_days", 35)
+        self.min_hold_days: int = sr_cfg.get("min_hold_days", 0)
         self.profit_target_pct: float = sr_cfg.get("profit_target_pct", 0.12)
         self.entry_dates: dict = {}
         self._partial_exit_done: set = set()
@@ -95,13 +96,23 @@ class SectorRotationStrategy(TradingStrategy):
         sym_map = {sym: grp for sym, grp in market_data.groupby("symbol")}
         latest_date = market_data.index[-1] if len(market_data) > 0 else None
 
+        # Sector ranking computed ONCE, before exits: the rebalance exit needs
+        # to know whether a held name's sector is still top-ranked. A losing
+        # position in a still-leading sector holds to the max ceiling instead
+        # of being calendar-dumped at hold_days.
+        sector_rets = self._sector_momentum(sym_map)
+        ranked_sectors = sorted(sector_rets.items(), key=lambda x: x[1], reverse=True)
+        top_sectors = [
+            s for s, _ in ranked_sectors[: self.top_sectors] if sector_rets.get(s, 0) > 0
+        ]
+        _symbol_sector = {sym: etf for etf, syms in _SECTOR_CONSTITUENTS.items() for sym in syms}
+
         # --- Exits for held positions ---
         for symbol in list(self.positions.keys()):
             if symbol not in sym_map:
                 continue
             sym_data = sym_map[symbol]
             price = float(sym_data.iloc[-1]["close"])
-            days_held = self.get_days_held(symbol, latest_date)
             entry_price = getattr(self, "entry_prices", {}).get(symbol)
 
             exit_reason = None
@@ -115,8 +126,20 @@ class SectorRotationStrategy(TradingStrategy):
                     exit_reason = f"Sector rotation profit target: {pnl_pct:.1%} → selling 50%"
                     partial_exit = True
 
-            if exit_reason is None and days_held >= self.hold_days:
-                exit_reason = f"Sector rebalance: held {days_held}d"
+            if exit_reason is None:
+                in_profit = (
+                    entry_price is not None and entry_price > 0 and price > float(entry_price)
+                )
+                _sector = _symbol_sector.get(symbol)
+                exit_reason = self.evaluate_time_exit(
+                    symbol,
+                    latest_date,
+                    in_profit=in_profit,
+                    thesis_intact=bool(sector_rets) and _sector in top_sectors,
+                    min_hold_days=self.min_hold_days,
+                    soft_hold_days=self.hold_days,
+                    max_hold_days=self.max_hold_days,
+                )
 
             if exit_reason:
                 signals.append(
@@ -140,15 +163,9 @@ class SectorRotationStrategy(TradingStrategy):
             return signals
 
         # --- New entries: rotate into top-sector stocks ---
-        sector_rets = self._sector_momentum(sym_map)
+        # (sector_rets / top_sectors computed once above, shared with exits)
         if not sector_rets:
             return signals
-
-        # Rank sectors by momentum, pick top N
-        ranked_sectors = sorted(sector_rets.items(), key=lambda x: x[1], reverse=True)
-        top_sectors = [
-            s for s, _ in ranked_sectors[: self.top_sectors] if sector_rets.get(s, 0) > 0
-        ]
 
         capacity = max(0, (self.top_sectors * self.stocks_per_sector) - len(self.positions))
         if capacity <= 0:

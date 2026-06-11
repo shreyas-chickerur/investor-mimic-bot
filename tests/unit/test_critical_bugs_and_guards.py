@@ -798,6 +798,7 @@ class TestLetWinnersRun:
         s.rsi_exit = 55
         s.hold_days = 20
         s.max_hold_days = 40
+        s.min_hold_days = 0
         s.profit_target_pct = 0.05
         s.stop_loss_pct = 0.07
         s.let_winners_run_pct = 0.03
@@ -827,10 +828,12 @@ class TestLetWinnersRun:
         df["symbol"] = "AAPL"
         return df, dates
 
-    def test_rsi_time_exit_fires_when_losing(self):
-        """Time exit fires normally when position is not profitable."""
+    def test_rsi_loser_with_intact_thesis_holds_past_soft_horizon(self):
+        """Phase-4 exit policy: a LOSING position whose thesis is intact
+        (RSI still below rsi_exit) is no longer dumped at hold_days — it
+        holds until the max ceiling. The old behavior force-realized losses
+        at the soft horizon."""
         strat = self._rsi_strategy()
-        # Build data first so we can anchor entry_date relative to dates[-1]
         df, dates = self._make_rsi_data(rsi=50.0, rsi_prev=48.0, price=100.0, sma_100=90.0)
         # Entry 20 business days ago → ~28 calendar days → between hold_days (20) and max_hold (40)
         strat.positions = {"AAPL": 10}
@@ -838,9 +841,7 @@ class TestLetWinnersRun:
         strat.entry_dates = {"AAPL": dates[-20].strftime("%Y-%m-%d")}
         signals = strat.generate_signals(df)
         sells = [s for s in signals if s["action"] == "SELL"]
-        # -2% loss → profit < let_winners_run_pct (3%) → let-winners-run doesn't apply → time exit fires
-        assert len(sells) == 1
-        assert "time-based exit" in sells[0]["reasoning"]
+        assert len(sells) == 0, "loser with intact thesis must hold to the ceiling, not be dumped"
 
     def test_rsi_time_exit_skipped_when_profitable(self):
         """Time exit is suppressed when position is ≥3% profitable and RSI < rsi_exit."""
@@ -869,9 +870,9 @@ class TestLetWinnersRun:
         strat.entry_dates = {"AAPL": dates[-32].strftime("%Y-%m-%d")}
         signals = strat.generate_signals(df)
         sells = [s for s in signals if s["action"] == "SELL"]
-        # days_held ~45 > max_hold_days=40 → let-winners-run `days_held < max_hold` check fails → time exit fires
+        # days_held ~45 > max_hold_days=40 → absolute ceiling fires regardless of P&L
         assert len(sells) == 1
-        assert "time-based exit" in sells[0]["reasoning"]
+        assert "ceiling" in sells[0]["reasoning"]
 
     def test_rsi_let_winners_attributes_exist(self):
         """RSIMeanReversionStrategy must expose max_hold_days and let_winners_run_pct."""

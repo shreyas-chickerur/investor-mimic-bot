@@ -99,6 +99,7 @@ class FactorMomentumStrategy(TradingStrategy):
         )
         self.hold_days = 20
         self.max_hold_days = 35  # absolute ceiling even for profitable positions
+        self.min_hold_days = 0
         self.top_n = 3  # Buy top 3 stocks (reduced from 5 — higher conviction, lower cost drag)
         self.profit_target_pct = 0.12  # Exit at 12% gain — lock in before mean-reversion
         self.stop_loss_pct = 0.08  # retained for reference; exits now via StopLossManager
@@ -330,6 +331,14 @@ class FactorMomentumStrategy(TradingStrategy):
         # Pre-build symbol→DataFrame lookup once — avoids repeated boolean filter per position
         sym_map = {sym: grp for sym, grp in market_data.groupby("symbol")}  # noqa: C416
 
+        # Compute factor scores ONCE, before exits: the rebalance exit needs to
+        # know whether a held name still ranks well. Rank hysteresis (hold while
+        # in the top 2*top_n) replaces blind calendar liquidation — a position
+        # only rotates out when something meaningfully better has displaced it.
+        scores = self._compute_factor_scores(market_data) or {}
+        _ranked_syms = [s for s, _ in sorted(scores.items(), key=lambda x: x[1], reverse=True)]
+        _hold_band = set(_ranked_syms[: self.top_n * 2])
+
         # Check SELL first — profit target, stop-loss, or time-based rebalance
         for symbol in list(self.positions.keys()):
             days_held = self.get_days_held(symbol, latest_date)
@@ -356,24 +365,28 @@ class FactorMomentumStrategy(TradingStrategy):
                     partial_exit = True
             # Stop-losses handled by StopLossManager (trailing ATR ratchet); no fixed pct here.
 
-            # Tax-aware extension: if profitable and approaching the 1-year
-            # LTCG threshold, defer the rebalance so the gain qualifies for
-            # long-term capital gains treatment.
+            # Time exit via the shared min/soft/max policy. Thesis intact =
+            # the name still ranks in the top 2*top_n of the composite (rank
+            # hysteresis) — calendar liquidation of a still-well-ranked name
+            # was pure churn. Winners-run and LTCG deferral preserved.
             in_profit = entry_price is not None and entry_price > 0 and price > float(entry_price)
             approaching_ltcg = 250 <= days_held < 370
-            if exit_reason is None and days_held >= self.hold_days:
-                # Let winners run; also respect 1-year tax threshold.
-                if (
-                    entry_price
-                    and entry_price > 0
-                    and days_held < self.max_hold_days
-                    and (price - entry_price) / entry_price >= self.let_winners_run_pct
-                ):
-                    pass  # momentum still working — keep holding
-                elif approaching_ltcg and in_profit:
-                    pass  # defer exit to capture long-term capital gains rate
-                else:
-                    exit_reason = f"Factor rebalance: held {days_held}d"
+            _winner_running = bool(
+                entry_price
+                and entry_price > 0
+                and (price - entry_price) / entry_price >= self.let_winners_run_pct
+            )
+            if exit_reason is None:
+                exit_reason = self.evaluate_time_exit(
+                    symbol,
+                    latest_date,
+                    in_profit=in_profit,
+                    thesis_intact=symbol in _hold_band if scores else True,
+                    min_hold_days=self.min_hold_days,
+                    soft_hold_days=self.hold_days,
+                    max_hold_days=self.max_hold_days,
+                    hold_winner=_winner_running or (approaching_ltcg and in_profit),
+                )
 
             if exit_reason:
                 signals.append(
@@ -404,8 +417,7 @@ class FactorMomentumStrategy(TradingStrategy):
         if buy_capacity <= 0:
             return signals
 
-        # Compute factor scores
-        scores = self._compute_factor_scores(market_data)
+        # Factor scores were computed once above (shared with the exit logic)
         if not scores:
             return signals
 
