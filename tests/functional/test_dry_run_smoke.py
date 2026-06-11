@@ -7,6 +7,7 @@ training data, with the broker patched out and DRY_RUN=true.
 This is the test that catches "the engine itself is broken" BEFORE the next
 production run does — it runs in CI's slow suite and a weekly schedule.
 """
+import os
 import sqlite3
 import sys
 from pathlib import Path
@@ -97,9 +98,25 @@ def test_full_pipeline_dry_run(tmp_path, monkeypatch):
             "SELECT stage, status FROM run_state ORDER BY updated_at DESC LIMIT 1"
         ).fetchone()
 
-    # All enabled strategies must at least report a funnel row (liveness)
-    assert len(funnel_strategies) >= 5, (
-        f"expected funnel rows from >=5 strategies, got {len(funnel_strategies)} — "
+    # All enabled strategies must report a funnel row (liveness). The expected
+    # count is derived from the canonical spec list minus config-disabled and
+    # env-disabled strategies — never hardcoded, so flipping a `disabled` flag
+    # in trading_config.yaml doesn't silently weaken or break this canary.
+    from src.utils.config_loader import get_config
+
+    _config = get_config()
+    _env_disabled = {
+        s.strip() for s in os.environ.get("STRATEGY_DISABLED_LIST", "").split(",") if s.strip()
+    }
+    _enabled = [
+        name
+        for name, _desc, _cls in ee.CANONICAL_STRATEGY_SPECS
+        if not _config.get(f"strategies.{name.lower().replace(' ', '_')}.disabled", False)
+        and name not in _env_disabled
+    ]
+    assert len(funnel_strategies) >= len(_enabled), (
+        f"expected funnel rows from all {len(_enabled)} enabled strategies "
+        f"({_enabled}), got {len(funnel_strategies)} — "
         "a strategy crashed or was silently skipped"
     )
     assert run_state is not None and run_state["status"] != "FAILED"

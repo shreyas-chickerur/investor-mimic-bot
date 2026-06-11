@@ -173,20 +173,24 @@ class CashManager:
         sorted_trades = sorted(all_trades, key=lambda x: x.get("confidence", 0.5), reverse=True)
 
         approved_trades = []
-        strategy_cash_used = {i: 0 for i in range(1, self.num_strategies + 1)}
+        # Key by ACTUAL bucket IDs — strategy IDs are not contiguous once
+        # strategies are disabled (range(1, N+1) silently missed real IDs).
+        strategy_cash_used = {sid: 0.0 for sid in self.allocated_cash}
 
         for trade in sorted_trades:
             strategy_id = trade.get("strategy_id", 1)
             trade_value = trade.get("value", 0)
 
             # Check if strategy has enough cash
-            cash_available = (
-                self.allocated_cash.get(strategy_id, 0) - strategy_cash_used[strategy_id]
+            cash_available = self.allocated_cash.get(strategy_id, 0) - strategy_cash_used.get(
+                strategy_id, 0.0
             )
 
             if cash_available >= trade_value:
                 approved_trades.append(trade)
-                strategy_cash_used[strategy_id] += trade_value
+                strategy_cash_used[strategy_id] = (
+                    strategy_cash_used.get(strategy_id, 0.0) + trade_value
+                )
             else:
                 logger.warning(f"Skipping trade for {trade.get('symbol')} - insufficient cash")
 
