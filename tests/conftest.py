@@ -5,13 +5,33 @@ All market-data fixtures use the same column schema as training_data.csv so
 that strategies work against them without KeyError exceptions.
 """
 import logging
+import lzma
 import os
 import tempfile
 from datetime import datetime
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _ensure_training_data():
+    """Inflate the committed market-data snapshot when data/training_data.csv
+    is absent (CI checkouts — the live file is gitignored and artifact-managed).
+
+    Local working copies that already have the live file are never touched.
+    The snapshot is the full production dataset with numerics rounded to 4dp
+    (sub-cent prices, 1bp returns) so the slow/functional suites — including
+    the DRY_RUN engine canary — exercise the real pipeline in CI.
+    """
+    repo_root = Path(__file__).parent.parent
+    target = repo_root / "data" / "training_data.csv"
+    snapshot = repo_root / "tests" / "fixtures" / "market_data_snapshot.csv.xz"
+    if not target.exists() and snapshot.exists():
+        target.parent.mkdir(exist_ok=True)
+        target.write_bytes(lzma.decompress(snapshot.read_bytes()))
 
 
 @pytest.fixture(autouse=True, scope="session")

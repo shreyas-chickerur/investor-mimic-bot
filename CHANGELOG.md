@@ -29,6 +29,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (a populated artifact with duplicates would have killed the run); populated
   legacy-DB migration test gates all future schema changes.
 
+### Fixed - CI functional suite actually runs (2026-06-11)
+
+- CI was red on every push since functional tests were enabled: three
+  end-to-end tests hard-failed on the missing gitignored
+  `data/training_data.csv`, and the DRY_RUN engine canary silently SKIPPED in
+  CI and on the weekly schedule — the canary never ran where it mattered.
+  Fixed by committing `tests/fixtures/market_data_snapshot.csv.xz` (full
+  22k-row production dataset, numerics rounded to 4dp, 1.5MB) which
+  `tests/conftest.py` inflates to `data/training_data.csv` when the live file
+  is absent; local working copies are never touched. Component strategy tests
+  got a 120s timeout marker (ML model training exceeds the 30s default).
+
 ### Added - Diagnosability layer (2026-06-11)
 
 - `artifacts/run_health.json` + `run_history` table: one consolidated
