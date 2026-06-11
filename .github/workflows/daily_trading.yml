@@ -194,6 +194,9 @@ jobs:
       continue-on-error: true
       env:
         ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+        # Premium pacing (1s/req vs 12s) — without it the expanded universe
+        # takes ~25 min per fetch attempt
+        ALPHA_VANTAGE_PREMIUM: ${{ secrets.ALPHA_VANTAGE_PREMIUM }}
       run: |
         echo "=== Fetching Latest Market Data ==="
         for attempt in 1 2 3; do

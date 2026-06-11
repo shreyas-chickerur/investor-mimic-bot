@@ -4,11 +4,12 @@ Daily Data Update Script
 Fetches latest market data and appends to training_data.csv
 Ensures data is always fresh for trading strategies
 """
+from __future__ import annotations
+
 import argparse
 import os
 import sys
 from pathlib import Path
-from typing import List, Optional
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -30,15 +31,56 @@ logger = logging.getLogger(__name__)
 from src.data.universe_provider import UniverseProvider
 
 
+def select_backfill_symbols(
+    existing_df,
+    universe,
+    latest_date,
+    min_rows: int = 350,
+    min_recent: int = 60,
+    max_backfills: int | None = None,
+):
+    """Pick symbols needing a full-history backfill, capped per run.
+
+    Returns (backfill, deferred): `backfill` is fetched with 730 days this
+    run; `deferred` (overflow beyond max_backfills, sorted alphabetically so
+    onboarding progresses deterministically across runs) is skipped entirely
+    this run and picked up on subsequent runs. Capping keeps a large universe
+    expansion from blowing the API budget / run time in a single morning.
+    """
+    if existing_df is None:
+        candidates = sorted(universe)
+    else:
+        rows_per_symbol = existing_df.groupby("symbol").size()
+        recent_cutoff = latest_date - timedelta(days=150) if latest_date is not None else None
+        if recent_cutoff is not None:
+            recent_counts = (
+                existing_df[existing_df["date"] >= recent_cutoff].groupby("symbol").size()
+            )
+        else:
+            recent_counts = pd.Series(dtype=int)
+        candidates = sorted(
+            s
+            for s in universe
+            if rows_per_symbol.get(s, 0) < min_rows or recent_counts.get(s, 0) < min_recent
+        )
+    if max_backfills is None or len(candidates) <= max_backfills:
+        return set(candidates), set()
+    return set(candidates[:max_backfills]), set(candidates[max_backfills:])
+
+
 class DailyDataUpdater:
     """Update training data with latest market data"""
 
-    def __init__(self, api_key: Optional[str] = None, symbols: Optional[List[str]] = None):
+    def __init__(self, api_key: str | None = None, symbols: list[str] | None = None):
         self.api_key = api_key or os.getenv("ALPHA_VANTAGE_API_KEY")
         if not self.api_key:
             raise ValueError("ALPHA_VANTAGE_API_KEY not set")
 
         self.base_url = "https://www.alphavantage.co/query"
+        # Premium keys allow 75 req/min — pace at 1s; free tier stays at 12s
+        _premium = os.getenv("ALPHA_VANTAGE_PREMIUM", "false").lower() == "true"
+        self.request_interval = 1.0 if _premium else 12.0
+        self.max_backfills_per_run = int(os.getenv("MAX_BACKFILLS_PER_RUN", "25"))
         self.universe = UniverseProvider().get_universe()
         self._subset_mode = False
         if symbols:
@@ -262,7 +304,7 @@ class DailyDataUpdater:
         return df
 
     def update_training_data(
-        self, data_file: str = "data/training_data.csv", output_file: Optional[str] = None
+        self, data_file: str = "data/training_data.csv", output_file: str | None = None
     ):
         """Update training data with latest market data"""
         data_path = Path(data_file)
@@ -284,42 +326,37 @@ class DailyDataUpdater:
 
         # Detect symbols that need a full backfill (new to universe or insufficient history)
         # Use 350 rows to keep 200-day SMA valid inside the last 150-day window.
-        _MIN_ROWS_FOR_INDICATORS = 350
-        _MIN_RECENT_ROWS = int(os.getenv("MIN_HISTORY_DAYS", "60"))
-        if existing_df is not None:
-            rows_per_symbol = existing_df.groupby("symbol").size()
-            recent_cutoff = (latest_date - timedelta(days=150)) if latest_date is not None else None
-            if recent_cutoff is not None:
-                recent_counts = (
-                    existing_df[existing_df["date"] >= recent_cutoff].groupby("symbol").size()
-                )
-            else:
-                recent_counts = pd.Series(dtype=int)
-            _backfill_symbols = {
-                s
-                for s in self.universe
-                if rows_per_symbol.get(s, 0) < _MIN_ROWS_FOR_INDICATORS
-                or recent_counts.get(s, 0) < _MIN_RECENT_ROWS
-            }
-        else:
-            _backfill_symbols = set(self.universe)
+        _backfill_symbols, _deferred_symbols = select_backfill_symbols(
+            existing_df,
+            self.universe,
+            latest_date,
+            min_rows=350,
+            min_recent=int(os.getenv("MIN_HISTORY_DAYS", "60")),
+            max_backfills=self.max_backfills_per_run,
+        )
         if _backfill_symbols:
             logger.info(
-                f"\n{len(_backfill_symbols)} symbol(s) need backfill (< {_MIN_ROWS_FOR_INDICATORS} rows): {sorted(_backfill_symbols)}"
+                f"\n{len(_backfill_symbols)} symbol(s) need backfill: {sorted(_backfill_symbols)}"
+            )
+        if _deferred_symbols:
+            logger.info(
+                f"{len(_deferred_symbols)} symbol(s) deferred to later runs "
+                f"(backfill cap {self.max_backfills_per_run}): {sorted(_deferred_symbols)}"
             )
 
-        # Fetch latest data for all symbols
-        logger.info(f"\nFetching latest data for {len(self.universe)} symbols...")
+        # Fetch latest data for all symbols except deferred onboarding ones
+        fetch_universe = [s for s in self.universe if s not in _deferred_symbols]
+        logger.info(f"\nFetching latest data for {len(fetch_universe)} symbols...")
         new_data = []
         failed = []
 
         if existing_df is None:
             logger.info("No existing data — full backfill (730 days per symbol for indicators)")
 
-        for i, symbol in enumerate(self.universe, 1):
+        for i, symbol in enumerate(fetch_universe, 1):
             days_to_fetch = 730 if symbol in _backfill_symbols else 5
             label = "backfill" if symbol in _backfill_symbols else "update"
-            logger.info(f"[{i}/{len(self.universe)}] {symbol} ({label}, {days_to_fetch}d)")
+            logger.info(f"[{i}/{len(fetch_universe)}] {symbol} ({label}, {days_to_fetch}d)")
 
             df = self.fetch_latest_data(symbol, days=days_to_fetch)
 
@@ -328,9 +365,9 @@ class DailyDataUpdater:
             else:
                 failed.append(symbol)
 
-            # Rate limiting: 5 requests per minute for free tier
-            if i < len(self.universe):
-                time.sleep(12)  # 12 seconds between requests
+            # Rate limiting: 12s for the 5/min free tier, 1s on premium keys
+            if i < len(fetch_universe):
+                time.sleep(self.request_interval)
 
         if failed:
             logger.warning(f"Failed to fetch {len(failed)} symbols: {failed}")
@@ -402,7 +439,7 @@ class DailyDataUpdater:
         return True
 
 
-def _parse_symbols(value: Optional[str]) -> Optional[List[str]]:
+def _parse_symbols(value: str | None) -> list[str] | None:
     if not value:
         return None
     symbols = [s.strip() for s in value.split(",") if s.strip()]
