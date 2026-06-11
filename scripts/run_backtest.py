@@ -93,6 +93,15 @@ def main():
         help="In-memory config override for parameter sweeps, e.g. "
         "--set strategies.rsi_mean_reversion.rsi_threshold=30 (repeatable)",
     )
+    parser.add_argument(
+        "--exclude",
+        action="append",
+        default=[],
+        metavar="CLASSNAME",
+        help="Strategy class name(s) to skip, e.g. --exclude MLMomentumStrategy "
+        "(its daily retrain makes 15yr runs take hours; its purged-OOS gate "
+        "is evaluated from training warnings instead)",
+    )
     args = parser.parse_args()
 
     if args.verbose:
@@ -136,6 +145,11 @@ def main():
         NewsSentimentStrategy,
         SectorRotationStrategy,
     ]
+    if args.exclude:
+        ALL_STRATEGY_CLASSES = [
+            c for c in ALL_STRATEGY_CLASSES if c.__name__ not in set(args.exclude)
+        ]
+        print(f"Excluded: {args.exclude}")
     strategy_classes = ALL_STRATEGY_CLASSES
 
     os.makedirs("artifacts/backtest", exist_ok=True)
