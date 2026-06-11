@@ -81,7 +81,8 @@ class DualMomentumStrategy(TradingStrategy):
         if market_data.empty or "symbol" not in market_data.columns:
             return signals
 
-        sym_map = dict(market_data.groupby("symbol"))
+        # dict(groupby) raises on the pinned pandas version — keep the comprehension
+        sym_map = {sym: grp for sym, grp in market_data.groupby("symbol")}  # noqa: C416
         latest_date = market_data.index[-1]
         benchmarks = self._benchmarks()
 
