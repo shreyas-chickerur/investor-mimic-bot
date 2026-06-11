@@ -29,6 +29,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (a populated artifact with duplicates would have killed the run); populated
   legacy-DB migration test gates all future schema changes.
 
+### Fixed - False-YELLOW "0 signals" expectation check (2026-06-11)
+
+- The first post-hardening run (2026-06-11, SUCCESS, 6 orders) was wrongly
+  flagged YELLOW with "Run None: 0 signals generated": sync_broker_state wrote
+  local-time `YYYY-MM-DDTHH:MM:SS` into broker_state.created_at while engine
+  rows use the UTC space format, and `'T' > ' '` made AUTO_SYNC rows win every
+  same-day `ORDER BY created_at DESC` — the signals check then joined
+  signal_funnel on run_id='AUTO_SYNC' and found nothing. Fixed at the writer
+  (created_at now uses the column's CURRENT_TIMESTAMP default) and in
+  post_run_expect.py (latest-run lookups order by id and skip SYNC rows).
+  Without the fix this would have gone `[RECURRING]` after 3 runs.
+
 ### Fixed - CI functional suite actually runs (2026-06-11)
 
 - CI was red on every push since functional tests were enabled: three

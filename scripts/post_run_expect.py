@@ -84,7 +84,7 @@ def check_reconciliation(conn: sqlite3.Connection, today: str) -> tuple[bool, st
         SELECT reconciliation_status, run_id, created_at
         FROM broker_state
         WHERE snapshot_type IN ('RECONCILIATION', 'RECONCILIATION_RETRY', 'END')
-        ORDER BY created_at DESC LIMIT 1
+        ORDER BY id DESC LIMIT 1
         """,
     )
     if not row:
@@ -99,7 +99,7 @@ def check_portfolio_value(conn: sqlite3.Connection, today: str) -> tuple[bool, s
     """Portfolio value is above $90k (sanity check — flags catastrophic loss)."""
     row = _q1(
         conn,
-        "SELECT portfolio_value, cash FROM broker_state ORDER BY created_at DESC LIMIT 1",
+        "SELECT portfolio_value, cash FROM broker_state ORDER BY id DESC LIMIT 1",
     )
     if not row:
         return False, "No broker_state row found"
@@ -128,12 +128,17 @@ def check_drawdown(conn: sqlite3.Connection, today: str) -> tuple[bool, str]:
 
 def check_signals_generated(conn: sqlite3.Connection, today: str) -> tuple[bool, str]:
     """Latest run generated at least 1 signal (strategies are running)."""
+    # Latest *trading run* — SYNC rows carry run_id='AUTO_SYNC' which never
+    # appears in signal_funnel, and ordering must be by id: legacy rows mix
+    # 'YYYY-MM-DDTHH:MM:SS' and 'YYYY-MM-DD HH:MM:SS' created_at formats.
     row = _q1(
         conn,
         """
         SELECT sf.run_id, SUM(sf.raw_signals_count) AS total
         FROM signal_funnel sf
-        JOIN (SELECT run_id AS latest_run FROM broker_state ORDER BY created_at DESC LIMIT 1) latest
+        JOIN (SELECT run_id AS latest_run FROM broker_state
+              WHERE snapshot_type != 'SYNC'
+              ORDER BY id DESC LIMIT 1) latest
           ON sf.run_id = latest.latest_run
         """,
     )
