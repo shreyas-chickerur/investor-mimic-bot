@@ -29,6 +29,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (a populated artifact with duplicates would have killed the run); populated
   legacy-DB migration test gates all future schema changes.
 
+### Added - Return levers: capital coherence, health gating, cash sweep, wider universe (2026-06-11)
+
+- **Capital allocation single source of truth**: the dynamic allocator's base
+  was `max(portfolio_value, buying_power)` — the ~4x day-trade margin ceiling —
+  so `strategies.capital_allocation` summed to ~$380k on a $96k account and
+  position sizing ran on phantom capital. Now: deployed % (0.85) of real equity.
+- **Health-gated allocation**: strategies with ≥5 trades/30d AND negative
+  expectancy get 0.5x capital (0.25x if win rate < 35%); gating is
+  profitability-only so sparse-but-unproven strategies are never starved.
+  Freed capital redistributes to healthy strategies up to the allocator cap.
+- **Cash sweep (SPY core sleeve)**: idle cash above a 15% buffer is deployed
+  into SPY via OPG limit after all strategies trade (June deployment averaged
+  4.2% — ~$92k earning 0%). VIX-throttled (half ≥25, off ≥35), skipped on kill
+  switch, sells down to restore the buffer, excluded from heat/stops/strategy
+  capital under a 'Cash Sweep' pseudo-strategy row.
+- **Universe 43 → 128 liquid S&P symbols** with capped rolling backfill
+  (MAX_BACKFILLS_PER_RUN=25/day, deterministic) and premium-aware API pacing.
+- **DB backup to data branch**: daily plain-text SQL dump (`db/trading.sql`)
+  committed alongside the dashboard snapshot — the 90-day artifact retention
+  is no longer the only copy of all state.
+
 ### Fixed - False-YELLOW "0 signals" expectation check (2026-06-11)
 
 - The first post-hardening run (2026-06-11, SUCCESS, 6 orders) was wrongly
