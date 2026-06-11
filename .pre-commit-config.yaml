@@ -16,6 +16,9 @@ repos:
       - id: check-toml
       - id: check-added-large-files
         args: ['--maxkb=1000']
+        # The committed market-data snapshot (1.5MB xz) feeds the CI
+        # functional suite / DRY_RUN canary; everything else stays <1MB.
+        exclude: ^tests/fixtures/market_data_snapshot\.csv\.xz$
       - id: check-merge-conflict
       - id: check-case-conflict
       - id: detect-private-key
