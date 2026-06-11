@@ -1616,7 +1616,7 @@ class MultiStrategyRunner:
         if refreshed:
             logger.info(f"Refreshed current prices for {refreshed} open positions")
 
-        self.dynamic_allocator.total_capital = max(self.portfolio_value, self.buying_power)
+        self.dynamic_allocator.total_capital = self._allocator_capital_base()
         self.dynamic_allocator.max_allocation = self.config.get(
             "risk.dynamic_max_allocation_pct", 0.35
         )
@@ -2252,6 +2252,13 @@ class MultiStrategyRunner:
                         sym,
                         " + ".join(sources),
                     )
+
+            # Cash sweep: deploy idle cash into the core index sleeve now that
+            # every strategy has had its chance to claim capital.
+            try:
+                self._execute_cash_sweep(current_prices)
+            except Exception as _sweep_exc:
+                logger.error("Cash sweep failed (non-fatal): %s", _sweep_exc)
 
             # Generate artifacts after all strategies complete
             logger.info("=" * 80)
@@ -3815,6 +3822,221 @@ class MultiStrategyRunner:
             atr=effective_atr,
         )
 
+    SWEEP_STRATEGY_NAME = "Cash Sweep"
+
+    def _sweep_strategy_id(self) -> int:
+        """Get or create the Cash Sweep pseudo-strategy row (BROKER_SYNC pattern)."""
+        import sqlite3 as _sqlite3
+
+        conn = _sqlite3.connect(self.db.db_path, timeout=10)
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT id FROM strategies WHERE name = ? LIMIT 1", (self.SWEEP_STRATEGY_NAME,)
+            )
+            row = cur.fetchone()
+            if row:
+                return int(row[0])
+            cur.execute(
+                """
+                INSERT INTO strategies (name, description, capital_allocation, initial_capital, status)
+                VALUES (?, 'Core index sleeve for idle cash', 0.0, 0.0, 'active')
+                """,
+                (self.SWEEP_STRATEGY_NAME,),
+            )
+            conn.commit()
+            return int(cur.lastrowid)
+        finally:
+            conn.close()
+
+    def _execute_cash_sweep(self, current_prices):
+        """Deploy idle cash into a core index sleeve (default SPY).
+
+        Idle cash earns 0%; with deployment averaging 4% in June 2026 that was
+        ~$92k of dead capital. After all strategies have traded, cash above
+        the buffer is bought into the sweep symbol via OPG limit; when cash
+        falls below half the buffer, the sleeve is sold down to restore it so
+        strategy entries are never starved.
+
+        The sleeve is deliberately OUTSIDE the alpha machinery: it is not part
+        of strategy capital, does not count toward portfolio heat (do NOT add
+        it to _calculate_strategy_exposures), and carries no stop-loss — it is
+        market beta, throttled by VIX (half size above 25, disabled above 35)
+        and skipped entirely when the kill switch has fired.
+        """
+        if not self.config.get("sweep.enabled", True):
+            logger.info("Cash sweep disabled by config")
+            return
+        if getattr(self.kill_switch, "is_killed", False):
+            logger.info("Cash sweep skipped: kill switch active")
+            return
+
+        symbol = self.config.get("sweep.symbol", "SPY")
+        buffer_pct = self.config.get("sweep.cash_buffer_pct", 0.15)
+        min_order = self.config.get("sweep.min_order_value", 500.0)
+
+        price = current_prices.get(symbol)
+        if not price or price <= 0:
+            logger.warning("Cash sweep skipped: no price for %s", symbol)
+            return
+        typical = getattr(self, "_typical_prices", {}).get(symbol, price)
+
+        vix = getattr(self, "_current_vix", 18.0)
+        if vix >= 35:
+            scale = 0.0
+        elif vix >= 25:
+            scale = 0.5
+        else:
+            scale = 1.0
+
+        account = self.trading_client.get_account()
+        cash = float(account.cash)
+        equity = float(account.portfolio_value)
+        # OPG buys submitted this run haven't debited cash yet
+        projected_cash = cash - getattr(self, "_pending_opg_value", 0.0)
+        buffer_value = equity * buffer_pct
+
+        sid = self._sweep_strategy_id()
+        pos = self.db.get_position(sid, symbol)
+        held = float(pos["shares"]) if pos else 0.0
+
+        investable = (projected_cash - buffer_value) * scale
+        logger.info(
+            "Cash sweep: projected_cash=$%.0f buffer=$%.0f held=%.0f %s "
+            "vix=%.1f scale=%.1f investable=$%.0f",
+            projected_cash,
+            buffer_value,
+            held,
+            symbol,
+            vix,
+            scale,
+            investable,
+        )
+
+        if investable >= min_order:
+            limit_price = round(typical * 1.01, 2)
+            shares = int(investable // limit_price)
+            if shares <= 0:
+                return
+            if self.db.find_active_order_intent_for_today(sid, symbol, "BUY"):
+                logger.info("Cash sweep BUY already submitted today — skipping")
+                return
+            intent_id = self.db.create_order_intent(sid, symbol, "BUY", shares)
+            order_data = LimitOrderRequest(
+                symbol=symbol,
+                qty=shares,
+                side=OrderSide.BUY,
+                time_in_force=TimeInForce.OPG,
+                limit_price=limit_price,
+            )
+            order = self.dry_run.execute_broker_operation(
+                f"submit_order_sweep_{symbol}", self.trading_client.submit_order, order_data
+            )
+            self.db.update_order_intent_status(intent_id, "SUBMITTED", str(order.id))
+            value = shares * limit_price
+            self.buying_power = max(0.0, self.buying_power - value)
+            self._pending_opg_value = getattr(self, "_pending_opg_value", 0.0) + value
+            if self.paper_mode:
+                self.db.update_order_intent_status(
+                    intent_id, "FILLED", broker_order_id=str(order.id)
+                )
+            self._update_position_record(
+                sid, symbol, shares, limit_price, entry_date=self.asof_date
+            )
+            self.db.log_trade(
+                sid, None, symbol, "BUY", shares, price, limit_price, 0.0, 0.0, str(order.id)
+            )
+            self.executed_trades.append(
+                {
+                    "symbol": symbol,
+                    "action": "BUY",
+                    "shares": shares,
+                    "price": limit_price,
+                    "order_id": order.id,
+                    "intent_id": intent_id,
+                }
+            )
+            logger.info(
+                "Cash sweep: BUY %d %s @ limit %.2f ($%.0f)", shares, symbol, limit_price, value
+            )
+            return
+
+        if projected_cash < buffer_value * 0.5 and held > 0:
+            limit_price = round(typical * 0.99, 2)
+            shortfall = buffer_value - projected_cash
+            sell_shares = min(held, float(int(shortfall // limit_price) + 1))
+            if sell_shares <= 0:
+                return
+            if self.db.find_active_order_intent_for_today(sid, symbol, "SELL"):
+                logger.info("Cash sweep SELL already submitted today — skipping")
+                return
+            intent_id = self.db.create_order_intent(sid, symbol, "SELL", sell_shares)
+            order_data = LimitOrderRequest(
+                symbol=symbol,
+                qty=sell_shares,
+                side=OrderSide.SELL,
+                time_in_force=TimeInForce.OPG,
+                limit_price=limit_price,
+            )
+            order = self.dry_run.execute_broker_operation(
+                f"submit_order_sweep_{symbol}", self.trading_client.submit_order, order_data
+            )
+            self.db.update_order_intent_status(intent_id, "SUBMITTED", str(order.id))
+            if self.paper_mode:
+                self.db.update_order_intent_status(
+                    intent_id, "FILLED", broker_order_id=str(order.id)
+                )
+            entry_price = float(pos["avg_price"]) if pos else limit_price
+            self.db.log_trade(
+                sid,
+                None,
+                symbol,
+                "SELL",
+                sell_shares,
+                price,
+                limit_price,
+                0.0,
+                0.0,
+                str(order.id),
+                pnl=(limit_price - entry_price) * sell_shares,
+            )
+            try:
+                self.db.log_trade_pnl(
+                    sid,
+                    self.SWEEP_STRATEGY_NAME,
+                    symbol,
+                    self.run_id,
+                    entry_price=entry_price,
+                    exit_price=limit_price,
+                    shares=sell_shares,
+                    entry_date=(pos["entry_date"] if pos and pos.get("entry_date") else None),
+                    exit_reason="Sweep liquidity (cash below buffer)",
+                    direction="long",
+                )
+            except Exception as _pnl_exc:
+                logger.warning("Sweep sell P&L logging failed: %s", _pnl_exc)
+            self._update_position_record(sid, symbol, -sell_shares, limit_price)
+            logger.info(
+                "Cash sweep: SELL %.0f %s @ limit %.2f to restore cash buffer " "(shortfall $%.0f)",
+                sell_shares,
+                symbol,
+                limit_price,
+                shortfall,
+            )
+
+    def _allocator_capital_base(self) -> float:
+        """Capital base for strategy allocations: deployed % of REAL equity.
+
+        This must never be buying power: max(portfolio_value, buying_power)
+        handed the allocator the ~4x day-trade margin ceiling ($380k on a
+        $96k account), so strategies sized positions off phantom capital and
+        the cash manager — which trusts sum(allocations) as total cash —
+        believed it too, leaving the broker buying-power cap as the only
+        real guard against 4x leverage.
+        """
+        deployed_pct = self.config.get("strategies.deployed_capital_pct", 0.85)
+        return self.portfolio_value * deployed_pct
+
     def _calculate_dynamic_allocations(self, strategies):
         """Calculate strategy allocations from actual closed-trade P&L.
 
@@ -3850,12 +4072,74 @@ class MultiStrategyRunner:
                 prior_sharpes[sid] = float(sharpe)
 
         strategy_ids = [strategy.strategy_id for strategy in strategies]
-        return self.dynamic_allocator.calculate_allocations(
+        allocations = self.dynamic_allocator.calculate_allocations(
             strategy_ids,
             performance_data,
             per_strategy_max=per_strategy_max,
             prior_sharpes=prior_sharpes,
         )
+        return self._apply_health_gating(allocations, strategies)
+
+    def _apply_health_gating(self, allocations: dict, strategies) -> dict:
+        """Scale down allocations for strategies with demonstrated negative edge.
+
+        Uses StrategyHealthScorer.allocation_multiplier (profitability-only —
+        inactivity never gates). Freed capital is redistributed pro-rata to
+        ungated strategies up to the allocator's max_allocation cap; whatever
+        cannot be redistributed stays unallocated and falls through to the
+        cash sweep rather than funding a losing strategy.
+        """
+        if not self.config.get("strategies.health_gating_enabled", True):
+            return allocations
+        from src.monitoring.strategy_health_scorer import StrategyHealthScorer
+
+        try:
+            scorer = StrategyHealthScorer(self.db)
+            multipliers: dict[int, float] = {}
+            for strategy in strategies:
+                metrics = scorer.calculate_strategy_health(strategy.strategy_id, strategy.name)
+                multipliers[strategy.strategy_id] = scorer.allocation_multiplier(metrics)
+        except Exception as exc:
+            logger.warning("Health gating skipped (scorer failed): %s", exc)
+            return allocations
+
+        gated = {sid: alloc * multipliers.get(sid, 1.0) for sid, alloc in allocations.items()}
+        freed = sum(allocations.values()) - sum(gated.values())
+        if freed <= 0:
+            return gated
+
+        for sid, mult in multipliers.items():
+            if mult < 1.0:
+                logger.info(
+                    "Health gating: strategy %s allocation x%.2f "
+                    "($%.0f → $%.0f) — negative 30d expectancy",
+                    sid,
+                    mult,
+                    allocations.get(sid, 0.0),
+                    gated.get(sid, 0.0),
+                )
+
+        # Redistribute freed capital to ungated strategies, respecting the
+        # allocator's per-strategy ceiling.
+        cap = self.dynamic_allocator.max_allocation * self.dynamic_allocator.total_capital
+        healthy = [sid for sid, m in multipliers.items() if m >= 1.0]
+        for _ in range(3):  # a few passes; leftovers go to the sweep
+            room = {sid: max(cap - gated.get(sid, 0.0), 0.0) for sid in healthy}
+            total_room = sum(room.values())
+            if freed <= 0 or total_room <= 0:
+                break
+            distributable = min(freed, total_room)
+            for sid in healthy:
+                share = distributable * (room[sid] / total_room)
+                gated[sid] = gated.get(sid, 0.0) + share
+            freed -= distributable
+        if freed > 1.0:
+            logger.info(
+                "Health gating: $%.0f left unallocated (all healthy strategies at cap) "
+                "— available to the cash sweep",
+                freed,
+            )
+        return gated
 
     def _calculate_strategy_exposures(self, strategies, current_prices):
         """Calculate current exposure per strategy, including BROKER_SYNC."""

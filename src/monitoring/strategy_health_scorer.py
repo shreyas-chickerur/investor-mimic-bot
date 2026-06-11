@@ -124,6 +124,29 @@ class StrategyHealthScorer:
 
         return metrics
 
+    @staticmethod
+    def allocation_multiplier(metrics: dict) -> float:
+        """Capital multiplier for the dynamic allocator, from health metrics.
+
+        Gates ONLY on demonstrated negative edge — never on inactivity: the
+        health *score* punishes low trade counts, which would wrongly starve
+        sparse-but-profitable strategies (Factor Momentum: 2 trades, +$714)
+        while the actual loser churns (ML Momentum: 17 trades, 29% win rate,
+        −$489). A strategy with too few trades is unproven, not unhealthy,
+        and keeps its full allocation until the data says otherwise.
+
+        Returns 1.0 (full), 0.5 (negative expectancy over >=5 trades in 30d),
+        or 0.25 (negative expectancy AND win rate < 35%).
+        """
+        trade_count = metrics.get("trade_count_30d") or 0
+        expectancy = metrics.get("expectancy_30d")
+        win_rate = metrics.get("win_rate_30d")
+        if trade_count < 5 or expectancy is None or expectancy >= 0:
+            return 1.0
+        if win_rate is not None and win_rate < 0.35:
+            return 0.25
+        return 0.5
+
     def _get_recent_trades(self, strategy_id: int, days: int, conn=None) -> list[dict]:
         """Get recent trades for strategy."""
         cutoff = (datetime.now() - timedelta(days=days)).isoformat()
