@@ -261,12 +261,17 @@ def sync_broker_to_database(db_path="trading.db"):
                     changes += 1
 
         # --- Record sync event ---
+        # created_at deliberately uses the column DEFAULT CURRENT_TIMESTAMP:
+        # an explicit datetime.now().isoformat() here wrote local-time
+        # 'YYYY-MM-DDTHH:MM:SS' while the engine's rows use the UTC space
+        # format, and 'T' > ' ' made SYNC rows beat same-day engine rows in
+        # every ORDER BY created_at DESC.
         cursor.execute(
             """
             INSERT INTO broker_state (
                 run_id, snapshot_date, snapshot_type, cash, portfolio_value,
-                buying_power, positions_json, reconciliation_status, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                buying_power, positions_json, reconciliation_status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 "AUTO_SYNC",
@@ -277,7 +282,6 @@ def sync_broker_to_database(db_path="trading.db"):
                 broker_state["buying_power"],
                 json.dumps(broker_positions),
                 "SYNCED",
-                datetime.now().isoformat(),
             ),
         )
 
