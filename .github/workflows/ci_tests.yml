@@ -57,7 +57,8 @@ jobs:
 
     - name: Run full suite with coverage
       run: |
-        python -m pytest tests/ -v --tb=short --cov=src --cov-report=term-missing --cov-report=html:coverage-report --junitxml=test-results/all.xml
+        python -m pytest tests/ -v --tb=short --cov=src --cov-report=term-missing \
+          --cov-report=html:coverage-report --junitxml=test-results/all.xml
 
     - name: Upload test results
       if: always()
