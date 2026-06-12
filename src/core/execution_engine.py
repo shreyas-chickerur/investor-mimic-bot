@@ -822,6 +822,31 @@ class MultiStrategyRunner:
         if disabled_names:
             logger.warning("Disabled strategies (config): %s", disabled_names)
 
+        # Reflect config enable/disable into strategies.status so dashboards
+        # and emails can label disabled strategies without parsing YAML.
+        # Re-enabled strategies are flipped back to 'active' BEFORE the
+        # active-only lookup below — otherwise initialize would try to
+        # re-create the row and hit the UNIQUE(name) constraint.
+        try:
+            import sqlite3 as _sqlite3
+
+            _conn = _sqlite3.connect(self.db.db_path, timeout=10)
+            _cur = _conn.cursor()
+            for _name in active_names:
+                _cur.execute(
+                    "UPDATE strategies SET status='active' WHERE name=? AND status!='active'",
+                    (_name,),
+                )
+            for _name in disabled_names:
+                _cur.execute(
+                    "UPDATE strategies SET status='disabled' WHERE name=? AND status!='disabled'",
+                    (_name,),
+                )
+            _conn.commit()
+            _conn.close()
+        except Exception as _status_exc:
+            logger.warning("Could not sync strategy status flags: %s", _status_exc)
+
         # Equal capital normalization: each active strategy gets an equal share of
         # deployed_capital_pct * portfolio_value so strategies are directly comparable.
         deployed_pct = self.config.get("strategies.deployed_capital_pct", 0.85)

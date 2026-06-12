@@ -126,6 +126,29 @@ def check_drawdown(conn: sqlite3.Connection, today: str) -> tuple[bool, str]:
     )
 
 
+def check_review_not_overdue(conn: sqlite3.Connection, today: str) -> tuple[bool, str]:
+    """Probation caps and parameter plateaus must be revisited quarterly.
+
+    Reads backtesting.next_review_date from trading_config.yaml; once the
+    date passes, every run goes YELLOW until the evidence run is done and
+    the date is bumped (procedure: docs/research/EVIDENCE_RUNBOOK.md).
+    """
+    try:
+        from src.utils.config_loader import get_config
+
+        due = str(get_config().get("backtesting.next_review_date", "") or "")
+    except Exception as exc:
+        return True, f"review date unreadable ({exc}) — skipping"
+    if not due:
+        return True, "no next_review_date configured"
+    if today >= due:
+        return False, (
+            f"Quarterly strategy re-validation was due {due} — run the evidence "
+            "pipeline (docs/research/EVIDENCE_RUNBOOK.md) and bump next_review_date"
+        )
+    return True, f"Next strategy re-validation due {due}"
+
+
 def check_signals_generated(conn: sqlite3.Connection, today: str) -> tuple[bool, str]:
     """Latest run generated at least 1 signal (strategies are running)."""
     # Latest *trading run* — SYNC rows carry run_id='AUTO_SYNC' which never
@@ -224,6 +247,7 @@ EXPECTATIONS = [
     ("Daily snapshot recorded", check_snapshot_fresh, "high"),
     ("No critical errors today", check_no_critical_errors, "medium"),
     ("Consecutive failures < 3", check_consecutive_failures, "high"),
+    ("Quarterly strategy re-validation not overdue", check_review_not_overdue, "medium"),
 ]
 
 

@@ -1,16 +1,14 @@
 name: Daily Trading Execution
 
 on:
-  # PRIMARY trigger is cron-job.org firing at 00:30 UTC (7:30 PM ET summer / 6:30 PM CT)
-  # via workflow_dispatch. GitHub's free-tier schedule runs were unreliable as a primary,
-  # and worse — when they DID fire, they ran 3-4 hours late (06-07 UTC) which put them
-  # AFTER cron-job.org's run, producing duplicate trading runs and duplicate emails per
-  # day (see 2026-05-28 inbox: two emails for the same trading session). Disabling the
-  # schedule cron so cron-job.org is the sole trigger. Re-enable here if cron-job.org
-  # goes down for an extended period.
-  #
-  # schedule:
-  #   - cron: '0 3 * * 2-6'
+  # PRIMARY trigger is cron-job.org firing at 05:45 UTC via workflow_dispatch.
+  # GitHub's native cron is unreliable as a primary (fires 1-4h late) and once
+  # produced duplicate runs/emails (2026-05-28). It is re-enabled below as a
+  # BACKUP only: it fires 2h after the primary, and the precheck job skips the
+  # whole run when a dispatched run already succeeded (or is running) today —
+  # so a missed cron-job.org dispatch no longer silently skips a trading day.
+  schedule:
+    - cron: '45 7 * * 1-5'  # backup, 07:45 UTC Mon-Fri (still pre-market)
   workflow_dispatch:  # Triggered by cron-job.org (and available for manual runs)
 
 # Prevent two trading runs from overlapping — concurrent runs would download the
@@ -29,7 +27,38 @@ env:
   DATA_MAX_AGE_HOURS: "80"
 
 jobs:
+  # Backup-trigger gate: when fired by the native cron (backup), skip the run
+  # entirely if cron-job.org's dispatched run already succeeded or is still
+  # in flight today. workflow_dispatch always proceeds.
+  precheck:
+    runs-on: ubuntu-latest
+    outputs:
+      proceed: ${{ steps.gate.outputs.proceed }}
+    steps:
+      - id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" != "schedule" ]; then
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          TODAY=$(date -u +%F)
+          N=$(gh api "repos/${{ github.repository }}/actions/workflows/daily_trading.yml/runs?per_page=15" \
+            --jq "[.workflow_runs[] | select(.event==\"workflow_dispatch\"
+                   and (.created_at|startswith(\"$TODAY\"))
+                   and (.conclusion==\"success\" or .status==\"in_progress\" or .status==\"queued\"))] | length")
+          if [ "$N" -gt 0 ]; then
+            echo "Primary (dispatched) run already succeeded/running today — backup skipping"
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "No successful dispatched run today — backup trigger proceeding"
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          fi
+
   daily-execution:
+    needs: precheck
+    if: needs.precheck.outputs.proceed == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write   # required for gh release create (DB backup)

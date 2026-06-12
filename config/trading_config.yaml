@@ -280,6 +280,12 @@ backtesting:
   min_sharpe: 0.5  # Minimum acceptable Sharpe
   max_drawdown: 0.25  # Maximum acceptable drawdown
   min_trades: 30  # Minimum trades for valid backtest
+  min_profit_factor: 1.1       # gross wins / gross losses floor
+  min_positive_window_pct: 0.5 # at least half of OOS windows must be positive
+  # Quarterly strategy re-validation due date — post_run_expect flags the run
+  # YELLOW once this passes so probation reviews can't be forgotten. Update it
+  # after each evidence run (procedure: docs/research/EVIDENCE_RUNBOOK.md).
+  next_review_date: '2026-09-01'
 
 # Paper Trading
 paper_trading:
