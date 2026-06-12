@@ -159,7 +159,10 @@ class UniverseProvider:
         "CMCSA",
         "PLD",
         "AMT",
-        # Sector ETFs (used for relative-strength factor computation; excluded from trading)
+        # Sector ETFs (used for relative-strength factor computation and
+        # sector-rotation ranking; excluded from trading). XLI/XLB/XLU/XLRE/
+        # XLC added 2026-06-12 with the full-universe sector map so Sector
+        # Rotation can rank ALL eleven GICS sectors, not just six.
         "SPY",
         "QQQ",
         "XLK",
@@ -168,10 +171,29 @@ class UniverseProvider:
         "XLV",
         "XLP",
         "XLY",
+        "XLI",
+        "XLB",
+        "XLU",
+        "XLRE",
+        "XLC",
     ]
 
     # Symbols used only for factor benchmarking — never traded as positions
-    BENCHMARK_SYMBOLS = {"SPY", "QQQ", "XLK", "XLF", "XLE", "XLV", "XLP", "XLY"}
+    BENCHMARK_SYMBOLS = {
+        "SPY",
+        "QQQ",
+        "XLK",
+        "XLF",
+        "XLE",
+        "XLV",
+        "XLP",
+        "XLY",
+        "XLI",
+        "XLB",
+        "XLU",
+        "XLRE",
+        "XLC",
+    }
 
     def __init__(self, mode: str | None = None):
         """
