@@ -55,6 +55,21 @@ OOS Sharpe ≥ 0.5 · max drawdown ≤ 25% · ≥ 30 closed trades ·
 profit factor ≥ 1.1 · ≥ 50% of OOS windows positive.
 Pairs additionally: Engle-Granger 5% cointegration AND half-life < 20 days.
 
+## The evidence dataset
+
+`data/extended_historical_data.csv` (36 symbols × 15yr, ~66MB) is gitignored —
+it is NOT in a fresh clone. Recovery options, in order:
+
+1. **Backup**: `research/extended_historical_data.csv.xz` on the `data`
+   branch (one-time upload 2026-06-12). Restore:
+   `git show origin/data:research/extended_historical_data.csv.xz | xz -d > data/extended_historical_data.csv`
+2. **Regenerate** (premium Alpha Vantage key, ~10 min at 75 req/min):
+   `python3 scripts/fetch_historical_data.py` with the symbol list from the
+   backup's header. When regenerating, ALSO include SPY + the 13 sector ETFs
+   and the full 128-symbol universe — that removes the two standing caveats
+   (permissive uptrend gates, Sector Rotation untestable on 15y) and gives
+   the next quarterly run a strictly better evidence base.
+
 ## Interpretation rules
 
 - Strong-prior strategies (PEAD, cross-sectional momentum) that fail get ONE
