@@ -681,6 +681,68 @@ class MultiStrategyRunner:
         """Save peak portfolio value to database."""
         self.db.set_system_state("peak_portfolio_value", str(peak_value))
 
+    def _alpha_sleeve_drawdown(self, market_data) -> float:
+        """Drawdown of the ALPHA sleeve (portfolio minus the SPY sweep), as a fraction.
+
+        The 5% kill switch must measure strategy losses, not the cash sweep's
+        market beta — otherwise a routine SPY correction halts all alpha
+        trading. Tracks its own peak in system_state ('peak_alpha_value',
+        same live-recompute pattern as peak_portfolio_value so a recovered
+        drawdown un-trips the switch). Falls back to whole-portfolio drawdown
+        if the sleeve can't be valued (no sweep position is simply value 0).
+        """
+        try:
+            sweep_value = 0.0
+            sweep_symbol = self.config.get("sweep.symbol", "SPY")
+            pos = self.db.get_position(self._sweep_strategy_id(), sweep_symbol)
+            if pos and float(pos["shares"]) > 0:
+                price = None
+                try:
+                    closes = self._get_last_close_map(market_data)
+                    price = closes.get(sweep_symbol)
+                except Exception:
+                    price = None
+                if not price or price <= 0:
+                    price = float(pos.get("current_price") or pos.get("avg_price") or 0)
+                sweep_value = float(pos["shares"]) * float(price or 0)
+
+            alpha_value = max(self.portfolio_value - sweep_value, 0.0)
+            peak_str = self.db.get_system_state("peak_alpha_value")
+            try:
+                peak_alpha = float(peak_str) if peak_str else alpha_value
+            except (ValueError, TypeError):
+                peak_alpha = alpha_value
+            if alpha_value > peak_alpha:
+                peak_alpha = alpha_value
+            self.db.set_system_state("peak_alpha_value", str(peak_alpha))
+
+            dd = (peak_alpha - alpha_value) / peak_alpha if peak_alpha > 0 else 0.0
+            logger.info(
+                "Alpha-sleeve drawdown: %.2f%% (alpha=$%.0f peak=$%.0f sweep=$%.0f); "
+                "whole-portfolio dd %.2f%% stays with the 10%%/15%% halt ladder",
+                dd * 100,
+                alpha_value,
+                peak_alpha,
+                sweep_value,
+                (
+                    (self.peak_portfolio_value - self.portfolio_value)
+                    / self.peak_portfolio_value
+                    * 100
+                    if self.peak_portfolio_value > 0
+                    else 0.0
+                ),
+            )
+            return dd
+        except Exception as exc:
+            logger.warning(
+                "Alpha-sleeve drawdown unavailable (%s) — falling back to whole-portfolio", exc
+            )
+            return (
+                (self.peak_portfolio_value - self.portfolio_value) / self.peak_portfolio_value
+                if self.peak_portfolio_value > 0
+                else 0.0
+            )
+
     def _get_last_close_map(self, market_data) -> dict:
         """Extract last close price per symbol from market_data DataFrame"""
         import pandas as pd
@@ -1402,14 +1464,18 @@ class MultiStrategyRunner:
         # NOT be used here directly — the kill switch threshold is 0.05 (5% decimal).
         # Computing from live portfolio values ensures a recovered drawdown won't permanently
         # trip the switch.
-        _current_dd = (
-            (self.peak_portfolio_value - self.portfolio_value) / self.peak_portfolio_value
-            if self.peak_portfolio_value > 0
-            else 0.0
-        )
+        #
+        # RISK LADDER (post-sweep): the 5% kill switch watches the ALPHA SLEEVE
+        # (portfolio minus the SPY cash-sweep position). With ~80% of equity in
+        # the sweep, a routine 6-7% market correction would otherwise trip the
+        # whole-portfolio 5% switch and punish the strategies for the sweep's
+        # beta. The DrawdownStopManager's 10% halt / 15% panic thresholds below
+        # remain on the WHOLE portfolio as the catastrophe backstop, and the
+        # sweep's own beta risk is governed by its VIX throttle.
+        _alpha_dd = self._alpha_sleeve_drawdown(market_data)
         kill_context = {
             "reconciliation_status": "UNKNOWN",
-            "daily_drawdown": max(_current_dd, 0.0),
+            "daily_drawdown": max(_alpha_dd, 0.0),
             "consecutive_failures": self.db.get_consecutive_failed_runs(),
             "rejected_orders_count": 0,
             "total_orders": 0,
