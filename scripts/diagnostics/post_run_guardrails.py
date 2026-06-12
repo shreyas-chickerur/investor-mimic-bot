@@ -4,18 +4,50 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sqlite3
+import sys
 from pathlib import Path
 
-CANONICAL_STRATEGIES = [
-    "RSI Mean Reversion",
-    "ML Momentum",
-    "Earnings Drift",
-    "News Sentiment",
-    "MA Crossover",
-    "Volatility Breakout",
-    "Factor Momentum",
-]
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+
+def expected_enabled_strategies() -> list[str]:
+    """Strategies whose funnel rows the liveness guardrail must see.
+
+    Derived from CANONICAL_STRATEGY_SPECS minus config-disabled minus
+    STRATEGY_DISABLED_LIST env — the same derivation the DRY_RUN smoke test
+    uses. The old hardcoded 7-name list here went RED on the FIRST run after
+    the 2026-06 evidence-driven dispositions, flagging the absence of ML
+    Momentum and News Sentiment funnel rows when both strategies were
+    correctly disabled and never ran (run 27397185082, 2026-06-12).
+    """
+    fallback = [
+        "RSI Mean Reversion",
+        "Earnings Drift",
+        "MA Crossover",
+        "Volatility Breakout",
+        "Factor Momentum",
+    ]
+    try:
+        from src.core.execution_engine import CANONICAL_STRATEGY_SPECS
+        from src.utils.config_loader import get_config
+
+        config = get_config()
+        env_disabled = {
+            s.strip() for s in os.environ.get("STRATEGY_DISABLED_LIST", "").split(",") if s.strip()
+        }
+        return [
+            name
+            for name, _desc, _cls in CANONICAL_STRATEGY_SPECS
+            if not config.get(f"strategies.{name.lower().replace(' ', '_')}.disabled", False)
+            and name not in env_disabled
+        ]
+    except Exception:
+        return fallback
+
+
+CANONICAL_STRATEGIES = expected_enabled_strategies()
 
 
 def stage(i: int, total: int, message: str) -> None:
