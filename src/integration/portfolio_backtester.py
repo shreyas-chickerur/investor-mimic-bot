@@ -132,6 +132,11 @@ class PortfolioBacktester:
         cash: float = self.initial_capital
         positions: dict = {}  # carried across windows
         stop_levels: dict = {}
+        # OPG order queues: signals generated at day t's close fill at day
+        # t+1's OPEN (production semantics — limit-on-open; a gap through the
+        # limit leaves the order unfilled and it expires, like a real OPG).
+        pending_buys: list = []
+        pending_sells: list = []
         cooldowns = {}  # {symbol: last_sell_date} — prevent re-entry churn
         equity_curve = []
         all_trades = []
@@ -233,6 +238,111 @@ class PortfolioBacktester:
                 )
                 continue
 
+            # -- Fill yesterday's queued OPG orders at TODAY'S open --
+            def _open_px(sym, day_data=day_data):  # bind loop var (B023)
+                row = day_data[day_data["symbol"] == sym]
+                if row.empty:
+                    return None
+                val = row.iloc[0].get("open") if "open" in row.columns else None
+                if val is None or pd.isna(val):
+                    val = row.iloc[0].get("close")
+                return float(val) if val is not None and not pd.isna(val) else None
+
+            for order in pending_sells:
+                sym = order["symbol"]
+                if sym not in positions:
+                    continue
+                open_px = _open_px(sym)
+                if open_px is None:
+                    continue  # no data today — OPG expires
+                if open_px < order["signal_price"] * 0.99:
+                    continue  # gapped below the sell limit — unfilled, position stays
+                pos = positions[sym]
+                req = float(order.get("shares") or 0)
+                sell_shares = min(req, pos["shares"]) if req > 0 else pos["shares"]
+                proceeds = self._sell_price(open_px, sell_shares)
+                pnl = proceeds - pos["entry_price"] * sell_shares
+                cash += proceeds
+                all_trades.append(
+                    {
+                        "date": date,
+                        "symbol": sym,
+                        "action": "SELL",
+                        "shares": sell_shares,
+                        "price": open_px,
+                        "pnl": pnl,
+                        "reason": order.get("reason", ""),
+                        "hold_days": (date - pos["entry_date"]).days,
+                    }
+                )
+                remaining = pos["shares"] - sell_shares
+                strat = pos.get("strategy_obj")
+                if remaining > 0:
+                    # Partial exit (50% tranche): position, stop, and entry
+                    # price are preserved — previously the backtester dumped
+                    # the WHOLE position on any SELL signal.
+                    pos["shares"] = remaining
+                    if strat:
+                        strat.positions[sym] = remaining
+                else:
+                    positions.pop(sym)
+                    stop_levels.pop(sym, None)
+                    if strat:
+                        strat.positions.pop(sym, None)
+                        strat.entry_dates.pop(sym, None)
+                    cooldowns[sym] = date
+            pending_sells = []
+
+            _fill_pos_value = self._mark_to_market(positions, day_data)
+            _fill_portfolio = cash + _fill_pos_value
+            current_exposure = sum(p["shares"] * p["entry_price"] for p in positions.values())
+            for order in pending_buys:
+                sym = order["symbol"]
+                if sym in positions:
+                    continue
+                open_px = _open_px(sym)
+                if open_px is None or open_px <= 0:
+                    continue
+                if open_px > order["signal_price"] * 1.01:
+                    continue  # gapped above the buy limit — unfilled (expires)
+                shares = order["shares"]
+                cost = self._buy_cost(open_px, shares)
+                if cost > cash:
+                    continue
+                new_exposure = current_exposure + cost
+                if _fill_portfolio > 0 and new_exposure / _fill_portfolio > self.max_portfolio_heat:
+                    continue
+                exec_price = open_px * (1 + self.slippage_bps / 10000)
+                cash -= cost
+                current_exposure += cost
+                atr = order.get("atr", 0) or 0
+                positions[sym] = {
+                    "shares": shares,
+                    "entry_price": exec_price,
+                    "entry_date": date,
+                    "atr": atr,
+                    "strategy_obj": order.get("strategy_obj"),
+                }
+                if atr > 0:
+                    stop_levels[sym] = exec_price - self.stop_loss_atr_mult * atr
+                all_trades.append(
+                    {
+                        "date": date,
+                        "symbol": sym,
+                        "action": "BUY",
+                        "shares": shares,
+                        "price": exec_price,
+                        "pnl": 0,
+                        "reason": order.get("reason", ""),
+                        "hold_days": 0,
+                    }
+                )
+                strat = order.get("strategy_obj")
+                if strat:
+                    strat.positions[sym] = shares
+                    strat.entry_dates[sym] = date
+            pending_buys = []
+
             # -- Check stop losses (respect min hold period) --
             for sym in list(positions.keys()):
                 sym_row = day_data[day_data["symbol"] == sym]
@@ -306,43 +416,32 @@ class PortfolioBacktester:
                 except Exception:
                     continue
 
-            # -- Process SELL signals (respect min hold period) --
+            # -- Queue SELL signals for tomorrow's open (OPG). Hold-period and
+            #    duplicate checks at queue time; partial-exit share counts are
+            #    carried so 50% tranches are modeled faithfully. --
+            queued_sell_syms: set = set()
             for sig in all_signals:
                 if sig.get("action") != "SELL":
                     continue
                 sym = sig["symbol"]
-                if sym not in positions:
+                if sym not in positions or sym in queued_sell_syms:
                     continue
                 days_held = (date - positions[sym]["entry_date"]).days
                 if days_held < self.min_hold_days:
                     continue
-                pos = positions.pop(sym)
-                stop_levels.pop(sym, None)
-                price = float(sig["price"])
-                proceeds = self._sell_price(price, pos["shares"])
-                pnl = proceeds - pos["entry_price"] * pos["shares"]
-                cash += proceeds
-                all_trades.append(
+                pending_sells.append(
                     {
-                        "date": date,
                         "symbol": sym,
-                        "action": "SELL",
-                        "shares": pos["shares"],
-                        "price": price,
-                        "pnl": pnl,
+                        "shares": float(sig.get("shares", 0) or 0),
+                        "signal_price": float(sig["price"]),
                         "reason": sig.get("reasoning", ""),
-                        "hold_days": days_held,
                     }
                 )
-                # Sync strategy state so it can generate new BUY signals
-                strat = pos.get("strategy_obj")
-                if strat:
-                    strat.positions.pop(sym, None)
-                    strat.entry_dates.pop(sym, None)
-                cooldowns[sym] = date  # prevent immediate re-entry
+                queued_sell_syms.add(sym)
 
-            # -- Process BUY signals (gates are constructor params; parity mode
-            #    disables the synthetic confidence floor / daily cap / cooldown) --
+            # -- Queue BUY signals for tomorrow's open (gates are constructor
+            #    params; cash/heat are checked at FILL time with that day's
+            #    portfolio state, mirroring production order submission) --
             buy_sigs = sorted(
                 [
                     s
@@ -360,58 +459,21 @@ class PortfolioBacktester:
                 reverse=True,
             )[: self.max_daily_buys]
 
-            pos_value = self._mark_to_market(positions, day_data)
-            portfolio_value = cash + pos_value
-            current_exposure = sum(p["shares"] * p["entry_price"] for p in positions.values())
-
             for sig in buy_sigs:
-                sym = sig["symbol"]
                 shares = sig.get("shares", 0)
                 price = float(sig["price"])
                 if shares <= 0 or price <= 0:
                     continue
-
-                cost = self._buy_cost(price, shares)
-                if cost > cash:
-                    continue
-
-                new_exposure = current_exposure + cost
-                if portfolio_value > 0 and new_exposure / portfolio_value > self.max_portfolio_heat:
-                    continue
-
-                exec_price = price * (1 + self.slippage_bps / 10000)
-                cash -= cost
-                current_exposure += cost
-                atr = sig.get("atr", 0) or 0
-
-                positions[sym] = {
-                    "shares": shares,
-                    "entry_price": exec_price,
-                    "entry_date": date,
-                    "atr": atr,
-                    "strategy_obj": sig.get("_strategy"),
-                }
-
-                if atr > 0:
-                    stop_levels[sym] = exec_price - self.stop_loss_atr_mult * atr
-
-                all_trades.append(
+                pending_buys.append(
                     {
-                        "date": date,
-                        "symbol": sym,
-                        "action": "BUY",
+                        "symbol": sig["symbol"],
                         "shares": shares,
-                        "price": exec_price,
-                        "pnl": 0,
+                        "signal_price": price,
+                        "atr": sig.get("atr", 0) or 0,
                         "reason": sig.get("reasoning", ""),
-                        "hold_days": 0,
+                        "strategy_obj": sig.get("_strategy"),
                     }
                 )
-
-                strat = sig.get("_strategy")
-                if strat:
-                    strat.positions[sym] = shares
-                    strat.entry_dates[sym] = date
 
             # -- End-of-day snapshot --
             pos_value = self._mark_to_market(positions, day_data)
