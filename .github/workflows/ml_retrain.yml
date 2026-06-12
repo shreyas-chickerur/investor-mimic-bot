@@ -1,10 +1,15 @@
 name: Weekly ML Model Retraining
 
 on:
-  # Monday at 3 AM UTC (Sunday 11 PM ET) — runs before the daily trading execution
-  schedule:
-    - cron: '0 3 * * 1'
-  workflow_dispatch:  # allow manual trigger
+  # Schedule disabled 2026-06-11: ML Momentum is disabled by evidence
+  # (purged-OOS accuracy near-random on 91/91 windows — see
+  # docs/research/EVIDENCE_2026-06.md). Weekly retraining of a model no
+  # strategy consumes wasted API quota and uploaded stale artifacts.
+  # Re-enable the cron only if ML is revalidated at a quarterly review.
+  #
+  # schedule:
+  #   - cron: '0 3 * * 1'
+  workflow_dispatch:  # manual trigger retained for revalidation experiments
 
 env:
   PYTHON_VERSION: "3.11"
