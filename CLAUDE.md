@@ -67,8 +67,12 @@ runs, email subjects get a `[RECURRING: <check>]` prefix.
 - **Signature**: log line `🛑 KILL SWITCH: ...`; `run_health.json` check `expect:Kill switch did not fire` failed.
 - **Diagnose**: `sqlite3 trading.db "SELECT key, value FROM system_state WHERE key IN
   ('max_drawdown','peak_portfolio_value','cumulative_pnl');"`
-- **History**: drawdown is computed live from `peak_portfolio_value` vs portfolio value as a FRACTION (0.05 = 5%). The
-  stored `max_drawdown` system_state value is in PERCENT units and must never feed the kill switch directly (a unit
+- **Risk ladder (since 2026-06-12)**: the 5% kill switch measures the ALPHA SLEEVE drawdown (portfolio minus the SPY
+  cash-sweep position; peak in system_state `peak_alpha_value`) — a routine SPY correction must not halt the
+  strategies. The DrawdownStopManager's 10% halt / 15% panic thresholds remain on the WHOLE portfolio as the
+  catastrophe backstop; the sweep's beta risk is governed by its VIX throttle.
+- **History**: drawdown is computed live from peak vs current value as a FRACTION (0.05 = 5%). The stored
+  `max_drawdown` system_state value is in PERCENT units and must never feed the kill switch directly (a unit
   mismatch halted trading for a week in June 2026 — "drawdown 186.7%").
 
 ### 4. Artifact DB migration failure
