@@ -99,10 +99,11 @@ def _run(bt, closes):
 
 
 class TestRatchetStop:
-    # Entry at close 100 on sim day 0 (exec ~100.05 with 5bps slippage), ATR 2.
-    # Day +1: 105 → profit ≈ 4.95 ≥ lock (2×ATR=4) → stop ratchets to
+    # OPG semantics: signal at sim day 0's close (100) fills at day +1's
+    # open (=close in these frames, 100; exec ~100.05 with 5bps), ATR 2.
+    # Day +2: 105 → profit ≈ 4.95 ≥ lock (2×ATR=4) → stop ratchets to
     # entry+1×ATR ≈ 102.05. Day +3: 101.5 ≤ stop → profitable stop exit.
-    CLOSES = [100.0] * 5 + [100.0, 105.0, 105.0, 101.5, 101.5, 101.5]
+    CLOSES = [100.0] * 5 + [100.0, 100.0, 105.0, 101.5, 101.5, 101.5]
 
     def test_parity_ratchet_locks_profit(self):
         bt = PortfolioBacktester.from_config(get_config())
@@ -122,8 +123,8 @@ class TestRatchetStop:
 
     def test_stop_never_ratchets_down(self):
         bt = PortfolioBacktester.from_config(get_config())
-        # Rises to lock tier, then hovers just above the ratcheted stop:
-        closes = [100.0] * 5 + [100.0, 105.0, 103.0, 103.0, 103.0, 103.0]
+        # Fill day +1, rises to lock tier, then hovers just above the stop:
+        closes = [100.0] * 5 + [100.0, 100.0, 105.0, 103.0, 103.0, 103.0]
         results = _run(bt, closes)
         trades = results["all_trades"]
         sells = trades[trades["action"] == "SELL"]
