@@ -40,52 +40,11 @@ logger = logging.getLogger(__name__)
 _PROJECT_ROOT = Path(__file__).parent.parent.parent
 _FUNDAMENTALS_PATH = _PROJECT_ROOT / "data" / "fundamentals.json"
 
-# Stock → sector ETF mapping
-_SECTOR_MAP: dict[str, str] = {
-    # Tech
-    "AAPL": "XLK",
-    "MSFT": "XLK",
-    "GOOGL": "XLK",
-    "AMZN": "XLK",
-    "META": "XLK",
-    "NVDA": "XLK",
-    "ADBE": "XLK",
-    "AVGO": "XLK",
-    "CRM": "XLK",
-    "AMD": "XLK",
-    "ACN": "XLK",
-    # Consumer Discretionary
-    "TSLA": "XLY",
-    "NFLX": "XLY",
-    "COST": "XLY",
-    "MCD": "XLY",
-    "NKE": "XLY",
-    "WMT": "XLY",
-    "HD": "XLY",
-    "DIS": "XLY",
-    # Healthcare
-    "JNJ": "XLV",
-    "ABBV": "XLV",
-    "MRK": "XLV",
-    "TMO": "XLV",
-    "DHR": "XLV",
-    "ABT": "XLV",
-    "UNH": "XLV",
-    "LLY": "XLV",
-    # Financials
-    "MA": "XLF",
-    "JPM": "XLF",
-    "V": "XLF",
-    # Consumer Staples
-    "KO": "XLP",
-    "PEP": "XLP",
-    "PG": "XLP",
-    # Energy
-    "XOM": "XLE",
-    "CVX": "XLE",
-    # Telecom → use SPY as fallback
-    "VZ": "SPY",
-}
+# Stock → sector ETF mapping — shared, full-universe (src/data/sector_map.py).
+# The old partial map here covered ~24 names and defaulted unmapped symbols to
+# SPY, which made the sector-RS factor spurious for the 2026-06 universe
+# expansion. Unmapped names now get NEUTRAL treatment, never a fake sector.
+from src.data.sector_map import SYMBOL_SECTOR as _SECTOR_MAP
 
 
 class FactorMomentumStrategy(TradingStrategy):
@@ -224,7 +183,9 @@ class FactorMomentumStrategy(TradingStrategy):
         # --- Factor 6: Sector relative strength ---
         sector_excess = pd.Series(0.0, index=latest_df.index)
         for sym in latest_df.index:
-            sector_etf = _SECTOR_MAP.get(sym, "SPY")
+            sector_etf = _SECTOR_MAP.get(sym)
+            if sector_etf is None:
+                continue  # unmapped: neutral 0.0, never a fake SPY "sector"
             etf_rows = (
                 market_data[market_data["symbol"] == sector_etf]
                 if "symbol" in market_data.columns
@@ -292,8 +253,8 @@ class FactorMomentumStrategy(TradingStrategy):
         sector_mults = self._sector_regime_multipliers(market_data)
         tilted: dict[str, float] = {}
         for sym, score in factors["composite"].items():
-            etf = _SECTOR_MAP.get(sym, "SPY")
-            mult = sector_mults.get(etf, 1.0)
+            etf = _SECTOR_MAP.get(sym)
+            mult = sector_mults.get(etf, 1.0) if etf else 1.0
             tilted[sym] = score * mult
             if mult != 1.0:
                 logger.debug(

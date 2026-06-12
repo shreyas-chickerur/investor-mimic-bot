@@ -35,15 +35,13 @@ from src.utils.config_loader import get_config
 
 logger = logging.getLogger(__name__)
 
-# Sector ETF → list of constituent stock symbols (from the tradeable universe)
-_SECTOR_CONSTITUENTS: dict[str, list[str]] = {
-    "XLK": ["AAPL", "MSFT", "NVDA", "GOOGL", "META", "AMZN", "ADBE", "CRM", "AMD", "AVGO", "ACN"],
-    "XLV": ["JNJ", "ABBV", "MRK", "UNH", "LLY", "TMO", "DHR", "ABT"],
-    "XLF": ["JPM", "V", "MA", "BAC"],
-    "XLY": ["TSLA", "NFLX", "COST", "MCD", "NKE", "WMT", "HD", "DIS"],
-    "XLP": ["KO", "PEP", "PG"],
-    "XLE": ["XOM", "CVX"],
-}
+# Sector ETF → constituents — derived from the shared full-universe map
+# (src/data/sector_map.py). The old hardcoded dict covered ~34 names, so the
+# 2026-06 universe expansion was invisible to this strategy. Sectors whose ETF
+# has no market data (not yet in the universe/backfill) simply never rank.
+from src.data.sector_map import constituents_by_sector
+
+_SECTOR_CONSTITUENTS: dict[str, list[str]] = constituents_by_sector()
 
 
 class SectorRotationStrategy(TradingStrategy):
