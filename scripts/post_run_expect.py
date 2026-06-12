@@ -126,6 +126,31 @@ def check_drawdown(conn: sqlite3.Connection, today: str) -> tuple[bool, str]:
     )
 
 
+def check_unfilled_opg_rate(conn: sqlite3.Connection, today: str) -> tuple[bool, str]:
+    """Yesterday's optimistically-FILLED OPG orders that never actually filled.
+
+    The pre-run broker sync sweeps phantom positions (local-not-at-broker) and
+    records the count in system_state. A handful is normal on gap days; a
+    burst means the 1% limit buffer is too tight or signals chase gaps.
+    """
+    row = _q1(conn, "SELECT value FROM system_state WHERE key='unfilled_opg_swept'")
+    if not row:
+        return True, "no unfilled-OPG sweep data yet"
+    try:
+        payload = json.loads(row["value"])
+        count = int(payload.get("count", 0))
+        symbols = payload.get("symbols", [])
+        swept_date = payload.get("date", "?")
+    except (ValueError, TypeError, KeyError) as exc:
+        return True, f"unfilled-OPG payload unreadable ({exc})"
+    if count >= 5:
+        return False, (
+            f"{count} unfilled OPG order(s) swept on {swept_date}: {symbols} — "
+            "the 1% limit-on-open buffer may be too tight for current gaps"
+        )
+    return True, f"{count} unfilled OPG order(s) swept on {swept_date}"
+
+
 def check_review_not_overdue(conn: sqlite3.Connection, today: str) -> tuple[bool, str]:
     """Probation caps and parameter plateaus must be revisited quarterly.
 
@@ -248,6 +273,7 @@ EXPECTATIONS = [
     ("No critical errors today", check_no_critical_errors, "medium"),
     ("Consecutive failures < 3", check_consecutive_failures, "high"),
     ("Quarterly strategy re-validation not overdue", check_review_not_overdue, "medium"),
+    ("Unfilled-OPG rate acceptable", check_unfilled_opg_rate, "medium"),
 ]
 
 

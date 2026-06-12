@@ -616,6 +616,46 @@ def _fetch_spy_return() -> float | None:
         return None
 
 
+def _fetch_inception_alpha(db_path: str) -> dict | None:
+    """Since-inception portfolio return vs SPY over the same window.
+
+    With ~80% of equity in the SPY cash sweep, the honest scorecard is alpha
+    over SPY — absolute P&L alone mostly restates the market.
+    """
+    try:
+        import sqlite3
+
+        import yfinance as yf
+
+        conn = sqlite3.connect(db_path, timeout=10)
+        first = conn.execute(
+            "SELECT snapshot_date, portfolio_value FROM daily_portfolio_snapshot "
+            "ORDER BY snapshot_date ASC LIMIT 1"
+        ).fetchone()
+        latest = conn.execute(
+            "SELECT portfolio_value FROM daily_portfolio_snapshot "
+            "ORDER BY snapshot_date DESC LIMIT 1"
+        ).fetchone()
+        conn.close()
+        if not first or not latest or not first[1] or float(first[1]) <= 0:
+            return None
+        start_date = str(first[0])[:10]
+        port_pct = (float(latest[0]) - float(first[1])) / float(first[1]) * 100
+        hist = yf.Ticker("SPY").history(start=start_date)
+        closes = hist["Close"].dropna()
+        if len(closes) < 2:
+            return None
+        spy_pct = (float(closes.iloc[-1]) - float(closes.iloc[0])) / float(closes.iloc[0]) * 100
+        return {
+            "since": start_date,
+            "portfolio_pct": port_pct,
+            "spy_pct": spy_pct,
+            "alpha_pct": port_pct - spy_pct,
+        }
+    except Exception:
+        return None
+
+
 # ── Section: Header bar ───────────────────────────────────────────────────────
 def build_header_bar(date_str: str, run_number: str | None) -> str:
     run_part = f" &nbsp;&middot;&nbsp; Run #{html_lib.escape(run_number)}" if run_number else ""
@@ -839,6 +879,7 @@ def build_hero(
     total_pnl: float = 0.0,
     cash: float = 0.0,
     open_count: int = 0,
+    inception_alpha: dict | None = None,
 ) -> str:
     # Treat near-zero P&L as a neutral state, not a green up-arrow. The prior
     # `today_pnl >= 0` rule lit a green ▲ at exactly $0.00 (e.g., when there
@@ -873,6 +914,16 @@ def build_hero(
     pv_dollars = f"${int(pv):,}"
     pv_cents = f"{pv % 1:.2f}"[1:]  # ".99"
 
+    inception_html = ""
+    if inception_alpha:
+        _ia = inception_alpha
+        _ia_col = GREEN if _ia["alpha_pct"] >= 0 else RED
+        inception_html = (
+            f'<br>since {_ia["since"]}:&nbsp;port&nbsp;{_ia["portfolio_pct"]:+.2f}%'
+            f'&nbsp;&middot;&nbsp;SPY&nbsp;{_ia["spy_pct"]:+.2f}%'
+            f"&nbsp;&middot;&nbsp;&alpha;&nbsp;"
+            f'<span style="color:{_ia_col};">{_ia["alpha_pct"]:+.2f}%</span>'
+        )
     spy_html = ""
     if spy_return is not None:
         spy_col = GREEN if spy_return >= 0 else RED
@@ -883,7 +934,7 @@ def build_hero(
         spy_html = f"""
 <div style="font-family:{FONT};color:{INK_MUTE};font-size:11px;padding-top:10px;">
   SPY&nbsp;<span style="color:{spy_col};">{spy_arrow}&nbsp;{spy_return:+.2f}%</span>
-  &nbsp;&nbsp;alpha&nbsp;<span style="color:{alpha_col};">{alpha_sign}{alpha:.2f}%</span>
+  &nbsp;&nbsp;alpha&nbsp;<span style="color:{alpha_col};">{alpha_sign}{alpha:.2f}%</span>{inception_html}
 </div>"""
 
     chart_html = ""
@@ -2218,6 +2269,7 @@ def generate_email_body(db_path: str = "trading.db", include_visuals: bool = Tru
         pass
 
     spy_return = _fetch_spy_return()
+    inception_alpha = _fetch_inception_alpha(db_path)
     traded_today_syms = [t.get("symbol", "") for t in trades_today if t.get("symbol")]
 
     # needs_attention glow: swap inner gradient colour when there's unresolved drift
@@ -2250,6 +2302,7 @@ def generate_email_body(db_path: str = "trading.db", include_visuals: bool = Tru
             total_pnl=total_pnl,
             cash=cash,
             open_count=len(positions),
+            inception_alpha=inception_alpha,
         )
         + build_alert_banner(alerts)
         + build_strategy_dashboard(strategy_rows, health_by_name=health_by_name, portfolio_value=pv)
