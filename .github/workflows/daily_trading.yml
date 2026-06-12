@@ -153,6 +153,19 @@ jobs:
         fi
         python scripts/sync_broker_state.py && echo "✅ Pre-sync complete" || echo "⚠️ Pre-sync failed (broker may have no positions)"
 
+    - name: Record fill quality (true-up from actual broker fills)
+      id: record_fill_quality
+      continue-on-error: true  # outcome feeds the final health gate
+      env:
+        ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+        ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+        ALPACA_PAPER: 'true'
+      run: |
+        # Paper mode books OPG fills optimistically at the limit price; this
+        # compares booked vs ACTUAL filled_avg_price for recent closed orders
+        # so the 5bps slippage assumption is measured, not assumed.
+        python3 scripts/record_fill_quality.py --db trading.db --days 3
+
     - name: Download previous training data (if exists)
       continue-on-error: true
       env:
@@ -1111,6 +1124,7 @@ jobs:
         [ "${{ steps.validate_snapshot.outcome }}" = "failure" ]    && FAILED_STEPS="$FAILED_STEPS validate_snapshot"
         [ "${{ steps.publish_snapshot.outcome }}" = "failure" ]     && FAILED_STEPS="$FAILED_STEPS publish_snapshot"
         [ "${{ steps.backup_db.outcome }}" = "failure" ]            && FAILED_STEPS="$FAILED_STEPS backup_db"
+        [ "${{ steps.record_fill_quality.outcome }}" = "failure" ]  && FAILED_STEPS="$FAILED_STEPS record_fill_quality"
         [ "${{ steps.run_health.outcome }}" = "failure" ]           && FAILED_STEPS="$FAILED_STEPS run_health"
         if [ -n "$FAILED_STEPS" ]; then
           echo "❌ Health gate failed: non-blocking step(s) failed:$FAILED_STEPS"

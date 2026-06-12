@@ -251,14 +251,37 @@ def sync_broker_to_database(db_path="trading.db"):
                     changes += 1
 
         # --- Remove local positions not in broker ---
+        # In the pre-run sync these are overwhelmingly yesterday's OPG orders
+        # that were optimistically marked FILLED but never actually filled
+        # (gap through the limit at the open). The count is persisted so
+        # post_run_expect can surface a high fill-miss rate — previously
+        # unfilled entries vanished without a trace.
+        phantom_symbols: list[str] = []
         for symbol, local_info in local.items():
             if symbol not in broker_positions:
+                phantom_symbols.append(symbol)
                 for sid, sname, _, _ in local_info["strategies"]:
                     cursor.execute(
                         "DELETE FROM positions WHERE strategy_id = ? AND symbol = ?", (sid, symbol)
                     )
                     logger.info(f"  🗑️  {symbol}: removed from {sname} (not in broker)")
                     changes += 1
+        cursor.execute(
+            "CREATE TABLE IF NOT EXISTS system_state ("
+            "key TEXT PRIMARY KEY, value TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)"
+        )
+        cursor.execute(
+            "INSERT OR REPLACE INTO system_state (key, value) VALUES ('unfilled_opg_swept', ?)",
+            (
+                json.dumps(
+                    {
+                        "date": datetime.now().strftime("%Y-%m-%d"),
+                        "count": len(phantom_symbols),
+                        "symbols": phantom_symbols,
+                    }
+                ),
+            ),
+        )
 
         # --- Record sync event ---
         # created_at deliberately uses the column DEFAULT CURRENT_TIMESTAMP:
