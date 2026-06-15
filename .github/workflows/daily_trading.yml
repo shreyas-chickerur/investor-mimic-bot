@@ -793,6 +793,10 @@ jobs:
     - name: Run per-strategy backtest (Mondays only)
       if: always()
       continue-on-error: true
+      # Cap a hung backtest so it can't stall the run for hours and delay the
+      # health gate, failure email and dead-man's switch ping (June 2026: a
+      # hung backtest blocked the whole job for 3h+).
+      timeout-minutes: 20
       run: |
         DAY=$(date +%u)
         if [ "$DAY" = "1" ]; then
