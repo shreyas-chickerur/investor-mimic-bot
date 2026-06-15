@@ -305,5 +305,36 @@ except ImportError:
     print("hypothesis not installed, skipping property-based tests")
 
 
+class TestPruneOrphanStops:
+    """prune_orphan_stops drops tracked stops for symbols no longer held."""
+
+    def setup_method(self):
+        self.manager = StopLossManager(atr_multiplier=2.5)
+        for sym in ["AAPL", "MSFT", "GOOGL", "AMD"]:
+            self.manager.set_stop_loss(sym, 100.0, 2.0)
+
+    def test_prunes_only_unheld_symbols(self):
+        held = {"AAPL", "MSFT"}
+        removed = self.manager.prune_orphan_stops(held)
+
+        assert set(removed) == {"GOOGL", "AMD"}
+        assert set(self.manager.stop_levels) == held
+        # Surviving stops still function
+        assert self.manager.get_stop_price("AAPL") > 0
+        # Pruned stops are fully cleared from every tracking dict
+        assert "GOOGL" not in self.manager.entry_prices
+        assert "AMD" not in self.manager.directions
+
+    def test_noop_when_all_held(self):
+        removed = self.manager.prune_orphan_stops({"AAPL", "MSFT", "GOOGL", "AMD"})
+        assert removed == []
+        assert len(self.manager.stop_levels) == 4
+
+    def test_prunes_all_when_nothing_held(self):
+        removed = self.manager.prune_orphan_stops(set())
+        assert set(removed) == {"AAPL", "MSFT", "GOOGL", "AMD"}
+        assert self.manager.stop_levels == {}
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -275,6 +275,23 @@ class TestSyncBrokerToDatabase:
         assert name == "BROKER_SYNC"
 
     @patch("scripts.sync_broker_state.BrokerReconciler")
+    def test_zero_broker_avg_price_falls_back_to_implied(self, MockReconciler, temp_db):
+        """avg_price=0 from the broker must not be written as 0 (corrupts P&L and
+        disables the stop-loss audit). It falls back to market_value/qty."""
+        mock_rec = MockReconciler.return_value
+        state = _mock_broker_state({"VZ": (25, 0.0)})  # broker reports avg_price 0
+        state["positions"]["VZ"]["market_value"] = 1150.0  # implies $46.00/share
+        mock_rec.get_broker_state.return_value = state
+
+        result = sync_broker_to_database(temp_db)
+        assert result is True
+
+        conn = sqlite3.connect(temp_db)
+        avg = conn.execute("SELECT avg_price FROM positions WHERE symbol='VZ'").fetchone()[0]
+        conn.close()
+        assert avg == pytest.approx(46.0), f"expected implied 46.0, got {avg}"
+
+    @patch("scripts.sync_broker_state.BrokerReconciler")
     def test_local_less_than_broker_adds_shares(self, MockReconciler, temp_db):
         """When local has fewer shares, the difference is added to the largest strategy."""
         sid = _seed_strategy(temp_db, "RSI")
