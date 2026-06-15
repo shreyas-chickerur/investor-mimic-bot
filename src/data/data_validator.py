@@ -13,14 +13,12 @@ Phase 1.2: Enhanced with comprehensive data quality checks
 from __future__ import annotations
 
 import logging
-import os
-from datetime import date, datetime
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
-from dateutil import tz  # type: ignore[import-untyped]
-from pandas.tseries.holiday import USFederalHolidayCalendar
-from pandas.tseries.offsets import CustomBusinessDay
+
+from src.validation.data_freshness import is_fresh
 
 logger = logging.getLogger(__name__)
 
@@ -49,28 +47,6 @@ class DataValidator:
     def __init__(self, max_age_hours: int = 24, max_price_jump_pct: float = 0.20):
         self.max_age_hours = max_age_hours
         self.max_price_jump_pct = max_price_jump_pct
-        self._holiday_calendar = USFederalHolidayCalendar()
-        self._business_day = CustomBusinessDay(calendar=self._holiday_calendar)
-
-    def _is_holiday(self, d: date) -> bool:
-        holidays = self._holiday_calendar.holidays(start=d, end=d)
-        return not holidays.empty
-
-    def _previous_business_day(self, d: date) -> date:
-        result = (pd.Timestamp(d) - self._business_day).date()
-        return result  # type: ignore[no-any-return]
-
-    def _expected_latest_date(self, now: datetime) -> date:
-        """Determine the expected latest trading date based on market time."""
-        today = now.date()
-        if now.weekday() >= 5 or self._is_holiday(today):
-            return self._previous_business_day(today)
-
-        market_close = now.replace(hour=16, minute=0, second=0, microsecond=0)
-        if now >= market_close:
-            return today
-
-        return self._previous_business_day(today)
 
     def validate_data_file(self, data_path: Path) -> tuple[bool, list[str]]:
         """
@@ -91,7 +67,12 @@ class DataValidator:
             df = pd.read_csv(data_path, index_col=0)
             df.index = pd.to_datetime(df.index)
 
-            # Check data freshness - configurable threshold
+            # Freshness defers to the single source of truth (is_fresh): data is
+            # tradeable if it is within the age threshold OR covers the last
+            # completed trading session (holiday/weekend gaps where wall-clock
+            # age legitimately exceeds the threshold). This keeps the engine's
+            # gate identical to scripts/pre_flight_check.py — a slightly-late run
+            # must not false-fail on weekend-gap data that pre-flight passed.
             latest_date = df.index.max()
             # Normalize to naive UTC for comparison
             if hasattr(latest_date, "tzinfo") and latest_date.tzinfo is not None:
@@ -99,24 +80,11 @@ class DataValidator:
             else:
                 latest_date_naive = latest_date
             now_utc = datetime.utcnow()
-            market_now = datetime.now(tz=tz.gettz("America/New_York"))
-            expected_latest_date = self._expected_latest_date(market_now)
             age_hours = (now_utc - latest_date_naive).total_seconds() / 3600
 
-            max_age_hours = int(os.getenv("DATA_VALIDATOR_MAX_AGE_HOURS", "288"))
-            # Two independent failure modes — report the one that actually fired
-            # (the old combined message claimed an age-limit breach even when
-            # only the trading-session check failed, which misled diagnosis).
-            if age_hours > max_age_hours:
-                errors.append(
-                    f"Data is {age_hours:.1f} hours old "
-                    f"(max: {max_age_hours}h via DATA_VALIDATOR_MAX_AGE_HOURS)"
-                )
-            elif latest_date_naive.date() < expected_latest_date:
-                errors.append(
-                    f"Data ends {latest_date_naive.date()} but the last completed "
-                    f"trading session is {expected_latest_date} — a session is missing"
-                )
+            fresh, reason = is_fresh(latest_date_naive.to_pydatetime(), now_utc, self.max_age_hours)
+            if not fresh:
+                errors.append(reason)
 
             # Check required columns
             required_cols = ["symbol", "close", "rsi", "volatility_20d", "sma_50", "sma_200"]
