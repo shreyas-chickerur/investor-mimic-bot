@@ -171,6 +171,27 @@ class StopLossManager:
                 logger.warning("Could not delete stop loss for %s from DB: %s", symbol, e)
         logger.debug(f"Stop loss removed for {symbol}")
 
+    def prune_orphan_stops(self, held_symbols: set[str]) -> list[str]:
+        """Drop tracked stops for symbols no longer held.
+
+        Stops are normally removed when a position closes, but a run that aborts
+        before the exit phase (e.g. a failed pre-flight) leaves the stop_loss_state
+        row behind. Over time these accumulate (June 2026: 18 stored stops vs 4
+        held positions). They are harmless to firing — check_stop_losses iterates
+        actual positions — but they bloat the table and mislead diagnostics, so
+        prune them at startup against the live position set.
+        """
+        orphans = [s for s in list(self.stop_levels) if s not in held_symbols]
+        for symbol in orphans:
+            self.remove_stop_loss(symbol)
+        if orphans:
+            logger.info(
+                "Pruned %d orphan stop-loss level(s) with no matching position: %s",
+                len(orphans),
+                orphans,
+            )
+        return orphans
+
     def get_stop_price(self, symbol: str) -> float:
         """Get stop price for a symbol"""
         return self.stop_levels.get(symbol, 0.0)

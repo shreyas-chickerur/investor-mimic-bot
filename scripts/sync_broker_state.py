@@ -125,6 +125,20 @@ def sync_broker_to_database(db_path="trading.db"):
         for symbol, pos_data in broker_positions.items():
             broker_qty = float(pos_data["qty"])
             broker_avg = float(pos_data["avg_price"])
+            # Alpaca occasionally reports avg_entry_price=0 (e.g. just after an
+            # OPG fill before it settles). Writing 0 corrupts the position:
+            # P&L computes off a zero basis and the stop-loss audit refuses to
+            # synthesise a stop (avg_price<=0 → no protection). Fall back to the
+            # implied price from market_value/qty so avg_price is never 0.
+            if broker_avg <= 0 and broker_qty != 0:
+                mkt_val = float(pos_data.get("market_value", 0.0) or 0.0)
+                implied = abs(mkt_val / broker_qty) if mkt_val else 0.0
+                if implied > 0:
+                    logger.warning(
+                        f"  ⚠️  {symbol}: broker avg_price=0; using implied "
+                        f"${implied:.2f} from market_value/qty"
+                    )
+                    broker_avg = implied
             local_info = local.get(symbol)
             local_total = local_info["total"] if local_info else 0.0
 

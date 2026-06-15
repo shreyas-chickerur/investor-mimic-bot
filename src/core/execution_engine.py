@@ -950,6 +950,18 @@ class MultiStrategyRunner:
             self._load_strategy_positions(strategy)
             strategies.append(strategy)
 
+        # Zero the capital_allocation of any strategy NOT in the active set.
+        # Disabled strategies (ML/News/Pairs) keep whatever value they last held
+        # while active, so the column drifts far above account equity (June 2026:
+        # sum was $174k of stale allocation on a $96k account) and pollutes the
+        # email/dashboard/platform-status report. Inactive strategies deploy no
+        # capital, so their allocation is 0 by definition.
+        _active_names = {name for name, _, _ in active_specs}
+        for name, row in existing_by_name.items():
+            if name not in _active_names and (row.get("capital_allocation") or 0) != 0:
+                self.db.update_strategy_capital_allocation(row["id"], 0.0)
+                logger.info("  Zeroed stale capital_allocation for inactive strategy: %s", name)
+
         return strategies
 
     def _load_strategy_positions(self, strategy):
@@ -1624,8 +1636,12 @@ class MultiStrategyRunner:
         _current_prices_for_audit = (
             market_data.groupby("symbol")["close"].last().to_dict() if not market_data.empty else {}
         )
+        _open_positions_for_audit = self.db.get_all_open_positions()
+        # Drop stale stops for symbols no longer held before (re)auditing the
+        # live set — keeps stop_loss_state in lockstep with positions.
+        self.stop_loss_manager.prune_orphan_stops({p["symbol"] for p in _open_positions_for_audit})
         self.stop_loss_manager.audit_and_repair_stops(
-            open_positions=self.db.get_all_open_positions(),
+            open_positions=_open_positions_for_audit,
             current_prices=_current_prices_for_audit,
         )
 
