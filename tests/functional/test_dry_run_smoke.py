@@ -57,14 +57,8 @@ def test_full_pipeline_dry_run(tmp_path, monkeypatch):
     monkeypatch.setenv("STRATEGY_DISABLED_LIST", "News Sentiment,ML Momentum")
 
     # The committed CSV is a snapshot, so the "covers the last trading session"
-    # calendar requirement can't hold — relax it (age/quality checks still run).
-    from datetime import date
-
-    monkeypatch.setattr(
-        "src.data.data_validator.DataValidator._expected_latest_date",
-        lambda self, market_now: date(2000, 1, 1),
-    )
-
+    # calendar requirement can't hold — the huge DATA_MAX_AGE_HOURS above makes
+    # is_fresh pass on age alone (age/quality checks still run).
     fake_client = MagicMock()
     fake_client.get_account.return_value = _fake_account()
     fake_client.get_all_positions.return_value = []
