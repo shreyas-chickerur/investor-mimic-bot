@@ -1,29 +1,29 @@
 {
   "meta": {
-    "generatedAt": "2026-06-16T05:49:25.010957Z",
+    "generatedAt": "2026-06-16T12:36:36.797373Z",
     "tradingDate": "2026-06-16",
-    "runId": "20260616_054901_mcs5",
-    "runNumber": 210,
+    "runId": "20260616_123611_gwi8",
+    "runNumber": 211,
     "paper": true,
     "schemaVersion": 1
   },
   "portfolio": {
-    "totalValue": 96200.35,
+    "totalValue": 96199.19,
     "cash": 91617.24,
     "positionsCount": 13,
-    "todayChangeUsd": -18.47,
-    "todayChangePct": -0.0192,
-    "allTimePnlUsd": -3799.65,
-    "allTimePnlPct": -3.7996,
+    "todayChangeUsd": -1.46,
+    "todayChangePct": -0.0015,
+    "allTimePnlUsd": -3800.81,
+    "allTimePnlPct": -3.8008,
     "spyTodayPct": 1.7634,
-    "vsSpyPct": -1.7826,
+    "vsSpyPct": -1.7649,
     "sharpe": null,
     "sortino": null,
     "maxDrawdownPct": 1.8664,
     "volatilityPct": null,
-    "winRatePct": 31.82,
-    "profitFactor": 2.6739,
-    "closedTradesCount": 22,
+    "winRatePct": 34.78,
+    "profitFactor": 4.1262,
+    "closedTradesCount": 23,
     "regime": "NORMAL",
     "heatCapPct": 40,
     "exposurePct": 4.76
@@ -231,7 +231,7 @@
     },
     {
       "date": "2026-06-16",
-      "value": 96200.35,
+      "value": 96199.19,
       "spy": 105032.98
     }
   ],
@@ -318,7 +318,7 @@
       "key": "factor_momentum",
       "name": "Factor Momentum",
       "allocationPct": 11.35,
-      "returnPct": 3.6057,
+      "returnPct": 3.6056,
       "sharpe": null,
       "sortino": null,
       "profitFactor": null,
@@ -344,12 +344,12 @@
       "key": "news_sentiment",
       "name": "News Sentiment",
       "allocationPct": 10.89,
-      "returnPct": 5.8881,
+      "returnPct": 12.0225,
       "sharpe": null,
       "sortino": null,
       "profitFactor": null,
       "maxDrawdownPct": 4.7753,
-      "tradesCount": 3,
+      "tradesCount": 4,
       "winRatePct": null,
       "holdPeriod": "7d",
       "healthScore": 70,
@@ -364,7 +364,7 @@
       },
       "backtestSharpe": 0.25,
       "status": "ACTIVE",
-      "note": "Negative expectancy: $-0.02 per trade"
+      "note": "Negative expectancy: $-0.01 per trade"
     },
     {
       "key": "ma_crossover",
@@ -421,7 +421,7 @@
     {
       "key": "pairs_trading",
       "name": "Pairs Trading",
-      "allocationPct": 21.79,
+      "allocationPct": 21.78,
       "returnPct": null,
       "sharpe": null,
       "sortino": null,
@@ -520,7 +520,7 @@
       },
       "backtestSharpe": null,
       "status": "WATCHING",
-      "note": "Low trade count: 2 in 30d (need 5)"
+      "note": "Low trade count: 3 in 30d (need 5)"
     }
   ],
   "positions": [
@@ -535,7 +535,7 @@
       "unrealizedPlUsd": -0.29,
       "beta": 2.562,
       "atrStop": 511.7772,
-      "sentimentScore": 0.5151,
+      "sentimentScore": 0.5335,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -560,10 +560,15 @@
           567.25,
           585.78
         ],
-        "confidence": 0.9974999999999999,
+        "confidence": 1.0,
         "sentimentMultiplier": "\u00d71.00",
         "whyHeld": "PEAD (proxy): +11.2% surprise 3d ago, vol spike 1.4x",
         "lots": [
+          {
+            "date": "2026-06-15",
+            "shares": 1.0,
+            "price": 586.0729
+          },
           {
             "date": "2026-06-15",
             "shares": 1.0,
@@ -582,73 +587,8 @@
             "score": 0.352
           },
           {
-            "headline": "Why Did AMD, WULF, AMAT Stocks Jump To 52-Week Highs?",
+            "headline": "Applied Materials (AMAT) Gets Higher Price Targets from Barclays and Cantor Fitzgerald",
             "source": "Yahoo Finance",
-            "score": 0.5
-          }
-        ]
-      }
-    },
-    {
-      "symbol": "AMGN",
-      "strategy": "Earnings Drift",
-      "direction": "long",
-      "shares": 3.0,
-      "value": 1051.59,
-      "costBasis": 1052.12,
-      "unrealizedPlPct": -0.05,
-      "unrealizedPlUsd": -0.53,
-      "beta": 0.478,
-      "atrStop": 329.0786,
-      "sentimentScore": 0.6298,
-      "sentimentLabel": "BULLISH",
-      "detail": {
-        "priceSpark": [
-          324.39,
-          330.75,
-          331.57,
-          337.42,
-          339.3,
-          335.94,
-          336.06,
-          336.48,
-          336.79,
-          329.13,
-          328.26,
-          338.22,
-          345.6,
-          349.58,
-          345.73,
-          344.565,
-          337.73,
-          354.06,
-          355.2,
-          350.53
-        ],
-        "confidence": 0.895676612974861,
-        "sentimentMultiplier": "\u00d71.15",
-        "whyHeld": "PEAD (proxy): +4.8% surprise 3d ago, vol spike 1.9x | news +0.63",
-        "lots": [
-          {
-            "date": "2026-06-15",
-            "shares": 3.0,
-            "price": 350.7053
-          }
-        ],
-        "news": [
-          {
-            "headline": "Amgen (AMGN) Stock Valuation Looks Split Between Analyst Targets And DCF Upside",
-            "source": "simplywall.st",
-            "score": 0.5
-          },
-          {
-            "headline": "AMGN DCF Analysis: Intrinsic Value $292 vs Price $355",
-            "source": "GuruFocus",
-            "score": 0.67
-          },
-          {
-            "headline": "Amgen Stock (AMGN) Opinions on Congressional Trade Disclosure",
-            "source": "Quiver Quantitative",
             "score": 0.5
           }
         ]
@@ -658,14 +598,14 @@
       "symbol": "BAC",
       "strategy": "MA Crossover",
       "direction": "long",
-      "shares": 21.0,
-      "value": 1173.27,
-      "costBasis": 1173.86,
+      "shares": 16.0,
+      "value": 893.92,
+      "costBasis": 894.37,
       "unrealizedPlPct": -0.05,
-      "unrealizedPlUsd": -0.59,
+      "unrealizedPlUsd": -0.45,
       "beta": 0.594,
       "atrStop": 53.1012,
-      "sentimentScore": 0.5629,
+      "sentimentScore": 0.5739,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -698,6 +638,11 @@
             "date": "2026-06-15",
             "shares": 21.0,
             "price": 55.8979
+          },
+          {
+            "date": "2026-06-15",
+            "shares": 16.0,
+            "price": 55.8979
           }
         ],
         "news": [
@@ -720,17 +665,82 @@
       }
     },
     {
+      "symbol": "COF",
+      "strategy": "Earnings Drift",
+      "direction": "long",
+      "shares": 7.0,
+      "value": 1362.34,
+      "costBasis": 1363.02,
+      "unrealizedPlPct": -0.05,
+      "unrealizedPlUsd": -0.68,
+      "beta": 1.244,
+      "atrStop": 180.8696,
+      "sentimentScore": 0.5534,
+      "sentimentLabel": "NEUTRAL",
+      "detail": {
+        "priceSpark": [
+          186.351,
+          182.03,
+          187.23,
+          186.66,
+          187.79,
+          186.42,
+          188.8,
+          187.02,
+          187.93,
+          184.56,
+          183.84,
+          177.62,
+          183.2,
+          180.67,
+          180.39,
+          183.35,
+          177.63,
+          182.04,
+          184.73,
+          194.62
+        ],
+        "confidence": 0.8828411736047213,
+        "sentimentMultiplier": "\u00d71.00",
+        "whyHeld": "PEAD (proxy): +5.4% surprise 1d ago, vol spike 1.5x",
+        "lots": [
+          {
+            "date": "2026-06-15",
+            "shares": 7.0,
+            "price": 194.7173
+          }
+        ],
+        "news": [
+          {
+            "headline": "Capital One (COF) Stock Valuation Check After Volatile Performance And Discover Deal Expectations",
+            "source": "simplywall.st",
+            "score": 0.5
+          },
+          {
+            "headline": "Why Are Capital One (COF) Shares Soaring Today",
+            "source": "StockStory",
+            "score": 0.648
+          },
+          {
+            "headline": "Capital One (COF) jumps as bank stocks rally amid easing oil prices and renewed risk appetite",
+            "source": "Quiver Quantitative",
+            "score": 0.4871
+          }
+        ]
+      }
+    },
+    {
       "symbol": "HON",
       "strategy": "Earnings Drift",
       "direction": "long",
-      "shares": 5.0,
-      "value": 1137.05,
-      "costBasis": 1137.62,
+      "shares": 6.0,
+      "value": 1364.46,
+      "costBasis": 1365.14,
       "unrealizedPlPct": -0.05,
-      "unrealizedPlUsd": -0.57,
+      "unrealizedPlUsd": -0.68,
       "beta": 1.211,
       "atrStop": 209.258,
-      "sentimentScore": 0.5763,
+      "sentimentScore": 0.6182,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -755,13 +765,18 @@
           220.31,
           227.41
         ],
-        "confidence": 0.8626238585583833,
+        "confidence": 0.9447785117544196,
         "sentimentMultiplier": "\u00d71.00",
         "whyHeld": "PEAD (proxy): +6.4% surprise 3d ago, vol spike 1.4x",
         "lots": [
           {
             "date": "2026-06-15",
             "shares": 5.0,
+            "price": 227.5237
+          },
+          {
+            "date": "2026-06-15",
+            "shares": 6.0,
             "price": 227.5237
           }
         ],
@@ -777,9 +792,9 @@
             "score": 0.793
           },
           {
-            "headline": "Honeywell Aerospace Looms As GE Flirts With A Breakout",
-            "source": "Investor's Business Daily",
-            "score": 0.5129
+            "headline": "Honeywell International (HON) Moves 3.2% Higher: Will This Strength Last?",
+            "source": "Yahoo Finance",
+            "score": 0.7894
           }
         ]
       }
@@ -795,7 +810,7 @@
       "unrealizedPlUsd": -0.64,
       "beta": 3.256,
       "atrStop": 104.0467,
-      "sentimentScore": 0.5206,
+      "sentimentScore": 0.541,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -828,6 +843,11 @@
             "date": "2026-06-15",
             "shares": 10.0,
             "price": 127.9239
+          },
+          {
+            "date": "2026-06-15",
+            "shares": 10.0,
+            "price": 127.9239
           }
         ],
         "news": [
@@ -837,14 +857,14 @@
             "score": 0.4119
           },
           {
+            "headline": "Double Upgrade Hits Intel Stock (NASDAQ:INTC): What Moved the Needle",
+            "source": "TipRanks",
+            "score": 0.5
+          },
+          {
             "headline": "This analyst sees Intel reaching a $5 trillion valuation",
             "source": "Investing.com",
             "score": 0.6011
-          },
-          {
-            "headline": "Jim Cramer Says Intel (INTC) Is An Alternative To TSMC",
-            "source": "Yahoo Finance",
-            "score": 0.5
           }
         ]
       }
@@ -860,7 +880,7 @@
       "unrealizedPlUsd": -0.51,
       "beta": 2.493,
       "atrStop": 222.9073,
-      "sentimentScore": 0.5503,
+      "sentimentScore": 0.5925,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -885,10 +905,15 @@
           254.54,
           256.42
         ],
-        "confidence": 0.9974999999999999,
+        "confidence": 1.0,
         "sentimentMultiplier": "\u00d71.00",
         "whyHeld": "PEAD (proxy): +12.9% surprise 3d ago, vol spike 1.7x",
         "lots": [
+          {
+            "date": "2026-06-15",
+            "shares": 4.0,
+            "price": 256.5482
+          },
           {
             "date": "2026-06-15",
             "shares": 4.0,
@@ -897,19 +922,19 @@
         ],
         "news": [
           {
-            "headline": "KLA (KLAC) Stock Valuation After 10 For 1 Split And Strong Earnings Momentum",
+            "headline": "KLA (KLAC) Is Up 31.9% After 10-for-1 Split And Dividend Hike Is The Bull Case Changed?",
             "source": "simplywall.st",
-            "score": 0.7553
-          },
-          {
-            "headline": "KLA Corporation (KLAC) Announces Ten-for-One Forward Stock Split",
-            "source": "GuruFocus",
             "score": 0.5
           },
           {
             "headline": "KLA (KLAC) Stock After Split And Strong AI Outlook Is The Valuation Still Attractive",
             "source": "Yahoo Finance",
             "score": 0.8676
+          },
+          {
+            "headline": "KLA Corporation Surged 12% Ahead of Its Stock Split. Here\u2019s What the Roadmap Means for Investors",
+            "source": "TIKR.com",
+            "score": 0.5
           }
         ]
       }
@@ -925,7 +950,7 @@
       "unrealizedPlUsd": -0.58,
       "beta": 3.208,
       "atrStop": 336.3973,
-      "sentimentScore": 0.5851,
+      "sentimentScore": 0.5906,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -950,10 +975,15 @@
           366.81,
           388.92
         ],
-        "confidence": 0.9974999999999999,
+        "confidence": 1.0,
         "sentimentMultiplier": "\u00d71.00",
         "whyHeld": "PEAD (proxy): +12.7% surprise 3d ago, vol spike 1.6x",
         "lots": [
+          {
+            "date": "2026-06-15",
+            "shares": 3.0,
+            "price": 389.1145
+          },
           {
             "date": "2026-06-15",
             "shares": 3.0,
@@ -962,19 +992,84 @@
         ],
         "news": [
           {
-            "headline": "A Look at Lam Research Corp (LRCX) After 6.0% Gain -- GF Value $129.43 vs Price $388.92",
-            "source": "GuruFocus",
-            "score": 0.8501
-          },
-          {
             "headline": "Lam Research (LRCX) Stock Fair Value Edges Higher After Analyst Target Increases",
             "source": "Yahoo Finance",
             "score": 0.7859
           },
           {
-            "headline": "Buy, Hold, or Sell: Lam Research Rocketed 21% Off Its June Lows as a New Fed Begins. Is LRCX Worthwhile at $366?",
-            "source": "24/7 Wall St.",
-            "score": 0.5766
+            "headline": "LRCX Stock: Where Compounding Could Take The Price",
+            "source": "Trefis",
+            "score": 0.5
+          },
+          {
+            "headline": "What Is The Market Really Expecting From LRCX Stock?",
+            "source": "Trefis",
+            "score": 0.5
+          }
+        ]
+      }
+    },
+    {
+      "symbol": "ROST",
+      "strategy": "MA Crossover",
+      "direction": "long",
+      "shares": 5.0,
+      "value": 1183.85,
+      "costBasis": 1184.44,
+      "unrealizedPlPct": -0.05,
+      "unrealizedPlUsd": -0.59,
+      "beta": 0.631,
+      "atrStop": 220.15,
+      "sentimentScore": 0.6467,
+      "sentimentLabel": "BULLISH",
+      "detail": {
+        "priceSpark": [
+          210.6714,
+          212.2683,
+          217.3684,
+          216.7696,
+          234.3555,
+          234.2257,
+          233.0181,
+          226.7602,
+          231.2814,
+          223.6363,
+          223.3868,
+          232.1697,
+          232.6089,
+          229.9241,
+          226.9798,
+          229.45,
+          231.92,
+          239.11,
+          240.13,
+          236.77
+        ],
+        "confidence": 1.0,
+        "sentimentMultiplier": "\u00d71.15",
+        "whyHeld": "Golden cross: SMA20 (228.14) > SMA50 (224.91), ADX 25.7 | news +0.65",
+        "lots": [
+          {
+            "date": "2026-06-15",
+            "shares": 5.0,
+            "price": 236.8884
+          }
+        ],
+        "news": [
+          {
+            "headline": "ROST Stock Rallies As Company Predicts Sales, Earnings Increase For Fiscal 2026",
+            "source": "Stocktwits",
+            "score": 0.6591
+          },
+          {
+            "headline": "Ross Stores (ROST) Stock Valuation Check After Strong Multi Year Returns And Premium P/E Ratio",
+            "source": "Yahoo Finance",
+            "score": 0.7553
+          },
+          {
+            "headline": "2 S&P 500 Stocks Worth Investigating and 1 Facing Headwinds",
+            "source": "StockStory",
+            "score": 0.6131
           }
         ]
       }
@@ -983,14 +1078,14 @@
       "symbol": "SPY",
       "strategy": "Cash Sweep",
       "direction": "long",
-      "shares": 90.0,
-      "value": 67934.7,
-      "costBasis": 68577.3,
+      "shares": 89.0,
+      "value": 67179.87,
+      "costBasis": 67815.33,
       "unrealizedPlPct": -0.937,
-      "unrealizedPlUsd": -642.6,
+      "unrealizedPlUsd": -635.46,
       "beta": 1.0,
       "atrStop": null,
-      "sentimentScore": 0.5162,
+      "sentimentScore": 0.4876,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -1028,88 +1123,28 @@
             "date": "2026-06-16",
             "shares": 90.0,
             "price": 761.97
+          },
+          {
+            "date": "2026-06-16",
+            "shares": 89.0,
+            "price": 761.97
           }
         ],
         "news": [
-          {
-            "headline": "S&P 500 ETF gains ground amid hopes for US-Iran interim agreement",
-            "source": "eciks.org",
-            "score": 0.9063
-          },
           {
             "headline": "VOO vs. SPY: Which S&P 500 ETF is The Better Bet?",
             "source": "Yahoo Finance",
             "score": 0.7202
           },
           {
+            "headline": "Will The Fed Kill The S&P 500\u2019s Relief Rally?",
+            "source": "Trefis",
+            "score": 0.3091
+          },
+          {
             "headline": "SPY is up 1.9% today, on MU stock price movement",
             "source": "Quiver Quantitative",
             "score": 0.5
-          }
-        ]
-      }
-    },
-    {
-      "symbol": "TJX",
-      "strategy": "MA Crossover",
-      "direction": "long",
-      "shares": 6.0,
-      "value": 1003.98,
-      "costBasis": 1004.48,
-      "unrealizedPlPct": -0.05,
-      "unrealizedPlUsd": -0.5,
-      "beta": 0.282,
-      "atrStop": 158.0777,
-      "sentimentScore": 0.6341,
-      "sentimentLabel": "BULLISH",
-      "detail": {
-        "priceSpark": [
-          150.25,
-          150.68,
-          159.21,
-          157.46,
-          158.27,
-          158.97,
-          157.01,
-          154.89,
-          154.75,
-          152.75,
-          153.69,
-          157.9,
-          158.63,
-          160.71,
-          159.75,
-          164.87,
-          167.66,
-          168.34,
-          168.41,
-          167.33
-        ],
-        "confidence": 1.0,
-        "sentimentMultiplier": "\u00d71.15",
-        "whyHeld": "Golden cross: SMA20 (159.08) > SMA50 (157.28), ADX 43.5 | news +0.63",
-        "lots": [
-          {
-            "date": "2026-06-15",
-            "shares": 6.0,
-            "price": 167.4137
-          }
-        ],
-        "news": [
-          {
-            "headline": "TJX Companies (TJX) Stock Valuation After 6% Comparable Sales Growth And Broad-Based Customer Demand",
-            "source": "simplywall.st",
-            "score": 0.6366
-          },
-          {
-            "headline": "The TJX Companies Hits 52-Week High: Is the Stock Still Worth Buying?",
-            "source": "Yahoo Finance",
-            "score": 0.6131
-          },
-          {
-            "headline": "The TJX Companies Hits 52-Week High: Is the Stock Still Worth Buying?",
-            "source": "Zacks Investment Research",
-            "score": 0.6131
           }
         ]
       }
@@ -1125,7 +1160,7 @@
       "unrealizedPlUsd": 84.96,
       "beta": 0.255,
       "atrStop": 391.7382,
-      "sentimentScore": 0.5078,
+      "sentimentScore": 0.529,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -1172,18 +1207,18 @@
         ],
         "news": [
           {
-            "headline": "UnitedHealth Just Raised Its Dividend 5%. Why You Should Buy UNH Stock Here.",
-            "source": "Barchart.com",
+            "headline": "UnitedHealth\u2019s next earnings drop: Q2 2026 results due July 16",
+            "source": "Stock Titan",
+            "score": 0.3634
+          },
+          {
+            "headline": "The Deliberate Shrinkage That Signaled UnitedHealth Stock\u2019s Surge",
+            "source": "Trefis",
             "score": 0.5
           },
           {
-            "headline": "UnitedHealth Group (UNH) Stock Analysis: Navigating Growth Amidst a Stable Dividend Yield",
-            "source": "DirectorsTalk Interviews",
-            "score": 0.793
-          },
-          {
-            "headline": "UnitedHealth Group (UNH) stock moves -1.28%: What you should know",
-            "source": "MSN",
+            "headline": "UnitedHealth Group Stock (UNH) Opinions on Analyst Upgrades",
+            "source": "Quiver Quantitative",
             "score": 0.5
           }
         ]
@@ -1200,7 +1235,7 @@
       "unrealizedPlUsd": 1176.75,
       "beta": -0.285,
       "atrStop": 45.9462,
-      "sentimentScore": 0.6304,
+      "sentimentScore": 0.6492,
       "sentimentLabel": "BULLISH",
       "detail": {
         "priceSpark": [
@@ -1242,20 +1277,32 @@
             "score": 0.5
           },
           {
-            "headline": "Verizon (VZ) Stock Trades Down, Here Is Why",
-            "source": "Yahoo Finance",
-            "score": 0.5
+            "headline": "Verizon axes upgrade fees and pays 3% back with new loyalty plan",
+            "source": "Stock Titan",
+            "score": 0.7712
           },
           {
-            "headline": "PARK CIRCLE Co Has $6.98 Million Stock Holdings in Verizon Communications Inc. $VZ",
-            "source": "MarketBeat",
-            "score": 0.5
+            "headline": "2 Attractive-Yield Dividend Stocks That Could Benefit If Inflation Stays Hot",
+            "source": "Seeking Alpha",
+            "score": 0.7294
           }
         ]
       }
     }
   ],
   "trades": [
+    {
+      "date": "2026-06-16",
+      "symbol": "VZ",
+      "strategy": "News Sentiment",
+      "side": "SELL",
+      "shares": 25.0,
+      "entry": 0.0,
+      "exit": 46.6,
+      "realizedPlPct": 0.0,
+      "realizedPlUsd": 1165.0,
+      "exitReason": "strategy wind-down (disabled)"
+    },
     {
       "date": "2026-06-16",
       "symbol": "VZ",
@@ -1540,39 +1587,39 @@
       },
       {
         "stage": "Passed risk checks",
-        "count": 14,
-        "note": "2 blocked: cash/heat cap or position limits"
+        "count": 13,
+        "note": "3 blocked: cash/heat cap or position limits"
       },
       {
         "stage": "Executed",
         "count": 8,
-        "note": "6 deferred or throttled"
+        "note": "5 deferred or throttled"
       }
     ],
     "explorer": [
       {
         "symbol": "BKNG",
         "strategy": "Volatility Breakout",
-        "confidence": 0.84,
-        "sentimentScore": 0.592,
-        "multiplier": "\u00d71.00",
+        "confidence": 0.798,
+        "sentimentScore": 0.624,
+        "multiplier": "\u00d71.15",
         "status": "FILTERED",
-        "reason": "BB breakout: close 174.64 > upper 174.03 (vol spike 1.3x, 5d ret 7.6%)"
+        "reason": "BB breakout: close 174.64 > upper 174.03 (vol spike 1.3x, 5d ret 7.6%) | news +0.62"
       },
       {
-        "symbol": "COF",
-        "strategy": "Volatility Breakout",
-        "confidence": 0.8711,
-        "sentimentScore": 0.5493,
+        "symbol": "AMGN",
+        "strategy": "MA Crossover",
+        "confidence": 0.7279,
+        "sentimentScore": 0.5823,
         "multiplier": "\u00d71.00",
-        "status": "FILTERED",
-        "reason": "BB breakout: close 194.62 > upper 192.73 (vol spike 1.4x, 5d ret 7.9%)"
+        "status": "DEFERRED",
+        "reason": "Golden cross: SMA20 (339.37) > SMA50 (338.84), ADX 20.2"
       },
       {
         "symbol": "NKE",
         "strategy": "MA Crossover",
         "confidence": 0.8677,
-        "sentimentScore": 0.5235,
+        "sentimentScore": 0.5661,
         "multiplier": "\u00d71.00",
         "status": "DEFERRED",
         "reason": "Golden cross: SMA20 (44.52) > SMA50 (44.24), ADX 28.6"
@@ -1581,43 +1628,43 @@
         "symbol": "ANET",
         "strategy": "MA Crossover",
         "confidence": 0.8761,
-        "sentimentScore": 0.5696,
+        "sentimentScore": 0.5556,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Golden cross: SMA20 (157.16) > SMA50 (156.58), ADX 30.6"
       },
       {
-        "symbol": "ROST",
-        "strategy": "MA Crossover",
-        "confidence": 0.882,
-        "sentimentScore": 0.5887,
-        "multiplier": "\u00d71.00",
-        "status": "FILTERED",
-        "reason": "Golden cross: SMA20 (228.14) > SMA50 (224.91), ADX 25.7"
-      },
-      {
         "symbol": "PG",
         "strategy": "MA Crossover",
         "confidence": 0.8987,
-        "sentimentScore": 0.6343,
+        "sentimentScore": 0.6659,
         "multiplier": "\u00d71.15",
         "status": "FILTERED",
-        "reason": "Golden cross: SMA20 (144.69) > SMA50 (144.51), ADX 24.5 | news +0.63"
+        "reason": "Golden cross: SMA20 (144.69) > SMA50 (144.51), ADX 24.5 | news +0.67"
       },
       {
         "symbol": "TJX",
         "strategy": "MA Crossover",
         "confidence": 1.0,
-        "sentimentScore": 0.6341,
+        "sentimentScore": 0.6297,
+        "multiplier": "\u00d71.15",
+        "status": "FILTERED",
+        "reason": "Golden cross: SMA20 (159.08) > SMA50 (157.28), ADX 43.5 | news +0.63"
+      },
+      {
+        "symbol": "ROST",
+        "strategy": "MA Crossover",
+        "confidence": 1.0,
+        "sentimentScore": 0.6467,
         "multiplier": "\u00d71.15",
         "status": "EXECUTED",
-        "reason": "Golden cross: SMA20 (159.08) > SMA50 (157.28), ADX 43.5 | news +0.63"
+        "reason": "Golden cross: SMA20 (228.14) > SMA50 (224.91), ADX 25.7 | news +0.65"
       },
       {
         "symbol": "BAC",
         "strategy": "MA Crossover",
         "confidence": 1.0,
-        "sentimentScore": 0.5629,
+        "sentimentScore": 0.5739,
         "multiplier": "\u00d71.00",
         "status": "EXECUTED",
         "reason": "Golden cross: SMA20 (52.55) > SMA50 (52.25), ADX 41.3"
@@ -1626,7 +1673,7 @@
         "symbol": "AMD",
         "strategy": "Factor Momentum",
         "confidence": 0.99,
-        "sentimentScore": 0.5368,
+        "sentimentScore": 0.5244,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Factor rank score 1.020 (top 2)"
@@ -1635,43 +1682,43 @@
         "symbol": "INTC",
         "strategy": "Factor Momentum",
         "confidence": 0.99,
-        "sentimentScore": 0.5206,
+        "sentimentScore": 0.541,
         "multiplier": "\u00d71.00",
         "status": "EXECUTED",
         "reason": "Factor rank score 1.029 (top 2)"
       },
       {
-        "symbol": "COF",
+        "symbol": "AMGN",
         "strategy": "Earnings Drift",
-        "confidence": 0.8061,
-        "sentimentScore": 0.5493,
+        "confidence": 0.853,
+        "sentimentScore": 0.5823,
         "multiplier": "\u00d71.00",
         "status": "DEFERRED",
+        "reason": "PEAD (proxy): +4.8% surprise 3d ago, vol spike 1.9x"
+      },
+      {
+        "symbol": "COF",
+        "strategy": "Earnings Drift",
+        "confidence": 0.8828,
+        "sentimentScore": 0.5534,
+        "multiplier": "\u00d71.00",
+        "status": "EXECUTED",
         "reason": "PEAD (proxy): +5.4% surprise 1d ago, vol spike 1.5x"
       },
       {
         "symbol": "HON",
         "strategy": "Earnings Drift",
-        "confidence": 0.8626,
-        "sentimentScore": 0.5763,
+        "confidence": 0.9448,
+        "sentimentScore": 0.6182,
         "multiplier": "\u00d71.00",
         "status": "EXECUTED",
         "reason": "PEAD (proxy): +6.4% surprise 3d ago, vol spike 1.4x"
       },
       {
-        "symbol": "AMGN",
-        "strategy": "Earnings Drift",
-        "confidence": 0.8957,
-        "sentimentScore": 0.6298,
-        "multiplier": "\u00d71.15",
-        "status": "EXECUTED",
-        "reason": "PEAD (proxy): +4.8% surprise 3d ago, vol spike 1.9x | news +0.63"
-      },
-      {
         "symbol": "LRCX",
         "strategy": "Earnings Drift",
-        "confidence": 0.9975,
-        "sentimentScore": 0.5851,
+        "confidence": 1.0,
+        "sentimentScore": 0.5906,
         "multiplier": "\u00d71.00",
         "status": "EXECUTED",
         "reason": "PEAD (proxy): +12.7% surprise 3d ago, vol spike 1.6x"
@@ -1679,8 +1726,8 @@
       {
         "symbol": "KLAC",
         "strategy": "Earnings Drift",
-        "confidence": 0.9975,
-        "sentimentScore": 0.5503,
+        "confidence": 1.0,
+        "sentimentScore": 0.5925,
         "multiplier": "\u00d71.00",
         "status": "EXECUTED",
         "reason": "PEAD (proxy): +12.9% surprise 3d ago, vol spike 1.7x"
@@ -1688,8 +1735,8 @@
       {
         "symbol": "AMAT",
         "strategy": "Earnings Drift",
-        "confidence": 0.9975,
-        "sentimentScore": 0.5151,
+        "confidence": 1.0,
+        "sentimentScore": 0.5335,
         "multiplier": "\u00d71.00",
         "status": "EXECUTED",
         "reason": "PEAD (proxy): +11.2% surprise 3d ago, vol spike 1.4x"
@@ -1860,7 +1907,7 @@
       },
       {
         "date": "2026-06-16",
-        "ddPct": 1.691
+        "ddPct": 1.6922
       }
     ],
     "rollingSharpe": [
@@ -1910,7 +1957,7 @@
       },
       {
         "date": "2026-06-16",
-        "sharpe": -0.1667
+        "sharpe": -0.0049
       }
     ],
     "monthlyReturns": [
@@ -1924,7 +1971,7 @@
       },
       {
         "month": "2026-06",
-        "returnPct": 0.0849
+        "returnPct": 0.1026
       }
     ],
     "returnDistribution": [
@@ -1954,7 +2001,7 @@
       },
       {
         "bucket": "2%",
-        "count": 4
+        "count": 5
       },
       {
         "bucket": "4%",
@@ -2056,7 +2103,7 @@
     ],
     "bestMonth": {
       "month": "2026-06",
-      "returnPct": 0.0849
+      "returnPct": 0.1026
     },
     "worstMonth": {
       "month": "2026-05",
