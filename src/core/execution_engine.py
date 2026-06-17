@@ -693,9 +693,11 @@ class MultiStrategyRunner:
         """
         try:
             sweep_value = 0.0
+            sweep_pnl = 0.0
             sweep_symbol = self.config.get("sweep.symbol", "SPY")
             pos = self.db.get_position(self._sweep_strategy_id(), sweep_symbol)
             if pos and float(pos["shares"]) > 0:
+                shares = float(pos["shares"])
                 price = None
                 try:
                     closes = self._get_last_close_map(market_data)
@@ -704,9 +706,19 @@ class MultiStrategyRunner:
                     price = None
                 if not price or price <= 0:
                     price = float(pos.get("current_price") or pos.get("avg_price") or 0)
-                sweep_value = float(pos["shares"]) * float(price or 0)
+                sweep_value = shares * float(price or 0)
+                # Exclude the sweep's UNREALIZED P&L (its market beta), not its
+                # full market value. The sweep is a cash-parking vehicle, so
+                # subtracting its cost basis keeps the alpha sleeve invariant to
+                # cash being swept into SPY. Subtracting market value instead made
+                # idle cash moving into the sweep look like an alpha loss: it
+                # anchored peak_alpha to a near-empty-sweep day and produced a
+                # phantom 57% drawdown that halted all trading on 2026-06-17.
+                avg = float(pos.get("avg_price") or 0)
+                sweep_cost = shares * (avg if avg > 0 else float(price or 0))
+                sweep_pnl = sweep_value - sweep_cost
 
-            alpha_value = max(self.portfolio_value - sweep_value, 0.0)
+            alpha_value = max(self.portfolio_value - sweep_pnl, 0.0)
             peak_str = self.db.get_system_state("peak_alpha_value")
             try:
                 peak_alpha = float(peak_str) if peak_str else alpha_value
@@ -718,12 +730,14 @@ class MultiStrategyRunner:
 
             dd = (peak_alpha - alpha_value) / peak_alpha if peak_alpha > 0 else 0.0
             logger.info(
-                "Alpha-sleeve drawdown: %.2f%% (alpha=$%.0f peak=$%.0f sweep=$%.0f); "
+                "Alpha-sleeve drawdown: %.2f%% (alpha=$%.0f peak=$%.0f "
+                "sweep_value=$%.0f sweep_pnl=$%+.0f); "
                 "whole-portfolio dd %.2f%% stays with the 10%%/15%% halt ladder",
                 dd * 100,
                 alpha_value,
                 peak_alpha,
                 sweep_value,
+                sweep_pnl,
                 (
                     (self.peak_portfolio_value - self.portfolio_value)
                     / self.peak_portfolio_value

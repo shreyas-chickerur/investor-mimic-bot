@@ -44,7 +44,11 @@ def true_up(db_path: str, days: int) -> int:
         os.getenv("ALPACA_SECRET_KEY"),
         paper=os.getenv("ALPACA_PAPER", "true").lower() == "true",
     )
-    after = datetime.now(timezone.utc) - timedelta(days=days)
+    # alpaca-py 0.11.0 serializes datetimes as `isoformat() + "Z"` with no
+    # naive-check, so a tz-aware UTC value becomes the invalid `...+00:00Z`
+    # (offset AND Z) → Alpaca 422. Pass NAIVE UTC so it serializes to a clean
+    # `...Z`. (0.43.4 coerces naive→UTC and is also fine with this.)
+    after = (datetime.now(timezone.utc) - timedelta(days=days)).replace(tzinfo=None)
     orders = client.get_orders(
         GetOrdersRequest(status=QueryOrderStatus.CLOSED, after=after, limit=200)
     )
