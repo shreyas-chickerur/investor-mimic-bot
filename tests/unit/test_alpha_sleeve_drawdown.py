@@ -59,24 +59,38 @@ def _seed_sweep(engine, shares, avg=500.0, current=500.0):
 
 class TestAlphaSleeveDrawdown:
     def test_spy_correction_does_not_count_against_alpha(self, engine):
-        # Sweep: 160 sh SPY @ 500 = $80k of a $96k portfolio. Alpha = $16k.
+        # Sweep: 160 sh SPY @ 500. The alpha sleeve excludes the sweep's beta, so
+        # it equals the full strategy equity valued with the sweep at cost.
         _seed_sweep(engine, 160.0)
         engine.portfolio_value = 96_000.0
-        engine.db.set_system_state("peak_alpha_value", "16000")
-        # SPY drops 6%: portfolio falls to ~$91.2k, alpha sleeve unchanged.
-        engine.portfolio_value = 96_000.0 - 160.0 * 30.0  # SPY 500 → 470
+        engine.db.set_system_state("peak_alpha_value", "96000")
+        # SPY drops 6% (500 → 470): portfolio falls $4.8k but the loss is all
+        # sweep beta, so the alpha sleeve is unchanged.
+        engine.portfolio_value = 96_000.0 - 160.0 * 30.0
         dd = engine._alpha_sleeve_drawdown(_md(470.0))
         assert dd == pytest.approx(
             0.0, abs=0.01
         ), "a pure SPY correction must not register as alpha drawdown"
 
     def test_alpha_losses_still_trip(self, engine):
+        # SPY flat (no sweep P&L), but the strategies lost $9.6k of a $96k sleeve.
         _seed_sweep(engine, 160.0)
-        engine.db.set_system_state("peak_alpha_value", "16000")
-        # SPY flat at 500 ($80k), but the portfolio lost $1.6k of ALPHA value:
-        engine.portfolio_value = 94_400.0  # alpha sleeve 16000 → 14400 = -10%
+        engine.db.set_system_state("peak_alpha_value", "96000")
+        engine.portfolio_value = 86_400.0  # alpha sleeve 96000 → 86400 = -10%
         dd = engine._alpha_sleeve_drawdown(_md(500.0))
         assert dd == pytest.approx(0.10, abs=0.01)
+
+    def test_cash_swept_into_spy_is_not_alpha_loss(self, engine):
+        # Regression for 2026-06-17: peak_alpha was anchored at ~$96k on a day the
+        # sweep was near-empty (idle cash all counted as alpha). Once ~$55k of that
+        # cash was swept into SPY, the old `portfolio - sweep_value` formula
+        # reported a phantom ~57% drawdown and halted all trading. Valuing the
+        # sweep at cost makes the cash→sweep relocation drawdown-neutral.
+        engine.portfolio_value = 96_000.0
+        engine.db.set_system_state("peak_alpha_value", "96000")
+        _seed_sweep(engine, 73.0, avg=754.83, current=754.83)  # freshly-bought sweep
+        dd = engine._alpha_sleeve_drawdown(_md(754.83))
+        assert dd == pytest.approx(0.0, abs=0.01)
 
     def test_no_sweep_equals_whole_portfolio_dd(self, engine):
         engine.portfolio_value = 90_000.0
@@ -94,9 +108,11 @@ class TestAlphaSleeveDrawdown:
         assert engine._alpha_sleeve_drawdown(_md(500.0)) == pytest.approx(0.05, abs=0.001)
 
     def test_missing_spy_price_falls_back_to_position_mark(self, engine):
+        # No SPY row in today's data → mark the sweep at its stored price (480 vs
+        # 500 cost = -$3.2k beta), which the alpha sleeve still excludes.
         _seed_sweep(engine, 160.0, current=480.0)
-        engine.portfolio_value = 92_800.0  # 80k*0.96 + 16k alpha
-        engine.db.set_system_state("peak_alpha_value", "16000")
+        engine.portfolio_value = 92_800.0
+        engine.db.set_system_state("peak_alpha_value", "96000")
         dates = pd.bdate_range("2026-06-01", periods=3)
         md = pd.DataFrame({"symbol": "AAPL", "close": 200.0}, index=dates)  # no SPY today
         dd = engine._alpha_sleeve_drawdown(md)
