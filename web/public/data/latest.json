@@ -1,32 +1,32 @@
 {
   "meta": {
-    "generatedAt": "2026-06-17T05:49:09.638825Z",
+    "generatedAt": "2026-06-17T12:11:38.281400Z",
     "tradingDate": "2026-06-17",
-    "runId": "20260617_054903_78h6",
-    "runNumber": 212,
+    "runId": "20260617_121131_g5ug",
+    "runNumber": 213,
     "paper": true,
     "schemaVersion": 1
   },
   "portfolio": {
     "totalValue": 96199.19,
     "cash": 91617.24,
-    "positionsCount": 4,
-    "todayChangeUsd": -152.21,
-    "todayChangePct": -0.1582,
+    "positionsCount": 5,
+    "todayChangeUsd": -86.92,
+    "todayChangePct": -0.0905,
     "allTimePnlUsd": -3800.81,
     "allTimePnlPct": -3.8008,
     "spyTodayPct": -0.5962,
-    "vsSpyPct": 0.438,
+    "vsSpyPct": 0.5057,
     "sharpe": null,
     "sortino": null,
-    "maxDrawdownPct": 1.8664,
+    "maxDrawdownPct": 1.9522,
     "volatilityPct": null,
     "winRatePct": 37.5,
     "profitFactor": 5.5679,
     "closedTradesCount": 24,
     "regime": "NORMAL",
     "heatCapPct": 40,
-    "exposurePct": 61.95
+    "exposurePct": 61.91
   },
   "equityCurve": [
     {
@@ -236,7 +236,7 @@
     },
     {
       "date": "2026-06-17",
-      "value": 96046.98,
+      "value": 95944.73,
       "spy": 104406.81
     }
   ],
@@ -270,7 +270,7 @@
     {
       "key": "ml_momentum",
       "name": "ML Momentum",
-      "allocationPct": 20.44,
+      "allocationPct": 20.45,
       "returnPct": -1.374,
       "sharpe": null,
       "sortino": null,
@@ -323,7 +323,7 @@
       "key": "factor_momentum",
       "name": "Factor Momentum",
       "allocationPct": 6.69,
-      "returnPct": 6.1201,
+      "returnPct": 6.1266,
       "sharpe": null,
       "sortino": null,
       "profitFactor": null,
@@ -348,7 +348,7 @@
     {
       "key": "news_sentiment",
       "name": "News Sentiment",
-      "allocationPct": 10.9,
+      "allocationPct": 10.91,
       "returnPct": 18.1122,
       "sharpe": null,
       "sortino": null,
@@ -426,7 +426,7 @@
     {
       "key": "pairs_trading",
       "name": "Pairs Trading",
-      "allocationPct": 21.8,
+      "allocationPct": 21.81,
       "returnPct": null,
       "sharpe": null,
       "sortino": null,
@@ -540,7 +540,7 @@
       "unrealizedPlUsd": -635.46,
       "beta": 1.0,
       "atrStop": null,
-      "sentimentScore": 0.4727,
+      "sentimentScore": 0.493,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -587,19 +587,19 @@
         ],
         "news": [
           {
-            "headline": "Will The Fed Kill The S&P 500\u2019s Relief Rally?",
+            "headline": "S&P 500 Stocks Trading At 52-Week Low",
             "source": "Trefis",
-            "score": 0.3091
+            "score": 0.3634
+          },
+          {
+            "headline": "Forget the Plain S&P 500. The Momentum Version Captured the Run and Beat It by 15% This Year",
+            "source": "24/7 Wall St.",
+            "score": 0.3869
           },
           {
             "headline": "Morgan Stanley issues verdict for nervous stock market investors",
             "source": "thestreet.com",
             "score": 0.436
-          },
-          {
-            "headline": "SPY is up 1.9% today, on MU stock price movement",
-            "source": "Quiver Quantitative",
-            "score": 0.5
           }
         ]
       }
@@ -615,7 +615,7 @@
       "unrealizedPlUsd": 84.96,
       "beta": 0.213,
       "atrStop": 391.7382,
-      "sentimentScore": 0.5136,
+      "sentimentScore": 0.5028,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -662,8 +662,8 @@
         ],
         "news": [
           {
-            "headline": "UnitedHealth Just Raised Its Dividend 5%. Why You Should Buy UNH Stock Here.",
-            "source": "Barchart.com",
+            "headline": "UnitedHealth Beats Q1 2026 and Raises Guidance - Is UNH Stock a Buy After Jumping 8%?",
+            "source": "TradingKey",
             "score": 0.5
           },
           {
@@ -672,9 +672,9 @@
             "score": 0.4111
           },
           {
-            "headline": "UNH Stock Under Pressure Ahead Of Q1 Print: Can Optum Recovery Offset Medicare Advantage Headwinds?",
+            "headline": "UnitedHealth, Applied Materials, Citigroup Stocks Surged To 52-Week Highs Today: What Drove The Uptick?",
             "source": "Stocktwits",
-            "score": 0.4742
+            "score": 0.5
           }
         ]
       }
@@ -1168,7 +1168,7 @@
       },
       {
         "date": "2026-06-17",
-        "ddPct": 1.8477
+        "ddPct": 1.9522
       }
     ],
     "rollingSharpe": [
@@ -1222,7 +1222,7 @@
       },
       {
         "date": "2026-06-17",
-        "sharpe": -2.0233
+        "sharpe": -1.5591
       }
     ],
     "monthlyReturns": [
@@ -1236,7 +1236,7 @@
       },
       {
         "month": "2026-06",
-        "returnPct": -0.0558
+        "returnPct": 0.0119
       }
     ],
     "returnDistribution": [
