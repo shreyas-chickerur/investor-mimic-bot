@@ -151,18 +151,30 @@ class BrokerReconciler:
                     disc = f"Quantity mismatch for {symbol}: local={local_data['qty']}, broker={broker_data['qty']}"
                     discrepancies.append(disc)
 
-                # Log average price differences as warnings (not failures)
-                # Price diffs are expected due to multi-strategy aggregation and partial fills
+                # Average price handling. Small drift is expected (multi-strategy
+                # aggregation, partial fills) and only warned about. But a local
+                # avg_price of 0/negative is corruption, NOT cosmetic: it makes
+                # P&L compute off a zero basis (unrealized = full market value)
+                # and blocks stop-loss synthesis. Flag it as a real discrepancy
+                # so the corrective sync repairs the basis from broker truth.
+                local_avg = local_data.get("avg_price", 0) or 0
                 if broker_data["avg_price"] > 0:
-                    price_diff_pct = (
-                        abs(local_data["avg_price"] - broker_data["avg_price"])
-                        / broker_data["avg_price"]
-                        * 100
-                    )
-                    if price_diff_pct > 1.0:
-                        logger.warning(
-                            f"Avg price drift for {symbol}: local=${local_data['avg_price']:.2f}, broker=${broker_data['avg_price']:.2f} ({price_diff_pct:.2f}% diff) — cosmetic only"
+                    if local_avg <= 0:
+                        disc = (
+                            f"Invalid cost basis for {symbol}: local avg_price=${local_avg:.2f}, "
+                            f"broker=${broker_data['avg_price']:.2f}"
                         )
+                        discrepancies.append(disc)
+                    else:
+                        price_diff_pct = (
+                            abs(local_avg - broker_data["avg_price"])
+                            / broker_data["avg_price"]
+                            * 100
+                        )
+                        if price_diff_pct > 1.0:
+                            logger.warning(
+                                f"Avg price drift for {symbol}: local=${local_avg:.2f}, broker=${broker_data['avg_price']:.2f} ({price_diff_pct:.2f}% diff) — cosmetic only"
+                            )
 
             # Check for positions in broker but not local
             for symbol in broker_dict:

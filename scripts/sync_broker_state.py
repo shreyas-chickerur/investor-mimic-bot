@@ -142,6 +142,42 @@ def sync_broker_to_database(db_path="trading.db"):
             local_info = local.get(symbol)
             local_total = local_info["total"] if local_info else 0.0
 
+            # Repair a corrupted local cost basis. A local avg_price of 0 (or
+            # negative) is not cosmetic drift: P&L is then computed off a zero
+            # basis (unrealized = full market value, e.g. VZ showed a phantom
+            # +$1,146 "gain"), and the stop-loss audit refuses to synthesise a
+            # stop when avg_price<=0. The qty-reconciliation branches below only
+            # touch `shares`, so without this a zero basis survives forever even
+            # when the quantity already matches the broker. Whenever the broker
+            # reports a valid average, write it back to any local row whose
+            # basis is non-positive — independent of the quantity diff.
+            if broker_avg > 0 and local_info:
+                repaired = []
+                for sid, sname, sshares, savg in local_info["strategies"]:
+                    if savg is None or savg <= 0:
+                        cursor.execute(
+                            "UPDATE positions SET avg_price = ?, "
+                            "unrealized_pnl = (COALESCE(current_price, ?) - ?) * shares, "
+                            "last_updated = ? WHERE strategy_id = ? AND symbol = ?",
+                            (
+                                broker_avg,
+                                broker_avg,
+                                broker_avg,
+                                datetime.now().isoformat(),
+                                sid,
+                                symbol,
+                            ),
+                        )
+                        logger.info(
+                            f"  🩹 {symbol}: repaired cost basis in {sname} "
+                            f"(avg_price 0 → ${broker_avg:.2f})"
+                        )
+                        changes += 1
+                        repaired.append((sid, sname, sshares, broker_avg))
+                    else:
+                        repaired.append((sid, sname, sshares, savg))
+                local_info["strategies"] = repaired
+
             diff = broker_qty - local_total
 
             if abs(diff) < 0.001:
