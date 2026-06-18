@@ -1447,8 +1447,65 @@ class MultiStrategyRunner:
             logger.warning(f"Could not load earnings calendar for pre-earnings check: {e}")
             return set()
 
+    def _prior_trading_run_today(self) -> str | None:
+        """Return the run_id of an EARLIER run that already executed trades today.
+
+        Makes the daily run idempotent at the source of truth — the DB. The
+        workflow-level precheck gate keys on the GitHub run *conclusion*, so a
+        primary dispatch that traded and then failed a later step (e.g. the
+        fill-quality 422 on 2026-06-16/17) looks like "no successful run today"
+        and lets the backup-cron run re-trade — duplicating positions and, worse,
+        cancelling the primary run's still-pending OPG orders via
+        _cancel_stale_orders (which strands the cash sweep). Keying on whether
+        trades were already logged today closes that hole regardless of trigger.
+        """
+        import sqlite3 as _sqlite3
+
+        try:
+            conn = _sqlite3.connect(self.db.db_path, timeout=10)
+            try:
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT run_id FROM trades "
+                    "WHERE substr(executed_at, 1, 10) = ? AND run_id != ? "
+                    "ORDER BY id DESC LIMIT 1",
+                    (self.asof_date, self.run_id),
+                )
+                row = cur.fetchone()
+                return row[0] if row else None
+            finally:
+                conn.close()
+        except Exception as exc:
+            logger.warning("Duplicate-run check failed (non-fatal): %s", exc)
+            return None
+
     def run_all_strategies(self, market_data):
         """Run all strategies and execute trades"""
+        # ── SAME-DAY IDEMPOTENCY GUARD ────────────────────────────────────────
+        # If a different run already executed trades today, this is a duplicate
+        # (e.g. the backup cron firing after the primary dispatch already traded).
+        # Doing ANY work here is net harmful: _cancel_stale_orders would cancel
+        # the primary run's pending OPG orders, and a duplicate firing after the
+        # 09:30 open would have its own OPG re-submissions rejected — together
+        # stranding the cash sweep. Skip the entire trading body. Defensive
+        # stop-losses set by the primary run remain in force; the next legitimate
+        # run reconciles everything.
+        prior_run = self._prior_trading_run_today()
+        if prior_run:
+            logger.warning(
+                "🛑 DUPLICATE RUN GUARD: trades were already executed today by run %s — "
+                "skipping all trading (no order cancellation, no new entries) to avoid "
+                "double-trading and cancelling pending OPG orders.",
+                prior_run,
+            )
+            self._set_run_stage(
+                "DUPLICATE_SKIP",
+                "SUCCESS",
+                metadata={"prior_run_id": prior_run, "asof_date": self.asof_date},
+                completed=True,
+            )
+            return []
+
         strategies = self.initialize_strategies()
         self.strategies_cache = strategies
         self.raw_signals_by_strategy = {}
