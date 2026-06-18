@@ -964,17 +964,18 @@ class MultiStrategyRunner:
             self._load_strategy_positions(strategy)
             strategies.append(strategy)
 
-        # Zero the capital_allocation of any strategy NOT in the active set.
-        # Disabled strategies (ML/News/Pairs) keep whatever value they last held
-        # while active, so the column drifts far above account equity (June 2026:
-        # sum was $174k of stale allocation on a $96k account) and pollutes the
-        # email/dashboard/platform-status report. Inactive strategies deploy no
-        # capital, so their allocation is 0 by definition.
+        # Zero the capital_allocation of any strategy NOT in the active set —
+        # including DISABLED ones (ML/News/Pairs). Scans all strategies regardless
+        # of status: existing_by_name above comes from get_all_strategies(), which
+        # returns only status='active' rows, so the disabled strategies were never
+        # visited here and their stale allocation ($92.5k of $95k in June 2026) was
+        # never cleared — distorting the cash manager (sum(allocations)) and emails.
         _active_names = {name for name, _, _ in active_specs}
-        for name, row in existing_by_name.items():
-            if name not in _active_names and (row.get("capital_allocation") or 0) != 0:
-                self.db.update_strategy_capital_allocation(row["id"], 0.0)
-                logger.info("  Zeroed stale capital_allocation for inactive strategy: %s", name)
+        try:
+            for _zname in self.db.zero_inactive_strategy_capital(_active_names):
+                logger.info("  Zeroed stale capital_allocation for inactive strategy: %s", _zname)
+        except Exception as _zero_exc:
+            logger.warning("Could not zero inactive-strategy capital_allocation: %s", _zero_exc)
 
         return strategies
 
