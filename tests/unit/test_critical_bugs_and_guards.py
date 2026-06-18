@@ -742,6 +742,84 @@ class TestStaleOrderCancellation:
 
 
 # ===========================================================================
+# 15b. Same-day idempotency guard: a duplicate run must not re-trade
+# ===========================================================================
+
+
+class TestSameDayIdempotencyGuard:
+    """A second run on the same trading day (e.g. the backup cron firing after
+    the primary dispatch already traded — even if the primary later FAILED a
+    health step) must not re-trade. The workflow precheck keys on the GitHub run
+    conclusion and cannot see that trading already happened; the DB-level guard
+    can. Without it, duplicate BUYs double position size and _cancel_stale_orders
+    cancels the primary's pending OPG sweep orders.
+    """
+
+    def _make_db(self, tmp_path, rows):
+        import sqlite3
+        import types
+
+        db = tmp_path / "trades.db"
+        conn = sqlite3.connect(db)
+        conn.execute(
+            "CREATE TABLE trades (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "run_id TEXT, executed_at TEXT)"
+        )
+        conn.executemany("INSERT INTO trades (run_id, executed_at) VALUES (?, ?)", rows)
+        conn.commit()
+        conn.close()
+        return types.SimpleNamespace(db=types.SimpleNamespace(db_path=str(db)))
+
+    def test_detects_prior_run_today(self, tmp_path):
+        from src.core.execution_engine import MultiStrategyRunner
+
+        stub = self._make_db(tmp_path, [("RUN_A", "2026-06-18T05:49:13.200465")])
+        stub.asof_date = "2026-06-18"
+        stub.run_id = "RUN_B"
+        assert MultiStrategyRunner._prior_trading_run_today(stub) == "RUN_A"
+
+    def test_ignores_own_run_and_other_days(self, tmp_path):
+        from src.core.execution_engine import MultiStrategyRunner
+
+        stub = self._make_db(
+            tmp_path,
+            [
+                ("RUN_A", "2026-06-18T05:49:13"),
+                ("RUN_B", "2026-06-17T05:49:13"),
+            ],
+        )
+        # Current run's own trades must not count.
+        stub.asof_date, stub.run_id = "2026-06-18", "RUN_A"
+        assert MultiStrategyRunner._prior_trading_run_today(stub) is None
+        # A different calendar day must not count.
+        stub.asof_date, stub.run_id = "2026-06-19", "RUN_C"
+        assert MultiStrategyRunner._prior_trading_run_today(stub) is None
+
+    def test_guard_runs_before_stale_order_cancellation(self):
+        """The guard must fire at the TOP of run_all_strategies — before
+        _cancel_stale_orders — so a duplicate run never cancels pending OPG orders.
+        """
+        import re
+
+        engine_src = Path("src/core/execution_engine.py").read_text()
+        match = re.search(
+            r"def run_all_strategies\(.*?\n(.*?)(?=\n    def |\Z)", engine_src, re.DOTALL
+        )
+        assert match is not None, "Could not locate run_all_strategies body"
+        body = match.group(1)
+        # Match the actual call sites (self.-prefixed), not bare mentions in
+        # comments — the guard's own comment references _cancel_stale_orders.
+        guard_pos = body.find("self._prior_trading_run_today(")
+        cancel_pos = body.find("self._cancel_stale_orders(")
+        assert guard_pos != -1, "run_all_strategies missing same-day idempotency guard"
+        assert cancel_pos != -1, "run_all_strategies missing _cancel_stale_orders"
+        assert guard_pos < cancel_pos, (
+            "idempotency guard must run BEFORE _cancel_stale_orders so a duplicate "
+            "run cannot cancel the primary run's pending OPG orders"
+        )
+
+
+# ===========================================================================
 # 16. ML Momentum confidence floor raised from near-random 0.51
 # ===========================================================================
 
