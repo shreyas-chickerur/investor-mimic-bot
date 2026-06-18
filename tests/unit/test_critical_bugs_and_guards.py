@@ -820,6 +820,54 @@ class TestSameDayIdempotencyGuard:
 
 
 # ===========================================================================
+# 15c. Disabled-strategy capital allocation must be zeroed
+# ===========================================================================
+
+
+class TestInactiveStrategyCapitalZeroing:
+    """Disabled strategies (ML/News/Pairs) deploy no capital, so their
+    capital_allocation must be 0. The zeroing loop in initialize_strategies used
+    get_all_strategies() (status='active' only), so disabled strategies were never
+    visited and hoarded $92.5k of $95k equity — distorting the cash manager and
+    every email/dashboard. zero_inactive_strategy_capital scans ALL statuses.
+    """
+
+    def test_zeroes_disabled_strategies_only(self, tmp_db):
+        a = tmp_db.create_strategy("Factor Momentum", "active strat", 20_000)
+        d = tmp_db.create_strategy("ML Momentum", "disabled strat", 35_000)
+        # Mark the second one disabled, like the engine does each run.
+        import sqlite3
+
+        with sqlite3.connect(tmp_db.db_path) as c:
+            c.execute("UPDATE strategies SET status='disabled' WHERE id=?", (d,))
+
+        zeroed = tmp_db.zero_inactive_strategy_capital({"Factor Momentum"})
+
+        assert zeroed == ["ML Momentum"]
+        by_id = {s["id"]: s for s in tmp_db.get_all_strategies()}
+        # Active strategy keeps its allocation; disabled one is excluded from the
+        # active view, so read it directly.
+        assert by_id[a]["capital_allocation"] == 20_000
+        with sqlite3.connect(tmp_db.db_path) as c:
+            (cap,) = c.execute(
+                "SELECT capital_allocation FROM strategies WHERE id=?", (d,)
+            ).fetchone()
+        assert cap == 0, "disabled strategy capital_allocation must be zeroed"
+
+    def test_get_all_strategies_excludes_disabled(self, tmp_db):
+        """Regression guard for the root cause: get_all_strategies() returns only
+        active rows, which is why the inline zeroing loop missed disabled ones.
+        """
+        import sqlite3
+
+        d = tmp_db.create_strategy("Pairs Trading", "disabled strat", 38_000)
+        with sqlite3.connect(tmp_db.db_path) as c:
+            c.execute("UPDATE strategies SET status='disabled' WHERE id=?", (d,))
+        names = {s["name"] for s in tmp_db.get_all_strategies()}
+        assert "Pairs Trading" not in names
+
+
+# ===========================================================================
 # 16. ML Momentum confidence floor raised from near-random 0.51
 # ===========================================================================
 

@@ -1291,6 +1291,33 @@ class TradingDatabase:
             )
             conn.commit()
 
+    def zero_inactive_strategy_capital(self, active_names: set[str]) -> list[str]:
+        """Zero capital_allocation for every strategy NOT in ``active_names``.
+
+        Disabled strategies (ML/News/Pairs) retain whatever allocation they last
+        held while active, so the column drifts far above account equity ($92.5k
+        of $95k in June 2026) and pollutes the email/dashboard AND the cash
+        manager, which trusts sum(allocations) as deployed capital. An inactive
+        strategy deploys no capital, so its allocation is 0 by definition.
+
+        This deliberately scans ALL strategies regardless of status — the bug it
+        fixes was that get_all_strategies() returns only status='active' rows, so
+        the disabled strategies were never visited and never cleared. Returns the
+        names that were zeroed.
+        """
+        zeroed: list[str] = []
+        with closing(sqlite3.connect(self.db_path, timeout=10)) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, name, capital_allocation FROM strategies")
+            for sid, name, cap in cursor.fetchall():
+                if name not in active_names and (cap or 0) != 0:
+                    cursor.execute(
+                        "UPDATE strategies SET capital_allocation = 0 WHERE id = ?", (sid,)
+                    )
+                    zeroed.append(name)
+            conn.commit()
+        return zeroed
+
     def log_signal(
         self,
         strategy_id: int,
