@@ -499,6 +499,28 @@ class TradingDatabase:
                 "CREATE INDEX IF NOT EXISTS idx_fill_quality_run ON fill_quality(run_id)"
             )
 
+            # Point-in-time news sentiment — one row per (asof_date, symbol).
+            # News Sentiment scores LIVE RSS, so it is unbacktestable from
+            # history; this table accumulates leak-free observations going
+            # forward so the strategy can eventually be validated with a t+1
+            # execution lag (EXP-2026-06-22-news-pit-recording).
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS sentiment_history (
+                    asof_date TEXT NOT NULL,
+                    symbol TEXT NOT NULL,
+                    score REAL NOT NULL,
+                    headline_count INTEGER DEFAULT 0,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (asof_date, symbol)
+                )
+                """
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_sentiment_history_date "
+                "ON sentiment_history(asof_date)"
+            )
+
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS stop_loss_state (

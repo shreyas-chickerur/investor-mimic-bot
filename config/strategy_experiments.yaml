@@ -1,0 +1,94 @@
+# Strategy experiments registry — the machine-readable side of the strategy
+# changelog (docs/research/STRATEGY_CHANGELOG.md).
+#
+# Every change aimed at making a strategy effective is logged here as an
+# EXPERIMENT with: a falsifiable hypothesis, the evidence basis (incl. web
+# research), MEASURABLE success criteria, and a review_date. The reviewer
+# (scripts/research/review_experiments.py) checks each due experiment against
+# its criteria using the recorded result artifacts and reports the verdict —
+# so we never silently abandon a strategy, and every disposition traces back to
+# evidence for or against it.
+#
+# status: pending | validated | rejected | inconclusive
+# criteria ops: ">=", ">", "<=", "<", "=="
+# metric: a dotted path resolved against the experiment's `result_file` JSON
+#         (e.g. "enriched.mean_acc"), or one of the built-in metrics the
+#         reviewer computes (see review_experiments.py: METRIC_RESOLVERS).
+
+version: 1
+
+experiments:
+  - id: EXP-2026-06-22-pairs-universe-screen
+    strategy: pairs_trading
+    date_started: "2026-06-22"
+    hypothesis: >
+      The original 5 hand-picked pairs failed because they were not
+      cointegrated and/or mean-reverted far slower than the 20-day force-exit.
+      Screening the whole universe (same-sector candidates, 1% Engle-Granger
+      threshold) for cointegrated pairs AND aligning each pair's max-hold to a
+      multiple of its measured half-life will surface tradeable pairs.
+    change_summary: >
+      Added scripts/research/screen_pairs.py (writes data/pairs_universe.json);
+      strategy_pairs_trading.py now loads screened pairs with per-pair
+      half-life-aligned max-hold; validate_pairs.simulate_pair parametrised.
+    evidence_refs:
+      - "Half-life sets the lookback/hold horizon; a 5-day window can't capture a 20-day half-life reversion — flare9xblog / Hudson & Thames cointegration intro."
+      - "Gatev, Goetzmann & Rouwenhorst (2006) — pairs alpha requires genuine long-run cointegration."
+      - "Multiple-comparisons: testing all C(n,2) pairs at 5% surfaces ~1-in-20 spurious — restrict to same-sector + use 1% critical value."
+    success_criteria:
+      - metric: pairs.passing_count   # built-in: count in data/pairs_universe.json
+        op: ">="
+        threshold: 2
+    result_file: data/pairs_universe.json
+    review_date: "2026-07-22"
+    status: pending
+    results: {}
+
+  - id: EXP-2026-06-22-ml-orthogonal-features
+    strategy: ml_momentum
+    date_started: "2026-06-22"
+    hypothesis: >
+      The 12 production features are mostly collinear single-name technicals.
+      Adding orthogonal signal — cross-sectional return ranks, distance from
+      252d high, momentum acceleration — lifts purged out-of-sample accuracy
+      above the 54% economic-edge gate.
+    change_summary: >
+      Added scripts/research/eval_ml_features.py (purged+embargoed walk-forward
+      measuring OOS accuracy, baseline vs enriched feature sets).
+    evidence_refs:
+      - "López de Prado, Advances in Financial Machine Learning — purged K-fold + embargo is the correct OOS estimator; cross-sectional/structural features carry orthogonal signal."
+      - "GARP 'Ten Reasons Most ML Funds Fail' (López de Prado) — collinear features + leakage produce illusory accuracy."
+    success_criteria:
+      - metric: enriched.mean_acc      # from result_file JSON
+        op: ">="
+        threshold: 0.54
+      - metric: delta_mean_acc         # enriched minus baseline
+        op: ">="
+        threshold: 0.01
+    result_file: docs/research/results/ml_feature_eval.json
+    review_date: "2026-07-06"
+    status: pending
+    results: {}
+
+  - id: EXP-2026-06-22-news-pit-recording
+    strategy: news_sentiment
+    date_started: "2026-06-22"
+    hypothesis: >
+      News Sentiment is unvalidatable offline because it scores LIVE RSS inside
+      generate_signals (look-ahead). Recording point-in-time sentiment daily
+      builds a leak-free history that can be backtested with a t+1 execution
+      lag after enough has accumulated.
+    change_summary: >
+      Added sentiment_history table + scripts/record_sentiment.py to capture
+      per-symbol VADER sentiment each run with the as-of date.
+    evidence_refs:
+      - "arXiv:2309.17322 — look-ahead bias in sentiment-based return prediction; point-in-time capture + reporting lag is the mitigation."
+      - "QuantConnect research guide / fortraders — backtest sentiment with t+1 execution lag and point-in-time data to avoid look-ahead and survivorship bias."
+    success_criteria:
+      - metric: news.distinct_dates    # built-in: COUNT(DISTINCT asof_date) in sentiment_history
+        op: ">="
+        threshold: 60
+    result_file: null   # reviewer reads the DB (sentiment_history) directly
+    review_date: "2026-09-22"
+    status: pending
+    results: {}

@@ -421,6 +421,18 @@ jobs:
           echo "executed=false" >> $GITHUB_OUTPUT
         fi
 
+    - name: Record point-in-time news sentiment
+      # Accumulates leak-free daily sentiment so the disabled News Sentiment
+      # strategy can eventually be validated offline (t+1 lag). Optional: never
+      # blocks the run or the DB upload. EXP-2026-06-22-news-pit-recording.
+      if: always()
+      continue-on-error: true
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      run: |
+        python3 scripts/record_sentiment.py --db trading.db \
+          || echo "Sentiment recording skipped (network/provider error)"
+
     - name: Post-run liveness and funnel guardrails
       id: guardrails
       if: always() && steps.check_execution.outputs.executed == 'true'

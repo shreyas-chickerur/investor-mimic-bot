@@ -95,12 +95,25 @@ def spread_half_life(log_a: pd.Series, log_b: pd.Series) -> float | None:
     return float(-math.log(2) / phi)
 
 
-def simulate_pair(num_close: pd.Series, den_close: pd.Series) -> dict:
-    """Dollar-neutral simulation of the production z-score rules."""
+def simulate_pair(
+    num_close: pd.Series,
+    den_close: pd.Series,
+    max_hold: int = MAX_HOLD,
+    lookback: int = LOOKBACK,
+    entry_z: float = ENTRY_Z,
+    exit_z: float = EXIT_Z,
+) -> dict:
+    """Dollar-neutral simulation of the production z-score rules.
+
+    ``max_hold``/``lookback``/thresholds are parameters (defaults reproduce the
+    production config) so the universe screener can align the force-exit horizon
+    to each pair's measured half-life — a 20-day exit on a 100-day half-life is
+    the structural break that sank the original 5 pairs.
+    """
     df = pd.DataFrame({"num": num_close, "den": den_close}).dropna()
     ratio = df["num"] / df["den"]
-    mean = ratio.rolling(LOOKBACK).mean()
-    std = ratio.rolling(LOOKBACK).std()
+    mean = ratio.rolling(lookback).mean()
+    std = ratio.rolling(lookback).std()
     z = (ratio - mean) / std
 
     slip = SLIPPAGE_BPS / 10_000.0
@@ -118,7 +131,7 @@ def simulate_pair(num_close: pd.Series, den_close: pd.Series) -> dict:
         if in_pos:
             daily_pnl.append(num_sh * (p_num - prev_num) - den_sh * (p_den - prev_den))
             held = i - entry_idx
-            if (not np.isnan(zi) and zi >= -EXIT_Z) or held >= MAX_HOLD:
+            if (not np.isnan(zi) and zi >= -exit_z) or held >= max_hold:
                 exit_num = p_num * (1 - slip)
                 exit_den = p_den * (1 + slip)
                 pnl = num_sh * (exit_num - entry_num) - den_sh * (exit_den - entry_den)
@@ -128,11 +141,11 @@ def simulate_pair(num_close: pd.Series, den_close: pd.Series) -> dict:
                         "exit": str(dates[i].date()),
                         "hold_days": held,
                         "pnl": round(pnl, 2),
-                        "exit_reason": "max_hold" if held >= MAX_HOLD else "reversion",
+                        "exit_reason": "max_hold" if held >= max_hold else "reversion",
                     }
                 )
                 in_pos = False
-        elif not np.isnan(zi) and zi < -ENTRY_Z:
+        elif not np.isnan(zi) and zi < -entry_z:
             entry_num = p_num * (1 + slip)
             entry_den = p_den * (1 - slip)
             num_sh = NOTIONAL_PER_LEG / entry_num
