@@ -988,6 +988,10 @@ jobs:
         DRIFT_REMAINING: ${{ steps.verify_sync.outputs.remaining }}
         RUN_NUMBER: ${{ github.run_number }}
       run: |
+        # Ground-truth run outcome so the email can't report "All Systems
+        # Healthy / READY TO GO LIVE" on a run that never traded.
+        export RUN_STATUS="$(cat /tmp/run_status.txt 2>/dev/null || echo UNKNOWN)"
+        echo "Run status for email: $RUN_STATUS"
         # Check if today is Mon/Wed/Fri for visual reports
         DAY_OF_WEEK=$(date +%u)  # 1=Mon, 3=Wed, 5=Fri
         if [ "$DAY_OF_WEEK" = "1" ] || [ "$DAY_OF_WEEK" = "3" ] || [ "$DAY_OF_WEEK" = "5" ]; then
