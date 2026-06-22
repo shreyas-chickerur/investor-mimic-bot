@@ -710,6 +710,7 @@ INSERT INTO broker_state VALUES(196,'AUTO_SYNC','2026-06-19','SYNC',36546.760000
 INSERT INTO broker_state VALUES(197,'20260619_054823_6a5b','2026-06-19','RECONCILIATION_RETRY',36546.760000000002,95529.1000000000058,311337.590000000025,'[{"symbol": "MA", "qty": 1.0, "market_value": 489.79}, {"symbol": "SPY", "qty": 73.0, "market_value": 54512.02}, {"symbol": "UNH", "qty": 3.0, "market_value": 1202.88}, {"symbol": "VZ", "qty": 25.0, "market_value": 1134.25}, {"symbol": "XLV", "qty": 11.0, "market_value": 1643.4}]','PASS','[]','2026-06-19 05:48:25');
 INSERT INTO broker_state VALUES(198,'20260619_054823_6a5b','2026-06-19','END',36546.760000000002,95529.1000000000058,289080.770000000018,'[{"symbol": "MA", "qty": 1.0, "market_value": 489.79}, {"symbol": "SPY", "qty": 73.0, "market_value": 54512.02}, {"symbol": "UNH", "qty": 3.0, "market_value": 1202.88}, {"symbol": "VZ", "qty": 25.0, "market_value": 1134.25}, {"symbol": "XLV", "qty": 11.0, "market_value": 1643.4}]','PASS','[]','2026-06-19 05:48:30');
 INSERT INTO broker_state VALUES(199,'AUTO_SYNC','2026-06-22','SYNC',36546.760000000002,95385.3000000000029,288678.130000000004,'{"MA": {"qty": 1.0, "avg_price": 490.0, "market_value": 490.01, "unrealized_pl": 0.01}, "SPY": {"qty": 73.0, "avg_price": 754.39, "market_value": 54372.59, "unrealized_pl": -697.88}, "UNH": {"qty": 3.0, "avg_price": 382.89, "market_value": 1199.37, "unrealized_pl": 50.7}, "VZ": {"qty": 25.0, "avg_price": 48.04, "market_value": 1139.0, "unrealized_pl": -62.0}, "XLV": {"qty": 11.0, "avg_price": 145.441818, "market_value": 1637.57, "unrealized_pl": 37.710002}}','SYNCED',NULL,'2026-06-22 05:45:46');
+INSERT INTO broker_state VALUES(200,'AUTO_SYNC','2026-06-22','SYNC',36546.760000000002,95605.4900000000052,289294.659999999974,'{"MA": {"qty": 1.0, "avg_price": 490.0, "market_value": 490.0001, "unrealized_pl": 0.0001}, "SPY": {"qty": 73.0, "avg_price": 754.39, "market_value": 54593.78, "unrealized_pl": -476.69}, "UNH": {"qty": 3.0, "avg_price": 382.89, "market_value": 1201.8, "unrealized_pl": 53.13}, "VZ": {"qty": 25.0, "avg_price": 48.04, "market_value": 1135.25, "unrealized_pl": -65.75}, "XLV": {"qty": 11.0, "avg_price": 145.441818, "market_value": 1637.9, "unrealized_pl": 38.040002}}','SYNCED',NULL,'2026-06-22 13:19:18');
 CREATE TABLE system_state (
                 key TEXT PRIMARY KEY,
                 value TEXT,
@@ -722,7 +723,7 @@ INSERT INTO system_state VALUES('peak_alpha_value','96960.28','2026-06-19 05:48:
 INSERT INTO system_state VALUES('regime','{"classification": "NORMAL", "vix": 16.4, "volatility_regime": "normal", "trend_regime": "weak_trend", "hmm_regime": "unknown", "composite_regime": "NORMAL"}','2026-06-19 05:48:25');
 INSERT INTO system_state VALUES('cumulative_pnl','2.5','2026-06-19 05:48:30');
 INSERT INTO system_state VALUES('max_drawdown','2.4817618053145516','2026-06-19 05:48:30');
-INSERT INTO system_state VALUES('unfilled_opg_swept','{"date": "2026-06-22", "count": 7, "symbols": ["BAC", "COF", "EMR", "INTC", "JPM", "QCOM", "WFC"]}','2026-06-22 05:45:46');
+INSERT INTO system_state VALUES('unfilled_opg_swept','{"date": "2026-06-22", "count": 0, "symbols": []}','2026-06-22 13:19:18');
 CREATE TABLE signal_funnel (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 run_id TEXT NOT NULL,
@@ -1486,6 +1487,7 @@ INSERT INTO daily_portfolio_snapshot VALUES(71,'20260618_054850_tea3','2026-06-1
 INSERT INTO daily_portfolio_snapshot VALUES(73,'20260619_054823_6a5b','2026-06-19',95529.1000000000058,36546.760000000002,58982.3400000000037,61.7427987911536888,0.0,0.0,-2325.97999999999592,-0.0237696397570774653,97855.0800000000017,5,16.3999999999999985,'normal/?','{"MA": 489.79, "SPY": 54512.02, "UNH": 1202.88, "VZ": 1134.25, "XLV": 1643.4}','2026-06-19 05:48:30');
 INSERT INTO daily_portfolio_snapshot VALUES(75,'snapshot','2026-06-20',95529.1000000000058,36546.760000000002,58982.3400000000037,0.0,0.0,0.0,-2325.97999999999592,-0.0237696397570774653,97855.0800000000017,5,NULL,NULL,'{"MA": 489.79, "SPY": 54512.02, "UNH": 1202.88, "VZ": 1134.25, "XLV": 1643.4}','2026-06-20 05:24:28');
 INSERT INTO daily_portfolio_snapshot VALUES(76,'snapshot','2026-06-21',95529.1000000000058,36546.760000000002,58982.3400000000037,0.0,0.0,0.0,-2325.97999999999592,-0.0237696397570774653,97855.0800000000017,5,NULL,NULL,'{"MA": 489.79, "SPY": 54512.02, "UNH": 1202.88, "VZ": 1134.25, "XLV": 1643.4}','2026-06-21 06:14:44');
+INSERT INTO daily_portfolio_snapshot VALUES(77,'snapshot','2026-06-22',95497.1600000000035,36546.760000000002,58950.4000000000014,0.0,-31.9400000000023283,-0.00033434838180200927,-2357.91999999999825,-0.0240960407982906792,97855.0800000000017,5,NULL,NULL,'{"MA": 489.63, "SPY": 54486.47, "UNH": 1198.98, "VZ": 1137.75, "XLV": 1637.57}','2026-06-22 06:45:13');
 CREATE TABLE trade_pnl_detail (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 strategy_id INTEGER NOT NULL,
@@ -1846,7 +1848,7 @@ INSERT INTO run_history VALUES(6,'20260616_123611_gwi8','2026-06-16','YELLOW','S
 INSERT INTO run_history VALUES(7,'20260617_054903_78h6','2026-06-17','RED','SUCCESS','["expect:Signals generated (strategies active)", "expect:Unfilled-OPG rate acceptable", "guardrails_clean"]',96046.9799999999959,1,0.0,'2026-06-17 05:49:08');
 INSERT INTO run_history VALUES(8,'20260617_121131_g5ug','2026-06-17','RED','SUCCESS','["expect:Signals generated (strategies active)", "guardrails_clean"]',95944.7299999999959,1,0.0,'2026-06-17 12:11:36');
 INSERT INTO run_history VALUES(9,'20260618_054850_tea3','2026-06-18','GREEN','SUCCESS','[]',95426.5500000000029,11,0.0,'2026-06-18 05:49:19');
-INSERT INTO run_history VALUES(11,'20260619_054823_6a5b','2026-06-22','RED','PREFLIGHT_FAILED','["run_status", "expect:Daily snapshot recorded", "expect:Unfilled-OPG rate acceptable", "guardrails_report_present"]',95529.1000000000058,0,0.599999999999999977,'2026-06-22 06:24:11');
+INSERT INTO run_history VALUES(12,'20260619_054823_6a5b','2026-06-22','RED','PREFLIGHT_FAILED','["run_status", "guardrails_report_present"]',95529.1000000000058,0,0.599999999999999977,'2026-06-22 13:57:44');
 CREATE TABLE tax_lots (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     strategy_id INTEGER NOT NULL,
@@ -1987,19 +1989,19 @@ CREATE TABLE error_log (
 DELETE FROM sqlite_sequence;
 INSERT INTO sqlite_sequence VALUES('strategies',12);
 INSERT INTO sqlite_sequence VALUES('notification_outbox',38);
-INSERT INTO sqlite_sequence VALUES('broker_state',199);
+INSERT INTO sqlite_sequence VALUES('broker_state',200);
 INSERT INTO sqlite_sequence VALUES('positions',199);
 INSERT INTO sqlite_sequence VALUES('signals',251);
 INSERT INTO sqlite_sequence VALUES('trades',169);
 INSERT INTO sqlite_sequence VALUES('signal_funnel',182);
 INSERT INTO sqlite_sequence VALUES('strategy_performance',179);
-INSERT INTO sqlite_sequence VALUES('daily_portfolio_snapshot',76);
+INSERT INTO sqlite_sequence VALUES('daily_portfolio_snapshot',77);
 INSERT INTO sqlite_sequence VALUES('trade_pnl_detail',26);
 INSERT INTO sqlite_sequence VALUES('signal_rejections',121);
 INSERT INTO sqlite_sequence VALUES('fill_quality',89);
 INSERT INTO sqlite_sequence VALUES('tax_lots',45);
 INSERT INTO sqlite_sequence VALUES('trade_audit_log',58);
-INSERT INTO sqlite_sequence VALUES('run_history',11);
+INSERT INTO sqlite_sequence VALUES('run_history',12);
 CREATE INDEX idx_signals_run_id ON signals(run_id);
 CREATE INDEX idx_signals_symbol ON signals(symbol);
 CREATE INDEX idx_signals_terminal_state ON signals(terminal_state);
