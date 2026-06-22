@@ -19,50 +19,81 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_MAX_AGE_HOURS = 80  # Fri close -> Mon 05:45 UTC ≈ 57h, with margin
 
-# Major US market holidays (kept in sync with scripts/pre_flight_check.py,
-# which imports this set).
-US_MARKET_HOLIDAYS: set[str] = {
-    # 2025
-    "2025-01-01",
-    "2025-01-20",
-    "2025-02-17",
-    "2025-04-18",
-    "2025-05-26",
-    "2025-07-04",
-    "2025-09-01",
-    "2025-11-27",
-    "2025-12-25",
-    # 2026
-    "2026-01-01",
-    "2026-01-19",
-    "2026-02-16",
-    "2026-04-03",
-    "2026-05-25",
-    "2026-07-03",
-    "2026-09-07",
-    "2026-11-26",
-    "2026-12-25",
-    # 2027
-    "2027-01-01",
-    "2027-01-18",
-    "2027-02-15",
-    "2027-04-02",
-    "2027-05-31",
-    "2027-07-05",
-    "2027-09-06",
-    "2027-11-25",
-    "2027-12-27",
-    # 2028
-    "2028-01-01",
-    "2028-01-17",
-    "2028-02-21",
-    "2028-04-14",
-    "2028-05-29",
-    "2028-07-04",
-    "2028-09-04",
-    "2028-11-23",
-    "2028-12-25",
-}
+# US market holidays are COMPUTED, not hand-maintained. A hand-typed list
+# silently dropped Juneteenth (2026-06-19) and mis-dated Good Friday/Christmas
+# 2027, which made the Monday-after-holiday freshness check declare correct
+# last-session data "stale" and fail pre-flight (PREFLIGHT_FAILED outage,
+# 2026-06-22). Deriving the dates removes the whole class of bug.
+#
+# Covers the ten NYSE full-closure holidays with NYSE observance rules
+# (Sat -> preceding Fri, Sun -> following Mon; New Year on Sat is NOT
+# observed). It does NOT capture ad-hoc closures (national mourning, weather)
+# — those are rare, unpredictable, and were never in the manual list either.
+
+
+def _nth_weekday(year: int, month: int, weekday: int, n: int) -> date:
+    """The ``n``-th ``weekday`` (Mon=0) of ``month`` in ``year``."""
+    first = date(year, month, 1)
+    first += timedelta(days=(weekday - first.weekday()) % 7)
+    return first + timedelta(weeks=n - 1)
+
+
+def _last_weekday(year: int, month: int, weekday: int) -> date:
+    """The last ``weekday`` (Mon=0) of ``month`` in ``year``."""
+    nxt = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+    d = nxt - timedelta(days=1)
+    return d - timedelta(days=(d.weekday() - weekday) % 7)
+
+
+def _easter(year: int) -> date:
+    """Easter Sunday (Anonymous Gregorian algorithm) — anchors Good Friday."""
+    a = year % 19
+    b, c = divmod(year, 100)
+    d, e = divmod(b, 4)
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = divmod(c, 4)
+    m = (a + 11 * h + 22 * ((32 + 2 * e + 2 * i - h - k) % 7)) // 451
+    month = (h + ((32 + 2 * e + 2 * i - h - k) % 7) - 7 * m + 114) // 31
+    day = ((h + ((32 + 2 * e + 2 * i - h - k) % 7) - 7 * m + 114) % 31) + 1
+    return date(year, month, day)
+
+
+def _observed(d: date, is_new_year: bool = False) -> date | None:
+    """Apply NYSE weekend-observance: Sat -> Fri, Sun -> Mon.
+
+    New Year's Day falling on a Saturday is NOT observed (the market is open
+    the preceding Friday, Dec 31), so this returns None for that case.
+    """
+    if d.weekday() == 5:  # Saturday
+        return None if is_new_year else d - timedelta(days=1)
+    if d.weekday() == 6:  # Sunday
+        return d + timedelta(days=1)
+    return d
+
+
+def nyse_holidays(year: int) -> set[str]:
+    """ISO dates of NYSE full-day closures in ``year`` (observance applied)."""
+    candidates = [
+        _observed(date(year, 1, 1), is_new_year=True),  # New Year's Day
+        _nth_weekday(year, 1, 0, 3),  # MLK Day (3rd Mon Jan)
+        _nth_weekday(year, 2, 0, 3),  # Washington's Birthday (3rd Mon Feb)
+        _easter(year) - timedelta(days=2),  # Good Friday
+        _last_weekday(year, 5, 0),  # Memorial Day (last Mon May)
+        _observed(date(year, 6, 19)),  # Juneteenth
+        _observed(date(year, 7, 4)),  # Independence Day
+        _nth_weekday(year, 9, 0, 1),  # Labor Day (1st Mon Sep)
+        _nth_weekday(year, 11, 3, 4),  # Thanksgiving (4th Thu Nov)
+        _observed(date(year, 12, 25)),  # Christmas
+    ]
+    return {d.isoformat() for d in candidates if d is not None}
+
+
+# Generated over a wide range so the calendar never silently runs out. Kept in
+# sync with scripts/pre_flight_check.py, which imports this set.
+_HOLIDAY_YEAR_RANGE = range(2020, 2041)
+US_MARKET_HOLIDAYS: set[str] = {iso for year in _HOLIDAY_YEAR_RANGE for iso in nyse_holidays(year)}
 
 _MARKET_CLOSE_ET = time(16, 0)
 
