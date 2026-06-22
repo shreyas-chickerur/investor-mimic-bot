@@ -1,0 +1,19 @@
+{
+  "data": "data/training_data.csv",
+  "train_days": 252,
+  "test_days": 21,
+  "horizon": 5,
+  "baseline": {
+    "folds": 11,
+    "mean_acc": 0.5005,
+    "std_acc": 0.0396,
+    "frac_folds_above_50": 0.545
+  },
+  "enriched": {
+    "folds": 11,
+    "mean_acc": 0.505,
+    "std_acc": 0.0457,
+    "frac_folds_above_50": 0.545
+  },
+  "delta_mean_acc": 0.0045
+}

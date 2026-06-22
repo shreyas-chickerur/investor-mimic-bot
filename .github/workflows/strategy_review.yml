@@ -1,0 +1,88 @@
+name: Strategy Experiment Review
+
+# Reviews the strategy-experiment registry (config/strategy_experiments.yaml):
+# any experiment whose review_date has arrived is evaluated against its
+# measurable success criteria and a verdict (validated / rejected /
+# inconclusive) is emailed and committed back into the registry — so a disabled
+# strategy is never silently abandoned and every disposition traces to evidence.
+on:
+  schedule:
+    - cron: '0 13 * * 1'  # Mondays 13:00 UTC (after the trading window)
+  workflow_dispatch:
+    inputs:
+      force_all:
+        description: "Review all pending experiments, ignoring review_date"
+        type: boolean
+        default: false
+
+concurrency:
+  group: strategy-experiment-review
+  cancel-in-progress: false
+
+permissions:
+  contents: write  # to commit verdicts back into the registry
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Download latest trading database (for DB-backed metrics)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ARTIFACT_ID=$(gh api "repos/${{ github.repository }}/actions/artifacts?name=trading-database&per_page=100" \
+            --jq '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | reverse | .[0].id // empty')
+          if [ -n "$ARTIFACT_ID" ]; then
+            gh api repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip > db.zip
+            unzip -o db.zip && rm -f db.zip && echo "✅ trading.db restored"
+          else
+            echo "⚠️ No trading-database artifact — DB-backed metrics will be inconclusive"
+          fi
+
+      - name: Review experiments
+        id: review
+        run: |
+          FORCE=""
+          if [ "${{ github.event.inputs.force_all }}" = "true" ]; then FORCE="--all"; fi
+          DB=""
+          if [ -f trading.db ]; then DB="--db trading.db"; fi
+          python3 scripts/research/review_experiments.py $FORCE $DB \
+            --update --report /tmp/strategy_review.md
+          # Convert the markdown report into a minimal HTML body for email.
+          python3 -c "import html,pathlib; t=pathlib.Path('/tmp/strategy_review.md').read_text(); pathlib.Path('/tmp/strategy_review.html').write_text('<pre style=\"font-family:ui-monospace,monospace;font-size:13px\">'+html.escape(t)+'</pre>')"
+
+      - name: Commit updated registry
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet config/strategy_experiments.yaml; then
+            git add config/strategy_experiments.yaml
+            git commit -m "chore(experiments): record review verdicts [skip ci]"
+            git push
+          else
+            echo "No registry changes to commit."
+          fi
+
+      - name: Email the review
+        if: always()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "🧪 Strategy Experiment Review"
+          to: ${{ secrets.EMAIL_TO }}
+          from: Trading System
+          html_body: file:///tmp/strategy_review.html

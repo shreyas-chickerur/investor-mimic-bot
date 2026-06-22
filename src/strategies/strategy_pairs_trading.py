@@ -53,6 +53,35 @@ _DEFAULT_PAIRS: list[tuple[str, str]] = [
     ("ABBV", "MRK"),
 ]
 
+# Data-driven pairs produced by scripts/research/screen_pairs.py. When present
+# this REPLACES the hardcoded defaults (the 5 defaults all failed validation —
+# EXP-2026-06-22-pairs-universe-screen). Each entry carries a per-pair
+# max_hold_days aligned to the pair's measured half-life.
+_PAIRS_UNIVERSE_PATH = Path(__file__).parent.parent.parent / "data" / "pairs_universe.json"
+
+
+def load_screened_pairs() -> tuple[list[tuple[str, str]], dict[str, int]]:
+    """Load (pairs, per-numerator max_hold) from the screener output.
+
+    Returns the hardcoded defaults with an empty hold-map when the file is
+    absent or empty, so behaviour is unchanged until a screen has been run.
+    """
+    try:
+        import json
+
+        if _PAIRS_UNIVERSE_PATH.exists():
+            data = json.loads(_PAIRS_UNIVERSE_PATH.read_text())
+            entries = data.get("pairs", [])
+            if entries:
+                pairs = [(e["num"], e["den"]) for e in entries]
+                holds = {
+                    e["num"]: int(e["max_hold_days"]) for e in entries if e.get("max_hold_days")
+                }
+                return pairs, holds
+    except Exception as exc:  # never let a bad file break signal generation
+        logger.warning("pairs_universe.json unreadable (%s) — using defaults", exc)
+    return _DEFAULT_PAIRS, {}
+
 
 class PairsTradingStrategy(TradingStrategy):
     """Statistical pairs trading: buy the lagging leg when the spread z-score
@@ -66,7 +95,10 @@ class PairsTradingStrategy(TradingStrategy):
         self.exit_threshold: float = pt_cfg.get("exit_z_threshold", 0.3)
         self.lookback: int = pt_cfg.get("lookback_days", 60)
         self.max_hold_days: int = pt_cfg.get("max_hold_days", 20)
-        self.pairs: list[tuple[str, str]] = _DEFAULT_PAIRS
+        # Prefer the data-driven, half-life-aligned pairs from the screener;
+        # _pair_holds maps a numerator → its per-pair max-hold (overrides the
+        # global max_hold_days for that pair).
+        self.pairs, self._pair_holds = load_screened_pairs()
         self.entry_dates: dict = {}
         # Track which pairs are currently held so we don't double-enter
         self._active_pairs: dict[str, str] = {}  # num → denom (long leg → short leg)
@@ -181,11 +213,12 @@ class PairsTradingStrategy(TradingStrategy):
             price = float(sym_map[symbol].iloc[-1]["close"])
             z = self._compute_zscore(sym_map, symbol, denom)
 
+            pair_max_hold = self._pair_holds.get(symbol, self.max_hold_days)
             exit_reason = None
             if z is not None and abs(z) <= self.exit_threshold:
                 exit_reason = f"Pairs spread reverted: z={z:.2f} ≤ {self.exit_threshold}"
-            elif days_held >= self.max_hold_days:
-                exit_reason = f"Max hold {self.max_hold_days}d reached"
+            elif days_held >= pair_max_hold:
+                exit_reason = f"Max hold {pair_max_hold}d reached"
 
             if exit_reason:
                 # Close the long leg

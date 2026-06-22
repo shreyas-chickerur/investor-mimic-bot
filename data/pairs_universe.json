@@ -1,0 +1,12 @@
+{
+  "generated_from": "data/extended_historical_data.csv",
+  "candidates_evaluated": 92,
+  "gates": {
+    "eg_tstat_max": -3.9,
+    "half_life_max": 15.0,
+    "hold_mult": 3.0,
+    "min_trades": 10,
+    "min_profit_factor": 1.1
+  },
+  "pairs": []
+}

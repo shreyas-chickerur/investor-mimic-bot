@@ -227,6 +227,19 @@ metrics:
 	@echo "$(BLUE)📈 Portfolio metrics:$(NC)"
 	@python3 scripts/view_performance.py
 
+# --- Strategy experiments (disabled-strategy revival tracking) ---
+screen-pairs:
+	@echo "$(BLUE)🔎 Screening universe for tradeable pairs...$(NC)"
+	@python3 scripts/research/screen_pairs.py
+
+eval-ml-features:
+	@echo "$(BLUE)🧪 Purged walk-forward: baseline vs enriched ML features...$(NC)"
+	@python3 scripts/research/eval_ml_features.py
+
+strategy-review:
+	@echo "$(BLUE)🧪 Reviewing strategy experiments (all pending)...$(NC)"
+	@python3 scripts/research/review_experiments.py --all $(if $(DB),--db $(DB),)
+
 email-test:
 	@echo "$(BLUE)📧 Generating email preview...$(NC)"
 	$(if $(STATE), \
