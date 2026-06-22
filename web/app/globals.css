@@ -57,12 +57,20 @@ body {
 @keyframes fade  { from { opacity:0; } to { opacity:1; } }
 @keyframes popover-in { from { opacity:0; transform:scale(0.95); } to { opacity:1; transform:scale(1); } }
 
+/* Strategy showcase visuals */
+@keyframes radar-sweep { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes radar-pulse { 0%,100% { opacity:0.5; } 50% { opacity:1; } }
+@keyframes sheen { from { transform: translateX(-130%); } to { transform: translateX(230%); } }
+
 .animate-rise  { animation: rise  0.4s ease both; }
 .animate-grow  { animation: grow  0.6s ease both; }
 .animate-fade  { animation: fade  0.3s ease both; }
+.radar-sweep   { animation: radar-sweep 4.2s linear infinite; transform-box: view-box; }
+.radar-pulse   { animation: radar-pulse 2.4s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-rise, .animate-grow, .animate-fade { animation: none !important; }
+  .animate-rise, .animate-grow, .animate-fade,
+  .radar-sweep, .radar-pulse { animation: none !important; }
   * { transition-duration:0.01ms !important; animation-duration:0.01ms !important; }
 }
 
