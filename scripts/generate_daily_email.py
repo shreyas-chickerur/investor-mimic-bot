@@ -681,9 +681,17 @@ def build_health_card(
     drift_remaining: str | None,
     fill_summary: dict,
     db_path: str,
+    run_status: str | None = None,
 ) -> str:
     import json as _json
     import time as _time
+
+    # The data markers below (recon/data/quality/…) can ALL be green on a run
+    # that never traded because pre-flight aborted it. The run's own outcome is
+    # the ground truth — surface it so the email can never report "All Systems
+    # Healthy" on a PREFLIGHT_FAILED/EXECUTION_FAILED run (2026-06-22 outage).
+    run_status_norm = (run_status or "").strip().upper()
+    run_failed = run_status_norm not in ("", "SUCCESS", "MARKET_CLOSED")
 
     recon_upper = (recon_status or "UNKNOWN").upper()
     recon_ok = recon_upper in ("PASS", "SYNCED") or "PASS" in recon_upper
@@ -777,6 +785,9 @@ def build_health_card(
         ("Correlation filter OK", corr_ok),
         (f"Regime: {regime_display}", regime_ok),
     ]
+    if run_failed:
+        # Prepend so the failure leads the card and counts against the tally.
+        markers.insert(0, (f"Trading run did not complete ({run_status_norm})", False))
 
     healthy = sum(1 for _, ok in markers if ok is True)
     neutral = sum(1 for _, ok in markers if ok is None)
@@ -784,7 +795,9 @@ def build_health_card(
     total = len(markers)
     healthy_total = healthy + neutral
 
-    if failed_count == 0:
+    if run_failed:
+        header_color, header_text = RED, f"Run Failed — {run_status_norm}"
+    elif failed_count == 0:
         header_color, header_text = GREEN, "All Systems Healthy"
     elif drift_clean and auto_sync_fired:
         header_color, header_text = AMBER, "Auto-Recovered"
@@ -838,7 +851,7 @@ def build_health_card(
     )
 
     attention_html = ""
-    if failed_count > 0 and not drift_clean:
+    if failed_count > 0 and (run_failed or not drift_clean):
         failed_labels = [label for label, ok in markers if ok is False]
         items_html = "".join(
             f'<div style="font-family:{FONT};font-size:12px;color:{RED};padding:4px 0;">'
@@ -1948,7 +1961,9 @@ def build_system_status(recon_status: str, fill_summary: dict, db_path: str) -> 
 
 
 # ── Section: Live Readiness ───────────────────────────────────────────────────
-def build_golive_section(db_path: str, recon_status: str, data_stale: bool) -> str:
+def build_golive_section(
+    db_path: str, recon_status: str, data_stale: bool, run_status: str | None = None
+) -> str:
     import math as _math
     import time as _time2
     from datetime import date as _date
@@ -2099,7 +2114,12 @@ def build_golive_section(db_path: str, recon_status: str, data_stale: bool) -> s
 
     passed = sum(1 for c in criteria if c["ok"])
     total = len(criteria)
-    is_ready = passed == total
+    # A run that aborted (pre-flight/execution failure) can never be "ready to
+    # go live" no matter how green the static criteria look — reliability of the
+    # daily run is itself a live-trading prerequisite.
+    run_status_norm = (run_status or "").strip().upper()
+    run_failed = run_status_norm not in ("", "SUCCESS", "MARKET_CLOSED")
+    is_ready = (passed == total) and not run_failed
 
     # Readiness check rows
     check_rows = ""
@@ -2148,11 +2168,12 @@ def build_golive_section(db_path: str, recon_status: str, data_stale: bool) -> s
     verdict_col = GREEN if is_ready else (AMBER if passed >= 3 else RED)
     verdict_bg = GREEN_BG if is_ready else (AMBER_BG if passed >= 3 else RED_BG)
     verdict_border = GREEN_BORDER if is_ready else (AMBER_BORDER if passed >= 3 else RED_BORDER)
-    verdict_text = (
-        "&#10003; READY TO GO LIVE"
-        if is_ready
-        else f"NOT READY &mdash; {passed}/{total} criteria met"
-    )
+    if is_ready:
+        verdict_text = "&#10003; READY TO GO LIVE"
+    elif run_failed:
+        verdict_text = f"NOT READY &mdash; last run {run_status_norm}"
+    else:
+        verdict_text = f"NOT READY &mdash; {passed}/{total} criteria met"
 
     return f"""
 <tr><td style="padding:14px 4px 10px 4px;font-family:{FONT};color:{INK_MUTE};
@@ -2198,6 +2219,10 @@ def generate_email_body(db_path: str = "trading.db", include_visuals: bool = Tru
     drift_resolved_env = os.environ.get("DRIFT_RESOLVED")
     drift_remaining_env = os.environ.get("DRIFT_REMAINING")
     run_number_env = os.environ.get("RUN_NUMBER")
+    # Ground-truth run outcome (STARTED/PREFLIGHT_FAILED/EXECUTION_FAILED/
+    # SUCCESS/MARKET_CLOSED) so the health card and go-live verdict reflect what
+    # actually happened, not just the static DB markers.
+    run_status_env = os.environ.get("RUN_STATUS")
 
     db = _conn(db_path)
     try:
@@ -2331,9 +2356,13 @@ def generate_email_body(db_path: str = "trading.db", include_visuals: bool = Tru
             drift_remaining=drift_remaining_env,
             fill_summary=fill_summary,
             db_path=db_path,
+            run_status=run_status_env,
         )
         + build_golive_section(
-            db_path, recon_status=recon_status_env or recon, data_stale=_data_stale
+            db_path,
+            recon_status=recon_status_env or recon,
+            data_stale=_data_stale,
+            run_status=run_status_env,
         )
         + build_footer()
     )
@@ -2380,6 +2409,17 @@ _MOCK_STATES: dict[str, dict[str, str]] = {
         "DRIFT_RESOLVED": "false",
         "DRIFT_REMAINING": "3",
         "RUN_NUMBER": "44",
+    },
+    "run_failed": {
+        # Data markers all green but the run aborted at pre-flight (the
+        # 2026-06-22 case): the card must say "Run Failed", not "All Systems
+        # Healthy", and the go-live verdict must not read "READY TO GO LIVE".
+        "RECON_STATUS": "PASS",
+        "AUTO_SYNC_OK": "",
+        "DRIFT_RESOLVED": "",
+        "DRIFT_REMAINING": "0",
+        "RUN_NUMBER": "45",
+        "RUN_STATUS": "PREFLIGHT_FAILED",
     },
 }
 
