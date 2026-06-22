@@ -1,40 +1,15 @@
 "use client";
 
 import React from "react";
-import {
-  RadarChart,
-  Radar,
-  PolarGrid,
-  PolarAngleAxis,
-  ResponsiveContainer,
-} from "recharts";
 import type { Snapshot } from "@/lib/types";
 import { tokens, plColor, healthChipColor, SERIES_COLORS } from "@/lib/tokens";
 import { Panel } from "@/components/Panel";
 import { Label } from "@/components/Label";
 import { Chip } from "@/components/Chip";
 import { fmtNum, fmtPct } from "@/lib/format";
+import { StrategyShowcase } from "@/components/viz/StrategyShowcase";
 
 const S = tokens.color;
-
-function FactorRadar({ factors, color }: { factors: Snapshot["strategies"][0]["factorProfile"]; color: string }) {
-  const data = [
-    { axis: "Momentum", value: factors.momentum },
-    { axis: "Quality", value: factors.quality },
-    { axis: "Reversion", value: factors.reversion },
-    { axis: "Volume", value: factors.volume },
-    { axis: "Volatility", value: factors.volatility },
-  ];
-  return (
-    <ResponsiveContainer width="100%" height={130}>
-      <RadarChart data={data} cx="50%" cy="50%">
-        <PolarGrid stroke={S.line} />
-        <PolarAngleAxis dataKey="axis" tick={{ fill: S.muted, fontSize: 10 }} />
-        <Radar dataKey="value" stroke={color} fill={color} fillOpacity={0.18} strokeWidth={1.5} />
-      </RadarChart>
-    </ResponsiveContainer>
-  );
-}
 
 export function StrategiesPage({ snapshot }: { snapshot: Snapshot }) {
   return (
@@ -98,34 +73,22 @@ export function StrategiesPage({ snapshot }: { snapshot: Snapshot }) {
         </table>
       </Panel>
 
-      {/* Factor radar cards */}
-      <div style={{ marginTop: 8 }}><Label>Factor Profiles <span style={{ fontSize: 10, letterSpacing: "0.05em" }}>— what each strategy bets on</span></Label></div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
-        {snapshot.strategies.map((s, i) => {
-          const accent = SERIES_COLORS[i % SERIES_COLORS.length];
-          return (
-            <Panel key={s.key} glow={accent} pad={18}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>{s.name}</div>
-                  <div style={{ fontSize: 11.5, color: S.sec, marginTop: 3, lineHeight: 1.5 }}>{s.edgeTechnical}</div>
-                </div>
-                {s.backtestSharpe != null && (
-                  <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 12 }}>
-                    <div style={{ fontSize: 10, color: S.muted }}>Backtest SR</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: S.cyan }}>{fmtNum(s.backtestSharpe)}</div>
-                  </div>
-                )}
-              </div>
-              <FactorRadar factors={s.factorProfile} color={accent} />
-              {s.note && (
-                <div style={{ fontSize: 11, color: S.muted, marginTop: 4, padding: "6px 10px", background: S.glass2, borderRadius: 8, border: `1px solid ${S.line}` }}>
-                  {s.note}
-                </div>
-              )}
-            </Panel>
-          );
-        })}
+      {/* Animated per-strategy showcase */}
+      <div style={{ marginTop: 8 }}>
+        <Label>
+          Strategy Profiles{" "}
+          <span style={{ fontSize: 10, letterSpacing: "0.05em" }}>— what each strategy bets on &amp; how it is doing</span>
+        </Label>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))", gap: 16 }}>
+        {snapshot.strategies.map((s, i) => (
+          <StrategyShowcase
+            key={s.key}
+            strategy={s}
+            accent={SERIES_COLORS[i % SERIES_COLORS.length]}
+            index={i}
+          />
+        ))}
       </div>
     </div>
   );
