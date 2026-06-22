@@ -392,6 +392,10 @@ jobs:
         ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
         ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
         ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+        # Premium pacing (1s/req vs 12s) so pre-flight's fallback data update
+        # can finish within its 700s timeout — without it the full universe
+        # takes ~25 min and times out (amplified the 2026-06-22 outage).
+        ALPHA_VANTAGE_PREMIUM: ${{ secrets.ALPHA_VANTAGE_PREMIUM }}
         ALPACA_PAPER: 'true'
         ALPACA_LIVE_ENABLED: 'false'
         DRY_RUN: 'false'
