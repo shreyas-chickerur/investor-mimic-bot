@@ -8,6 +8,8 @@ import { Label } from "@/components/Label";
 import { Chip } from "@/components/Chip";
 import { fmtNum, fmtPct } from "@/lib/format";
 import { StrategyShowcase } from "@/components/viz/StrategyShowcase";
+import { StrategyFlow } from "@/components/viz/StrategyFlow";
+import { STRATEGY_FLOWS } from "@/lib/strategyFlows";
 
 const S = tokens.color;
 
@@ -89,6 +91,32 @@ export function StrategiesPage({ snapshot }: { snapshot: Snapshot }) {
             index={i}
           />
         ))}
+      </div>
+
+      {/* How each strategy works — animated decision pipeline */}
+      <div style={{ marginTop: 8 }}>
+        <Label>
+          How Each Strategy Works{" "}
+          <span style={{ fontSize: 10, letterSpacing: "0.05em" }}>— the step-by-step decision pipeline, entry to exit</span>
+        </Label>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {snapshot.strategies.map((s, i) => {
+          const steps =
+            STRATEGY_FLOWS[s.key] ??
+            [
+              { kind: "scan" as const, title: "Scan", detail: "Evaluate the universe each morning" },
+              { kind: "signal" as const, title: "Signal", detail: s.edgeTechnical },
+            ];
+          return (
+            <StrategyFlow
+              key={s.key}
+              strategy={s}
+              accent={SERIES_COLORS[i % SERIES_COLORS.length]}
+              steps={steps}
+            />
+          );
+        })}
       </div>
     </div>
   );

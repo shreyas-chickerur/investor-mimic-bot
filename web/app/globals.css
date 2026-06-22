@@ -61,16 +61,19 @@ body {
 @keyframes radar-sweep { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 @keyframes radar-pulse { 0%,100% { opacity:0.5; } 50% { opacity:1; } }
 @keyframes sheen { from { transform: translateX(-130%); } to { transform: translateX(230%); } }
+/* Pulse travelling along a flow-diagram connector */
+@keyframes flow-dot { 0% { left:0%; opacity:0; } 12% { opacity:1; } 88% { opacity:1; } 100% { left:100%; opacity:0; } }
 
 .animate-rise  { animation: rise  0.4s ease both; }
 .animate-grow  { animation: grow  0.6s ease both; }
 .animate-fade  { animation: fade  0.3s ease both; }
 .radar-sweep   { animation: radar-sweep 4.2s linear infinite; transform-box: view-box; }
 .radar-pulse   { animation: radar-pulse 2.4s ease-in-out infinite; }
+.flow-dot      { animation: flow-dot 1.8s linear infinite; }
 
 @media (prefers-reduced-motion: reduce) {
   .animate-rise, .animate-grow, .animate-fade,
-  .radar-sweep, .radar-pulse { animation: none !important; }
+  .radar-sweep, .radar-pulse, .flow-dot { animation: none !important; }
   * { transition-duration:0.01ms !important; animation-duration:0.01ms !important; }
 }
 
