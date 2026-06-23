@@ -2,6 +2,22 @@
 type Term = { t: string; d: string };
 
 export const glossary: Record<string, Term> = {
+  status: {
+    t: "Strategy Status",
+    d: "ACTIVE = trading-eligible and will act when its signal fires. WATCHING = enabled and scanning, but it hasn't found a setup that meets its rules recently (so 0 trades is normal, not a fault). DISABLED = switched off by the quarterly evidence review because it had no validated edge.",
+  },
+  alloc: {
+    t: "Allocation",
+    d: "The share of the portfolio's risk budget assigned to this strategy. Capital is split across the enabled strategies (e.g. 14.29% ≈ 1/7) so no single strategy can dominate the book.",
+  },
+  return: {
+    t: "Return",
+    d: "The strategy's contribution to performance over the window, from its CLOSED trades. A '—' means it has no closed trades yet, so there is nothing to measure — not a loss.",
+  },
+  trades: {
+    t: "Trades",
+    d: "Closed round-trips in the last 30 days. Most strategies trade rarely by design — they only act when their specific signal fires AND it clears the regime, correlation and risk-cap funnel. A low count usually means 'no qualifying setups', not a problem.",
+  },
   regime: {
     t: "Market Regime",
     d: "The market's current 'mood', judged by how volatile it is (a VIX proxy). LOW_VOL = calm, NORMAL = average, HIGH_VOL = turbulent. The bot trades more cautiously when markets are turbulent.",

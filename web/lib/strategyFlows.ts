@@ -25,6 +25,40 @@ export interface FlowStep {
   rules?: FlowRule[]; // used by entry/exit nodes to show condition → action
 }
 
+// What each KIND of stage does, in general — shown in the click-through detail
+// panel so the pipeline reads as cause → effect, not just labels.
+export const KIND_INFO: Record<FlowKind, string> = {
+  scan: "Every run starts here: pull fresh prices and indicators for every symbol in the universe.",
+  gate: "A gate is a yes/no precondition. If it fails, the strategy does nothing for that name today — no signal is even generated.",
+  signal: "The core trigger. When this condition fires, the strategy PROPOSES a trade — but the proposal still has to clear the filters, the risk funnel and the cash/heat caps before it becomes an order.",
+  filter: "A filter trims weak or risky proposals so only high-quality signals proceed.",
+  rank: "Instead of fixed thresholds, the strategy scores and ranks every candidate, then acts on only the best few.",
+  entry: "When a proposal clears every check, the engine places the order at the next market open and sets the stop-loss.",
+  hold: "While a position is open it is re-evaluated against the exit rules on every single run.",
+  exit: "The position is closed the moment ANY one exit rule fires — whichever comes first.",
+};
+
+// Plain-English definitions for the jargon a step mentions. The detail panel
+// auto-surfaces any whose key appears in the step's text, so a click explains
+// exactly what e.g. "RSI" or "golden cross" means.
+export const TERMS: Record<string, { t: string; d: string }> = {
+  "RSI": { t: "RSI (Relative Strength Index)", d: "A 0–100 momentum gauge. Below ~30 means the stock has fallen hard recently (‘oversold’ — often due a bounce); above ~70 means it has run up hard (‘overbought’)." },
+  "SMA": { t: "SMA (Simple Moving Average)", d: "The average closing price over the last N days. The 100-day SMA is a slow trend line: price above it = broad uptrend." },
+  "VWAP": { t: "VWAP", d: "Volume-weighted average price — the average price paid recently, weighting heavier-volume days more. ‘Near VWAP’ means you’re buying close to what everyone else paid, not chasing." },
+  "Bollinger": { t: "Bollinger Bands", d: "A band drawn 2 standard deviations above/below a 20-day average. A close above the UPPER band is an unusually strong move — a breakout." },
+  "ATR": { t: "ATR (Average True Range)", d: "A measure of how much a stock typically moves in a day. Stops are set as a multiple of ATR so a calm stock gets a tight stop and a wild one gets room to breathe." },
+  "ADX": { t: "ADX", d: "Trend-strength meter (0–100). Above ~20 means a real trend is in place rather than choppy sideways noise." },
+  "golden cross": { t: "Golden Cross", d: "When the fast 20-day average crosses ABOVE the slow 50-day average — a classic ‘an uptrend just started’ signal." },
+  "death cross": { t: "Death Cross", d: "The opposite of a golden cross: the 20-day average drops below the 50-day — a ‘trend is rolling over’ exit signal." },
+  "z-score": { t: "Z-score", d: "How many standard deviations a value is from its average. A pair spread at z = −1.5 is unusually stretched and statistically due to snap back." },
+  "cointegrated": { t: "Cointegration", d: "Two stocks whose prices move together over the long run, so the gap between them reliably mean-reverts. The basis for pairs trading." },
+  "12-1 momentum": { t: "12-1 Momentum", d: "Return from 12 months ago up to 1 month ago. Skipping the most recent month avoids the short-term ‘what went up last month tends to dip’ reversal effect." },
+  "VIX": { t: "VIX", d: "The market’s ‘fear gauge’ of expected volatility. When it’s high the cash sweep parks less in stock to keep risk down." },
+  "Bollinger Band": { t: "Bollinger Bands", d: "A band 2 standard deviations around a 20-day average; a close above the upper band flags an unusually strong breakout." },
+  "earnings": { t: "Post-Earnings Drift", d: "After a positive earnings surprise, a stock tends to keep drifting up for weeks — the market underreacts at first. This strategy rides that drift." },
+  "VADER": { t: "VADER sentiment", d: "A rule-based analyzer that scores news headlines from negative to positive (0–1). Used as a context tilt, not a standalone signal." },
+};
+
 // Keyed by the strategy `key` in the snapshot. Every key the dashboard can show
 // has a flow; StrategyFlow falls back to the edge text if one is ever missing.
 export const STRATEGY_FLOWS: Record<string, FlowStep[]> = {
