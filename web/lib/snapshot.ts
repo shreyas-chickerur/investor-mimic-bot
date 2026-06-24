@@ -10,7 +10,7 @@ import type { Snapshot } from "./types";
 const SNAPSHOT_URL =
   process.env.NEXT_PUBLIC_SNAPSHOT_URL ??
   `https://raw.githubusercontent.com/${
-    process.env.NEXT_PUBLIC_GH_REPO ?? "shreyaschickerur/investor-mimic-bot"
+    process.env.NEXT_PUBLIC_GH_REPO ?? "shreyas-chickerur/investor-mimic-bot"
   }/data/web/public/data/latest.json`;
 
 // ISR: revalidate every 3600s (1 hour).
