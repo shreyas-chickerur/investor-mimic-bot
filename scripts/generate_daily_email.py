@@ -2264,7 +2264,14 @@ def generate_email_body(db_path: str = "trading.db", include_visuals: bool = Tru
         today_pnl = (curr_e or 0) - (prev or 0)
         today_pct = (today_pnl / prev * 100) if prev else 0.0
 
-    total_pnl = float(agg.get("total_pnl") or 0)
+    # All-time P&L is ACCOUNT-BASED (current value − the $100k starting capital),
+    # matching the dashboard's allTimePnlUsd. The old value summed trades.pnl,
+    # which (a) ignored that the account is below its start and (b) was inflated
+    # by zero-cost-basis phantom gains (e.g. VZ sold at a $0 basis booked a fake
+    # ~$3.3k profit) — so the email reported +$3.5k while the account was −$5k.
+    INITIAL_CAPITAL = 100_000.0
+    realized_pnl = float(agg.get("total_pnl") or 0)  # kept for reference/debug
+    total_pnl = (pv - INITIAL_CAPITAL) if pv > 0 else realized_pnl
     closed = int(agg.get("closed") or 0)
 
     date_str = datetime.now().strftime("%A, %b %-d")
