@@ -88,9 +88,11 @@ def _multi_symbol_data(n_symbols: int = 10, n_bars: int = 100) -> pd.DataFrame:
 
 
 class TestRSIMeanReversionFixes:
-    def test_rsi_threshold_is_35(self):
+    def test_rsi_threshold_is_38(self):
         s = RSIMeanReversionStrategy(1, 25_000)
-        assert s.rsi_threshold == 35, "Entry threshold must be 35 (meaningfully oversold)"
+        assert (
+            s.rsi_threshold == 38
+        ), "Entry threshold widened to 38 for more early-reversal signals"
 
     def test_rsi_exit_threshold_is_55(self):
         s = RSIMeanReversionStrategy(1, 25_000)
