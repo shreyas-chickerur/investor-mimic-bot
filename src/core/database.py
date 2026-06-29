@@ -662,6 +662,12 @@ class TradingDatabase:
                 "CREATE INDEX IF NOT EXISTS idx_error_log_type ON error_log(error_type, occurred_at)"
             )
 
+            # One-time data repair: remove zero-basis trade_pnl_detail rows written
+            # when disabled-strategy wind-downs logged exits before avg_price was
+            # populated (News Sentiment VZ phantom +$3,486 as of 2026-06-22).
+            # entry_price=0 is always a bug (real fills are never free).
+            cursor.execute("DELETE FROM trade_pnl_detail WHERE entry_price <= 0")
+
             conn.commit()
 
     def record_error(

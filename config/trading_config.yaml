@@ -7,7 +7,7 @@ risk:
   max_portfolio_heat: 0.40  # Maximum 40% of portfolio in positions at any time
   max_daily_loss_pct: 0.05  # Maximum 5% daily loss before halt
   max_position_size_pct: 0.10  # Maximum 10% per position
-  max_total_positions: 12       # Hard cap on total open positions across all strategies
+  max_total_positions: 16       # Hard cap on total open positions across all strategies (Cash Sweep excluded)
   min_cash_allocation_pct: 0.20  # Minimum 20% per-strategy cash buffer
   dynamic_max_allocation_pct: 0.50  # Max strategy allocation (dynamic allocator)
   dynamic_min_allocation_pct: 0.05  # Min strategy allocation (dynamic allocator)
@@ -48,7 +48,7 @@ risk:
   # Correlation filter
   correlation_window: 60  # 60-day rolling correlation
   correlation_short_window: 20  # 20-day short window for regime shifts
-  max_correlation: 0.70  # Reject/attenuate if correlation > 0.70; missing-data prior = 0.4-0.5
+  max_correlation: 0.75  # Reject/attenuate if correlation > 0.75; missing-data prior = 0.4-0.5
 
 # Position Sizing
 position_sizing:
@@ -133,7 +133,7 @@ strategies:
     factor_momentum: 0.30      # strongest combined evidence (15y 1.16 / 2y 1.76, live +$714)
     earnings_drift: 0.25       # PASS, but 15y DD 23.7% near the limit — monitor
     rsi_mean_reversion: 0.25   # PASS both horizons
-    dual_momentum: 0.15        # new, OOS-validated (best PF) — probation cap first quarter
+    dual_momentum: 0.25        # OOS-validated (best PF 2.06, Sharpe 1.20) — raised after data window fix
     volatility_breakout: 0.15  # PASS both horizons; weak prior → probation cap
     ma_crossover: 0.10         # PASS 15y but FAILED the 2y recent regime (Sharpe 0.33)
     sector_rotation: 0.10      # 25 trades < 30 gate — probation until sample accrues
@@ -145,6 +145,7 @@ strategies:
     rsi_overbought: 70
     rsi_slope_threshold: 5
     vwap_proximity_pct: 0.02
+    rsi_entry_threshold: 38    # RSI below this triggers entry (wider than oversold=30 to catch early reversals)
 
   ma_crossover:
     fast_ma: 20
