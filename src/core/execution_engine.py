@@ -1209,7 +1209,8 @@ class MultiStrategyRunner:
         from datetime import timedelta
 
         latest_date = df.index.max()
-        cutoff_date = latest_date - timedelta(days=150)
+        # 300 days: Dual Momentum needs 252 (lookback) + 21 (skip) + buffer
+        cutoff_date = latest_date - timedelta(days=300)
         df = df[df.index >= cutoff_date].copy()
 
         # Check data freshness and warn if stale
@@ -1511,6 +1512,26 @@ class MultiStrategyRunner:
         self.strategies_cache = strategies
         self.raw_signals_by_strategy = {}
 
+        # Cancel stale open orders from previous runs and reconcile any
+        # optimistic paper-mode fills against broker truth BEFORE the defensive
+        # exits run. This MUST precede stop-losses and the inactive-strategy
+        # wind-down: those phases place new exit orders (OPG SELL / BUY-to-cover),
+        # and if _cancel_stale_orders ran after them it would cancel the very
+        # orders just submitted — the wind-down SELL would be placed, immediately
+        # cancelled, then reversed as a "phantom" by _reconcile_optimistic_fills,
+        # so a disabled strategy's position could never actually be wound down
+        # (it re-triggered a reconciliation discrepancy every single run).
+        # Running cleanup first also means stop-losses and wind-down operate on
+        # positions that already reflect broker truth for the prior run.
+        # OPG orders placed last session and not filled (market closed, duplicate
+        # run, or position already closed) must be cancelled so we don't
+        # accumulate conflicting order intent.
+        self._cancel_stale_orders()
+        # Catches paper-mode OPG submissions that were marked FILLED optimistically
+        # but expired/canceled at the broker, and reverses the phantom positions.
+        # See PLATFORM_AUDIT 2026-05-28 §16.2 / §17 #1.
+        self._reconcile_optimistic_fills()
+
         # ── DEFENSIVE EXITS ───────────────────────────────────────────────────
         # Stop-losses must run UNCONDITIONALLY — even when the kill switch or
         # drawdown halt is active. A portfolio under enough stress to trip a
@@ -1653,16 +1674,9 @@ class MultiStrategyRunner:
         logger.info("✅ Drawdown stop check passed")
         logger.info("=" * 80)
 
-        # Cancel any stale open orders from previous runs before placing new ones.
-        # OPG orders placed last session and not filled (e.g. market was closed, duplicate run)
-        # must be cancelled so we don't accumulate conflicting order intent.
-        self._cancel_stale_orders()
-
-        # Reconcile locally-recorded intents against actual broker status.
-        # Catches paper-mode OPG submissions that were marked FILLED optimistically
-        # but expired/canceled at the broker, and reverses the phantom positions.
-        # See PLATFORM_AUDIT 2026-05-28 §16.2 / §17 #1.
-        self._reconcile_optimistic_fills()
+        # Stale-order cancellation and optimistic-fill reconciliation already ran
+        # before the defensive-exit phase (see top of this method) so that the
+        # stop-loss and wind-down orders placed there are not cancelled by it.
 
         # CRITICAL: Check data quality BEFORE trading
         logger.info("=" * 80)
@@ -2695,9 +2709,16 @@ class MultiStrategyRunner:
                         )
                         continue
 
-                    # Max positions guard: cap total open positions across all strategies
+                    # Max positions guard: cap total open positions across all strategies.
+                    # Exclude the Cash Sweep sleeve (SPY parking) — it is not an alpha
+                    # position and should not block new strategy entries.
                     max_total_positions = self.config.get("risk.max_total_positions", 12)
-                    total_open = len(self.db.get_all_open_positions())
+                    _sweep_sid = self._sweep_strategy_id()
+                    total_open = sum(
+                        1
+                        for p in self.db.get_all_open_positions()
+                        if p.get("strategy_id") != _sweep_sid
+                    )
                     if total_open >= max_total_positions:
                         logger.warning(
                             f"Skipping BUY {symbol} - at max positions limit ({total_open}/{max_total_positions})"
@@ -4283,19 +4304,21 @@ class MultiStrategyRunner:
             qty = abs(float(shares))
             side = OrderSide.BUY if is_short else OrderSide.SELL
             side_str = "BUY" if is_short else "SELL"
-            # Liquidity-taking limit: generous 1% buffer so the OPG fills
-            limit_price = round(price * (1.01 if is_short else 0.99), 2)
 
             if self.db.find_active_order_intent_for_today(sid, symbol, side_str):
                 logger.info("Wind-down %s %s already submitted today — skipping", side_str, symbol)
                 continue
             intent_id = self.db.create_order_intent(sid, symbol, side_str, qty)
-            order_data = LimitOrderRequest(
+            # Use Market-on-Open (MOO) for wind-down exits — a LOO limit order
+            # can miss the open if the stock gaps through the limit, causing
+            # _reconcile_optimistic_fills to reverse the "fill" and restore
+            # the position the next morning, creating an infinite loop where
+            # a disabled strategy's position never actually closes.
+            order_data = MarketOrderRequest(
                 symbol=symbol,
                 qty=qty,
                 side=side,
                 time_in_force=TimeInForce.OPG,
-                limit_price=limit_price,
             )
             order = self.dry_run.execute_broker_operation(
                 f"submit_order_winddown_{symbol}", self.trading_client.submit_order, order_data
@@ -4306,7 +4329,7 @@ class MultiStrategyRunner:
                     intent_id, "FILLED", broker_order_id=str(order.id)
                 )
             direction = "short" if is_short else "long"
-            pnl = (avg_price - limit_price) * qty if is_short else (limit_price - avg_price) * qty
+            pnl = (avg_price - price) * qty if is_short else (price - avg_price) * qty
             self.db.log_trade(
                 sid,
                 None,
@@ -4314,7 +4337,7 @@ class MultiStrategyRunner:
                 side_str,
                 qty,
                 price,
-                limit_price,
+                price,
                 0.0,
                 0.0,
                 str(order.id),
@@ -4327,7 +4350,7 @@ class MultiStrategyRunner:
                     symbol,
                     self.run_id,
                     entry_price=float(avg_price),
-                    exit_price=limit_price,
+                    exit_price=price,
                     shares=qty,
                     entry_date=entry_date,
                     exit_reason="strategy wind-down (disabled)",
@@ -4336,13 +4359,13 @@ class MultiStrategyRunner:
             except Exception as _pnl_exc:
                 logger.warning("Wind-down P&L logging failed for %s: %s", symbol, _pnl_exc)
             # Positive delta covers a short; negative delta sells a long
-            self._update_position_record(sid, symbol, qty if is_short else -qty, limit_price)
+            self._update_position_record(sid, symbol, qty if is_short else -qty, price)
             logger.info(
-                "Wind-down: %s %.0f %s @ limit %.2f (%s, %s)",
+                "Wind-down: %s %.0f %s MOO ~%.2f (%s, %s)",
                 side_str,
                 qty,
                 symbol,
-                limit_price,
+                price,
                 strat_name,
                 direction,
             )

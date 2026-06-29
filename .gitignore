@@ -50,3 +50,9 @@ artifacts/
 # Backtest output (regenerated per run)
 backtest_results/
 tmp/
+.venv/
+
+# Local archive of every email the bot sends/queues — kept for review, never
+# pushed (may contain portfolio values, P&L, positions). See
+# src/utils/email_notifier.archive_email and scripts/dump_sent_emails.py.
+sent_emails/

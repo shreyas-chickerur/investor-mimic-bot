@@ -21,6 +21,47 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
+# Local archive of sent mail
+# ---------------------------------------------------------------------------
+
+
+def _slugify_subject(subject: str, max_len: int = 60) -> str:
+    """Filesystem-safe slug from an email subject (emoji/punctuation dropped)."""
+    cleaned = "".join(c if (c.isalnum() or c in " -_") else " " for c in subject)
+    slug = "-".join(cleaned.split()).strip("-_")[:max_len]
+    return slug or "email"
+
+
+def archive_email(subject: str, body_html: str, archive_dir: str | None = None) -> str | None:
+    """Write a copy of an outgoing email to a local, gitignored directory.
+
+    Lets us review exactly what the bot sent without trawling the DB. The
+    directory (default ``sent_emails/``, overridable via ``EMAIL_ARCHIVE_DIR``)
+    is gitignored — bodies contain portfolio values, P&L and positions and must
+    never be pushed. Best-effort: any failure here must never block delivery,
+    so callers should treat this as fire-and-forget.
+
+    Returns the written path, or ``None`` if archiving was skipped/failed.
+    """
+    try:
+        directory: str = (
+            archive_dir or os.getenv("EMAIL_ARCHIVE_DIR", "sent_emails") or "sent_emails"
+        )
+        os.makedirs(directory, exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        path = os.path.join(directory, f"{ts}__{_slugify_subject(subject)}.html")
+        # Prepend a comment header so the subject is visible even if the body
+        # is a full HTML document with its own <title>.
+        header = f"<!-- Subject: {subject} | archived {datetime.now().isoformat()} -->\n"
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(header + body_html)
+        return path
+    except Exception as exc:  # pragma: no cover - never break delivery
+        logger.warning("Could not archive sent email locally: %s", exc)
+        return None
+
+
+# ---------------------------------------------------------------------------
 # Shared HTML template
 # ---------------------------------------------------------------------------
 
@@ -199,6 +240,8 @@ class EmailNotifier:
                 server.send_message(msg)
 
             logger.info(f"Email sent successfully: {subject}")
+            # Keep a local, gitignored copy of everything we actually send.
+            archive_email(subject, body)
 
         except Exception as e:
             logger.error(f"Failed to send email: {e}")
