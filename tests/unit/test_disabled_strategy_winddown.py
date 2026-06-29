@@ -181,3 +181,35 @@ class TestWinddown:
         )
         engine._winddown_inactive_strategy_positions([], md)
         assert engine._test_client.submit_order.call_count == 1
+
+
+class TestStaleOrderCancellationOrdering:
+    """Regression: _cancel_stale_orders must run BEFORE the defensive-exit phase.
+
+    The wind-down (and stop-loss exits) place new OPG orders. If
+    _cancel_stale_orders ran *after* them — as it did before 2026-06-19 — it
+    cancelled the very wind-down SELL just submitted, which _reconcile_optimistic_fills
+    then reversed as a "phantom", so a disabled strategy's position could never
+    actually be wound down and re-tripped a reconciliation discrepancy every run
+    (stranded VZ News-Sentiment position). Lock the ordering so it can't regress.
+    """
+
+    def test_cancel_runs_before_winddown_and_stoplosses(self):
+        import inspect
+
+        src = inspect.getsource(ee.MultiStrategyRunner.run_all_strategies)
+        i_cancel = src.find("self._cancel_stale_orders(")
+        i_reconcile = src.find("self._reconcile_optimistic_fills(")
+        i_winddown = src.find("self._winddown_inactive_strategy_positions(")
+        i_stops = src.find("self.check_stop_losses(")
+
+        assert i_cancel != -1, "_cancel_stale_orders no longer called in run()"
+        assert i_winddown != -1, "wind-down no longer called in run()"
+        assert i_stops != -1, "stop-loss check no longer called in run()"
+        assert i_reconcile != -1, "_reconcile_optimistic_fills no longer called in run()"
+
+        # Cancellation + optimistic-fill reconciliation must precede BOTH
+        # defensive-exit phases so their freshly-placed orders survive.
+        assert i_cancel < i_stops, "_cancel_stale_orders must run before stop-losses"
+        assert i_cancel < i_winddown, "_cancel_stale_orders must run before wind-down"
+        assert i_reconcile < i_winddown, "_reconcile_optimistic_fills must run before wind-down"

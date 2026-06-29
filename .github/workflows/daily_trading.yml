@@ -1297,7 +1297,16 @@ jobs:
         # Ping healthchecks.io so external monitoring knows the run completed.
         # Set HEALTHCHECKS_URL secret to your healthchecks.io check URL.
         # If the secret is absent, this is a no-op (continue-on-error: true handles it).
-        if [ -n "${{ secrets.HEALTHCHECKS_URL }}" ]; then
+        # Skip pinging on weekends: the check is configured for weekdays only
+        # (schedule 45 5 * * 1-5 on healthchecks.io). Pinging on Sat/Sun would
+        # reset the grace timer but not prevent the "DOWN" alert that fires when
+        # Monday's expected ping hasn't arrived — instead skipping keeps the
+        # "last ping" timestamp from the prior Friday intact so the weekend gap
+        # is not treated as a downtime event.
+        DAY_OF_WEEK=$(date -u +%u)  # 1=Mon ... 7=Sun
+        if [ "$DAY_OF_WEEK" -ge 6 ]; then
+          echo "Weekend — skipping healthcheck ping (configure check schedule to 45 5 * * 1-5 on healthchecks.io)"
+        elif [ -n "${{ secrets.HEALTHCHECKS_URL }}" ]; then
           STATUS="0"
           if [ "${{ job.status }}" != "success" ]; then STATUS="1"; fi
           curl -fsS --retry 3 --max-time 10 \

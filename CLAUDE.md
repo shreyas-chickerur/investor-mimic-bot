@@ -61,6 +61,8 @@ runs, email subjects get a `[RECURRING: <check>]` prefix.
 - **Signature**: healthchecks.io "check is down" email; no run in `gh run list` at 05:45 UTC.
 - **Diagnose**: cron-job.org dashboard → execution history (it logs the HTTP response of the dispatch call; 422 = GitHub
   rejected it, 401 = PAT expired).
+- **Weekend false alerts**: The workflow skips pinging healthchecks.io on Sat/Sun (added 2026-06-29). On healthchecks.io,
+  configure the check schedule to `45 5 * * 1-5` and grace to 96h so the weekend gap (Fri→Mon) does not trigger an alert.
 
 ### 3. Kill switch fired / 0 trades
 
