@@ -1209,8 +1209,10 @@ class MultiStrategyRunner:
         from datetime import timedelta
 
         latest_date = df.index.max()
-        # 300 days: Dual Momentum needs 252 (lookback) + 21 (skip) + buffer
-        cutoff_date = latest_date - timedelta(days=300)
+        # 420 calendar days ≈ 290 trading days — Dual Momentum needs 252
+        # (lookback) + 21 (skip) = 273 *trading* days minimum. 300 calendar
+        # days was only ~207 trading days (still short). 420 cal ≈ 290 td.
+        cutoff_date = latest_date - timedelta(days=420)
         df = df[df.index >= cutoff_date].copy()
 
         # Check data freshness and warn if stale
