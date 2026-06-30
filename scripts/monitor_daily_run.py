@@ -43,9 +43,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 def download_latest_artifact(dest_dir: Path) -> Path | None:
-    """Download trading-database artifact from the latest successful daily run."""
+    """Download trading-database artifact from the latest successful daily run.
+
+    Tries the 5 most recent successful runs in order — artifacts expire after
+    ~90 days but the most recent run's artifact occasionally isn't ready yet
+    (race between run completion and artifact upload finishing).
+    """
     try:
-        # Find latest successful run
         result = subprocess.run(
             [
                 "gh",
@@ -56,7 +60,7 @@ def download_latest_artifact(dest_dir: Path) -> Path | None:
                 "--status",
                 "success",
                 "--limit",
-                "1",
+                "5",
                 "--json",
                 "databaseId",
             ],
@@ -68,21 +72,34 @@ def download_latest_artifact(dest_dir: Path) -> Path | None:
         if not runs:
             print("ERROR: no successful daily runs found", file=sys.stderr)
             return None
-        run_id = runs[0]["databaseId"]
 
-        subprocess.run(
-            ["gh", "run", "download", str(run_id), "-n", "trading-database", "-D", str(dest_dir)],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        db_candidates = list(dest_dir.glob("**/*.db"))
-        if not db_candidates:
-            print("ERROR: no .db file found in downloaded artifact", file=sys.stderr)
-            return None
-        return db_candidates[0]
+        for run in runs:
+            run_id = run["databaseId"]
+            dl = subprocess.run(
+                [
+                    "gh",
+                    "run",
+                    "download",
+                    str(run_id),
+                    "-n",
+                    "trading-database",
+                    "-D",
+                    str(dest_dir),
+                ],
+                capture_output=True,
+                text=True,
+            )
+            if dl.returncode == 0:
+                db_candidates = list(dest_dir.glob("**/*.db"))
+                if db_candidates:
+                    print(f"Downloaded artifact from run {run_id}", file=sys.stderr)
+                    return db_candidates[0]
+            print(f"Run {run_id}: artifact unavailable, trying next…", file=sys.stderr)
+
+        print("ERROR: no artifact found in last 5 successful runs", file=sys.stderr)
+        return None
     except subprocess.CalledProcessError as e:
-        print(f"ERROR downloading artifact: {e.stderr}", file=sys.stderr)
+        print(f"ERROR listing runs: {e.stderr}", file=sys.stderr)
         return None
 
 
