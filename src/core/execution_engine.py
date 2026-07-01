@@ -4147,11 +4147,20 @@ class MultiStrategyRunner:
                 logger.info("Cash sweep BUY already submitted today — skipping")
                 return
             intent_id = self.db.create_order_intent(sid, symbol, "BUY", shares)
+            # Sweep sleeve: DAY marketable limit, NOT OPG. This is market beta,
+            # not an alpha signal, so it does not need to print at the open.
+            # OPG orders fill ONLY in the opening auction cross and expire
+            # (broker_expired) if the opening print clears the limit — which
+            # stranded the sweep for two weeks (June 2026, cash never deployed).
+            # A DAY marketable limit rests through the session and fills on the
+            # first touch, exactly like the stop-loss exits placed in this same
+            # pre-market run. The guard in test_critical_bugs_and_guards.py
+            # whitelists this block via the "sweep" marker.
             order_data = LimitOrderRequest(
                 symbol=symbol,
                 qty=shares,
-                side=OrderSide.BUY,
-                time_in_force=TimeInForce.OPG,
+                side=OrderSide.BUY,  # sweep beta sleeve — see DAY rationale above
+                time_in_force=TimeInForce.DAY,
                 limit_price=limit_price,
             )
             order = self.dry_run.execute_broker_operation(
@@ -4196,11 +4205,12 @@ class MultiStrategyRunner:
                 logger.info("Cash sweep SELL already submitted today — skipping")
                 return
             intent_id = self.db.create_order_intent(sid, symbol, "SELL", sell_shares)
+            # Sweep sleeve liquidation: DAY marketable limit (see BUY rationale).
             order_data = LimitOrderRequest(
                 symbol=symbol,
                 qty=sell_shares,
                 side=OrderSide.SELL,
-                time_in_force=TimeInForce.OPG,
+                time_in_force=TimeInForce.DAY,
                 limit_price=limit_price,
             )
             order = self.dry_run.execute_broker_operation(

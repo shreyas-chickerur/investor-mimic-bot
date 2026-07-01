@@ -115,8 +115,13 @@ runs, email subjects get a `[RECURRING: <check>]` prefix.
   user; its pair map is rebuilt from positions each run (never trust in-memory state across runs).
 - **Signals**: every emitted signal dict must include `asof_date` (AST-enforced by
   `tests/unit/test_signal_contract.py`).
-- **Orders**: new entries use `TimeInForce.OPG` (signals are generated pre-open); only defensive exits (stop-loss SELL /
-  BUY-to-cover) may use `DAY`.
+- **Orders**: new alpha entries use `TimeInForce.OPG` (signals are generated pre-open). Defensive exits (stop-loss SELL /
+  BUY-to-cover) use `DAY` — they fill intraday when the stop triggers. The **cash sweep** also uses `DAY` (marketable
+  limit): it is market beta, not alpha, so it need not print at the open, and OPG expired in the opening cross every day
+  (`broker_expired`), stranding the sweep for two weeks in June 2026 — cash never deployed while reconciliation
+  silently self-healed. `check_sweep_deploying` in `post_run_expect.py` now escalates if the last 3 settled sweep
+  orders all expired. The DAY guard in `test_workflow_tripwires`/`test_critical_bugs_and_guards.py` whitelists these
+  three cases (SELL exit, `side=order_side`, and the `sweep`-marked block); DAY in a genuine alpha-entry BUY is a bug.
 - **Tests**: `make test` = fast suite; integration/functional are auto-marked `slow` — CI runs them with `-o
   addopts=""`. The DRY_RUN smoke test (`tests/functional/test_dry_run_smoke.py`) is the engine-level canary; it runs on
   every CI push and a weekly Sunday schedule.

@@ -70,7 +70,7 @@ def _sweep_position(engine):
 
 
 class TestSweepBuy:
-    def test_idle_cash_buys_spy_opg(self, engine):
+    def test_idle_cash_buys_spy_day(self, engine):
         # cash 92k, equity 96k, buffer 15% = 14.4k → investable ≈ 77.6k
         engine._execute_cash_sweep(PRICES)
 
@@ -79,7 +79,10 @@ class TestSweepBuy:
         req = order_call.args[0] if order_call.args else order_call.kwargs["order_data"]
         assert req.symbol == "SPY"
         assert str(req.side).endswith("BUY") or "buy" in str(req.side).lower()
-        assert "OPG" in str(req.time_in_force).upper() or "opg" in str(req.time_in_force)
+        # Sweep is beta, not alpha: DAY marketable limit rests through the
+        # session and fills on first touch. OPG expired daily (broker_expired)
+        # when the opening print cleared the limit, stranding the sweep.
+        assert "DAY" in str(req.time_in_force).upper()
 
         pos = _sweep_position(engine)
         assert pos is not None
