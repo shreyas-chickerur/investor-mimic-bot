@@ -605,19 +605,26 @@ class TestOrderTimingOPG:
         execute intraday during market hours when the stop is triggered (the
         bot polls during the session). That covers SELLs closing longs AND
         BUYs covering shorts (side=order_side in execute_stop_loss_exits).
-        DAY in a new-entry BUY block would be a bug.
+
+        The cash-sweep sleeve also uses DAY: it is market beta, not an alpha
+        signal, so it need not print at the open, and a DAY marketable limit
+        rests through the session (OPG expired daily, stranding the sweep —
+        June 2026). Its blocks are annotated with "sweep" so this guard can
+        distinguish them from a genuine alpha-entry BUY, where DAY WOULD be a
+        bug.
         """
         engine_src = Path("src/core/execution_engine.py").read_text()
         lines = engine_src.splitlines()
         for i, line in enumerate(lines):
             if "TimeInForce.DAY" not in line:
                 continue
-            # Look backwards up to 8 lines for the OrderSide on this request
-            window = "\n".join(lines[max(0, i - 8) : i + 1])
+            # Look backwards up to 12 lines for the OrderSide / sweep marker
+            window = "\n".join(lines[max(0, i - 12) : i + 1])
             assert (
                 "OrderSide.SELL" in window
                 or "side=OrderSide.SELL" in window
                 or "side=order_side" in window  # stop-loss exit: SELL long / BUY-to-cover short
+                or "sweep" in window.lower()  # cash-sweep beta sleeve (documented DAY exception)
             ), (
                 f"execution_engine.py line {i+1} uses TimeInForce.DAY without a "
                 f"nearby defensive-exit OrderSide — new-entry BUY orders must use "

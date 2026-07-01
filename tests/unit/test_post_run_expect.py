@@ -21,6 +21,7 @@ from scripts.post_run_expect import (
     check_portfolio_value,
     check_reconciliation,
     check_signals_generated,
+    check_sweep_deploying,
 )
 
 
@@ -117,3 +118,69 @@ def test_portfolio_value_check_reads_latest_row_by_id(conn):
     ok, detail = check_portfolio_value(conn, "2026-06-11")
     assert ok, detail
     assert "95,000" in detail
+
+
+# ---------------------------------------------------------------------------
+# check_sweep_deploying: the sweep silently stopped filling (broker_expired)
+# for two weeks in June 2026 while reconciliation self-healed and the run
+# stayed GREEN. Cash sat idle. This check must catch that.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def sweep_conn():
+    conn = sqlite3.connect(":memory:")
+    conn.executescript(
+        """
+        CREATE TABLE strategies (id INTEGER PRIMARY KEY, name TEXT);
+        CREATE TABLE order_intents (
+            intent_id TEXT, strategy_id INTEGER, symbol TEXT, side TEXT,
+            status TEXT, error_code TEXT, created_at TEXT
+        );
+        INSERT INTO strategies (id, name) VALUES (12, 'Cash Sweep');
+        """
+    )
+    yield conn
+    conn.close()
+
+
+def _add_intent(conn, day, status, error_code=None, side="BUY"):
+    conn.execute(
+        "INSERT INTO order_intents (intent_id, strategy_id, symbol, side, status, "
+        "error_code, created_at) VALUES (?, 12, 'SPY', ?, ?, ?, ?)",
+        (f"i{day}", side, status, error_code, f"2026-06-{day} 05:48:00"),
+    )
+
+
+def test_sweep_deploying_fails_when_last_three_expired(sweep_conn):
+    for day in ("26", "29", "30"):
+        _add_intent(sweep_conn, day, "FAILED", "broker_expired")
+    # today's optimistic FILLED intent must be excluded from the verdict
+    _add_intent(sweep_conn, "01", "FILLED")  # will read as 2026-06-01, still < today
+    sweep_conn.commit()
+    ok, detail = check_sweep_deploying(sweep_conn, "2026-07-01")
+    assert not ok
+    assert "has not deployed" in detail
+
+
+def test_sweep_deploying_passes_when_orders_fill(sweep_conn):
+    for day in ("26", "29", "30"):
+        _add_intent(sweep_conn, day, "FILLED")
+    sweep_conn.commit()
+    ok, detail = check_sweep_deploying(sweep_conn, "2026-07-01")
+    assert ok, detail
+
+
+def test_sweep_deploying_excludes_todays_optimistic_fill(sweep_conn):
+    # Prior days all expired; today shows an (optimistic) FILLED — the verdict
+    # must be driven by the settled prior days, not today's not-yet-trued row.
+    for day in ("26", "29", "30"):
+        _add_intent(sweep_conn, day, "FAILED", "broker_expired")
+    sweep_conn.execute(
+        "INSERT INTO order_intents (intent_id, strategy_id, symbol, side, status, "
+        "error_code, created_at) VALUES ('today', 12, 'SPY', 'BUY', 'FILLED', NULL, "
+        "'2026-07-01 05:48:00')"
+    )
+    sweep_conn.commit()
+    ok, _ = check_sweep_deploying(sweep_conn, "2026-07-01")
+    assert not ok
