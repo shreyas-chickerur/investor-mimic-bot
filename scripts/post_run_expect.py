@@ -151,6 +151,46 @@ def check_unfilled_opg_rate(conn: sqlite3.Connection, today: str) -> tuple[bool,
     return True, f"{count} unfilled OPG order(s) swept on {swept_date}"
 
 
+def check_sweep_deploying(conn: sqlite3.Connection, today: str) -> tuple[bool, str]:
+    """The cash sweep must actually deploy — its orders must reach the broker.
+
+    The sweep parks idle cash in the index sleeve so cash does not sit at 0%.
+    When its orders fail to fill (broker_expired), the DB records an optimistic
+    fill that the next run trues up — so reconciliation self-heals and the run
+    stays GREEN while cash silently never deploys. That hid a two-week sweep
+    outage in June 2026 (OPG orders expired in the opening cross every day).
+
+    This looks at the sweep's most recent *settled* BUY intents (prior days,
+    excluding today's not-yet-trued optimistic fill). If the last 3 all expired
+    at the broker, the sweep is not deploying and must escalate.
+    """
+    rows = _qall(
+        conn,
+        """
+        SELECT oi.status, oi.error_code, date(oi.created_at) AS d
+        FROM order_intents oi
+        JOIN strategies s ON s.id = oi.strategy_id
+        WHERE s.name = 'Cash Sweep' AND oi.side = 'BUY' AND date(oi.created_at) < ?
+        ORDER BY oi.created_at DESC
+        LIMIT 3
+        """,
+        (today,),
+    )
+    if len(rows) < 3:
+        return True, "not enough settled sweep orders yet"
+    expired = [
+        r for r in rows if r.get("error_code") == "broker_expired" or r["status"] == "FAILED"
+    ]
+    if len(expired) == len(rows):
+        days = ", ".join(r["d"] for r in rows)
+        return False, (
+            f"Cash sweep has not deployed: the last {len(rows)} settled sweep BUY "
+            f"orders all expired at the broker ({days}). Cash is sitting idle — "
+            "check the sweep limit/time-in-force (DAY marketable limit expected)"
+        )
+    return True, f"sweep deploying ({len(rows) - len(expired)}/{len(rows)} recent orders filled)"
+
+
 def check_review_not_overdue(conn: sqlite3.Connection, today: str) -> tuple[bool, str]:
     """Probation caps and parameter plateaus must be revisited quarterly.
 
@@ -274,6 +314,7 @@ EXPECTATIONS = [
     ("Consecutive failures < 3", check_consecutive_failures, "high"),
     ("Quarterly strategy re-validation not overdue", check_review_not_overdue, "medium"),
     ("Unfilled-OPG rate acceptable", check_unfilled_opg_rate, "medium"),
+    ("Cash sweep is deploying", check_sweep_deploying, "high"),
 ]
 
 
