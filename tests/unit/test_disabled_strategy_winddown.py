@@ -4,7 +4,7 @@ Disabled-strategy wind-down tests.
 
 initialize_strategies() filters disabled strategies out entirely, so their
 open positions would never receive exit signals — only catastrophe stops.
-The engine must emit OPG SELL (longs) / BUY-to-cover (shorts) for every
+The engine must emit DAY SELL (longs) / BUY-to-cover (shorts) for every
 position whose strategy is inactive (excluding BROKER_SYNC and Cash Sweep).
 """
 import sys
@@ -102,7 +102,9 @@ class TestWinddown:
         req = engine._test_client.submit_order.call_args.args[0]
         assert req.symbol == "XYZ"
         assert "sell" in str(req.side).lower()
-        assert "OPG" in str(req.time_in_force).upper()
+        # DAY, not OPG: an OPG wind-down that misses the opening auction expires
+        # and the position is restored next run (infinite non-close loop).
+        assert "DAY" in str(req.time_in_force).upper()
         assert engine.db.get_position(dead_sid, "XYZ") is None
 
     def test_short_position_covered(self, engine):

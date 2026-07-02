@@ -588,71 +588,52 @@ class TestConfigSanity:
 
 
 # ===========================================================================
-# 13. Order timing: execution engine must use OPG not DAY
-#     (DAY orders placed at 4:15 PM ET after market close never fill)
+# 13. Order timing: execution engine must use DAY marketable limits, NOT OPG
+#     OPG (limit/market-on-open) orders fill ONLY in the opening auction cross
+#     and expired unfilled ~87% of the time (126 FAILED vs 19 FILLED buys,
+#     2026-05-20 → 2026-07-02), so the strategies almost never held positions.
+#     A DAY order placed pre-market rests through the session and fills on
+#     first touch. See execution failure 2026-07-02.
 # ===========================================================================
 
 
-class TestOrderTimingOPG:
-    def test_execution_engine_uses_opg_not_day_for_buys(self):
-        """All BUY orders in execution_engine must use TimeInForce.OPG.
+class TestOrderTimingDAY:
+    def test_execution_engine_uses_no_opg(self):
+        """No order in the engine may use TimeInForce.OPG.
 
-        Signals are generated after close at 4:15 PM ET.  DAY orders placed
-        after market close are queued or rejected by Alpaca.  OPG (market-on-
-        open) orders execute at the next session's open — the correct workflow.
-
-        Note: stop-loss exits legitimately use TimeInForce.DAY because they
-        execute intraday during market hours when the stop is triggered (the
-        bot polls during the session). That covers SELLs closing longs AND
-        BUYs covering shorts (side=order_side in execute_stop_loss_exits).
-
-        The cash-sweep sleeve also uses DAY: it is market beta, not an alpha
-        signal, so it need not print at the open, and a DAY marketable limit
-        rests through the session (OPG expired daily, stranding the sweep —
-        June 2026). Its blocks are annotated with "sweep" so this guard can
-        distinguish them from a genuine alpha-entry BUY, where DAY WOULD be a
-        bug.
+        OPG orders participate only in the opening auction cross; if the
+        opening print clears the limit (or the auction does not cross the
+        order) they expire unfilled. Empirically that stranded ~87% of orders.
+        Every entry/exit now uses DAY (marketable limit for entries, DAY market
+        for exits/wind-down), which rests through the session. DAY placed
+        pre-market is proven safe: the stop-loss exits and cash sweep have used
+        it in this same 00:45-ET run for weeks.
         """
         engine_src = Path("src/core/execution_engine.py").read_text()
-        lines = engine_src.splitlines()
-        for i, line in enumerate(lines):
-            if "TimeInForce.DAY" not in line:
-                continue
-            # Look backwards up to 12 lines for the OrderSide / sweep marker
-            window = "\n".join(lines[max(0, i - 12) : i + 1])
-            assert (
-                "OrderSide.SELL" in window
-                or "side=OrderSide.SELL" in window
-                or "side=order_side" in window  # stop-loss exit: SELL long / BUY-to-cover short
-                or "sweep" in window.lower()  # cash-sweep beta sleeve (documented DAY exception)
-            ), (
-                f"execution_engine.py line {i+1} uses TimeInForce.DAY without a "
-                f"nearby defensive-exit OrderSide — new-entry BUY orders must use "
-                f"OPG to execute at next market open. Context:\n{window}"
-            )
-
-    def test_execution_engine_uses_opg(self):
-        engine_src = Path("src/core/execution_engine.py").read_text()
-        assert "TimeInForce.OPG" in engine_src, (
-            "execution_engine.py has no TimeInForce.OPG — after-hours orders "
-            "must use OPG to execute at next market open."
+        assert "TimeInForce.OPG" not in engine_src, (
+            "execution_engine.py uses TimeInForce.OPG — OPG orders expire in the "
+            "opening auction cross (~87% non-fill). Use TimeInForce.DAY so orders "
+            "rest through the session and fill on first touch."
         )
 
-    def test_limit_order_uses_generous_buffer(self):
-        """BUY orders use LOO (Limit-On-Open) with a 1% buffer above typical price.
+    def test_entry_buys_use_marketable_day_limit(self):
+        """Alpha-entry BUYs must be DAY LimitOrderRequests with the 1% buffer.
 
-        The previous bug used 0.1% which caused non-fills on any overnight gap.
-        The new design intentionally uses LimitOrderRequest with typical_price * 1.01
-        so we avoid chasing gap-ups while still filling on normal opens.
+        A DAY *market* buy would fill at any price; the marketable limit
+        (typical × 1.01) caps how far we chase a gap-up while still resting
+        through the session. The 0.1% (1.001) buffer that caused non-fills must
+        never return; 1.01 must be present.
         """
         engine_src = Path("src/core/execution_engine.py").read_text()
         import re
 
-        # Must use LimitOrderRequest for BUY (the intentional new design)
-        instantiations = re.findall(r"LimitOrderRequest\s*\(", engine_src)
         assert (
-            len(instantiations) >= 1
-        ), "LimitOrderRequest should be used for BUY OPG orders (LOO) with a 1% typical-price buffer"
+            len(re.findall(r"LimitOrderRequest\s*\(", engine_src)) >= 1
+        ), "LimitOrderRequest (DAY marketable limit) must be used for BUY entries"
+        assert (
+            "1.001" not in engine_src
+        ), "Found old 0.1% limit buffer — use 1.01 (1%) so orders fill on normal opens"
+        assert "1.01" in engine_src, "Typical-price 1% buffer (1.01) must be present"
 
         # The buffer must be 1% (1.01), NOT the old 0.1% (1.001) that caused non-fills
         assert (
