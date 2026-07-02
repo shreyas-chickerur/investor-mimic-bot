@@ -115,13 +115,17 @@ runs, email subjects get a `[RECURRING: <check>]` prefix.
   user; its pair map is rebuilt from positions each run (never trust in-memory state across runs).
 - **Signals**: every emitted signal dict must include `asof_date` (AST-enforced by
   `tests/unit/test_signal_contract.py`).
-- **Orders**: new alpha entries use `TimeInForce.OPG` (signals are generated pre-open). Defensive exits (stop-loss SELL /
-  BUY-to-cover) use `DAY` — they fill intraday when the stop triggers. The **cash sweep** also uses `DAY` (marketable
-  limit): it is market beta, not alpha, so it need not print at the open, and OPG expired in the opening cross every day
-  (`broker_expired`), stranding the sweep for two weeks in June 2026 — cash never deployed while reconciliation
-  silently self-healed. `check_sweep_deploying` in `post_run_expect.py` now escalates if the last 3 settled sweep
-  orders all expired. The DAY guard in `test_workflow_tripwires`/`test_critical_bugs_and_guards.py` whitelists these
-  three cases (SELL exit, `side=order_side`, and the `sweep`-marked block); DAY in a genuine alpha-entry BUY is a bug.
+- **Orders**: **everything uses `TimeInForce.DAY`** — entries are DAY marketable limits (`typical × 1.01`), exits/
+  wind-down are DAY market orders. OPG (limit/market-on-open) was abandoned 2026-07-02: OPG orders fill ONLY in the
+  opening auction cross and expired unfilled **~87% of the time** (126 FAILED vs 19 FILLED buys, 2026-05-20 →
+  2026-07-02), so the strategies almost never held positions — paper mode booked optimistic fills and the digest
+  reported phantom trades while the account just tracked SPY beta. A DAY order placed pre-market (00:45 ET) rests
+  through the session and fills on first touch; this is proven safe (stop-loss exits and the cash sweep used it for
+  weeks). The `TestOrderTimingDAY` guard in `test_critical_bugs_and_guards.py` asserts **no `TimeInForce.OPG`** remains
+  and that entries use a DAY `LimitOrderRequest` with the 1% buffer. `check_order_fill_rate` (settled BUY fill rate over
+  14d, fails <50%) and `check_sweep_deploying` in `post_run_expect.py` guard against a regression. Note: the
+  **backtester** still models fills at the next open (`test_backtester_fidelity`) — that's the simulation's fill model,
+  a separate concern from live TIF, and is a known fidelity gap to revisit when re-validating strategy edge.
 - **Tests**: `make test` = fast suite; integration/functional are auto-marked `slow` — CI runs them with `-o
   addopts=""`. The DRY_RUN smoke test (`tests/functional/test_dry_run_smoke.py`) is the engine-level canary; it runs on
   every CI push and a weekly Sunday schedule.

@@ -3182,16 +3182,22 @@ class MultiStrategyRunner:
                         intent_id, strategy.strategy_id, symbol, "BUY", adjusted_shares
                     )
 
-                    # Limit-on-open: use previous day's typical price (H+L+C)/3 as the cap.
-                    # Orders only fill if the open is at or below this limit — avoids chasing
-                    # overnight gap-ups.  A 1% buffer keeps fill rates high on normal opens.
+                    # DAY marketable limit (NOT OPG). Cap = previous day's typical
+                    # price (H+L+C)/3 + 1% so we never chase a gap-up beyond 1%,
+                    # but the order RESTS through the session and fills on first
+                    # touch instead of only in the opening auction. OPG limit-on-
+                    # open orders expired unfilled ~87% of the time (they clear
+                    # only if the opening print is at/below the limit), so the
+                    # strategies almost never held positions (see execution
+                    # failure 2026-07-02). DAY placed pre-market is proven safe
+                    # here — the stop-loss exits and cash sweep already use it.
                     _typical = getattr(self, "_typical_prices", {}).get(symbol, price)
                     _limit_price = round(_typical * 1.01, 2)
                     order_data = LimitOrderRequest(
                         symbol=symbol,
                         qty=adjusted_shares,
                         side=OrderSide.BUY,
-                        time_in_force=TimeInForce.OPG,
+                        time_in_force=TimeInForce.DAY,
                         limit_price=_limit_price,
                     )
 
@@ -3493,12 +3499,17 @@ class MultiStrategyRunner:
                         commission_cost,
                         total_cost,
                     ) = self.cost_model.calculate_execution_price(price, "SELL", shares)
-                    # Market-on-open: signals generated after close, execute at next day's open
+                    # Strategy exit: DAY market order (NOT OPG). Signals are
+                    # generated pre-open, but a DAY order placed pre-market fills
+                    # at/after the open and RESTS through the session — an OPG
+                    # exit that misses the opening auction cross expires unfilled
+                    # and leaves the position stranded (see execution failure
+                    # 2026-07-02).
                     order_data = MarketOrderRequest(
                         symbol=symbol,
                         qty=shares,
                         side=OrderSide.SELL,
-                        time_in_force=TimeInForce.OPG,
+                        time_in_force=TimeInForce.DAY,
                     )
 
                     # Wrap with DRY_RUN protection
@@ -3735,13 +3746,15 @@ class MultiStrategyRunner:
                         continue
 
                     _typical = getattr(self, "_typical_prices", {}).get(symbol, price)
-                    _limit_price = round(_typical * 0.99, 2)  # 1% buffer below open
+                    _limit_price = round(_typical * 0.99, 2)  # 1% marketable buffer below open
 
+                    # DAY marketable limit (NOT OPG) — rests through the session
+                    # instead of expiring in the opening auction cross.
                     order_data = LimitOrderRequest(
                         symbol=symbol,
                         qty=shares,
                         side=OrderSide.SELL,
-                        time_in_force=TimeInForce.OPG,
+                        time_in_force=TimeInForce.DAY,
                         limit_price=_limit_price,
                     )
                     order = self.dry_run.execute_broker_operation(
@@ -3811,13 +3824,15 @@ class MultiStrategyRunner:
                         continue
 
                     _typical = getattr(self, "_typical_prices", {}).get(symbol, price)
-                    _limit_price = round(_typical * 1.01, 2)  # 1% buffer above open
+                    _limit_price = round(_typical * 1.01, 2)  # 1% marketable buffer above open
 
+                    # DAY marketable limit (NOT OPG) — rests through the session
+                    # instead of expiring in the opening auction cross.
                     order_data = LimitOrderRequest(
                         symbol=symbol,
                         qty=cover_qty,
                         side=OrderSide.BUY,
-                        time_in_force=TimeInForce.OPG,
+                        time_in_force=TimeInForce.DAY,
                         limit_price=_limit_price,
                     )
                     order = self.dry_run.execute_broker_operation(
@@ -4321,16 +4336,18 @@ class MultiStrategyRunner:
                 logger.info("Wind-down %s %s already submitted today — skipping", side_str, symbol)
                 continue
             intent_id = self.db.create_order_intent(sid, symbol, side_str, qty)
-            # Use Market-on-Open (MOO) for wind-down exits — a LOO limit order
-            # can miss the open if the stock gaps through the limit, causing
-            # _reconcile_optimistic_fills to reverse the "fill" and restore
-            # the position the next morning, creating an infinite loop where
-            # a disabled strategy's position never actually closes.
+            # DAY market order for wind-down exits (NOT OPG). A limit order can
+            # miss the open, and an OPG market order that misses the opening
+            # auction cross expires unfilled — either way
+            # _reconcile_optimistic_fills reverses the "fill" and restores the
+            # position the next morning, an infinite loop where a disabled
+            # strategy's position never closes. A DAY market order rests through
+            # the session and fills, breaking the loop.
             order_data = MarketOrderRequest(
                 symbol=symbol,
                 qty=qty,
                 side=side,
-                time_in_force=TimeInForce.OPG,
+                time_in_force=TimeInForce.DAY,
             )
             order = self.dry_run.execute_broker_operation(
                 f"submit_order_winddown_{symbol}", self.trading_client.submit_order, order_data

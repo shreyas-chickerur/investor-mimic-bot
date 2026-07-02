@@ -191,6 +191,46 @@ def check_sweep_deploying(conn: sqlite3.Connection, today: str) -> tuple[bool, s
     return True, f"sweep deploying ({len(rows) - len(expired)}/{len(rows)} recent orders filled)"
 
 
+def check_order_fill_rate(conn: sqlite3.Connection, today: str) -> tuple[bool, str]:
+    """Platform-wide order fill rate must be healthy — the bot must actually trade.
+
+    OPG limit/market-on-open orders expired in the opening auction cross ~87% of
+    the time (126 FAILED vs 19 FILLED buys, 2026-05-20 → 2026-07-02): the
+    strategies almost never held positions, paper mode booked optimistic fills,
+    and the digest reported phantom trades while the account drifted with SPY
+    beta. Fixed by switching all entries/exits to DAY marketable limits
+    (see execution failure 2026-07-02).
+
+    Looks at settled BUY intents over the last 10 trading days (excluding
+    today's not-yet-trued optimistic fills). Fails if fewer than half filled.
+    Immediately after the DAY fix deploys, historical FAILED rows dominate the
+    window and this will read RED for a few days — that is correct, it reflects
+    reality until real fills accrue.
+    """
+    rows = _qall(
+        conn,
+        """
+        SELECT status FROM order_intents
+        WHERE side = 'BUY' AND status IN ('FILLED', 'FAILED')
+          AND date(created_at) < ?
+          AND date(created_at) >= date(?, '-14 days')
+        ORDER BY created_at DESC
+        """,
+        (today, today),
+    )
+    if len(rows) < 5:
+        return True, f"not enough settled orders to judge fill rate ({len(rows)})"
+    filled = sum(1 for r in rows if r["status"] == "FILLED")
+    rate = filled / len(rows)
+    if rate < 0.5:
+        return False, (
+            f"Order fill rate {rate:.0%} ({filled}/{len(rows)} settled buys filled) "
+            "over the last 14 days — orders are expiring unfilled. Entries/exits "
+            "must use DAY marketable limits, not OPG (auction-only)"
+        )
+    return True, f"Order fill rate {rate:.0%} ({filled}/{len(rows)} settled buys filled, 14d)"
+
+
 def check_review_not_overdue(conn: sqlite3.Connection, today: str) -> tuple[bool, str]:
     """Probation caps and parameter plateaus must be revisited quarterly.
 
@@ -315,6 +355,7 @@ EXPECTATIONS = [
     ("Quarterly strategy re-validation not overdue", check_review_not_overdue, "medium"),
     ("Unfilled-OPG rate acceptable", check_unfilled_opg_rate, "medium"),
     ("Cash sweep is deploying", check_sweep_deploying, "high"),
+    ("Order fill rate healthy", check_order_fill_rate, "high"),
 ]
 
 
