@@ -18,6 +18,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from scripts.post_run_expect import (
+    check_order_fill_rate,
     check_portfolio_value,
     check_reconciliation,
     check_signals_generated,
@@ -184,3 +185,46 @@ def test_sweep_deploying_excludes_todays_optimistic_fill(sweep_conn):
     sweep_conn.commit()
     ok, _ = check_sweep_deploying(sweep_conn, "2026-07-01")
     assert not ok
+
+
+# ---------------------------------------------------------------------------
+# check_order_fill_rate: OPG orders expired ~87% of the time platform-wide,
+# so the bot barely traded. This must fail when most settled buys don't fill.
+# ---------------------------------------------------------------------------
+
+
+def _add_buy(conn, day, status):
+    conn.execute(
+        "INSERT INTO order_intents (intent_id, strategy_id, symbol, side, status, "
+        "error_code, created_at) VALUES (?, 12, 'AAA', 'BUY', ?, NULL, ?)",
+        (f"b{day}{status}", status, f"2026-06-{day} 05:48:00"),
+    )
+
+
+def test_fill_rate_fails_when_most_orders_expire(sweep_conn):
+    # 8 failed, 2 filled over the window → 20% → RED
+    for day in ("20", "21", "22", "23", "24", "25", "26", "27"):
+        _add_buy(sweep_conn, day, "FAILED")
+    _add_buy(sweep_conn, "28", "FILLED")
+    _add_buy(sweep_conn, "29", "FILLED")
+    sweep_conn.commit()
+    ok, detail = check_order_fill_rate(sweep_conn, "2026-06-30")
+    assert not ok
+    assert "fill rate" in detail.lower()
+
+
+def test_fill_rate_passes_when_orders_fill(sweep_conn):
+    for day in ("24", "25", "26", "27", "28", "29"):
+        _add_buy(sweep_conn, day, "FILLED")
+    _add_buy(sweep_conn, "23", "FAILED")
+    sweep_conn.commit()
+    ok, detail = check_order_fill_rate(sweep_conn, "2026-06-30")
+    assert ok, detail
+
+
+def test_fill_rate_skips_when_too_few_orders(sweep_conn):
+    _add_buy(sweep_conn, "28", "FAILED")
+    _add_buy(sweep_conn, "29", "FAILED")
+    sweep_conn.commit()
+    ok, _ = check_order_fill_rate(sweep_conn, "2026-06-30")
+    assert ok  # not enough data → do not flag
