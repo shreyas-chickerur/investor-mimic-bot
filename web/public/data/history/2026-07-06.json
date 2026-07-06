@@ -1,9 +1,9 @@
 {
   "meta": {
-    "generatedAt": "2026-07-06T06:12:56.261058Z",
+    "generatedAt": "2026-07-06T12:18:37.730452Z",
     "tradingDate": "2026-07-06",
     "runId": "20260706_061240_2z69",
-    "runNumber": 238,
+    "runNumber": 239,
     "paper": true,
     "schemaVersion": 1
   },
@@ -11,22 +11,22 @@
     "totalValue": 95763.83,
     "cash": 19947.68,
     "positionsCount": 10,
-    "todayChangeUsd": -45.6,
-    "todayChangePct": -0.0476,
+    "todayChangeUsd": 126.44,
+    "todayChangePct": 0.132,
     "allTimePnlUsd": -4236.17,
     "allTimePnlPct": -4.2362,
     "spyTodayPct": -0.1314,
-    "vsSpyPct": 0.0838,
-    "sharpe": -1.6217,
-    "sortino": -1.8523,
+    "vsSpyPct": 0.2634,
+    "sharpe": -1.4647,
+    "sortino": -1.6772,
     "maxDrawdownPct": 3.6642,
-    "volatilityPct": 4.8283,
+    "volatilityPct": 4.8393,
     "winRatePct": 26.67,
     "profitFactor": 0.8094,
     "closedTradesCount": 30,
     "regime": "NORMAL",
     "heatCapPct": 40,
-    "exposurePct": 79.17
+    "exposurePct": 79.2
   },
   "equityCurve": [
     {
@@ -331,7 +331,7 @@
     },
     {
       "date": "2026-07-06",
-      "value": 95763.83,
+      "value": 95890.27,
       "spy": 103634.54
     }
   ],
@@ -348,7 +348,7 @@
       "tradesCount": 0,
       "winRatePct": null,
       "holdPeriod": "\u226420d",
-      "healthScore": 100,
+      "healthScore": 90,
       "edgeTechnical": "RSI(14) < 35 with positive slope; uptrend gate (SMA-100); exits RSI > 55 OR 20-day hold. 2.5\u00d7 ATR stop, volume-spike filter.",
       "edgePlain": "Buys stocks that dropped too fast, betting they bounce back.",
       "factorProfile": {
@@ -360,7 +360,7 @@
       },
       "backtestSharpe": 0.65,
       "status": "ACTIVE",
-      "note": "Low trade count: 0 closed trades (need 5+ for full scoring)"
+      "note": "Recent rejections high: 100.0% (7d)"
     },
     {
       "key": "ml_momentum",
@@ -635,7 +635,7 @@
       "unrealizedPlUsd": -0.18,
       "beta": 0.755,
       "atrStop": 329.5471,
-      "sentimentScore": 0.5308,
+      "sentimentScore": 0.5403,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -682,7 +682,7 @@
         ],
         "news": [
           {
-            "headline": "GIS, WEN, HD Stocks Hit 52-Week Lows Today: What's Driving The Selloff?",
+            "headline": "Why Did LULU, WEN, HD Stocks Fall To 52-Week Lows Today?",
             "source": "Stocktwits",
             "score": 0.3988
           },
@@ -710,7 +710,7 @@
       "unrealizedPlUsd": 46.58,
       "beta": 0.497,
       "atrStop": 334.4155,
-      "sentimentScore": 0.6185,
+      "sentimentScore": 0.5861,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -753,13 +753,13 @@
           },
           {
             "headline": "ChatGPT-Maker OpenAI Is Headed for a $1 Trillion IPO. The Biggest Winner Could Be Microsoft Stock.",
-            "source": "Yahoo Finance",
-            "score": 0.793
-          },
-          {
-            "headline": "ChatGPT-Maker OpenAI Is Headed for a $1 Trillion IPO. The Biggest Winner Could Be Microsoft Stock.",
             "source": "The Motley Fool",
             "score": 0.721
+          },
+          {
+            "headline": "The Microsoft Stock Outlook Remains Upbeat Despite Layoffs",
+            "source": "Yahoo Finance",
+            "score": 0.5
           }
         ]
       }
@@ -775,7 +775,7 @@
       "unrealizedPlUsd": -122.59,
       "beta": 4.302,
       "atrStop": 902.3836,
-      "sentimentScore": 0.5405,
+      "sentimentScore": 0.5914,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -812,19 +812,19 @@
         ],
         "news": [
           {
-            "headline": "Relax, Micron Stock Can Rebound Quickly After the Fourth of July Holiday",
-            "source": "Barron's",
-            "score": 0.8404
+            "headline": "Micron, Intel, and Sandisk Are the Best-Performing S&P 500 Stocks This Year. Which Is the Best Buy Now?",
+            "source": "The Globe and Mail",
+            "score": 0.8185
           },
           {
             "headline": "Is Micron Technology Stock Going to $1,500? The Bull Case Is Stronger Than You Think.",
             "source": "Yahoo Finance",
-            "score": 0.655
+            "score": 0.776
           },
           {
-            "headline": "Why Micron (MU) Stock Is Falling Today",
-            "source": "StockStory",
-            "score": 0.4234
+            "headline": "Micron Stock Dip Is a Buying Opportunity, Analyst Says",
+            "source": "Barron's",
+            "score": 0.7107
           }
         ]
       }
@@ -965,7 +965,7 @@
       "unrealizedPlUsd": 130.95,
       "beta": -0.137,
       "atrStop": 354.1732,
-      "sentimentScore": 0.5058,
+      "sentimentScore": 0.5397,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -1017,9 +1017,9 @@
             "score": 0.5
           },
           {
-            "headline": "UnitedHealth Group (UNH) Stock Looks Reasonable On Earnings Yet Stretched On Broader Checks",
-            "source": "simplywall.st",
-            "score": 0.5
+            "headline": "1 Mooning Stock with Exciting Potential and 2 Facing Challenges",
+            "source": "StockStory",
+            "score": 0.7712
           },
           {
             "headline": "UnitedHealth (UNH) Stock Looks Reasonable Even After A 42% Gain",
@@ -1040,7 +1040,7 @@
       "unrealizedPlUsd": 22.64,
       "beta": -0.002,
       "atrStop": 78.7923,
-      "sentimentScore": 0.6311,
+      "sentimentScore": 0.6415,
       "sentimentLabel": "BULLISH",
       "detail": {
         "priceSpark": [
@@ -1092,14 +1092,14 @@
             "score": 0.4742
           },
           {
+            "headline": "Wells Fargo & Company $WFC Stock Holdings Decreased by Wilsey Asset Management Inc.",
+            "source": "MarketBeat",
+            "score": 0.7712
+          },
+          {
             "headline": "WFC Stock Rises as CFO Sees Stronger Q2 NII, Reaffirms $50B 2026 Target",
             "source": "Yahoo Finance",
             "score": 0.6909
-          },
-          {
-            "headline": "Wells Fargo (WFC) Stock Could Be 15% Undervalued After Fed Basel III Shift",
-            "source": "simplywall.st",
-            "score": 0.625
           }
         ]
       }
@@ -1741,7 +1741,7 @@
       },
       {
         "date": "2026-07-06",
-        "ddPct": 2.1371
+        "ddPct": 2.0079
       }
     ],
     "rollingSharpe": [
@@ -1871,7 +1871,7 @@
       },
       {
         "date": "2026-07-06",
-        "sharpe": -1.4596
+        "sharpe": 0.1776
       }
     ],
     "monthlyReturns": [
@@ -1889,7 +1889,7 @@
       },
       {
         "month": "2026-07",
-        "returnPct": -0.247
+        "returnPct": -0.0677
       }
     ],
     "returnDistribution": [
