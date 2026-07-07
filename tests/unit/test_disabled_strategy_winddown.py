@@ -203,11 +203,25 @@ class TestStaleOrderCancellationOrdering:
         i_cancel = src.find("self._cancel_stale_orders(")
         i_reconcile = src.find("self._reconcile_optimistic_fills(")
         i_winddown = src.find("self._winddown_inactive_strategy_positions(")
-        i_stops = src.find("self.check_stop_losses(")
-
+        # Stop-loss checks were extracted into _run_defensive_stop_losses so the
+        # duplicate-run guard's early-return branch can also invoke them
+        # unconditionally (regression: stop-losses must fire even on a
+        # detected duplicate run, since it may be the only pass today that
+        # sees a price move past a stop level). That means the FIRST call
+        # site in source order is the duplicate-guard's — intentionally
+        # before _cancel_stale_orders. The ordering invariant this test
+        # guards applies to the main-path call, i.e. the occurrence at/after
+        # i_cancel.
         assert i_cancel != -1, "_cancel_stale_orders no longer called in run()"
+        i_stops_guard = src.find("self._run_defensive_stop_losses(")
+        assert i_stops_guard != -1, "stop-loss check no longer called in run()"
+        assert i_stops_guard < i_cancel, (
+            "duplicate-run guard must call _run_defensive_stop_losses before "
+            "_cancel_stale_orders (it returns early and never reaches it)"
+        )
+        i_stops = src.find("self._run_defensive_stop_losses(", i_cancel)
+        assert i_stops != -1, "main-path stop-loss check no longer called in run()"
         assert i_winddown != -1, "wind-down no longer called in run()"
-        assert i_stops != -1, "stop-loss check no longer called in run()"
         assert i_reconcile != -1, "_reconcile_optimistic_fills no longer called in run()"
 
         # Cancellation + optimistic-fill reconciliation must precede BOTH
