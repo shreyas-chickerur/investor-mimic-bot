@@ -18,11 +18,15 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from scripts.post_run_expect import (
+    EXIT_ALL_OK,
+    EXIT_CRITICAL,
+    EXIT_HIGH_ONLY,
     check_order_fill_rate,
     check_portfolio_value,
     check_reconciliation,
     check_signals_generated,
     check_sweep_deploying,
+    exit_code_from_report,
 )
 
 
@@ -228,3 +232,46 @@ def test_fill_rate_skips_when_too_few_orders(sweep_conn):
     sweep_conn.commit()
     ok, _ = check_order_fill_rate(sweep_conn, "2026-06-30")
     assert ok  # not enough data → do not flag
+
+
+# ---------------------------------------------------------------------------
+# Exit-code contract — consumed by daily_trading.yml's health gate. A HIGH-only
+# failure (exit 2, e.g. fill rate low for a few days after a fix) must NOT fail
+# the workflow job; only a CRITICAL failure (exit 1) may. Regression for
+# 2026-07-07 where a HIGH finding produced a false "workflow failed" email and
+# tripped the backup-cron into re-running the whole pipeline.
+# ---------------------------------------------------------------------------
+
+
+def test_exit_code_all_ok():
+    assert exit_code_from_report({"critical_failures": 0, "high_failures": 0}) == EXIT_ALL_OK
+
+
+def test_exit_code_high_only_is_two_not_one():
+    # HIGH-only must be exit 2 (non-fatal to the job), never 1.
+    assert exit_code_from_report({"critical_failures": 0, "high_failures": 3}) == EXIT_HIGH_ONLY
+
+
+def test_exit_code_critical_takes_precedence():
+    # A critical failure is fatal even if highs are also present.
+    assert exit_code_from_report({"critical_failures": 1, "high_failures": 3}) == EXIT_CRITICAL
+
+
+def test_exit_code_missing_keys_default_ok():
+    assert exit_code_from_report({}) == EXIT_ALL_OK
+
+
+def test_workflow_expect_check_step_does_not_fail_job_on_exit_two():
+    """The daily_trading.yml expect_check step must treat exit code 2 as pass.
+
+    Guards the fix: the step captures the script's exit code and only fails
+    (exit 1) when the code is neither 0 nor 2, so a HIGH-only finding can't
+    fail the job or fool the backup-cron dedup gate.
+    """
+    wf = Path(__file__).parent.parent.parent / ".github/workflows/daily_trading.yml"
+    text = wf.read_text()
+    # The step must special-case exit code 2 alongside 0 (i.e. not blindly
+    # propagate any non-zero as failure).
+    assert (
+        '"$EXIT_CODE" -ne 2' in text
+    ), "expect_check step must exempt exit code 2 (HIGH-only) from failing the job"

@@ -496,6 +496,32 @@ def send_alert(report: dict, db_path: str = "trading.db") -> None:
 
 
 # ---------------------------------------------------------------------------
+# Exit-code contract
+# ---------------------------------------------------------------------------
+
+# Exit-code contract (consumed by daily_trading.yml's "Post-run expectation
+# check" step, which fails the job on 1 but NOT on 2):
+#   0 = all expectations met
+#   1 = one or more CRITICAL expectations failed → the run is untrustworthy,
+#       fail the workflow job
+#   2 = only HIGH/medium expectations failed (all critical passed) → surfaced
+#       as an alert email + YELLOW in run_health, but must NOT fail the job
+#       (e.g. fill rate reading low for a few days right after a fix deploys)
+EXIT_ALL_OK = 0
+EXIT_CRITICAL = 1
+EXIT_HIGH_ONLY = 2
+
+
+def exit_code_from_report(report: dict) -> int:
+    """Map a run_checks() report to the process exit code (see contract above)."""
+    if report.get("critical_failures", 0) > 0:
+        return EXIT_CRITICAL
+    if report.get("high_failures", 0) > 0:
+        return EXIT_HIGH_ONLY
+    return EXIT_ALL_OK
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
@@ -530,12 +556,7 @@ def main() -> int:
     if not args.no_email and not report["all_ok"]:
         send_alert(report, db_path=args.db)
 
-    # Exit codes: 0=all ok, 1=critical failure, 2=high failure only
-    if report["critical_failures"] > 0:
-        return 1
-    if report["high_failures"] > 0:
-        return 2
-    return 0
+    return exit_code_from_report(report)
 
 
 if __name__ == "__main__":
