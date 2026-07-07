@@ -25,7 +25,6 @@ risk:
   stop_loss_atr_multiplier: 2.5  # Default / normal-vol multiplier
   stop_loss_atr_multiplier_low_vol: 3.0  # Wider in low vol — avoid noise stop-outs in chop
   stop_loss_atr_multiplier_high_vol: 2.0  # Tighter in high vol — protect against fast moves
-  trailing_stop_atr_multiplier: 3.0  # 3x ATR for trailing stop (legacy)
   # Ratchet trailing: lock in profits as winners run
   trailing_breakeven_atr: 1.0  # +1×ATR open profit → ratchet stop to entry
   trailing_lock_atr: 2.0       # +2×ATR open profit → ratchet stop to entry +1×ATR
@@ -293,9 +292,14 @@ paper_trading:
   min_duration_days: 14  # Minimum 2 weeks
   log_all_signals: true
   log_rejected_signals: true
+  # Go-live readiness (closed-trade count, days-running) must be measured from
+  # when orders actually started filling, not from account inception. Before
+  # this date ALL orders used OPG time-in-force and ~87% expired unfilled, so
+  # trades/days before it are not evidence of a working system (see execution
+  # failure 2026-07-02 / the DAY-order fix, c488ae8). Bump this only if the
+  # order-fill mechanism changes again in a way that resets the clock.
+  live_readiness_track_since: '2026-07-02'
 
 # Database
 database:
   path: "trading.db"
-  backup_frequency_days: 7
-  vacuum_frequency_days: 30
