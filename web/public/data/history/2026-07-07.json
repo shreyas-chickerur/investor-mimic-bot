@@ -1,32 +1,32 @@
 {
   "meta": {
-    "generatedAt": "2026-07-07T05:49:33.732215Z",
+    "generatedAt": "2026-07-07T10:43:45.103654Z",
     "tradingDate": "2026-07-07",
     "runId": "20260707_054858_77fp",
-    "runNumber": 240,
+    "runNumber": 241,
     "paper": true,
     "schemaVersion": 1
   },
   "portfolio": {
     "totalValue": 95869.67,
     "cash": 20501.53,
-    "positionsCount": 13,
-    "todayChangeUsd": 33.13,
-    "todayChangePct": 0.0346,
+    "positionsCount": 10,
+    "todayChangeUsd": 101.65,
+    "todayChangePct": 0.106,
     "allTimePnlUsd": -4130.33,
     "allTimePnlPct": -4.1303,
     "spyTodayPct": 0.8727,
-    "vsSpyPct": -0.8381,
-    "sharpe": -1.4231,
-    "sortino": -1.6301,
+    "vsSpyPct": -0.7667,
+    "sharpe": -1.3609,
+    "sortino": -1.5608,
     "maxDrawdownPct": 3.6642,
-    "volatilityPct": 4.8018,
+    "volatilityPct": 4.8076,
     "winRatePct": 29.03,
     "profitFactor": 0.8107,
     "closedTradesCount": 31,
     "regime": "NORMAL",
     "heatCapPct": 40,
-    "exposurePct": 78.62
+    "exposurePct": 78.64
   },
   "equityCurve": [
     {
@@ -336,7 +336,7 @@
     },
     {
       "date": "2026-07-07",
-      "value": 95869.67,
+      "value": 95971.32,
       "spy": 104539.0
     }
   ],
@@ -630,141 +630,6 @@
   ],
   "positions": [
     {
-      "symbol": "CSCO",
-      "strategy": "RSI Mean Reversion",
-      "direction": "long",
-      "shares": 8.0,
-      "value": 911.84,
-      "costBasis": 912.3,
-      "unrealizedPlPct": -0.05,
-      "unrealizedPlUsd": -0.46,
-      "beta": 1.275,
-      "atrStop": 104.0314,
-      "sentimentScore": 0.5262,
-      "sentimentLabel": "NEUTRAL",
-      "detail": {
-        "priceSpark": [
-          121.64,
-          124.15,
-          120.36,
-          118.8,
-          121.83,
-          121.1,
-          120.17,
-          119.57,
-          117.33,
-          119.54,
-          121.53,
-          121.15,
-          119.73,
-          118.97,
-          113.77,
-          117.7,
-          117.46,
-          117.01,
-          112.69,
-          113.98
-        ],
-        "confidence": 0.13,
-        "sentimentMultiplier": "\u00d71.00",
-        "whyHeld": "RSI 36.3 < 38 (oversold), slope +4.28 (turning up), vol_ratio 0.9x (normal)",
-        "lots": [
-          {
-            "date": "2026-07-06",
-            "shares": 8.0,
-            "price": 114.037
-          }
-        ],
-        "news": [
-          {
-            "headline": "CSCO Stock Soars To Record Highs Amid Expectation Beating Guidance, Job Cut Announcement",
-            "source": "Stocktwits",
-            "score": 0.1875
-          },
-          {
-            "headline": "Cisco (CSCO) Stock Surges 46% in 2026: AI Infrastructure Growth, Earnings, and Outlook",
-            "source": "TradingKey",
-            "score": 0.6909
-          },
-          {
-            "headline": "The Wide-Open Possibilities The Options Market Sees In Cisco Stock",
-            "source": "Trefis",
-            "score": 0.5
-          }
-        ]
-      }
-    },
-    {
-      "symbol": "GIS",
-      "strategy": "Earnings Drift",
-      "direction": "long",
-      "shares": 29.0,
-      "value": 1047.48,
-      "costBasis": 1048.0,
-      "unrealizedPlPct": -0.05,
-      "unrealizedPlUsd": -0.52,
-      "beta": -0.483,
-      "atrStop": 33.3339,
-      "sentimentScore": 0.5381,
-      "sentimentLabel": "NEUTRAL",
-      "detail": {
-        "priceSpark": [
-          33.15,
-          33.14,
-          33.72,
-          33.82,
-          33.82,
-          34.51,
-          34.27,
-          34.4,
-          33.36,
-          33.42,
-          33.34,
-          34.43,
-          34.8,
-          35.4,
-          36.01,
-          36.38,
-          34.8,
-          37.77,
-          37.57,
-          36.12
-        ],
-        "confidence": 1.0,
-        "sentimentMultiplier": "\u00d71.00",
-        "whyHeld": "PEAD (proxy): +8.5% surprise 3d ago, vol spike 2.5x",
-        "lots": [
-          {
-            "date": "2026-07-01",
-            "shares": 28.0,
-            "price": 37.7889
-          },
-          {
-            "date": "2026-07-06",
-            "shares": 29.0,
-            "price": 36.1381
-          }
-        ],
-        "news": [
-          {
-            "headline": "General Mills Earnings And A Tough Road Ahead (NYSE:GIS)",
-            "source": "Seeking Alpha",
-            "score": 0.436
-          },
-          {
-            "headline": "General Mills (NYSE: GIS) CHRO logs minor tax-withholding share disposition",
-            "source": "Stock Titan",
-            "score": 0.648
-          },
-          {
-            "headline": "Is General Mills Inc (GIS) a Bargain After 3.9% Drop? GF Value S",
-            "source": "GuruFocus",
-            "score": 0.6366
-          }
-        ]
-      }
-    },
-    {
       "symbol": "HD",
       "strategy": "MA Crossover",
       "direction": "long",
@@ -832,8 +697,8 @@
             "score": 0.5
           },
           {
-            "headline": "Home Depot Inc Stock (HD) Moved Up by 3.38% on Jun 24: What Investors Need To Know",
-            "source": "TradingKey",
+            "headline": "Home Depot(HD) Stock Options Chain | Quotes & News",
+            "source": "Moomoo",
             "score": 0.5
           }
         ]
@@ -850,7 +715,7 @@
       "unrealizedPlUsd": 53.96,
       "beta": 0.515,
       "atrStop": 334.4155,
-      "sentimentScore": 0.4675,
+      "sentimentScore": 0.4735,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -887,19 +752,19 @@
         ],
         "news": [
           {
-            "headline": "MSFT Stock Layoffs: What to Know as Microsoft Cuts Jobs in Xbox Unit",
+            "headline": "Microsoft Stock (MSFT) Gets a Price Target Cut as Capex Worries Intensify",
+            "source": "TipRanks",
+            "score": 0.2003
+          },
+          {
+            "headline": "Got $1,000? Why Microsoft's Drop to a 52-Week Low Is a Screaming Buy for Long-Term Investors",
             "source": "Yahoo Finance",
-            "score": 0.352
+            "score": 0.1498
           },
           {
             "headline": "Are You Missing The Real Story In Microsoft Stock?",
             "source": "Forbes",
             "score": 0.352
-          },
-          {
-            "headline": "Microsoft Q4 Preview: Azure And AI Investments Focal Points As Shares Lag Behind (MSFT)",
-            "source": "Seeking Alpha",
-            "score": 0.4742
           }
         ]
       }
@@ -915,7 +780,7 @@
       "unrealizedPlUsd": -170.12,
       "beta": 4.482,
       "atrStop": 902.3836,
-      "sentimentScore": 0.5197,
+      "sentimentScore": 0.5324,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -962,74 +827,9 @@
             "score": 0.6366
           },
           {
-            "headline": "Could This AI Chip Stock Be the Next Micron?",
-            "source": "The Motley Fool",
-            "score": 0.4119
-          }
-        ]
-      }
-    },
-    {
-      "symbol": "QCOM",
-      "strategy": "RSI Mean Reversion",
-      "direction": "long",
-      "shares": 5.0,
-      "value": 932.4,
-      "costBasis": 932.87,
-      "unrealizedPlPct": -0.05,
-      "unrealizedPlUsd": -0.47,
-      "beta": 3.6,
-      "atrStop": 146.811,
-      "sentimentScore": 0.5847,
-      "sentimentLabel": "NEUTRAL",
-      "detail": {
-        "priceSpark": [
-          215.94,
-          217.77,
-          205.42,
-          191.2,
-          202.96,
-          211.72,
-          220.81,
-          214.07,
-          212.97,
-          226.11,
-          221.9,
-          204.13,
-          197.41,
-          204.9,
-          189.39,
-          188.72,
-          184.79,
-          181.92,
-          176.25,
-          186.48
-        ],
-        "confidence": 0.13,
-        "sentimentMultiplier": "\u00d71.00",
-        "whyHeld": "RSI 38.0 < 38 (oversold), slope +0.88 (turning up), vol_ratio 0.7x (normal)",
-        "lots": [
-          {
-            "date": "2026-07-06",
-            "shares": 5.0,
-            "price": 186.5732
-          }
-        ],
-        "news": [
-          {
-            "headline": "Qualcomm acquires AI software startup Modular for $3.9 billion",
-            "source": "qz.com",
-            "score": 0.5
-          },
-          {
-            "headline": "Qualcomm Stock: Not The Next AI Darling (Rating Downgrade) (NASDAQ:QCOM)",
-            "source": "Seeking Alpha",
-            "score": 0.793
-          },
-          {
-            "headline": "Benchmark reaffirms Qualcomm stock rating citing data center growth",
-            "source": "Investing.com",
-            "score": 0.6909
+            "headline": "MU, SNDK, WDC Stocks Fall Premarket: Samsung, SK Hynix Briefly Drag South Korea's Kospi Into Brief Bear",
+            "source": "Yahoo Finance",
+            "score": 0.3869
           }
         ]
       }
@@ -1038,14 +838,14 @@
       "symbol": "SPY",
       "strategy": "Cash Sweep",
       "direction": "long",
-      "shares": 95.0,
-      "value": 71371.6,
-      "costBasis": 71452.5,
+      "shares": 91.0,
+      "value": 68366.48,
+      "costBasis": 68443.97,
       "unrealizedPlPct": -0.1132,
       "unrealizedPlUsd": -80.9,
       "beta": 1.0,
       "atrStop": 708.6321,
-      "sentimentScore": 0.6002,
+      "sentimentScore": 0.5322,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -1147,19 +947,19 @@
         ],
         "news": [
           {
-            "headline": "As SPY Nears Best Month Since 2020, These Three Stocks Stole The Show In April",
-            "source": "Stocktwits",
-            "score": 0.8185
-          },
-          {
             "headline": "Which S&P 500 ETF Is Better in 2026? State Street's SPY or iShares' IVV?",
             "source": "Yahoo Finance",
             "score": 0.752
           },
           {
-            "headline": "Which S&P 500 ETF Is Better in 2026? State Street's SPY or iShares' IVV?",
-            "source": "The Motley Fool",
-            "score": 0.6512
+            "headline": "Responsive Playbooks and the SPY Inflection",
+            "source": "Stock Traders Daily",
+            "score": 0.6806
+          },
+          {
+            "headline": "Small Cap Stocks Trading At 52-Week High",
+            "source": "Trefis",
+            "score": 0.5
           }
         ]
       }
@@ -1175,7 +975,7 @@
       "unrealizedPlUsd": 105.3,
       "beta": -0.128,
       "atrStop": 354.1732,
-      "sentimentScore": 0.5854,
+      "sentimentScore": 0.5578,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -1222,9 +1022,9 @@
         ],
         "news": [
           {
-            "headline": "UnitedHealth Group (UNH) Stock Analysis: Navigating Market Challenges with Strategic Growth",
-            "source": "DirectorsTalk Interviews",
-            "score": 0.7202
+            "headline": "How Investors May Respond To UnitedHealth Group (UNH) Covering Guardant\u2019s Shield Blood Test For Colon Cancer",
+            "source": "simplywall.st",
+            "score": 0.1702
           },
           {
             "headline": "UnitedHealth Group (UNH) Stock Declines While Market Improves: Some Information for Investors",
@@ -1232,9 +1032,9 @@
             "score": 0.7107
           },
           {
-            "headline": "New Analyst Forecast: $UNH Given $380 Price Target",
-            "source": "Quiver Quantitative",
-            "score": 0.5
+            "headline": "UNH Stock Gains Retail Attention: This UnitedHealth Move Could Make Getting Treatment Faster",
+            "source": "Stocktwits",
+            "score": 0.67
           }
         ]
       }
@@ -1250,7 +1050,7 @@
       "unrealizedPlUsd": 39.25,
       "beta": -0.168,
       "atrStop": 78.7923,
-      "sentimentScore": 0.6575,
+      "sentimentScore": 0.6631,
       "sentimentLabel": "BULLISH",
       "detail": {
         "priceSpark": [
@@ -1302,14 +1102,14 @@
             "score": 0.7553
           },
           {
+            "headline": "RDDT Stock Plunges After Hours On S&P 500 Exclusion: But Wells Fargo Forecasts $550M AI Deal Jackpot",
+            "source": "Stocktwits",
+            "score": 0.6131
+          },
+          {
             "headline": "Wells Fargo Completes 2026 Stress Test and Intends to Raise Dividend by 11% to $0.50",
             "source": "wellsfargo.com",
             "score": 0.3988
-          },
-          {
-            "headline": "Wells Fargo & Company $WFC Stock Holdings Decreased by Wilsey Asset Management Inc.",
-            "source": "MarketBeat",
-            "score": 0.7712
           }
         ]
       }
@@ -1722,7 +1522,7 @@
         "symbol": "AMAT",
         "strategy": "Dual Momentum",
         "confidence": 0.6707,
-        "sentimentScore": 0.5998,
+        "sentimentScore": 0.5774,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +165.5%, rank 5/121"
@@ -1731,7 +1531,7 @@
         "symbol": "LRCX",
         "strategy": "Dual Momentum",
         "confidence": 0.673,
-        "sentimentScore": 0.5278,
+        "sentimentScore": 0.5575,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +249.5%, rank 4/121"
@@ -1740,7 +1540,7 @@
         "symbol": "AMD",
         "strategy": "Dual Momentum",
         "confidence": 0.6753,
-        "sentimentScore": 0.5369,
+        "sentimentScore": 0.5154,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +291.7%, rank 3/121"
@@ -1749,7 +1549,7 @@
         "symbol": "INTC",
         "strategy": "Dual Momentum",
         "confidence": 0.6777,
-        "sentimentScore": 0.5362,
+        "sentimentScore": 0.5501,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +415.1%, rank 2/121"
@@ -1758,7 +1558,7 @@
         "symbol": "VRTX",
         "strategy": "Sector Rotation",
         "confidence": 0.5439,
-        "sentimentScore": 0.5568,
+        "sentimentScore": 0.5764,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Sector rotation: XLV rank #2 (+6.5% 20d), VRTX 20d ret +19.9%"
@@ -1767,7 +1567,7 @@
         "symbol": "SCHW",
         "strategy": "Sector Rotation",
         "confidence": 0.5611,
-        "sentimentScore": 0.5674,
+        "sentimentScore": 0.5568,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Sector rotation: XLF rank #1 (+7.6% 20d), SCHW 20d ret +14.3%"
@@ -1776,7 +1576,7 @@
         "symbol": "ISRG",
         "strategy": "Volatility Breakout",
         "confidence": 0.5052,
-        "sentimentScore": 0.5679,
+        "sentimentScore": 0.5836,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "BB breakout: close 432.83 > upper 431.40 (vol spike 1.3x, 5d ret 7.0%)"
@@ -1785,7 +1585,7 @@
         "symbol": "WM",
         "strategy": "MA Crossover",
         "confidence": 0.4309,
-        "sentimentScore": 0.3528,
+        "sentimentScore": 0.3762,
         "multiplier": "\u00d70.80",
         "status": "FILTERED",
         "reason": "Golden cross: SMA20 (221.00) > SMA50 (220.29), ADX 20.1 | news -0.35"
@@ -1803,7 +1603,7 @@
         "symbol": "MDT",
         "strategy": "MA Crossover",
         "confidence": 0.6127,
-        "sentimentScore": 0.5666,
+        "sentimentScore": 0.6107,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Golden cross: SMA20 (80.49) > SMA50 (79.04), ADX 20.3"
@@ -1812,7 +1612,7 @@
         "symbol": "SCHW",
         "strategy": "MA Crossover",
         "confidence": 0.7535,
-        "sentimentScore": 0.5674,
+        "sentimentScore": 0.5568,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Golden cross: SMA20 (91.93) > SMA50 (90.51), ADX 36.5"
@@ -1830,7 +1630,7 @@
         "symbol": "FDX",
         "strategy": "Factor Momentum",
         "confidence": 0.99,
-        "sentimentScore": 0.4997,
+        "sentimentScore": 0.521,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Factor rank score 0.923 (top 1)"
@@ -1848,7 +1648,7 @@
         "symbol": "NKE",
         "strategy": "Earnings Drift",
         "confidence": 0.8193,
-        "sentimentScore": 0.5366,
+        "sentimentScore": 0.5291,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "PEAD (proxy): +4.9% surprise 3d ago, vol spike 3.1x"
@@ -1866,7 +1666,7 @@
         "symbol": "SPGI",
         "strategy": "Earnings Drift",
         "confidence": 0.8803,
-        "sentimentScore": 0.6003,
+        "sentimentScore": 0.5927,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "PEAD (proxy): +6.0% surprise 2d ago, vol spike 1.5x"
@@ -1875,7 +1675,7 @@
         "symbol": "META",
         "strategy": "Earnings Drift",
         "confidence": 1.0,
-        "sentimentScore": 0.4848,
+        "sentimentScore": 0.47,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "PEAD (proxy): +8.8% surprise 3d ago, vol spike 2.5x"
@@ -1884,7 +1684,7 @@
         "symbol": "GIS",
         "strategy": "Earnings Drift",
         "confidence": 1.0,
-        "sentimentScore": 0.5381,
+        "sentimentScore": 0.5012,
         "multiplier": "\u00d71.00",
         "status": "EXECUTED",
         "reason": "PEAD (proxy): +8.5% surprise 3d ago, vol spike 2.5x"
@@ -1893,7 +1693,7 @@
         "symbol": "QCOM",
         "strategy": "RSI Mean Reversion",
         "confidence": 0.13,
-        "sentimentScore": 0.5847,
+        "sentimentScore": 0.5987,
         "multiplier": "\u00d71.00",
         "status": "EXECUTED",
         "reason": "RSI 38.0 < 38 (oversold), slope +0.88 (turning up), vol_ratio 0.7x (normal)"
@@ -1902,7 +1702,7 @@
         "symbol": "CSCO",
         "strategy": "RSI Mean Reversion",
         "confidence": 0.13,
-        "sentimentScore": 0.5262,
+        "sentimentScore": 0.5623,
         "multiplier": "\u00d71.00",
         "status": "EXECUTED",
         "reason": "RSI 36.3 < 38 (oversold), slope +4.28 (turning up), vol_ratio 0.9x (normal)"
@@ -2157,7 +1957,7 @@
       },
       {
         "date": "2026-07-07",
-        "ddPct": 2.0289
+        "ddPct": 1.9251
       }
     ],
     "rollingSharpe": [
@@ -2291,7 +2091,7 @@
       },
       {
         "date": "2026-07-07",
-        "sharpe": 0.4703
+        "sharpe": 1.0351
       }
     ],
     "monthlyReturns": [
@@ -2309,7 +2109,7 @@
       },
       {
         "month": "2026-07",
-        "returnPct": -0.0332
+        "returnPct": 0.0382
       }
     ],
     "returnDistribution": [
