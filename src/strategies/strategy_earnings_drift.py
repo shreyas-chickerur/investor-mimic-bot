@@ -292,7 +292,12 @@ class EarningsDriftStrategy(TradingStrategy):
                     )
                     continue
                 surprise_mag = abs(event["event_return"]) if event else self.min_surprise_return
-                confidence = min(0.90, 0.55 + surprise_mag * 4)
+                # Calendar-confirmed entries are the more reliable signal (known
+                # earnings date, not inferred from price/volume), so their
+                # confidence cap must sit at or above the proxy path's — it
+                # previously capped lower (0.90 vs proxy's 0.95), inverting the
+                # intended reliability ordering at high surprise magnitudes.
+                confidence = min(0.95, 0.55 + surprise_mag * 4)
                 reasoning = f"PEAD (calendar): earnings reported, entry within {self.calendar_entry_window_days}d window"
                 if event:
                     reasoning += f', {event["event_return"]:+.1%} day-of move'
@@ -303,7 +308,7 @@ class EarningsDriftStrategy(TradingStrategy):
                 if event is None or event["direction"] != "positive":
                     continue
                 surprise_mag = abs(event["event_return"])
-                confidence = min(0.95, 0.5 + surprise_mag * 5)
+                confidence = min(0.90, 0.5 + surprise_mag * 5)
                 reasoning = (
                     f'PEAD (proxy): +{event["event_return"]:.1%} surprise {event["days_ago"]}d ago, '
                     f'vol spike {event["volume_ratio"]:.1f}x'
