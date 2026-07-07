@@ -6,7 +6,7 @@
 	clean clean-all clean-cache format lint type-check \
 	dev-setup dev-test dev-run \
 	web-mock web-mock-healthy web-mock-recovered web-mock-needs-action web-export web-validate \
-	web-dev web-dev-live snapshot snapshot-mock expect-check
+	web-dev web-dev-live snapshot snapshot-mock expect-check monitor dump-emails live-readiness
 
 # Default target
 .DEFAULT_GOAL := help
@@ -409,3 +409,15 @@ diagnose:
 diagnose-local:
 	@echo "$(BLUE)🩺 Platform diagnosis (local trading.db only)...$(NC)"
 	@python3 scripts/diagnose.py --no-gha
+
+monitor:
+	@echo "$(BLUE)📡 Daily run monitor (downloads latest artifact, checks tracked metrics)...$(NC)"
+	@python3 scripts/monitor_daily_run.py
+
+live-readiness:
+	@echo "$(BLUE)🚦 Live-trading readiness gate (strict statistical + recon criteria)...$(NC)"
+	@python3 scripts/adhoc/check_live_readiness.py --db trading.db
+
+dump-emails:
+	@echo "$(BLUE)📧 Dumping notification_outbox emails to local HTML archive...$(NC)"
+	@python3 scripts/dump_sent_emails.py --db trading.db
