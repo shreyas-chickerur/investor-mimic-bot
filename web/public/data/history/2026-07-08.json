@@ -1,32 +1,32 @@
 {
   "meta": {
-    "generatedAt": "2026-07-08T05:49:22.549882Z",
+    "generatedAt": "2026-07-08T10:02:42.149111Z",
     "tradingDate": "2026-07-08",
     "runId": "20260708_054852_fwd9",
-    "runNumber": 242,
+    "runNumber": 243,
     "paper": true,
     "schemaVersion": 1
   },
   "portfolio": {
     "totalValue": 95626.86,
     "cash": 15161.66,
-    "positionsCount": 14,
-    "todayChangeUsd": -158.34,
-    "todayChangePct": -0.1653,
+    "positionsCount": 13,
+    "todayChangeUsd": -714.56,
+    "todayChangePct": -0.7472,
     "allTimePnlUsd": -4373.14,
     "allTimePnlPct": -4.3731,
     "spyTodayPct": -0.4752,
-    "vsSpyPct": 0.3099,
-    "sharpe": -1.4862,
-    "sortino": -1.702,
+    "vsSpyPct": -0.272,
+    "sharpe": -1.8934,
+    "sortino": -2.1335,
     "maxDrawdownPct": 3.6642,
-    "volatilityPct": 4.7773,
+    "volatilityPct": 4.9794,
     "winRatePct": 29.03,
     "profitFactor": 0.8107,
     "closedTradesCount": 31,
     "regime": "NORMAL",
     "heatCapPct": 40,
-    "exposurePct": 84.14
+    "exposurePct": 84.03
   },
   "equityCurve": [
     {
@@ -341,7 +341,7 @@
     },
     {
       "date": "2026-07-08",
-      "value": 95626.86,
+      "value": 94912.3,
       "spy": 104042.25
     }
   ],
@@ -645,7 +645,7 @@
       "unrealizedPlUsd": -5.81,
       "beta": 0.516,
       "atrStop": 329.5471,
-      "sentimentScore": 0.524,
+      "sentimentScore": 0.5144,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -702,8 +702,8 @@
             "score": 0.5
           },
           {
-            "headline": "The Home Depot, Inc. $HD Stock Holdings Lessened by Burney Co.",
-            "source": "MarketBeat",
+            "headline": "Why Home Depot Stock Looks Mispriced After Its Q1 Margin Compression Results in 2026",
+            "source": "TIKR.com",
             "score": 0.5
           }
         ]
@@ -720,7 +720,7 @@
       "unrealizedPlUsd": 60.26,
       "beta": 0.509,
       "atrStop": 368.7543,
-      "sentimentScore": 0.5581,
+      "sentimentScore": 0.5453,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -767,9 +767,9 @@
             "score": 0.67
           },
           {
-            "headline": "Nasdaq Slides Nearly 2% As Higher Treasury Yields, Soaring Oil Prices Pressure Tech And Chip Stocks \u2014 META, AMZN, SPCX, MSFT In Focus",
-            "source": "TradingView",
-            "score": 0.4486
+            "headline": "Microsoft Q4 Preview: Azure And AI Investments Focal Points As Shares Lag Behind (MSFT)",
+            "source": "Seeking Alpha",
+            "score": 0.4742
           }
         ]
       }
@@ -785,7 +785,7 @@
       "unrealizedPlUsd": -216.49,
       "beta": 4.535,
       "atrStop": 902.3836,
-      "sentimentScore": 0.5332,
+      "sentimentScore": 0.5498,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -827,79 +827,14 @@
             "score": 0.3634
           },
           {
-            "headline": "Micron Stock Rises. Analyst Calls Latest Selloff a Buying Opportunity.",
-            "source": "Barron's",
-            "score": 0.7646
-          },
-          {
-            "headline": "Micron, Samsung, SK Hynix just dragged memory stocks into a bear market",
-            "source": "Yahoo Finance",
-            "score": 0.4742
-          }
-        ]
-      }
-    },
-    {
-      "symbol": "SPGI",
-      "strategy": "Earnings Drift",
-      "direction": "long",
-      "shares": 1.0,
-      "value": 443.46,
-      "costBasis": 443.68,
-      "unrealizedPlPct": -0.05,
-      "unrealizedPlUsd": -0.22,
-      "beta": -0.231,
-      "atrStop": 405.9008,
-      "sentimentScore": 0.5778,
-      "sentimentLabel": "NEUTRAL",
-      "detail": {
-        "priceSpark": [
-          417.09,
-          424.82,
-          426.38,
-          413.34,
-          418.91,
-          424.07,
-          433.25,
-          418.02,
-          410.92,
-          407.39,
-          400.16,
-          402.35,
-          395.14,
-          408.16,
-          387.946,
-          386.7116,
-          414.97,
-          439.89,
-          447.22,
-          443.46
-        ],
-        "confidence": 0.8802889365496291,
-        "sentimentMultiplier": "\u00d71.00",
-        "whyHeld": "PEAD (proxy): +6.0% surprise 3d ago, vol spike 1.5x",
-        "lots": [
-          {
-            "date": "2026-07-07",
-            "shares": 1.0,
-            "price": 443.6817
-          }
-        ],
-        "news": [
-          {
-            "headline": "1 Legally Protected Financial Monopoly to Buy Hand Over Fist and Hold for the Next 30 Years",
+            "headline": "Micron, SanDisk, and Western Digital Sink 7% as Samsung Earnings Spark a Memory Selloff",
             "source": "24/7 Wall St.",
-            "score": 0.879
+            "score": 0.6131
           },
           {
-            "headline": "S&P Global (SPGI) Reshapes Leadership And Operations, Is The Stock Fully Valued?",
+            "headline": "Why Micron Stock Just Crashed",
             "source": "Yahoo Finance",
-            "score": 0.7464
-          },
-          {
-            "headline": "How To Earn 8.1% On SPGI Stock And Set A 30% Safety Net",
-            "source": "Trefis",
-            "score": 0.7107
+            "score": 0.6635
           }
         ]
       }
@@ -915,7 +850,7 @@
       "unrealizedPlUsd": -422.96,
       "beta": 1.0,
       "atrStop": 708.6321,
-      "sentimentScore": 0.5443,
+      "sentimentScore": 0.5493,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -1022,13 +957,13 @@
             "score": 0.8185
           },
           {
-            "headline": "SPY is down 0.5% today, on INTC stock price movement",
-            "source": "Quiver Quantitative",
+            "headline": "37 S&P 500 Stocks Just Made New 52-Week Highs",
+            "source": "Trefis",
             "score": 0.5
           },
           {
-            "headline": "SPDR S&P 500 ETF (SPY) Stock Price | Quotes & News",
-            "source": "Moomoo",
+            "headline": "SPY is down 0.5% today, on INTC stock price movement",
+            "source": "Quiver Quantitative",
             "score": 0.5
           }
         ]
@@ -1120,7 +1055,7 @@
       "unrealizedPlUsd": 36.28,
       "beta": -0.176,
       "atrStop": 83.8819,
-      "sentimentScore": 0.683,
+      "sentimentScore": 0.6712,
       "sentimentLabel": "BULLISH",
       "detail": {
         "priceSpark": [
@@ -1177,9 +1112,9 @@
             "score": 0.3988
           },
           {
-            "headline": "WFC Stock Rises as CFO Sees Stronger Q2 NII, Reaffirms $50B 2026 Target",
-            "source": "Yahoo Finance",
-            "score": 0.6909
+            "headline": "Wells Fargo Stock (WFC) Opinions on Analyst Price Target Increases",
+            "source": "Quiver Quantitative",
+            "score": 0.625
           }
         ]
       }
@@ -1592,7 +1527,7 @@
         "symbol": "AMAT",
         "strategy": "Dual Momentum",
         "confidence": 0.6707,
-        "sentimentScore": 0.5227,
+        "sentimentScore": 0.5098,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +164.6%, rank 5/121"
@@ -1601,7 +1536,7 @@
         "symbol": "LRCX",
         "strategy": "Dual Momentum",
         "confidence": 0.673,
-        "sentimentScore": 0.5858,
+        "sentimentScore": 0.619,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +242.1%, rank 4/121"
@@ -1610,7 +1545,7 @@
         "symbol": "AMD",
         "strategy": "Dual Momentum",
         "confidence": 0.6753,
-        "sentimentScore": 0.5445,
+        "sentimentScore": 0.5212,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +279.4%, rank 3/121"
@@ -1619,7 +1554,7 @@
         "symbol": "INTC",
         "strategy": "Dual Momentum",
         "confidence": 0.6777,
-        "sentimentScore": 0.5204,
+        "sentimentScore": 0.5847,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +397.0%, rank 2/121"
@@ -1628,7 +1563,7 @@
         "symbol": "SCHW",
         "strategy": "Sector Rotation",
         "confidence": 0.5547,
-        "sentimentScore": 0.5746,
+        "sentimentScore": 0.5511,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Sector rotation: XLF rank #2 (+7.2% 20d), SCHW 20d ret +14.7%"
@@ -1646,8 +1581,8 @@
         "symbol": "WM",
         "strategy": "MA Crossover",
         "confidence": 0.5897,
-        "sentimentScore": 0.4052,
-        "multiplier": "\u00d71.00",
+        "sentimentScore": 0.3751,
+        "multiplier": "\u00d70.80",
         "status": "FILTERED",
         "reason": "Golden cross: SMA20 (221.84) > SMA50 (220.40), ADX 23.8"
       },
@@ -1691,7 +1626,7 @@
         "symbol": "MCD",
         "strategy": "Earnings Drift",
         "confidence": 0.7786,
-        "sentimentScore": 0.4771,
+        "sentimentScore": 0.4819,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "PEAD (proxy): +4.2% surprise 3d ago, vol spike 1.4x"
@@ -1968,7 +1903,7 @@
       },
       {
         "date": "2026-07-08",
-        "ddPct": 2.2771
+        "ddPct": 3.0073
       }
     ],
     "rollingSharpe": [
@@ -2106,7 +2041,7 @@
       },
       {
         "date": "2026-07-08",
-        "sharpe": -0.2942
+        "sharpe": -2.198
       }
     ],
     "monthlyReturns": [
@@ -2124,7 +2059,7 @@
       },
       {
         "month": "2026-07",
-        "returnPct": -0.1272
+        "returnPct": -0.7093
       }
     ],
     "returnDistribution": [
