@@ -1,32 +1,32 @@
 {
   "meta": {
-    "generatedAt": "2026-07-09T05:59:33.569421Z",
+    "generatedAt": "2026-07-09T10:53:24.247343Z",
     "tradingDate": "2026-07-09",
     "runId": "20260709_055901_z99r",
-    "runNumber": 244,
+    "runNumber": 245,
     "paper": true,
     "schemaVersion": 1
   },
   "portfolio": {
     "totalValue": 95744.3,
     "cash": 14720.7,
-    "positionsCount": 15,
-    "todayChangeUsd": 88.85,
-    "todayChangePct": 0.0929,
+    "positionsCount": 14,
+    "todayChangeUsd": -194.03,
+    "todayChangePct": -0.2027,
     "allTimePnlUsd": -4255.7,
     "allTimePnlPct": -4.2557,
     "spyTodayPct": -0.3089,
-    "vsSpyPct": 0.4018,
-    "sharpe": -1.8021,
-    "sortino": -2.0334,
+    "vsSpyPct": 0.1062,
+    "sharpe": -2.0357,
+    "sortino": -2.2892,
     "maxDrawdownPct": 3.6642,
-    "volatilityPct": 4.947,
+    "volatilityPct": 4.9511,
     "winRatePct": 29.03,
     "profitFactor": 0.8107,
     "closedTradesCount": 31,
     "regime": "NORMAL",
     "heatCapPct": 40,
-    "exposurePct": 84.62
+    "exposurePct": 84.59
   },
   "equityCurve": [
     {
@@ -346,7 +346,7 @@
     },
     {
       "date": "2026-07-09",
-      "value": 95744.3,
+      "value": 95550.27,
       "spy": 103720.81
     }
   ],
@@ -640,71 +640,6 @@
   ],
   "positions": [
     {
-      "symbol": "CMG",
-      "strategy": "MA Crossover",
-      "direction": "long",
-      "shares": 11.0,
-      "value": 367.73,
-      "costBasis": 367.91,
-      "unrealizedPlPct": -0.05,
-      "unrealizedPlUsd": -0.18,
-      "beta": -0.065,
-      "atrStop": 30.5904,
-      "sentimentScore": 0.5291,
-      "sentimentLabel": "NEUTRAL",
-      "detail": {
-        "priceSpark": [
-          29.88,
-          30.42,
-          31.25,
-          32.23,
-          32.73,
-          32.61,
-          31.86,
-          32.49,
-          30.54,
-          30.95,
-          31.69,
-          32.28,
-          33.34,
-          32.97,
-          34.0,
-          35.0,
-          35.39,
-          33.98,
-          34.35,
-          33.43
-        ],
-        "confidence": 0.5901071618503254,
-        "sentimentMultiplier": "\u00d71.00",
-        "whyHeld": "Golden cross: SMA20 (32.57) > SMA50 (32.24), ADX 29.4",
-        "lots": [
-          {
-            "date": "2026-07-08",
-            "shares": 11.0,
-            "price": 33.4467
-          }
-        ],
-        "news": [
-          {
-            "headline": "Chipotle Mexican Grill (CMG) Heads Into Earnings As Its Growth Story Tests Valuation",
-            "source": "simplywall.st",
-            "score": 0.6909
-          },
-          {
-            "headline": "Why the Market Dipped But Chipotle Mexican Grill (CMG) Gained Today",
-            "source": "Yahoo Finance",
-            "score": 0.7633
-          },
-          {
-            "headline": "Chipotle (NYSE: CMG) adds Albert Baldocchi to Audit & Risk Committee",
-            "source": "Stock Titan",
-            "score": 0.3634
-          }
-        ]
-      }
-    },
-    {
       "symbol": "HD",
       "strategy": "MA Crossover",
       "direction": "long",
@@ -715,7 +650,7 @@
       "unrealizedPlUsd": -14.81,
       "beta": 0.541,
       "atrStop": 329.5471,
-      "sentimentScore": 0.4808,
+      "sentimentScore": 0.4715,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -772,8 +707,8 @@
             "score": 0.5
           },
           {
-            "headline": "Home Depot Stock and Retail Peers Facing a Key Consumer Spending Test",
-            "source": "simplywall.st",
+            "headline": "Greenwood Capital Associates LLC Reduces Stock Position in The Home Depot, Inc. $HD",
+            "source": "MarketBeat",
             "score": 0.5
           }
         ]
@@ -790,7 +725,7 @@
       "unrealizedPlUsd": 43.76,
       "beta": 0.52,
       "atrStop": 368.7543,
-      "sentimentScore": 0.5135,
+      "sentimentScore": 0.4904,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -827,14 +762,14 @@
         ],
         "news": [
           {
-            "headline": "Microsoft (MSFT) Launches $2.5 Billion Frontier Company For Enterprise AI Push",
-            "source": "simplywall.st",
-            "score": 0.5
+            "headline": "Microsoft: 3 Signals That Could End The AI CapEx Fear (Rating Upgrade) (NASDAQ:MSFT)",
+            "source": "Seeking Alpha",
+            "score": 0.253
           },
           {
             "headline": "Is Microsoft Corporation (MSFT) the Best Software Stocks to Buy in 2026?",
             "source": "Yahoo Finance",
-            "score": 0.8264
+            "score": 0.8185
           },
           {
             "headline": "Xbox Is the Biggest Casualty in a New Round of Microsoft Layoffs. What This Means for MSFT Stock.",
@@ -897,13 +832,13 @@
             "score": 0.5405
           },
           {
-            "headline": "Citi Just Placed Micron on an Upside Catalyst Watch. What This Means for MU Stock.",
-            "source": "Yahoo Finance",
+            "headline": "Micron Stock Steadies After Memory Selloff, BofA Says It\u2019s Time to Buy",
+            "source": "Barron's",
             "score": 0.5
           },
           {
-            "headline": "Micron & 2 Momentum Stocks to Buy in July for Explosive Upside",
-            "source": "Zacks Investment Research",
+            "headline": "Citi Just Placed Micron on an Upside Catalyst Watch. What This Means for MU Stock.",
+            "source": "Yahoo Finance",
             "score": 0.5
           }
         ]
@@ -920,7 +855,7 @@
       "unrealizedPlUsd": -642.41,
       "beta": 1.0,
       "atrStop": 708.6321,
-      "sentimentScore": 0.5657,
+      "sentimentScore": 0.5476,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -1022,18 +957,18 @@
         ],
         "news": [
           {
-            "headline": "S&P 500 Shows Strength as Market Breadth Expands",
-            "source": "GuruFocus",
-            "score": 0.7787
-          },
-          {
-            "headline": "16 Stocks Just Touched 52-Week Lows",
+            "headline": "1 S&P 500 Stock Just Touched 52-Week Lows",
             "source": "Trefis",
             "score": 0.3988
           },
           {
             "headline": "SPDR S&P 500 ETF (SPY) Stock Price | Quotes & News",
             "source": "Moomoo",
+            "score": 0.5
+          },
+          {
+            "headline": "Will the SPDR S&P 500 ETF (SPY) Stock Hit $800 in 2026?",
+            "source": "AOL.com",
             "score": 0.5
           }
         ]
@@ -1050,7 +985,7 @@
       "unrealizedPlUsd": 128.13,
       "beta": -0.148,
       "atrStop": 354.1732,
-      "sentimentScore": 0.5786,
+      "sentimentScore": 0.5496,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -1125,7 +1060,7 @@
       "unrealizedPlUsd": 18.46,
       "beta": -0.158,
       "atrStop": 78.7923,
-      "sentimentScore": 0.6537,
+      "sentimentScore": 0.6353,
       "sentimentLabel": "BULLISH",
       "detail": {
         "priceSpark": [
@@ -1172,8 +1107,8 @@
         ],
         "news": [
           {
-            "headline": "Wells Fargo sets July 14 call for Q2 2026 earnings release",
-            "source": "Stock Titan",
+            "headline": "How Investors May Respond To Wells Fargo (WFC) New Bonds, Index Moves, And Dividend Plans",
+            "source": "simplywall.st",
             "score": 0.625
           },
           {
@@ -1182,9 +1117,9 @@
             "score": 0.3988
           },
           {
-            "headline": "WFC Stock Rises as CFO Sees Stronger Q2 NII, Reaffirms $50B 2026 Target",
+            "headline": "Wells Fargo (WFC) Added to Goldman Sachs Conviction List",
             "source": "Yahoo Finance",
-            "score": 0.6909
+            "score": 0.625
           }
         ]
       }
@@ -1597,7 +1532,7 @@
         "symbol": "AMAT",
         "strategy": "Dual Momentum",
         "confidence": 0.6707,
-        "sentimentScore": 0.5447,
+        "sentimentScore": 0.5468,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +139.2%, rank 5/121"
@@ -1606,7 +1541,7 @@
         "symbol": "LRCX",
         "strategy": "Dual Momentum",
         "confidence": 0.673,
-        "sentimentScore": 0.5588,
+        "sentimentScore": 0.5764,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +210.5%, rank 4/121"
@@ -1615,7 +1550,7 @@
         "symbol": "AMD",
         "strategy": "Dual Momentum",
         "confidence": 0.6753,
-        "sentimentScore": 0.5066,
+        "sentimentScore": 0.5474,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +246.0%, rank 3/121"
@@ -1624,7 +1559,7 @@
         "symbol": "INTC",
         "strategy": "Dual Momentum",
         "confidence": 0.6777,
-        "sentimentScore": 0.5525,
+        "sentimentScore": 0.5484,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +350.8%, rank 2/121"
@@ -1633,7 +1568,7 @@
         "symbol": "SCHW",
         "strategy": "Sector Rotation",
         "confidence": 0.5324,
-        "sentimentScore": 0.5323,
+        "sentimentScore": 0.5353,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Sector rotation: XLF rank #2 (+5.8% 20d), SCHW 20d ret +15.5%"
@@ -1642,7 +1577,7 @@
         "symbol": "JNJ",
         "strategy": "Sector Rotation",
         "confidence": 0.6223,
-        "sentimentScore": 0.6439,
+        "sentimentScore": 0.6615,
         "multiplier": "\u00d71.15",
         "status": "FILTERED",
         "reason": "Sector rotation: XLV rank #1 (+6.3% 20d), JNJ 20d ret +13.5% | news +0.64"
@@ -1651,7 +1586,7 @@
         "symbol": "ANET",
         "strategy": "Volatility Breakout",
         "confidence": 0.5562,
-        "sentimentScore": 0.6105,
+        "sentimentScore": 0.568,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "BB breakout: close 181.05 > upper 179.49 (vol spike 1.4x, 5d ret 6.6%)"
@@ -1660,8 +1595,8 @@
         "symbol": "WM",
         "strategy": "MA Crossover",
         "confidence": 0.4538,
-        "sentimentScore": 0.3653,
-        "multiplier": "\u00d70.80",
+        "sentimentScore": 0.4116,
+        "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Golden cross: SMA20 (222.73) > SMA50 (220.51), ADX 26.7 | news -0.37"
       },
@@ -1678,7 +1613,7 @@
         "symbol": "SYK",
         "strategy": "MA Crossover",
         "confidence": 0.5702,
-        "sentimentScore": 0.5871,
+        "sentimentScore": 0.6107,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Golden cross: SMA20 (315.55) > SMA50 (308.93), ADX 21.4"
@@ -1687,7 +1622,7 @@
         "symbol": "CMG",
         "strategy": "MA Crossover",
         "confidence": 0.5901,
-        "sentimentScore": 0.5291,
+        "sentimentScore": 0.5127,
         "multiplier": "\u00d71.00",
         "status": "EXECUTED",
         "reason": "Golden cross: SMA20 (32.57) > SMA50 (32.24), ADX 29.4"
@@ -1696,7 +1631,7 @@
         "symbol": "MPC",
         "strategy": "Factor Momentum",
         "confidence": 0.9,
-        "sentimentScore": 0.6116,
+        "sentimentScore": 0.5779,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Factor rank score 0.934 (top 1)"
@@ -1705,7 +1640,7 @@
         "symbol": "ANET",
         "strategy": "Earnings Drift",
         "confidence": 1.0,
-        "sentimentScore": 0.6105,
+        "sentimentScore": 0.568,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "PEAD (proxy): +8.8% surprise 1d ago, vol spike 1.5x"
@@ -1968,7 +1903,7 @@
       },
       {
         "date": "2026-07-09",
-        "ddPct": 2.157
+        "ddPct": 2.3553
       }
     ],
     "rollingSharpe": [
@@ -2110,7 +2045,7 @@
       },
       {
         "date": "2026-07-09",
-        "sharpe": -1.8598
+        "sharpe": -2.8558
       }
     ],
     "monthlyReturns": [
@@ -2128,7 +2063,7 @@
       },
       {
         "month": "2026-07",
-        "returnPct": -0.6171
+        "returnPct": -0.9105
       }
     ],
     "returnDistribution": [
