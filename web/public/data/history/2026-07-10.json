@@ -1,32 +1,32 @@
 {
   "meta": {
-    "generatedAt": "2026-07-10T05:49:25.146393Z",
+    "generatedAt": "2026-07-10T10:41:56.108416Z",
     "tradingDate": "2026-07-10",
     "runId": "20260710_054852_pte6",
-    "runNumber": 246,
+    "runNumber": 247,
     "paper": true,
     "schemaVersion": 1
   },
   "portfolio": {
     "totalValue": 96129.31,
     "cash": 14351.54,
-    "positionsCount": 16,
-    "todayChangeUsd": -4.41,
-    "todayChangePct": -0.0046,
+    "positionsCount": 15,
+    "todayChangeUsd": 115.24,
+    "todayChangePct": 0.1199,
     "allTimePnlUsd": -3870.69,
     "allTimePnlPct": -3.8707,
     "spyTodayPct": 0.8465,
-    "vsSpyPct": -0.8511,
-    "sharpe": -2.0234,
-    "sortino": -2.2756,
+    "vsSpyPct": -0.7266,
+    "sharpe": -1.9215,
+    "sortino": -2.1651,
     "maxDrawdownPct": 3.6642,
-    "volatilityPct": 4.9133,
+    "volatilityPct": 4.9227,
     "winRatePct": 31.25,
     "profitFactor": 0.8486,
     "closedTradesCount": 32,
     "regime": "NORMAL",
     "heatCapPct": 40,
-    "exposurePct": 85.07
+    "exposurePct": 85.09
   },
   "equityCurve": [
     {
@@ -351,7 +351,7 @@
     },
     {
       "date": "2026-07-10",
-      "value": 96129.31,
+      "value": 96244.55,
       "spy": 104598.84
     }
   ],
@@ -655,7 +655,7 @@
       "unrealizedPlUsd": -12.29,
       "beta": 0.533,
       "atrStop": 329.5471,
-      "sentimentScore": 0.5422,
+      "sentimentScore": 0.5139,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -702,14 +702,14 @@
         ],
         "news": [
           {
+            "headline": "HD Stock: Stifel Turns More Cautious Ahead Of Earnings Report, Warns Of Cooling Demand",
+            "source": "Stocktwits",
+            "score": 0.3098
+          },
+          {
             "headline": "Home Depot (HD): Buy, Sell, or Hold Post Q1 Earnings?",
             "source": "Yahoo Finance",
             "score": 0.5
-          },
-          {
-            "headline": "Granite Investment Partners LLC Boosts Stock Holdings in The Home Depot, Inc. $HD",
-            "source": "MarketBeat",
-            "score": 0.6591
           },
           {
             "headline": "The Pro-Focused Pivot That Puts Home Depot Stock\u2019s Core Engine At Risk",
@@ -730,7 +730,7 @@
       "unrealizedPlUsd": 46.82,
       "beta": 0.454,
       "atrStop": 368.7543,
-      "sentimentScore": 0.5297,
+      "sentimentScore": 0.5135,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -772,14 +772,14 @@
             "score": 0.2893
           },
           {
+            "headline": "Microsoft (MSFT) Dips More Than Broader Market: What You Should Know",
+            "source": "Yahoo Finance",
+            "score": 0.3638
+          },
+          {
             "headline": "Nasdaq Slides Nearly 2% As Higher Treasury Yields, Soaring Oil Prices Pressure Tech And Chip Stocks \u2014 META, AMZN, SPCX, MSFT In Focus",
             "source": "Stocktwits",
             "score": 0.4486
-          },
-          {
-            "headline": "Microsoft in the Spotlight After Reports Show Company Is Swapping Out Anthropic, OpenAI for In-House AI",
-            "source": "Benzinga",
-            "score": 0.5
           }
         ]
       }
@@ -795,7 +795,7 @@
       "unrealizedPlUsd": -163.23,
       "beta": 4.587,
       "atrStop": 902.3836,
-      "sentimentScore": 0.5042,
+      "sentimentScore": 0.5259,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -837,14 +837,14 @@
             "score": 0.648
           },
           {
-            "headline": "Why Is Micron Stock Falling Despite Solid Results?",
-            "source": "Trefis",
-            "score": 0.2877
+            "headline": "Memory Stock Sell-Off: Is This the Time to Buy Micron Technology and Sandisk Like There's No Tomorrow?",
+            "source": "The Motley Fool",
+            "score": 0.4468
           },
           {
-            "headline": "Micron, Sandisk, Marvell stocks jump, leading chip sector gains",
-            "source": "Yahoo Finance",
-            "score": 0.67
+            "headline": "Why Is Micron Stock Falling Despite Solid Results?",
+            "source": "Trefis",
+            "score": 0.4602
           }
         ]
       }
@@ -860,7 +860,7 @@
       "unrealizedPlUsd": -42.96,
       "beta": 1.0,
       "atrStop": 708.6321,
-      "sentimentScore": 0.5536,
+      "sentimentScore": 0.5553,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -967,13 +967,13 @@
             "score": 0.8454
           },
           {
-            "headline": "1 S&P 500 Stock Just Touched 52-Week Lows",
+            "headline": "11 Stocks Hit 52-Week Lows On Thursday",
             "source": "Trefis",
             "score": 0.3988
           },
           {
-            "headline": "SPY is up 0.6% today, on SNDK stock price movement",
-            "source": "Quiver Quantitative",
+            "headline": "The 52-Week-Low List: 1 S&P 500 Name On Thursday",
+            "source": "Trefis",
             "score": 0.5
           }
         ]
@@ -983,14 +983,14 @@
       "symbol": "UNH",
       "strategy": "Factor Momentum",
       "direction": "long",
-      "shares": 2.0,
-      "value": 863.36,
-      "costBasis": 765.78,
+      "shares": 3.0,
+      "value": 1295.04,
+      "costBasis": 1148.67,
       "unrealizedPlPct": 12.7426,
       "unrealizedPlUsd": 97.58,
       "beta": -0.181,
       "atrStop": 354.1732,
-      "sentimentScore": 0.4429,
+      "sentimentScore": 0.4871,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -1037,6 +1037,11 @@
         ],
         "news": [
           {
+            "headline": "UNH Stock Becomes Dow\u2019s Biggest Driver Back To 50,000 \u2014 Will Trump Tailwinds Spark Another Leg Higher?",
+            "source": "Stocktwits",
+            "score": 0.6131
+          },
+          {
             "headline": "Don't Buy UnitedHealth Group (UNH) Stock Before Reading This",
             "source": "The Motley Fool",
             "score": 0.4119
@@ -1044,11 +1049,6 @@
           {
             "headline": "Don't Buy UnitedHealth Group (UNH) Stock Before Reading This",
             "source": "Yahoo Finance",
-            "score": 0.5
-          },
-          {
-            "headline": "The Real Price Of UnitedHealth Stock Isn\u2019t On Today\u2019s Label",
-            "source": "Trefis",
             "score": 0.5
           }
         ]
@@ -1065,7 +1065,7 @@
       "unrealizedPlUsd": 33.31,
       "beta": -0.161,
       "atrStop": 83.8819,
-      "sentimentScore": 0.6538,
+      "sentimentScore": 0.6671,
       "sentimentLabel": "BULLISH",
       "detail": {
         "priceSpark": [
@@ -1117,79 +1117,14 @@
             "score": 0.625
           },
           {
-            "headline": "How Investors May Respond To Wells Fargo (WFC) New Bonds, Index Moves, And Dividend Plans",
-            "source": "simplywall.st",
-            "score": 0.625
-          },
-          {
             "headline": "Wells Fargo sets July 14 call for Q2 2026 earnings release",
             "source": "Stock Titan",
             "score": 0.625
-          }
-        ]
-      }
-    },
-    {
-      "symbol": "WM",
-      "strategy": "MA Crossover",
-      "direction": "long",
-      "shares": 1.0,
-      "value": 231.67,
-      "costBasis": 231.79,
-      "unrealizedPlPct": -0.05,
-      "unrealizedPlUsd": -0.12,
-      "beta": -0.904,
-      "atrStop": 219.8652,
-      "sentimentScore": 0.4052,
-      "sentimentLabel": "NEUTRAL",
-      "detail": {
-        "priceSpark": [
-          224.28,
-          218.79,
-          219.45,
-          216.94,
-          218.59,
-          215.85,
-          214.6,
-          213.31,
-          218.84,
-          223.26,
-          223.08,
-          225.53,
-          223.37,
-          222.88,
-          224.08,
-          230.4,
-          228.98,
-          237.21,
-          233.94,
-          231.67
-        ],
-        "confidence": 0.6683374967363832,
-        "sentimentMultiplier": "\u00d71.00",
-        "whyHeld": "Golden cross: SMA20 (223.25) > SMA50 (220.63), ADX 29.4",
-        "lots": [
-          {
-            "date": "2026-07-09",
-            "shares": 1.0,
-            "price": 231.7858
-          }
-        ],
-        "news": [
-          {
-            "headline": "Index Additions and Analyst Upgrade Might Change The Case For Investing In Waste Management (WM)",
-            "source": "simplywall.st",
-            "score": 0.2893
           },
           {
-            "headline": "Waste Management (WM) Stock Weighs DCF Upside Against Premium P/E Multiple",
-            "source": "Yahoo Finance",
-            "score": 0.2893
-          },
-          {
-            "headline": "Waste Management, Inc. (WM) Stock Price Today: $233.92",
-            "source": "Pluang",
-            "score": 0.2893
+            "headline": "Wells Fargo Completes 2026 Stress Test and Intends to Raise Dividend by 11% to $0.50",
+            "source": "wellsfargo.com",
+            "score": 0.3988
           }
         ]
       }
@@ -1614,7 +1549,7 @@
         "symbol": "AMAT",
         "strategy": "Dual Momentum",
         "confidence": 0.6707,
-        "sentimentScore": 0.53,
+        "sentimentScore": 0.5616,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +154.3%, rank 5/121"
@@ -1623,7 +1558,7 @@
         "symbol": "LRCX",
         "strategy": "Dual Momentum",
         "confidence": 0.673,
-        "sentimentScore": 0.5306,
+        "sentimentScore": 0.5069,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +226.6%, rank 4/121"
@@ -1632,7 +1567,7 @@
         "symbol": "AMD",
         "strategy": "Dual Momentum",
         "confidence": 0.6753,
-        "sentimentScore": 0.5644,
+        "sentimentScore": 0.5787,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +255.8%, rank 3/121"
@@ -1641,7 +1576,7 @@
         "symbol": "INTC",
         "strategy": "Dual Momentum",
         "confidence": 0.6777,
-        "sentimentScore": 0.4632,
+        "sentimentScore": 0.4786,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +367.4%, rank 2/121"
@@ -1650,7 +1585,7 @@
         "symbol": "VRTX",
         "strategy": "Sector Rotation",
         "confidence": 0.5187,
-        "sentimentScore": 0.5927,
+        "sentimentScore": 0.6168,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Sector rotation: XLV rank #2 (+4.9% 20d), VRTX 20d ret +11.4%"
@@ -1668,7 +1603,7 @@
         "symbol": "META",
         "strategy": "Volatility Breakout",
         "confidence": 0.5413,
-        "sentimentScore": 0.528,
+        "sentimentScore": 0.5706,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "BB breakout: close 631.48 > upper 627.84 (vol spike 1.4x, 5d ret 3.0%)"
@@ -1677,7 +1612,7 @@
         "symbol": "SBUX",
         "strategy": "MA Crossover",
         "confidence": 0.5829,
-        "sentimentScore": 0.5392,
+        "sentimentScore": 0.554,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Golden cross: SMA20 (102.51) > SMA50 (102.26), ADX 25.1"
@@ -1686,7 +1621,7 @@
         "symbol": "AAPL",
         "strategy": "MA Crossover",
         "confidence": 0.584,
-        "sentimentScore": 0.5046,
+        "sentimentScore": 0.5125,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Golden cross: SMA20 (296.92) > SMA50 (296.87), ADX 26.4"
@@ -1704,7 +1639,7 @@
         "symbol": "WM",
         "strategy": "MA Crossover",
         "confidence": 0.6683,
-        "sentimentScore": 0.4052,
+        "sentimentScore": 0.4108,
         "multiplier": "\u00d71.00",
         "status": "EXECUTED",
         "reason": "Golden cross: SMA20 (223.25) > SMA50 (220.63), ADX 29.4"
@@ -1713,7 +1648,7 @@
         "symbol": "AMD",
         "strategy": "Factor Momentum",
         "confidence": 0.9,
-        "sentimentScore": 0.5644,
+        "sentimentScore": 0.5787,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Factor rank score 0.970 (top 2)"
@@ -1722,7 +1657,7 @@
         "symbol": "UNH",
         "strategy": "Factor Momentum",
         "confidence": 0.9,
-        "sentimentScore": 0.4429,
+        "sentimentScore": 0.4871,
         "multiplier": "\u00d71.00",
         "status": "EXECUTED",
         "reason": "Partial profit target: 12.7% gain \u2192 selling 50% (1 of 3.0 shares)"
@@ -1731,7 +1666,7 @@
         "symbol": "PEP",
         "strategy": "Earnings Drift",
         "confidence": 0.693,
-        "sentimentScore": 0.562,
+        "sentimentScore": 0.5795,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "PEAD (calendar): earnings reported, entry within 5d window"
@@ -1740,7 +1675,7 @@
         "symbol": "ROST",
         "strategy": "RSI Mean Reversion",
         "confidence": 0.13,
-        "sentimentScore": 0.5834,
+        "sentimentScore": 0.6008,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "RSI 37.5 < 38 (oversold), slope +4.63 (turning up), vol_ratio 0.9x (normal)"
@@ -2007,7 +1942,7 @@
       },
       {
         "date": "2026-07-10",
-        "ddPct": 1.7636
+        "ddPct": 1.6458
       }
     ],
     "rollingSharpe": [
@@ -2153,7 +2088,7 @@
       },
       {
         "date": "2026-07-10",
-        "sharpe": -3.0366
+        "sharpe": -2.5665
       }
     ],
     "monthlyReturns": [
@@ -2171,7 +2106,7 @@
       },
       {
         "month": "2026-07",
-        "returnPct": -0.9151
+        "returnPct": -0.7917
       }
     ],
     "returnDistribution": [
