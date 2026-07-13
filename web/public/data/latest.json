@@ -1,32 +1,32 @@
 {
   "meta": {
-    "generatedAt": "2026-07-13T06:13:40.840633Z",
+    "generatedAt": "2026-07-13T11:10:26.878236Z",
     "tradingDate": "2026-07-13",
-    "runId": "20260713_061309_ffv9",
-    "runNumber": 248,
+    "runId": "20260713_111004_h41z",
+    "runNumber": 249,
     "paper": true,
     "schemaVersion": 1
   },
   "portfolio": {
-    "totalValue": 96049.9,
+    "totalValue": 96328.25,
     "cash": 14549.51,
     "positionsCount": 16,
-    "todayChangeUsd": -32.91,
-    "todayChangePct": -0.0343,
-    "allTimePnlUsd": -3950.1,
-    "allTimePnlPct": -3.9501,
+    "todayChangeUsd": 278.35,
+    "todayChangePct": 0.2898,
+    "allTimePnlUsd": -3671.75,
+    "allTimePnlPct": -3.6717,
     "spyTodayPct": 0.431,
-    "vsSpyPct": -0.4653,
-    "sharpe": -1.6323,
-    "sortino": -1.8588,
+    "vsSpyPct": -0.1412,
+    "sharpe": -1.3745,
+    "sortino": -1.5779,
     "maxDrawdownPct": 3.6642,
-    "volatilityPct": 4.8646,
+    "volatilityPct": 4.9032,
     "winRatePct": 31.25,
     "profitFactor": 0.8486,
     "closedTradesCount": 32,
     "regime": "NORMAL",
     "heatCapPct": 40,
-    "exposurePct": 84.85
+    "exposurePct": 84.9
   },
   "equityCurve": [
     {
@@ -366,7 +366,7 @@
     },
     {
       "date": "2026-07-13",
-      "value": 96049.9,
+      "value": 96328.25,
       "spy": 105049.68
     }
   ],
@@ -447,13 +447,13 @@
       },
       "backtestSharpe": 0.8,
       "status": "ACTIVE",
-      "note": "Recent rejections high: 100.0% (7d)"
+      "note": "Recent rejections high: 108.3% (7d)"
     },
     {
       "key": "factor_momentum",
       "name": "Factor Momentum",
       "allocationPct": 21.27,
-      "returnPct": 4.6766,
+      "returnPct": 4.6632,
       "sharpe": null,
       "sortino": null,
       "profitFactor": null,
@@ -513,7 +513,7 @@
       "tradesCount": 0,
       "winRatePct": null,
       "holdPeriod": "30d",
-      "healthScore": 90,
+      "healthScore": 80,
       "edgeTechnical": "Golden cross (SMA-20 > SMA-50) with ADX > 20 trend-quality filter and volume confirmation (ratio > 0.3). 5-day lookback window.",
       "edgePlain": "Follows stocks whose short-term average price is rising above the longer-term average.",
       "factorProfile": {
@@ -525,7 +525,7 @@
       },
       "backtestSharpe": 0.2,
       "status": "ACTIVE",
-      "note": "Recent rejections high: 140.0% (7d)"
+      "note": "High rejection rate: 81.7% (threshold: 80.0%)"
     },
     {
       "key": "volatility_breakout",
@@ -670,7 +670,7 @@
       "unrealizedPlUsd": -7.72,
       "beta": 0.545,
       "atrStop": 329.5471,
-      "sentimentScore": 0.5427,
+      "sentimentScore": 0.5452,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -727,9 +727,9 @@
             "score": 0.3634
           },
           {
-            "headline": "Why Home Depot Stock Looks Mispriced After Its Q1 Margin Compression Results in 2026",
-            "source": "TIKR.com",
-            "score": 0.5
+            "headline": "Triglav Investments D.O.O. Lowers Stock Holdings in The Home Depot, Inc. $HD",
+            "source": "MarketBeat",
+            "score": 0.436
           }
         ]
       }
@@ -745,7 +745,7 @@
       "unrealizedPlUsd": 49.04,
       "beta": 0.406,
       "atrStop": 368.7543,
-      "sentimentScore": 0.4703,
+      "sentimentScore": 0.4607,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -792,9 +792,9 @@
             "score": 0.4119
           },
           {
-            "headline": "AMZN, MSFT, GOOG, ORCL Designated As Critical Third Parties In The UK \u2013 What It Means",
-            "source": "TradingView",
-            "score": 0.5514
+            "headline": "Why Retail Traders Couldn\u2019t Take Their Eyes Off These Stocks Last Week: AAPL, MU, MSFT, META, BABA",
+            "source": "Yahoo Finance",
+            "score": 0.5
           }
         ]
       }
@@ -810,7 +810,7 @@
       "unrealizedPlUsd": -175.57,
       "beta": 4.484,
       "atrStop": 902.3836,
-      "sentimentScore": 0.5163,
+      "sentimentScore": 0.5861,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -847,19 +847,19 @@
         ],
         "news": [
           {
-            "headline": "SK Hynix Listing Closes Gap With Micron. The Korean Stock Is Still the Better Bet.",
-            "source": "Barron's",
-            "score": 0.7202
-          },
-          {
-            "headline": "Micron Stock\u2019s Sell-Off Won't Last. Here\u2019s the Simple Reason Why.",
-            "source": "Yahoo Finance",
+            "headline": "Is a Deal With Ford and a $100 Billion Backlog Enough to Get Micron Stock Back Over $1,200?",
+            "source": "The Motley Fool",
             "score": 0.4119
           },
           {
-            "headline": "MU, SNDK, DRAM: Memory Stocks Fall Ahead Of SK Hynix's Nasdaq Debut Today",
-            "source": "Yahoo Finance",
-            "score": 0.5
+            "headline": "SK Hynix Falls In Seoul After Strong Nasdaq Debut: MU, SNDK, US Memory Stocks Decline Overnight Amid Fresh US-Iran Tensions",
+            "source": "Stocktwits",
+            "score": 0.7202
+          },
+          {
+            "headline": "SK Hynix Stock Is the Star of the Show Today. Just Look at Micron Shares.",
+            "source": "Barron's",
+            "score": 0.648
           }
         ]
       }
@@ -875,7 +875,7 @@
       "unrealizedPlUsd": 264.84,
       "beta": 1.0,
       "atrStop": 708.6321,
-      "sentimentScore": 0.5548,
+      "sentimentScore": 0.529,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -982,14 +982,14 @@
             "score": 0.8454
           },
           {
-            "headline": "Stocks At 52-Week Lows: Friday\u2019s Full List",
+            "headline": "Where The Buying Ran Strongest: 29 Small Cap Stocks At 52-Week Highs",
             "source": "Trefis",
-            "score": 0.3988
+            "score": 0.7202
           },
           {
-            "headline": "SPY is down 0.9% today, on INTC stock price movement",
-            "source": "Quiver Quantitative",
-            "score": 0.5
+            "headline": "Where The Selling Ran Deepest: 1 S&P 500 Stock At 52-Week Lows",
+            "source": "Trefis",
+            "score": 0.3988
           }
         ]
       }
@@ -1005,7 +1005,7 @@
       "unrealizedPlUsd": 83.46,
       "beta": -0.197,
       "atrStop": 354.1733,
-      "sentimentScore": 0.5321,
+      "sentimentScore": 0.5194,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -1080,7 +1080,7 @@
       "unrealizedPlUsd": 36.06,
       "beta": -0.007,
       "atrStop": 83.8819,
-      "sentimentScore": 0.6116,
+      "sentimentScore": 0.6017,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -1127,7 +1127,7 @@
         ],
         "news": [
           {
-            "headline": "What To Expect From Wells Fargo\u2019s (WFC) Q2 Earnings",
+            "headline": "JPMorgan, Wells Fargo, Citigroup and Bank of America are part of Zacks Earnings Preview",
             "source": "The Globe and Mail",
             "score": 0.625
           },
@@ -1137,8 +1137,8 @@
             "score": 0.5
           },
           {
-            "headline": "Wells Fargo & Co(WFC) Stock Options Chain | Quotes & News",
-            "source": "Moomoo",
+            "headline": "Looking to Buy Wells Fargo & Co (WFC) Stock? Listen to JPMorgan First",
+            "source": "Yahoo Finance",
             "score": 0.625
           }
         ]
@@ -1573,7 +1573,7 @@
         "symbol": "LRCX",
         "strategy": "Dual Momentum",
         "confidence": 0.673,
-        "sentimentScore": 0.5818,
+        "sentimentScore": 0.5731,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +229.4%, rank 4/121"
@@ -1582,7 +1582,7 @@
         "symbol": "INTC",
         "strategy": "Dual Momentum",
         "confidence": 0.6777,
-        "sentimentScore": 0.531,
+        "sentimentScore": 0.536,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +360.4%, rank 2/121"
@@ -1591,10 +1591,10 @@
         "symbol": "AMD",
         "strategy": "Dual Momentum",
         "confidence": 0.7766,
-        "sentimentScore": 0.6395,
+        "sentimentScore": 0.6257,
         "multiplier": "\u00d71.15",
         "status": "FILTERED",
-        "reason": "Dual momentum: 12-1 return +243.5%, rank 3/121 | news +0.64"
+        "reason": "Dual momentum: 12-1 return +243.5%, rank 3/121 | news +0.63"
       },
       {
         "symbol": "SCHW",
@@ -1609,16 +1609,16 @@
         "symbol": "GE",
         "strategy": "Sector Rotation",
         "confidence": 0.639,
-        "sentimentScore": 0.6259,
+        "sentimentScore": 0.6357,
         "multiplier": "\u00d71.15",
         "status": "FILTERED",
-        "reason": "Sector rotation: XLI rank #1 (+7.2% 20d), GE 20d ret +12.7% | news +0.63"
+        "reason": "Sector rotation: XLI rank #1 (+7.2% 20d), GE 20d ret +12.7% | news +0.64"
       },
       {
         "symbol": "META",
         "strategy": "Volatility Breakout",
         "confidence": 0.616,
-        "sentimentScore": 0.4605,
+        "sentimentScore": 0.5279,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "BB breakout: close 669.21 > upper 640.72 (vol spike 2.0x, 5d ret 14.8%)"
@@ -1636,7 +1636,7 @@
         "symbol": "SBUX",
         "strategy": "MA Crossover",
         "confidence": 0.6064,
-        "sentimentScore": 0.6069,
+        "sentimentScore": 0.6199,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Golden cross: SMA20 (102.87) > SMA50 (102.45), ADX 26.8"
@@ -1645,7 +1645,7 @@
         "symbol": "XLU",
         "strategy": "MA Crossover",
         "confidence": 0.6328,
-        "sentimentScore": 0.6079,
+        "sentimentScore": 0.5867,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Golden cross: SMA20 (45.19) > SMA50 (44.96), ADX 29.1"
@@ -1654,7 +1654,7 @@
         "symbol": "ANET",
         "strategy": "Earnings Drift",
         "confidence": 1.0,
-        "sentimentScore": 0.5554,
+        "sentimentScore": 0.5555,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "PEAD (proxy): +8.8% surprise 3d ago, vol spike 1.5x"
@@ -1933,7 +1933,7 @@
       },
       {
         "date": "2026-07-13",
-        "ddPct": 1.8447
+        "ddPct": 1.5603
       }
     ],
     "rollingSharpe": [
@@ -2091,7 +2091,7 @@
       },
       {
         "date": "2026-07-13",
-        "sharpe": -1.5739
+        "sharpe": -0.5215
       }
     ],
     "monthlyReturns": [
@@ -2109,7 +2109,7 @@
       },
       {
         "month": "2026-07",
-        "returnPct": -0.4971
+        "returnPct": -0.1745
       }
     ],
     "returnDistribution": [
