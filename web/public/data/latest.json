@@ -1,32 +1,32 @@
 {
   "meta": {
-    "generatedAt": "2026-07-14T05:49:11.614483Z",
+    "generatedAt": "2026-07-14T09:33:57.955990Z",
     "tradingDate": "2026-07-14",
-    "runId": "20260714_054845_89j7",
-    "runNumber": 250,
+    "runId": "20260714_093330_z1gk",
+    "runNumber": 251,
     "paper": true,
     "schemaVersion": 1
   },
   "portfolio": {
-    "totalValue": 96116.66,
+    "totalValue": 95995.6,
     "cash": 14549.51,
     "positionsCount": 16,
-    "todayChangeUsd": 321.34,
-    "todayChangePct": 0.3354,
-    "allTimePnlUsd": -3883.34,
-    "allTimePnlPct": -3.8833,
+    "todayChangeUsd": -121.06,
+    "todayChangePct": -0.126,
+    "allTimePnlUsd": -4004.4,
+    "allTimePnlPct": -4.0044,
     "spyTodayPct": -0.7656,
-    "vsSpyPct": 1.101,
-    "sharpe": -1.1019,
-    "sortino": -1.2775,
+    "vsSpyPct": 0.6396,
+    "sharpe": -1.458,
+    "sortino": -1.6722,
     "maxDrawdownPct": 3.6642,
-    "volatilityPct": 4.9158,
+    "volatilityPct": 4.8712,
     "winRatePct": 31.25,
     "profitFactor": 0.8486,
     "closedTradesCount": 32,
     "regime": "NORMAL",
     "heatCapPct": 40,
-    "exposurePct": 84.86
+    "exposurePct": 84.84
   },
   "equityCurve": [
     {
@@ -371,7 +371,7 @@
     },
     {
       "date": "2026-07-14",
-      "value": 96116.66,
+      "value": 95995.6,
       "spy": 104245.4
     }
   ],
@@ -388,7 +388,7 @@
       "tradesCount": 0,
       "winRatePct": null,
       "holdPeriod": "\u226420d",
-      "healthScore": 100,
+      "healthScore": 75,
       "edgeTechnical": "RSI(14) < 35 with positive slope; uptrend gate (SMA-100); exits RSI > 55 OR 20-day hold. 2.5\u00d7 ATR stop, volume-spike filter.",
       "edgePlain": "Buys stocks that dropped too fast, betting they bounce back.",
       "factorProfile": {
@@ -400,7 +400,7 @@
       },
       "backtestSharpe": 0.65,
       "status": "ACTIVE",
-      "note": "Low trade count: 0 closed trades (need 5+ for full scoring)"
+      "note": "No trades in past 7 days"
     },
     {
       "key": "ml_momentum",
@@ -452,13 +452,13 @@
       },
       "backtestSharpe": 0.8,
       "status": "ACTIVE",
-      "note": "Recent rejections high: 108.3% (7d)"
+      "note": "Recent rejections high: 133.3% (7d)"
     },
     {
       "key": "factor_momentum",
       "name": "Factor Momentum",
       "allocationPct": 21.27,
-      "returnPct": 4.6735,
+      "returnPct": 4.6793,
       "sharpe": null,
       "sortino": null,
       "profitFactor": null,
@@ -530,7 +530,7 @@
       },
       "backtestSharpe": 0.2,
       "status": "ACTIVE",
-      "note": "High rejection rate: 84.1% (threshold: 80.0%)"
+      "note": "High rejection rate: 86.4% (threshold: 80.0%)"
     },
     {
       "key": "volatility_breakout",
@@ -648,7 +648,7 @@
       "tradesCount": 0,
       "winRatePct": null,
       "holdPeriod": "?",
-      "healthScore": 100,
+      "healthScore": 85,
       "edgeTechnical": "",
       "edgePlain": "",
       "factorProfile": {
@@ -660,7 +660,7 @@
       },
       "backtestSharpe": null,
       "status": "WATCHING",
-      "note": "Low trade count: 0 closed trades (need 5+ for full scoring)"
+      "note": "No trades in past 7 days"
     }
   ],
   "positions": [
@@ -675,7 +675,7 @@
       "unrealizedPlUsd": -13.91,
       "beta": 0.6,
       "atrStop": 329.5471,
-      "sentimentScore": 0.5346,
+      "sentimentScore": 0.53,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -722,6 +722,11 @@
         ],
         "news": [
           {
+            "headline": "AMG National Trust Bank Raises Stock Position in The Home Depot, Inc. $HD",
+            "source": "MarketBeat",
+            "score": 0.7553
+          },
+          {
             "headline": "Home Depot (HD) Stock Looks Fairly Valued After Its 21% Five Year Run",
             "source": "Yahoo Finance",
             "score": 0.7202
@@ -730,11 +735,6 @@
             "headline": "The Real Risk Inside Home Depot Stock",
             "source": "Trefis",
             "score": 0.3634
-          },
-          {
-            "headline": "Triglav Investments D.O.O. Lowers Stock Holdings in The Home Depot, Inc. $HD",
-            "source": "MarketBeat",
-            "score": 0.436
           }
         ]
       }
@@ -750,7 +750,7 @@
       "unrealizedPlUsd": 66.71,
       "beta": 0.29,
       "atrStop": 368.7543,
-      "sentimentScore": 0.5121,
+      "sentimentScore": 0.4952,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -795,6 +795,11 @@
             "headline": "MSFT Stock Has Bounced From This Price Before. Now What?",
             "source": "Trefis",
             "score": 0.5
+          },
+          {
+            "headline": "Why Is Microsoft Stock So Cheap?",
+            "source": "Forbes",
+            "score": 0.5
           }
         ]
       }
@@ -810,7 +815,7 @@
       "unrealizedPlUsd": -217.87,
       "beta": 4.629,
       "atrStop": 902.3836,
-      "sentimentScore": 0.4832,
+      "sentimentScore": 0.5017,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -847,14 +852,14 @@
         ],
         "news": [
           {
-            "headline": "Micron New Investment Could Be an Early Warning for the AI Industry",
-            "source": "Yahoo Finance",
-            "score": 0.33
-          },
-          {
             "headline": "Why Micron Is Doubling Down While the HBM Shortage Persists",
             "source": "MarketBeat",
             "score": 0.375
+          },
+          {
+            "headline": "Micron Technology Inc. (MU) Is A Top AI Stock In D. E. Shaw\u2019s Holdings",
+            "source": "Yahoo Finance",
+            "score": 0.6011
           },
           {
             "headline": "Micron Shares Slide as Semiconductor Selloff Weighs on Memory Stocks (MU)",
@@ -875,7 +880,7 @@
       "unrealizedPlUsd": -284.26,
       "beta": 1.0,
       "atrStop": 708.6321,
-      "sentimentScore": 0.5647,
+      "sentimentScore": 0.558,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -977,18 +982,18 @@
         ],
         "news": [
           {
-            "headline": "The Big Tech Fund Hiding Inside SPY ETF",
+            "headline": "24 Stocks Hit 52-Week Lows On Monday",
             "source": "Trefis",
-            "score": 0.352
+            "score": 0.3988
+          },
+          {
+            "headline": "28 S&P 500 Stocks Hit 52-Week Highs On Monday",
+            "source": "Trefis",
+            "score": 0.5
           },
           {
             "headline": "SPY is down 0.5% today, on SNDK stock price movement",
             "source": "Quiver Quantitative",
-            "score": 0.5
-          },
-          {
-            "headline": "Stt Strt SPDR S&P 500 ETF (SPY) Stock Forum and Discussion",
-            "source": "Moomoo",
             "score": 0.5
           }
         ]
@@ -1005,7 +1010,7 @@
       "unrealizedPlUsd": 92.4,
       "beta": -0.197,
       "atrStop": 354.1733,
-      "sentimentScore": 0.5346,
+      "sentimentScore": 0.5102,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -1080,8 +1085,8 @@
       "unrealizedPlUsd": 41.67,
       "beta": 0.014,
       "atrStop": 83.8819,
-      "sentimentScore": 0.6046,
-      "sentimentLabel": "NEUTRAL",
+      "sentimentScore": 0.6213,
+      "sentimentLabel": "BULLISH",
       "detail": {
         "priceSpark": [
           83.73,
@@ -1106,7 +1111,7 @@
           87.67
         ],
         "confidence": 1.0,
-        "sentimentMultiplier": "\u00d71.00",
+        "sentimentMultiplier": "\u00d71.15",
         "whyHeld": "Golden cross: SMA20 (80.61) > SMA50 (79.49), ADX 56.1 | news +0.66",
         "lots": [
           {
@@ -1564,7 +1569,7 @@
         "symbol": "AMAT",
         "strategy": "Dual Momentum",
         "confidence": 0.6707,
-        "sentimentScore": 0.5843,
+        "sentimentScore": 0.5934,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +152.9%, rank 5/121"
@@ -1573,7 +1578,7 @@
         "symbol": "AMD",
         "strategy": "Dual Momentum",
         "confidence": 0.673,
-        "sentimentScore": 0.5178,
+        "sentimentScore": 0.5175,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +213.8%, rank 4/121"
@@ -1582,7 +1587,7 @@
         "symbol": "LRCX",
         "strategy": "Dual Momentum",
         "confidence": 0.6753,
-        "sentimentScore": 0.5554,
+        "sentimentScore": 0.5017,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +220.0%, rank 3/121"
@@ -1591,7 +1596,7 @@
         "symbol": "INTC",
         "strategy": "Dual Momentum",
         "confidence": 0.6777,
-        "sentimentScore": 0.4968,
+        "sentimentScore": 0.4898,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +349.4%, rank 2/121"
@@ -1609,7 +1614,7 @@
         "symbol": "SCHW",
         "strategy": "Sector Rotation",
         "confidence": 0.5449,
-        "sentimentScore": 0.6089,
+        "sentimentScore": 0.6167,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Sector rotation: XLF rank #1 (+6.6% 20d), SCHW 20d ret +15.4%"
@@ -1618,7 +1623,7 @@
         "symbol": "XLE",
         "strategy": "Volatility Breakout",
         "confidence": 0.4848,
-        "sentimentScore": 0.5234,
+        "sentimentScore": 0.5286,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "BB breakout: close 56.74 > upper 56.71 (vol spike 1.2x, 5d ret 6.8%)"
@@ -1627,7 +1632,7 @@
         "symbol": "AAPL",
         "strategy": "MA Crossover",
         "confidence": 0.5296,
-        "sentimentScore": 0.5584,
+        "sentimentScore": 0.5619,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Golden cross: SMA20 (299.19) > SMA50 (298.71), ADX 26.5"
@@ -1636,7 +1641,7 @@
         "symbol": "SBUX",
         "strategy": "MA Crossover",
         "confidence": 0.551,
-        "sentimentScore": 0.5659,
+        "sentimentScore": 0.5561,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Golden cross: SMA20 (103.13) > SMA50 (102.50), ADX 26.7"
@@ -1654,7 +1659,7 @@
         "symbol": "CVS",
         "strategy": "Factor Momentum",
         "confidence": 0.99,
-        "sentimentScore": 0.5409,
+        "sentimentScore": 0.5882,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Factor rank score 0.980 (top 1)"
@@ -1937,7 +1942,7 @@
       },
       {
         "date": "2026-07-14",
-        "ddPct": 1.7765
+        "ddPct": 1.9002
       }
     ],
     "rollingSharpe": [
@@ -2099,7 +2104,7 @@
       },
       {
         "date": "2026-07-14",
-        "sharpe": 0.4598
+        "sharpe": -0.8935
       }
     ],
     "monthlyReturns": [
@@ -2117,7 +2122,7 @@
       },
       {
         "month": "2026-07",
-        "returnPct": 0.1603
+        "returnPct": -0.3003
       }
     ],
     "returnDistribution": [
@@ -2248,8 +2253,8 @@
       }
     ],
     "bestMonth": {
-      "month": "2026-07",
-      "returnPct": 0.1603
+      "month": "2026-06",
+      "returnPct": 0.1096
     },
     "worstMonth": {
       "month": "2026-05",
