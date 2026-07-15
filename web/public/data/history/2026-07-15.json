@@ -1,24 +1,24 @@
 {
   "meta": {
-    "generatedAt": "2026-07-15T05:49:10.784354Z",
+    "generatedAt": "2026-07-15T09:37:30.261821Z",
     "tradingDate": "2026-07-15",
-    "runId": "20260715_054850_k9de",
-    "runNumber": 252,
+    "runId": "20260715_093701_vldb",
+    "runNumber": 253,
     "paper": true,
     "schemaVersion": 1
   },
   "portfolio": {
-    "totalValue": 96402.18,
+    "totalValue": 96384.82,
     "cash": 14549.51,
     "positionsCount": 16,
-    "todayChangeUsd": -21.39,
-    "todayChangePct": -0.0222,
-    "allTimePnlUsd": -3597.82,
-    "allTimePnlPct": -3.5978,
+    "todayChangeUsd": -17.36,
+    "todayChangePct": -0.018,
+    "allTimePnlUsd": -3615.18,
+    "allTimePnlPct": -3.6152,
     "spyTodayPct": 0.3551,
-    "vsSpyPct": -0.3773,
-    "sharpe": -1.464,
-    "sortino": -1.6791,
+    "vsSpyPct": -0.3731,
+    "sharpe": -1.4609,
+    "sortino": -1.6755,
     "maxDrawdownPct": 3.6642,
     "volatilityPct": 4.8363,
     "winRatePct": 31.25,
@@ -26,7 +26,7 @@
     "closedTradesCount": 32,
     "regime": "NORMAL",
     "heatCapPct": 40,
-    "exposurePct": 84.91
+    "exposurePct": 84.9
   },
   "equityCurve": [
     {
@@ -376,7 +376,7 @@
     },
     {
       "date": "2026-07-15",
-      "value": 96402.18,
+      "value": 96384.82,
       "spy": 104615.53
     }
   ],
@@ -463,7 +463,7 @@
       "key": "factor_momentum",
       "name": "Factor Momentum",
       "allocationPct": 21.27,
-      "returnPct": 4.6596,
+      "returnPct": 4.6603,
       "sharpe": null,
       "sortino": null,
       "profitFactor": null,
@@ -535,7 +535,7 @@
       },
       "backtestSharpe": 0.2,
       "status": "ACTIVE",
-      "note": "High rejection rate: 89.5% (threshold: 80.0%)"
+      "note": "High rejection rate: 92.4% (threshold: 80.0%)"
     },
     {
       "key": "volatility_breakout",
@@ -755,7 +755,7 @@
       "unrealizedPlUsd": 48.53,
       "beta": 0.274,
       "atrStop": 368.7543,
-      "sentimentScore": 0.471,
+      "sentimentScore": 0.478,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -793,18 +793,18 @@
         "news": [
           {
             "headline": "MSFT Court News: Microsoft Class Action Lawsuit Alleges Securities Fraud on behalf of Investors with Losses",
-            "source": "PR Newswire",
+            "source": "TradingView",
             "score": 0.1325
           },
           {
-            "headline": "Microsoft (MSFT) Stock Declines While Market Improves: Some Information for Investors",
-            "source": "Yahoo Finance Singapore",
-            "score": 0.7107
+            "headline": "GXPT and ACGR: Two Best ETFs with 20%+ Upside for Exposure to Microsoft Stock (MSFT)",
+            "source": "TipRanks",
+            "score": 0.8185
           },
           {
-            "headline": "ADBE, CRM, NOW, MSFT: Software Stocks Fall After IBM Warns Clients Shifting Spending To Servers, Cybersecurity",
-            "source": "Yahoo Finance",
-            "score": 0.4486
+            "headline": "How To Get Paid To Buy Microsoft Stock At A 30% Discount",
+            "source": "Trefis",
+            "score": 0.5
           }
         ]
       }
@@ -820,7 +820,7 @@
       "unrealizedPlUsd": -171.75,
       "beta": 4.649,
       "atrStop": 902.3836,
-      "sentimentScore": 0.4477,
+      "sentimentScore": 0.4812,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -857,19 +857,19 @@
         ],
         "news": [
           {
+            "headline": "The $536 Billion Chip War Threatening Micron Stock",
+            "source": "Barron's",
+            "score": 0.1124
+          },
+          {
             "headline": "Micron, SanDisk, Western Digital Fall 6% as SK Hynix's Weak Outlook Rattles Memory Stocks",
             "source": "24/7 Wall St.",
             "score": 0.2798
           },
           {
-            "headline": "Micron (MU) Stock May Look Reasonable Despite Fresh AI Expansion Plans",
-            "source": "Yahoo Finance UK",
-            "score": 0.3795
-          },
-          {
-            "headline": "President Trump Sells Micron Stock and Buys an AI Stock Up 1,340% Since 2023",
-            "source": "The Motley Fool",
-            "score": 0.4119
+            "headline": "Micron vs. SK Hynix: Which AI Memory Stock Is the Better Buy?",
+            "source": "Yahoo Finance",
+            "score": 0.7202
           }
         ]
       }
@@ -885,7 +885,7 @@
       "unrealizedPlUsd": -31.56,
       "beta": 1.0,
       "atrStop": 708.6321,
-      "sentimentScore": 0.5205,
+      "sentimentScore": 0.5463,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -1015,7 +1015,7 @@
       "unrealizedPlUsd": 84.6,
       "beta": -0.206,
       "atrStop": 354.1733,
-      "sentimentScore": 0.5593,
+      "sentimentScore": 0.5206,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -1068,7 +1068,7 @@
           },
           {
             "headline": "UnitedHealth (UNH) Reports Q2: Everything You Need To Know Ahead Of Earnings",
-            "source": "TradingView",
+            "source": "StockStory",
             "score": 0.5
           },
           {
@@ -1090,7 +1090,7 @@
       "unrealizedPlUsd": 15.49,
       "beta": -0.006,
       "atrStop": 78.7923,
-      "sentimentScore": 0.7055,
+      "sentimentScore": 0.6976,
       "sentimentLabel": "BULLISH",
       "detail": {
         "priceSpark": [
@@ -1137,14 +1137,14 @@
         ],
         "news": [
           {
-            "headline": "Wells Fargo (WFC) Q2 Earnings and Revenues Beat Estimates",
-            "source": "Yahoo Finance",
-            "score": 0.625
+            "headline": "Wells Fargo (WFC) Plans 11% Dividend Increase to $0.50 Per Share",
+            "source": "GuruFocus",
+            "score": 0.8353
           },
           {
-            "headline": "Wells Fargo stock rises as Q2 interest income beats estimates, provisions fall (WFC:NYSE)",
-            "source": "Seeking Alpha",
-            "score": 0.8062
+            "headline": "Citigroup Is Up 14% This Year: Is It Outperforming Other Bank Stocks Like Wells Fargo and Bank of America?",
+            "source": "24/7 Wall St.",
+            "score": 0.7712
           },
           {
             "headline": "Why Wells Fargo (WFC) Stock Is Down Today",
@@ -1574,7 +1574,7 @@
         "symbol": "AMAT",
         "strategy": "Dual Momentum",
         "confidence": 0.6707,
-        "sentimentScore": 0.5298,
+        "sentimentScore": 0.551,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +181.3%, rank 5/121"
@@ -1583,7 +1583,7 @@
         "symbol": "AMD",
         "strategy": "Dual Momentum",
         "confidence": 0.673,
-        "sentimentScore": 0.5592,
+        "sentimentScore": 0.5697,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +233.6%, rank 4/121"
@@ -1592,7 +1592,7 @@
         "symbol": "LRCX",
         "strategy": "Dual Momentum",
         "confidence": 0.6753,
-        "sentimentScore": 0.5209,
+        "sentimentScore": 0.5306,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +258.1%, rank 3/121"
@@ -1601,7 +1601,7 @@
         "symbol": "INTC",
         "strategy": "Dual Momentum",
         "confidence": 0.6777,
-        "sentimentScore": 0.4633,
+        "sentimentScore": 0.4874,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +399.2%, rank 2/121"
@@ -1619,7 +1619,7 @@
         "symbol": "COF",
         "strategy": "Sector Rotation",
         "confidence": 0.5252,
-        "sentimentScore": 0.5374,
+        "sentimentScore": 0.5582,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Sector rotation: XLF rank #1 (+5.3% 20d), COF 20d ret +11.1%"
@@ -1627,29 +1627,20 @@
       {
         "symbol": "JPM",
         "strategy": "Volatility Breakout",
-        "confidence": 0.4867,
-        "sentimentScore": 0.5958,
-        "multiplier": "\u00d71.00",
+        "confidence": 0.5598,
+        "sentimentScore": 0.6255,
+        "multiplier": "\u00d71.15",
         "status": "FILTERED",
-        "reason": "BB breakout: close 342.89 > upper 342.01 (vol spike 1.3x, 5d ret 1.1%)"
+        "reason": "BB breakout: close 342.89 > upper 342.01 (vol spike 1.3x, 5d ret 1.1%) | news +0.63"
       },
       {
         "symbol": "AAPL",
         "strategy": "MA Crossover",
         "confidence": 0.5281,
-        "sentimentScore": 0.6095,
+        "sentimentScore": 0.5755,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Golden cross: SMA20 (300.37) > SMA50 (299.58), ADX 25.8"
-      },
-      {
-        "symbol": "SBUX",
-        "strategy": "MA Crossover",
-        "confidence": 0.5627,
-        "sentimentScore": 0.5988,
-        "multiplier": "\u00d71.00",
-        "status": "FILTERED",
-        "reason": "Golden cross: SMA20 (103.28) > SMA50 (102.53), ADX 27.5"
       },
       {
         "symbol": "XLU",
@@ -1664,34 +1655,43 @@
         "symbol": "APD",
         "strategy": "MA Crossover",
         "confidence": 0.6038,
-        "sentimentScore": 0.6401,
+        "sentimentScore": 0.6461,
         "multiplier": "\u00d71.15",
         "status": "FILTERED",
-        "reason": "Golden cross: SMA20 (290.83) > SMA50 (290.27), ADX 25.8 | news +0.64"
+        "reason": "Golden cross: SMA20 (290.83) > SMA50 (290.27), ADX 25.8 | news +0.65"
+      },
+      {
+        "symbol": "SBUX",
+        "strategy": "MA Crossover",
+        "confidence": 0.6471,
+        "sentimentScore": 0.6316,
+        "multiplier": "\u00d71.15",
+        "status": "FILTERED",
+        "reason": "Golden cross: SMA20 (103.28) > SMA50 (102.53), ADX 27.5 | news +0.63"
       },
       {
         "symbol": "MPC",
         "strategy": "Factor Momentum",
-        "confidence": 1.0,
-        "sentimentScore": 0.6301,
-        "multiplier": "\u00d71.15",
+        "confidence": 0.99,
+        "sentimentScore": 0.5886,
+        "multiplier": "\u00d71.00",
         "status": "FILTERED",
-        "reason": "Factor rank score 0.979 (top 1) | news +0.63"
+        "reason": "Factor rank score 0.979 (top 1)"
       },
       {
         "symbol": "JPM",
         "strategy": "Earnings Drift",
-        "confidence": 0.693,
-        "sentimentScore": 0.5958,
-        "multiplier": "\u00d71.00",
+        "confidence": 0.7245,
+        "sentimentScore": 0.6255,
+        "multiplier": "\u00d71.15",
         "status": "FILTERED",
-        "reason": "PEAD (calendar): earnings reported, entry within 5d window"
+        "reason": "PEAD (calendar): earnings reported, entry within 5d window | news +0.63"
       },
       {
         "symbol": "INTC",
         "strategy": "RSI Mean Reversion",
         "confidence": 0.1975,
-        "sentimentScore": 0.4633,
+        "sentimentScore": 0.4874,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "RSI 31.7 < 38 (oversold), slope +8.31 (turning up), vol_ratio 0.8x (normal)"
@@ -1978,7 +1978,7 @@
       },
       {
         "date": "2026-07-15",
-        "ddPct": 1.4847
+        "ddPct": 1.5025
       }
     ],
     "rollingSharpe": [
@@ -2144,7 +2144,7 @@
       },
       {
         "date": "2026-07-15",
-        "sharpe": -0.9329
+        "sharpe": -0.9205
       }
     ],
     "monthlyReturns": [
@@ -2162,7 +2162,7 @@
       },
       {
         "month": "2026-07",
-        "returnPct": -0.3224
+        "returnPct": -0.3182
       }
     ],
     "returnDistribution": [
