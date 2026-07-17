@@ -1,9 +1,9 @@
 {
   "meta": {
-    "generatedAt": "2026-07-17T05:51:32.111432Z",
+    "generatedAt": "2026-07-17T09:34:25.036361Z",
     "tradingDate": "2026-07-17",
     "runId": "20260717_054826_igi7",
-    "runNumber": 256,
+    "runNumber": 257,
     "paper": true,
     "schemaVersion": 1
   },
@@ -11,16 +11,16 @@
     "totalValue": 95325.33,
     "cash": 14549.51,
     "positionsCount": 16,
-    "todayChangeUsd": -125.02,
-    "todayChangePct": -0.131,
+    "todayChangeUsd": 9.63,
+    "todayChangePct": 0.0101,
     "allTimePnlUsd": -4674.67,
     "allTimePnlPct": -4.6747,
     "spyTodayPct": -0.5419,
-    "vsSpyPct": 0.4109,
-    "sharpe": -1.5791,
-    "sortino": -1.8089,
+    "vsSpyPct": 0.552,
+    "sharpe": -1.4767,
+    "sortino": -1.6934,
     "maxDrawdownPct": 3.6642,
-    "volatilityPct": 4.7728,
+    "volatilityPct": 4.7696,
     "winRatePct": 30.3,
     "profitFactor": 0.6869,
     "closedTradesCount": 33,
@@ -386,7 +386,7 @@
     },
     {
       "date": "2026-07-17",
-      "value": 95325.33,
+      "value": 95334.96,
       "spy": 104461.08
     }
   ],
@@ -690,7 +690,7 @@
       "unrealizedPlUsd": -3.0,
       "beta": 0.492,
       "atrStop": 329.5471,
-      "sentimentScore": 0.5,
+      "sentimentScore": 0.5281,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -735,7 +735,23 @@
             "price": 351.0154
           }
         ],
-        "news": []
+        "news": [
+          {
+            "headline": "Is Home Depot (HD) Fully Valued After Its 2026 Halloween Launch?",
+            "source": "simplywall.st",
+            "score": 0.7464
+          },
+          {
+            "headline": "Home Depot (HD) Stock Looks Fairly Valued After Its 21% Five Year Run",
+            "source": "Yahoo Finance",
+            "score": 0.7202
+          },
+          {
+            "headline": "Why Did LULU, WEN, HD Stocks Fall To 52-Week Lows Today?",
+            "source": "Stocktwits",
+            "score": 0.3988
+          }
+        ]
       }
     },
     {
@@ -749,7 +765,7 @@
       "unrealizedPlUsd": 97.04,
       "beta": 0.249,
       "atrStop": 334.4155,
-      "sentimentScore": 0.5,
+      "sentimentScore": 0.5176,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -784,7 +800,23 @@
             "price": 368.7543
           }
         ],
-        "news": []
+        "news": [
+          {
+            "headline": "Microsoft (MSFT) Turns to In-House AI Models to Cut Costs and Reduce Reliance on Rivals",
+            "source": "Yahoo Finance",
+            "score": 0.3634
+          },
+          {
+            "headline": "Microsoft Stock (NASDAQ:MSFT) Ticks Up With New 3M Partnership",
+            "source": "TipRanks",
+            "score": 0.5
+          },
+          {
+            "headline": "How To Get Paid To Buy Microsoft Stock At A 30% Discount",
+            "source": "Trefis",
+            "score": 0.5
+          }
+        ]
       }
     },
     {
@@ -798,7 +830,7 @@
       "unrealizedPlUsd": -137.01,
       "beta": 1.0,
       "atrStop": 708.6321,
-      "sentimentScore": 0.5,
+      "sentimentScore": 0.515,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -898,7 +930,23 @@
             "price": 757.87
           }
         ],
-        "news": []
+        "news": [
+          {
+            "headline": "30 large-cap stocks flashing Strong Buy as earnings roll in (SPY:NYSEARCA)",
+            "source": "Seeking Alpha",
+            "score": 0.7553
+          },
+          {
+            "headline": "Where The Buying Ran Strongest: 28 Large Cap Stocks At 52-Week Highs",
+            "source": "Trefis",
+            "score": 0.7202
+          },
+          {
+            "headline": "SPY is down 0.2% today, on SNDK stock price movement",
+            "source": "Quiver Quantitative",
+            "score": 0.5
+          }
+        ]
       }
     },
     {
@@ -912,7 +960,7 @@
       "unrealizedPlUsd": 80.98,
       "beta": -0.303,
       "atrStop": 354.1733,
-      "sentimentScore": 0.5,
+      "sentimentScore": 0.5522,
       "sentimentLabel": "NEUTRAL",
       "detail": {
         "priceSpark": [
@@ -957,7 +1005,23 @@
             "price": 382.7213
           }
         ],
-        "news": []
+        "news": [
+          {
+            "headline": "What\u2019s Fueling UNH Stock\u2019s Rally? A Bigger Buyback, Higher Guidance \u2013 And CEO Says Turnaround Is \u2018Returning To Form\u2019",
+            "source": "Stocktwits",
+            "score": 0.5
+          },
+          {
+            "headline": "UnitedHealth blows past estimates, hikes earnings outlook as it reins in costs",
+            "source": "CNBC",
+            "score": 0.6543
+          },
+          {
+            "headline": "UnitedHealth Surged 10% Intraday After Earnings. Here\u2019s Where UNH Stock Could Head in 2026",
+            "source": "TIKR.com",
+            "score": 0.5
+          }
+        ]
       }
     },
     {
@@ -971,8 +1035,8 @@
       "unrealizedPlUsd": 46.07,
       "beta": 0.006,
       "atrStop": 78.7923,
-      "sentimentScore": 0.5,
-      "sentimentLabel": "NEUTRAL",
+      "sentimentScore": 0.7551,
+      "sentimentLabel": "BULLISH",
       "detail": {
         "priceSpark": [
           83.81,
@@ -997,7 +1061,7 @@
           88.07
         ],
         "confidence": 1.0,
-        "sentimentMultiplier": "\u00d71.00",
+        "sentimentMultiplier": "\u00d71.15",
         "whyHeld": "Golden cross: SMA20 (80.61) > SMA50 (79.49), ADX 56.1 | news +0.66",
         "lots": [
           {
@@ -1016,7 +1080,23 @@
             "price": 83.8819
           }
         ],
-        "news": []
+        "news": [
+          {
+            "headline": "Wells Fargo (WFC) Stock Faces Slower 3.3% EPS Growth Forecast After Strong Q2 Earnings",
+            "source": "simplywall.st",
+            "score": 0.8922
+          },
+          {
+            "headline": "WFC Stock Slips Toward $85 as Wells Fargo Profit Beat Fails to Ease Margin Concerns",
+            "source": "FXLeaders",
+            "score": 0.7787
+          },
+          {
+            "headline": "Citigroup vs. Wells Fargo: Which Bank Stock Looks Attractive Post Q2 Results?",
+            "source": "Yahoo Finance",
+            "score": 0.7997
+          }
+        ]
       }
     }
   ],
@@ -1451,7 +1531,7 @@
         "symbol": "AMAT",
         "strategy": "Dual Momentum",
         "confidence": 0.6707,
-        "sentimentScore": 0.5,
+        "sentimentScore": 0.5658,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +196.1%, rank 5/121"
@@ -1460,7 +1540,7 @@
         "symbol": "AMD",
         "strategy": "Dual Momentum",
         "confidence": 0.673,
-        "sentimentScore": 0.5,
+        "sentimentScore": 0.4526,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +251.7%, rank 4/121"
@@ -1469,7 +1549,7 @@
         "symbol": "LRCX",
         "strategy": "Dual Momentum",
         "confidence": 0.6753,
-        "sentimentScore": 0.5,
+        "sentimentScore": 0.5822,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +286.4%, rank 3/121"
@@ -1478,7 +1558,7 @@
         "symbol": "INTC",
         "strategy": "Dual Momentum",
         "confidence": 0.6777,
-        "sentimentScore": 0.5,
+        "sentimentScore": 0.4581,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +457.9%, rank 2/121"
@@ -1487,7 +1567,7 @@
         "symbol": "MU",
         "strategy": "Dual Momentum",
         "confidence": 0.68,
-        "sentimentScore": 0.5,
+        "sentimentScore": 0.4826,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Dual momentum: 12-1 return +807.2%, rank 1/121"
@@ -1496,7 +1576,7 @@
         "symbol": "CSX",
         "strategy": "Volatility Breakout",
         "confidence": 0.4983,
-        "sentimentScore": 0.5,
+        "sentimentScore": 0.5991,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "BB breakout: close 50.89 > upper 50.88 (vol spike 1.3x, 5d ret 3.1%)"
@@ -1505,7 +1585,7 @@
         "symbol": "COF",
         "strategy": "Volatility Breakout",
         "confidence": 0.5166,
-        "sentimentScore": 0.5,
+        "sentimentScore": 0.5822,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "BB breakout: close 211.93 > upper 210.23 (vol spike 1.4x, 5d ret 5.9%)"
@@ -1514,7 +1594,7 @@
         "symbol": "UNP",
         "strategy": "Volatility Breakout",
         "confidence": 0.5256,
-        "sentimentScore": 0.5,
+        "sentimentScore": 0.6022,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "BB breakout: close 299.42 > upper 298.70 (vol spike 1.3x, 5d ret 5.0%)"
@@ -1523,8 +1603,8 @@
         "symbol": "PLD",
         "strategy": "Volatility Breakout",
         "confidence": 0.5708,
-        "sentimentScore": 0.5,
-        "multiplier": "\u00d71.00",
+        "sentimentScore": 0.7083,
+        "multiplier": "\u00d71.15",
         "status": "FILTERED",
         "reason": "BB breakout: close 150.06 > upper 146.91 (vol spike 1.5x, 5d ret 6.2%)"
       },
@@ -1532,7 +1612,7 @@
         "symbol": "ABT",
         "strategy": "Volatility Breakout",
         "confidence": 0.5854,
-        "sentimentScore": 0.5,
+        "sentimentScore": 0.5967,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "BB breakout: close 98.83 > upper 97.88 (vol spike 2.2x, 5d ret 4.7%)"
@@ -1541,7 +1621,7 @@
         "symbol": "BMY",
         "strategy": "MA Crossover",
         "confidence": 0.5267,
-        "sentimentScore": 0.5,
+        "sentimentScore": 0.6083,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Golden cross: SMA20 (56.98) > SMA50 (56.85), ADX 25.8"
@@ -1550,7 +1630,7 @@
         "symbol": "APD",
         "strategy": "MA Crossover",
         "confidence": 0.5544,
-        "sentimentScore": 0.5,
+        "sentimentScore": 0.6028,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Golden cross: SMA20 (292.21) > SMA50 (290.10), ADX 26.6"
@@ -1559,8 +1639,8 @@
         "symbol": "CVS",
         "strategy": "Factor Momentum",
         "confidence": 0.81,
-        "sentimentScore": 0.5,
-        "multiplier": "\u00d71.00",
+        "sentimentScore": 0.6229,
+        "multiplier": "\u00d71.15",
         "status": "FILTERED",
         "reason": "Factor rank score 0.985 (top 2)"
       },
@@ -1568,7 +1648,7 @@
         "symbol": "MPC",
         "strategy": "Factor Momentum",
         "confidence": 0.81,
-        "sentimentScore": 0.5,
+        "sentimentScore": 0.5538,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "Factor rank score 0.998 (top 2)"
@@ -1577,7 +1657,7 @@
         "symbol": "NFLX",
         "strategy": "Earnings Drift",
         "confidence": 0.63,
-        "sentimentScore": 0.5,
+        "sentimentScore": 0.5645,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "PEAD (calendar): earnings reported, entry within 5d window"
@@ -1586,8 +1666,8 @@
         "symbol": "PLD",
         "strategy": "Earnings Drift",
         "confidence": 0.7352,
-        "sentimentScore": 0.5,
-        "multiplier": "\u00d71.00",
+        "sentimentScore": 0.7083,
+        "multiplier": "\u00d71.15",
         "status": "FILTERED",
         "reason": "PEAD (calendar): earnings reported, entry within 5d window, +4.6% day-of move"
       },
@@ -1595,7 +1675,7 @@
         "symbol": "ABT",
         "strategy": "Earnings Drift",
         "confidence": 0.9,
-        "sentimentScore": 0.5,
+        "sentimentScore": 0.5967,
         "multiplier": "\u00d71.00",
         "status": "FILTERED",
         "reason": "PEAD (calendar): earnings reported, entry within 5d window, +10.7% day-of move"
@@ -1890,7 +1970,7 @@
       },
       {
         "date": "2026-07-17",
-        "ddPct": 2.5852
+        "ddPct": 2.5754
       }
     ],
     "rollingSharpe": [
@@ -2064,7 +2144,7 @@
       },
       {
         "date": "2026-07-17",
-        "sharpe": -1.2087
+        "sharpe": -0.7958
       }
     ],
     "monthlyReturns": [
@@ -2082,7 +2162,7 @@
       },
       {
         "month": "2026-07",
-        "returnPct": -0.5084
+        "returnPct": -0.3678
       }
     ],
     "returnDistribution": [
