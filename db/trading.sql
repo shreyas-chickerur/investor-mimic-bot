@@ -9,17 +9,17 @@ CREATE TABLE strategies (
                 status TEXT DEFAULT 'active',
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             );
-INSERT INTO strategies VALUES(1,'RSI Mean Reversion','Buy when RSI < 30 + low volatility, hold 20 days',9503.7844107579458,24427.7200000000011,'active','2026-04-30 23:00:36');
+INSERT INTO strategies VALUES(1,'RSI Mean Reversion','Buy when RSI < 30 + low volatility, hold 20 days',9527.12420537897196,24427.7200000000011,'active','2026-04-30 23:00:36');
 INSERT INTO strategies VALUES(2,'ML Momentum','GradientBoosting 12-feature classifier predicting 5d return',0.0,24427.7200000000011,'disabled','2026-04-30 23:00:36');
-INSERT INTO strategies VALUES(3,'Earnings Drift','Post-earnings announcement drift via volume spike detection',8761.30125366748143,24427.7200000000011,'active','2026-04-30 23:00:36');
-INSERT INTO strategies VALUES(4,'Factor Momentum','Cross-sectional factor ranking: momentum+quality+reversion',17225.6092444987771,24427.7200000000011,'active','2026-04-30 23:00:36');
+INSERT INTO strategies VALUES(3,'Earnings Drift','Post-earnings announcement drift via volume spike detection',8782.81762683373926,24427.7200000000011,'active','2026-04-30 23:00:36');
+INSERT INTO strategies VALUES(4,'Factor Momentum','Cross-sectional factor ranking: momentum+quality+reversion',17267.9126222493869,24427.7200000000011,'active','2026-04-30 23:00:36');
 INSERT INTO strategies VALUES(5,'BROKER_SYNC','Positions synced from broker',0.0,97711.8200000000069,'active','2026-04-30 23:15:47');
 INSERT INTO strategies VALUES(6,'News Sentiment','Buy on positive news sentiment score (Google News RSS + VADER), exit when sentiment sours',0.0,16014.4649999999983,'disabled','2026-05-22 07:15:43');
-INSERT INTO strategies VALUES(7,'MA Crossover','Golden/death cross on SMA-20/50 with ADX trend filter and volume confirmation',8098.01630000000022,16014.4649999999983,'active','2026-05-22 07:15:43');
-INSERT INTO strategies VALUES(8,'Volatility Breakout','Bollinger Band upper breakout with 1.5x volume surge confirmation',12147.0244499999989,16014.4649999999983,'active','2026-05-22 07:15:43');
+INSERT INTO strategies VALUES(7,'MA Crossover','Golden/death cross on SMA-20/50 with ADX trend filter and volume confirmation',8117.90374999999949,16014.4649999999983,'active','2026-05-22 07:15:43');
+INSERT INTO strategies VALUES(8,'Volatility Breakout','Bollinger Band upper breakout with 1.5x volume surge confirmation',12176.8556249999983,16014.4649999999983,'active','2026-05-22 07:15:43');
 INSERT INTO strategies VALUES(9,'Pairs Trading','Statistical pairs mean-reversion: buy lagging leg when spread z-score < -1.5σ',0.0,9083.33327777777776,'disabled','2026-06-11 05:55:04');
-INSERT INTO strategies VALUES(10,'Sector Rotation','Explicit sector momentum rotation: top-2 sectors by 20d return, best stock each',7424.83157090464555,9083.33327777777776,'active','2026-06-11 05:55:04');
-INSERT INTO strategies VALUES(11,'Dual Momentum','12-1 cross-sectional momentum with absolute momentum filter (Antonacci)',17819.5957701711486,11679.7054999999982,'active','2026-06-12 05:47:26');
+INSERT INTO strategies VALUES(10,'Sector Rotation','Explicit sector momentum rotation: top-2 sectors by 20d return, best stock each',7443.06578545232241,9083.33327777777776,'active','2026-06-11 05:55:04');
+INSERT INTO strategies VALUES(11,'Dual Momentum','12-1 cross-sectional momentum with absolute momentum filter (Antonacci)',17863.3578850855737,11679.7054999999982,'active','2026-06-12 05:47:26');
 INSERT INTO strategies VALUES(12,'Cash Sweep','Core index sleeve for idle cash',0.0,0.0,'active','2026-06-12 05:47:32');
 CREATE TABLE signals (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -585,6 +585,10 @@ INSERT INTO signals VALUES(546,'20260720_061257_thyh',11,'INTC','BUY',0.67766666
 INSERT INTO signals VALUES(547,'20260720_061257_thyh',11,'LRCX','BUY',0.675333333333333341,'Dual momentum: 12-1 return +269.5%, rank 3/121','2026-07-20','2026-07-20 06:13:09','FILTERED','risk_or_cash_limit','2026-07-20T06:13:09.217713',0.548699999999999965,'×1.00');
 INSERT INTO signals VALUES(548,'20260720_061257_thyh',11,'AMD','BUY',0.673000000000000042,'Dual momentum: 12-1 return +216.9%, rank 4/121','2026-07-20','2026-07-20 06:13:09','FILTERED','risk_or_cash_limit','2026-07-20T06:13:09.219190',0.535499999999999976,'×1.00');
 INSERT INTO signals VALUES(549,'20260720_061257_thyh',11,'AMAT','BUY',0.670666666666666744,'Dual momentum: 12-1 return +193.9%, rank 5/121','2026-07-20','2026-07-20 06:13:09','FILTERED','risk_or_cash_limit','2026-07-20T06:13:09.220588',0.585999999999999965,'×1.00');
+INSERT INTO signals VALUES(550,'20260721_054846_2d74',11,'INTC','BUY',0.677666666666666639,'Dual momentum: 12-1 return +431.1%, rank 2/121','2026-07-21','2026-07-21 05:49:00','FILTERED','risk_or_cash_limit','2026-07-21T05:49:00.913520',0.575799999999999978,'×1.00');
+INSERT INTO signals VALUES(551,'20260721_054846_2d74',11,'LRCX','BUY',0.675333333333333341,'Dual momentum: 12-1 return +273.0%, rank 3/121','2026-07-21','2026-07-21 05:49:00','FILTERED','risk_or_cash_limit','2026-07-21T05:49:00.915292',0.576300000000000034,'×1.00');
+INSERT INTO signals VALUES(552,'20260721_054846_2d74',11,'AMD','BUY',0.673000000000000042,'Dual momentum: 12-1 return +219.5%, rank 4/121','2026-07-21','2026-07-21 05:49:00','FILTERED','risk_or_cash_limit','2026-07-21T05:49:00.917055',0.540599999999999969,'×1.00');
+INSERT INTO signals VALUES(553,'20260721_054846_2d74',11,'AMAT','BUY',0.670666666666666744,'Dual momentum: 12-1 return +210.3%, rank 5/121','2026-07-21','2026-07-21 05:49:00','FILTERED','risk_or_cash_limit','2026-07-21T05:49:00.918896',0.558000000000000051,'×1.00');
 CREATE TABLE trades (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 run_id TEXT NOT NULL,
@@ -869,23 +873,23 @@ CREATE TABLE positions (
                 FOREIGN KEY (strategy_id) REFERENCES strategies(id),
                 UNIQUE(strategy_id, symbol)
             );
-INSERT INTO positions VALUES(96,5,'XLV',11.0,145.441818000000012,161.090000000000003,1771.99,172.130001999999905,NULL,'2026-05-22',NULL,NULL,'2026-07-20T06:13:09.288415');
-INSERT INTO positions VALUES(144,5,'MA',1.0,490.0,543.600000000000022,543.600000000000022,53.6000000000000227,NULL,'2026-06-12',NULL,NULL,'2026-07-20T06:13:09.288000');
-INSERT INTO positions VALUES(173,12,'SPY',95.0,752.162170443094851,743.289999999999963,70612.5500000000029,-842.856192094014318,761.970000000000027,'2026-06-16',NULL,NULL,'2026-07-20T06:13:09.288238');
-INSERT INTO positions VALUES(190,4,'UNH',2.0,382.890000000000043,426.089999999999974,852.179999999999949,86.3999999999998635,0.0,NULL,NULL,NULL,'2026-07-20T06:13:09.288298');
-INSERT INTO positions VALUES(206,7,'WFC',11.0,83.8819199999999938,87.5100000000000051,962.610000000000013,39.9088800000001242,83.8819199999999938,'2026-06-22',2.03582999999999714,NULL,'2026-07-20T06:13:09.288336');
-INSERT INTO positions VALUES(240,5,'PSX',3.0,172.229999999999989,206.860000000000013,620.58000000000004,103.890000000000071,NULL,'2026-06-29',NULL,NULL,'2026-07-20T06:13:09.288166');
-INSERT INTO positions VALUES(241,5,'UBER',3.0,73.0699999999999931,72.4599999999999937,217.379999999999995,-1.82999999999999829,NULL,'2026-06-29',NULL,NULL,'2026-07-20T06:13:09.288291');
-INSERT INTO positions VALUES(248,3,'MSFT',3.0,368.754284999999981,393.819999999999993,1181.46000000000003,75.1971450000000345,368.754284999999981,'2026-06-29',13.7354950000000055,NULL,'2026-07-20T06:13:09.288049');
-INSERT INTO positions VALUES(271,7,'HD',1.0,351.015419999999949,338.870000000000004,338.870000000000004,-12.1454199999999445,351.015419999999949,'2026-07-01',8.58732739912897713,NULL,'2026-07-20T06:13:09.287912');
-INSERT INTO positions VALUES(279,5,'VZ',-26.0,42.6038459999999972,43.5900000000000034,-1133.34000000000014,-25.6400040000001609,NULL,'2026-07-07',NULL,NULL,'2026-07-20T06:13:09.288328');
-INSERT INTO positions VALUES(286,5,'CSCO',8.0,113.338750000000004,111.939999999999997,895.519999999999981,-11.1900000000000545,NULL,'2026-07-08',NULL,NULL,'2026-07-20T06:13:09.287790');
-INSERT INTO positions VALUES(287,5,'GIS',29.0,36.759999999999998,37.9699999999999988,1101.12999999999988,35.0900000000000247,NULL,'2026-07-08',NULL,NULL,'2026-07-20T06:13:09.287889');
-INSERT INTO positions VALUES(288,5,'QCOM',5.0,183.975999999999999,171.780000000000001,858.899999999999977,-60.9799999999999897,NULL,'2026-07-08',NULL,NULL,'2026-07-20T06:13:09.288174');
-INSERT INTO positions VALUES(290,5,'SPGI',1.0,440.939999999999997,450.839999999999975,450.839999999999975,9.89999999999997726,NULL,'2026-07-09',NULL,NULL,'2026-07-20T06:13:09.288232');
-INSERT INTO positions VALUES(292,5,'CMG',11.0,33.5590910000000022,34.4399999999999977,378.839999999999974,9.68999899999995051,NULL,'2026-07-10',NULL,NULL,'2026-07-20T06:13:09.287744');
-INSERT INTO positions VALUES(295,5,'WM',1.0,232.909999999999996,239.310000000000002,239.310000000000002,6.40000000000000568,NULL,'2026-07-13',NULL,NULL,'2026-07-20T06:13:09.288344');
-INSERT INTO positions VALUES(297,1,'MU',1.0,849.374474999999961,848.950000000000045,848.950000000000045,-0.42447499999991578,849.374474999999961,'2026-07-17',94.4309899999999942,NULL,'2026-07-20T06:13:09.288055');
+INSERT INTO positions VALUES(96,5,'XLV',11.0,145.441818000000012,159.25,1751.75,151.890001999999867,NULL,'2026-05-22',NULL,NULL,'2026-07-21T05:49:01.004513');
+INSERT INTO positions VALUES(144,5,'MA',1.0,490.0,547.440000000000054,547.440000000000054,57.4400000000000545,NULL,'2026-06-12',NULL,NULL,'2026-07-21T05:49:01.004283');
+INSERT INTO positions VALUES(173,12,'SPY',95.0,752.162170443094851,742.090000000000031,70498.5500000000029,-956.856192094007838,761.970000000000027,'2026-06-16',NULL,NULL,'2026-07-21T05:49:01.004411');
+INSERT INTO positions VALUES(190,4,'UNH',2.0,382.890000000000043,421.550000000000011,843.100000000000022,77.3199999999999363,0.0,NULL,NULL,NULL,'2026-07-21T05:49:01.004447');
+INSERT INTO positions VALUES(206,7,'WFC',11.0,83.8819199999999938,86.3299999999999982,949.629999999999995,26.9288800000000492,83.8819199999999938,'2026-06-22',2.03582999999999714,NULL,'2026-07-21T05:49:01.004470');
+INSERT INTO positions VALUES(240,5,'PSX',3.0,172.229999999999989,208.800000000000011,626.40000000000009,109.710000000000064,NULL,'2026-06-29',NULL,NULL,'2026-07-21T05:49:01.004368');
+INSERT INTO positions VALUES(241,5,'UBER',3.0,73.0699999999999931,72.1700000000000017,216.50999999999999,-2.69999999999997442,NULL,'2026-06-29',NULL,NULL,'2026-07-21T05:49:01.004443');
+INSERT INTO positions VALUES(248,3,'MSFT',3.0,368.754284999999981,402.29000000000002,1206.87000000000011,100.607145000000116,368.754284999999981,'2026-06-29',13.7354950000000055,NULL,'2026-07-21T05:49:01.004315');
+INSERT INTO positions VALUES(271,7,'HD',1.0,351.015419999999949,333.04000000000002,333.04000000000002,-17.9754199999999286,351.015419999999949,'2026-07-01',8.58732739912897713,NULL,'2026-07-21T05:49:01.004229');
+INSERT INTO positions VALUES(279,5,'VZ',-26.0,42.6038459999999972,43.5,-1131.0,-23.3000040000000723,NULL,'2026-07-07',NULL,NULL,'2026-07-21T05:49:01.004465');
+INSERT INTO positions VALUES(286,5,'CSCO',8.0,113.338750000000004,110.700000000000002,885.600000000000022,-21.1100000000000136,NULL,'2026-07-08',NULL,NULL,'2026-07-21T05:49:01.004162');
+INSERT INTO positions VALUES(287,5,'GIS',29.0,36.759999999999998,37.5799999999999982,1089.81999999999993,23.7800000000000082,NULL,'2026-07-08',NULL,NULL,'2026-07-21T05:49:01.004215');
+INSERT INTO positions VALUES(288,5,'QCOM',5.0,183.975999999999999,170.319999999999993,851.599999999999909,-68.2800000000000295,NULL,'2026-07-08',NULL,NULL,'2026-07-21T05:49:01.004372');
+INSERT INTO positions VALUES(290,5,'SPGI',1.0,440.939999999999997,448.350000000000022,448.350000000000022,7.41000000000002501,NULL,'2026-07-09',NULL,NULL,'2026-07-21T05:49:01.004406');
+INSERT INTO positions VALUES(292,5,'CMG',11.0,33.5590910000000022,33.1300000000000025,364.430000000000006,-4.72000099999999633,NULL,'2026-07-10',NULL,NULL,'2026-07-21T05:49:01.004139');
+INSERT INTO positions VALUES(295,5,'WM',1.0,232.909999999999996,239.050000000000011,239.050000000000011,6.14000000000001478,NULL,'2026-07-13',NULL,NULL,'2026-07-21T05:49:01.004474');
+INSERT INTO positions VALUES(297,1,'MU',1.0,849.374474999999961,865.460000000000036,865.460000000000036,16.0855250000000751,849.374474999999961,'2026-07-17',94.4309899999999942,NULL,'2026-07-21T05:49:01.004320');
 CREATE TABLE broker_state (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 run_id TEXT NOT NULL,
@@ -1216,6 +1220,10 @@ INSERT INTO broker_state VALUES(314,'AUTO_SYNC','2026-07-20','SYNC',15377.149999
 INSERT INTO broker_state VALUES(315,'20260720_061257_thyh','2026-07-20','START',15377.1499999999996,95270.7799999999988,282496.359999999986,'[{"symbol": "CMG", "qty": 11.0, "market_value": 379.61}, {"symbol": "CSCO", "qty": 8.0, "market_value": 893.12}, {"symbol": "GIS", "qty": 29.0, "market_value": 1101.13}, {"symbol": "HD", "qty": 1.0, "market_value": 340.74}, {"symbol": "MA", "qty": 1.0, "market_value": 543.6}, {"symbol": "MSFT", "qty": 3.0, "market_value": 1182.15}, {"symbol": "PSX", "qty": 3.0, "market_value": 622.5}, {"symbol": "QCOM", "qty": 5.0, "market_value": 861.25}, {"symbol": "SPGI", "qty": 1.0, "market_value": 450.84}, {"symbol": "SPY", "qty": 95.0, "market_value": 70600.2}, {"symbol": "UBER", "qty": 3.0, "market_value": 217.71}, {"symbol": "UNH", "qty": 2.0, "market_value": 851.82}, {"symbol": "VZ", "qty": -26.0, "market_value": -1131.0}, {"symbol": "WFC", "qty": 11.0, "market_value": 963.93}, {"symbol": "WM", "qty": 1.0, "market_value": 239.31}, {"symbol": "XLV", "qty": 11.0, "market_value": 1776.72}]','SKIPPED','[]','2026-07-20 06:13:04');
 INSERT INTO broker_state VALUES(316,'20260720_061257_thyh','2026-07-20','RECONCILIATION',15377.1499999999996,95270.7799999999988,282496.359999999986,'[{"symbol": "CMG", "qty": 11.0, "market_value": 379.61}, {"symbol": "CSCO", "qty": 8.0, "market_value": 893.12}, {"symbol": "GIS", "qty": 29.0, "market_value": 1101.13}, {"symbol": "HD", "qty": 1.0, "market_value": 340.74}, {"symbol": "MA", "qty": 1.0, "market_value": 543.6}, {"symbol": "MSFT", "qty": 3.0, "market_value": 1182.15}, {"symbol": "PSX", "qty": 3.0, "market_value": 622.5}, {"symbol": "QCOM", "qty": 5.0, "market_value": 861.25}, {"symbol": "SPGI", "qty": 1.0, "market_value": 450.84}, {"symbol": "SPY", "qty": 95.0, "market_value": 70600.2}, {"symbol": "UBER", "qty": 3.0, "market_value": 217.71}, {"symbol": "UNH", "qty": 2.0, "market_value": 851.82}, {"symbol": "VZ", "qty": -26.0, "market_value": -1131.0}, {"symbol": "WFC", "qty": 11.0, "market_value": 963.93}, {"symbol": "WM", "qty": 1.0, "market_value": 239.31}, {"symbol": "XLV", "qty": 11.0, "market_value": 1776.72}]','PASS','[]','2026-07-20 06:13:05');
 INSERT INTO broker_state VALUES(317,'20260720_061257_thyh','2026-07-20','END',15377.1499999999996,95270.7799999999988,281635.520000000018,'[{"symbol": "CMG", "qty": 11.0, "market_value": 379.61}, {"symbol": "CSCO", "qty": 8.0, "market_value": 893.12}, {"symbol": "GIS", "qty": 29.0, "market_value": 1101.13}, {"symbol": "HD", "qty": 1.0, "market_value": 340.74}, {"symbol": "MA", "qty": 1.0, "market_value": 543.6}, {"symbol": "MSFT", "qty": 3.0, "market_value": 1182.15}, {"symbol": "PSX", "qty": 3.0, "market_value": 622.5}, {"symbol": "QCOM", "qty": 5.0, "market_value": 861.25}, {"symbol": "SPGI", "qty": 1.0, "market_value": 450.84}, {"symbol": "SPY", "qty": 95.0, "market_value": 70600.2}, {"symbol": "UBER", "qty": 3.0, "market_value": 217.71}, {"symbol": "UNH", "qty": 2.0, "market_value": 851.82}, {"symbol": "VZ", "qty": -26.0, "market_value": -1131.0}, {"symbol": "WFC", "qty": 11.0, "market_value": 963.93}, {"symbol": "WM", "qty": 1.0, "market_value": 239.31}, {"symbol": "XLV", "qty": 11.0, "market_value": 1776.72}]','PASS','[]','2026-07-20 06:13:09');
+INSERT INTO broker_state VALUES(318,'AUTO_SYNC','2026-07-21','SYNC',14516.4099999999998,95495.2599999999947,282095.130000000004,'{"CMG": {"qty": 11.0, "avg_price": 33.559091, "market_value": 365.42, "unrealized_pl": -3.730001}, "CSCO": {"qty": 8.0, "avg_price": 113.33875, "market_value": 885.68, "unrealized_pl": -21.03}, "GIS": {"qty": 29.0, "avg_price": 36.76, "market_value": 1088.3091, "unrealized_pl": 22.2691}, "HD": {"qty": 1.0, "avg_price": 352.37, "market_value": 332.12, "unrealized_pl": -20.25}, "MA": {"qty": 1.0, "avg_price": 490.0, "market_value": 547.45, "unrealized_pl": 57.45}, "MSFT": {"qty": 3.0, "avg_price": 370.58, "market_value": 1200.66, "unrealized_pl": 88.92}, "MU": {"qty": 1.0, "avg_price": 860.74, "market_value": 901.86, "unrealized_pl": 41.12}, "PSX": {"qty": 3.0, "avg_price": 172.23, "market_value": 626.4, "unrealized_pl": 109.71}, "QCOM": {"qty": 5.0, "avg_price": 183.976, "market_value": 867.45, "unrealized_pl": -52.43}, "SPGI": {"qty": 1.0, "avg_price": 440.94, "market_value": 448.35, "unrealized_pl": 7.41}, "SPY": {"qty": 95.0, "avg_price": 752.858842, "market_value": 70846.25, "unrealized_pl": -675.33999}, "UBER": {"qty": 3.0, "avg_price": 73.07, "market_value": 217.32, "unrealized_pl": -1.89}, "UNH": {"qty": 2.0, "avg_price": 382.89, "market_value": 844.48, "unrealized_pl": 78.7}, "VZ": {"qty": -26.0, "avg_price": 42.704231, "market_value": -1129.7, "unrealized_pl": -19.389994}, "WFC": {"qty": 11.0, "avg_price": 84.17, "market_value": 951.1667, "unrealized_pl": 25.2967}, "WM": {"qty": 1.0, "avg_price": 232.91, "market_value": 239.05, "unrealized_pl": 6.14}, "XLV": {"qty": 11.0, "avg_price": 145.441818, "market_value": 1746.58, "unrealized_pl": 146.720002}}','SYNCED',NULL,'2026-07-21 05:45:50');
+INSERT INTO broker_state VALUES(319,'20260721_054846_2d74','2026-07-21','START',14516.4099999999998,95505.3200000000069,282123.299999999988,'[{"symbol": "CMG", "qty": 11.0, "market_value": 365.42}, {"symbol": "CSCO", "qty": 8.0, "market_value": 885.68}, {"symbol": "GIS", "qty": 29.0, "market_value": 1088.3091}, {"symbol": "HD", "qty": 1.0, "market_value": 332.12}, {"symbol": "MA", "qty": 1.0, "market_value": 547.45}, {"symbol": "MSFT", "qty": 3.0, "market_value": 1201.29}, {"symbol": "MU", "qty": 1.0, "market_value": 903.57}, {"symbol": "PSX", "qty": 3.0, "market_value": 626.4}, {"symbol": "QCOM", "qty": 5.0, "market_value": 867.75}, {"symbol": "SPGI", "qty": 1.0, "market_value": 448.35}, {"symbol": "SPY", "qty": 95.0, "market_value": 70853.85}, {"symbol": "UBER", "qty": 3.0, "market_value": 217.32}, {"symbol": "UNH", "qty": 2.0, "market_value": 844.3}, {"symbol": "VZ", "qty": -26.0, "market_value": -1129.7}, {"symbol": "WFC", "qty": 11.0, "market_value": 951.1667}, {"symbol": "WM", "qty": 1.0, "market_value": 239.05}, {"symbol": "XLV", "qty": 11.0, "market_value": 1746.58}]','SKIPPED','[]','2026-07-21 05:48:57');
+INSERT INTO broker_state VALUES(320,'20260721_054846_2d74','2026-07-21','RECONCILIATION',14516.4099999999998,95505.3200000000069,282123.299999999988,'[{"symbol": "CMG", "qty": 11.0, "market_value": 365.42}, {"symbol": "CSCO", "qty": 8.0, "market_value": 885.68}, {"symbol": "GIS", "qty": 29.0, "market_value": 1088.3091}, {"symbol": "HD", "qty": 1.0, "market_value": 332.12}, {"symbol": "MA", "qty": 1.0, "market_value": 547.45}, {"symbol": "MSFT", "qty": 3.0, "market_value": 1201.29}, {"symbol": "MU", "qty": 1.0, "market_value": 903.57}, {"symbol": "PSX", "qty": 3.0, "market_value": 626.4}, {"symbol": "QCOM", "qty": 5.0, "market_value": 867.75}, {"symbol": "SPGI", "qty": 1.0, "market_value": 448.35}, {"symbol": "SPY", "qty": 95.0, "market_value": 70853.85}, {"symbol": "UBER", "qty": 3.0, "market_value": 217.32}, {"symbol": "UNH", "qty": 2.0, "market_value": 844.3}, {"symbol": "VZ", "qty": -26.0, "market_value": -1129.7}, {"symbol": "WFC", "qty": 11.0, "market_value": 951.1667}, {"symbol": "WM", "qty": 1.0, "market_value": 239.05}, {"symbol": "XLV", "qty": 11.0, "market_value": 1746.58}]','PASS','[]','2026-07-21 05:48:58');
+INSERT INTO broker_state VALUES(321,'20260721_054846_2d74','2026-07-21','END',14516.4099999999998,95505.2799999999988,282123.179999999993,'[{"symbol": "CMG", "qty": 11.0, "market_value": 365.42}, {"symbol": "CSCO", "qty": 8.0, "market_value": 885.68}, {"symbol": "GIS", "qty": 29.0, "market_value": 1088.3091}, {"symbol": "HD", "qty": 1.0, "market_value": 332.12}, {"symbol": "MA", "qty": 1.0, "market_value": 547.45}, {"symbol": "MSFT", "qty": 3.0, "market_value": 1201.29}, {"symbol": "MU", "qty": 1.0, "market_value": 903.53}, {"symbol": "PSX", "qty": 3.0, "market_value": 626.4}, {"symbol": "QCOM", "qty": 5.0, "market_value": 867.75}, {"symbol": "SPGI", "qty": 1.0, "market_value": 448.35}, {"symbol": "SPY", "qty": 95.0, "market_value": 70853.85}, {"symbol": "UBER", "qty": 3.0, "market_value": 217.32}, {"symbol": "UNH", "qty": 2.0, "market_value": 844.3}, {"symbol": "VZ", "qty": -26.0, "market_value": -1129.7}, {"symbol": "WFC", "qty": 11.0, "market_value": 951.1667}, {"symbol": "WM", "qty": 1.0, "market_value": 239.05}, {"symbol": "XLV", "qty": 11.0, "market_value": 1746.58}]','PASS','[]','2026-07-21 05:49:01');
 CREATE TABLE system_state (
                 key TEXT PRIMARY KEY,
                 value TEXT,
@@ -1224,11 +1232,11 @@ CREATE TABLE system_state (
 INSERT INTO system_state VALUES('peak_portfolio_value','97855.08','2026-04-30 23:54:53');
 INSERT INTO system_state VALUES('partial_exit_2_XLV','0','2026-05-21 23:18:57');
 INSERT INTO system_state VALUES('partial_exit_4_UNH','1','2026-07-10 05:49:08');
-INSERT INTO system_state VALUES('unfilled_opg_swept','{"date": "2026-07-20", "count": 1, "symbols": ["MU"]}','2026-07-20 05:45:51');
-INSERT INTO system_state VALUES('peak_alpha_value','96960.28','2026-07-20 06:12:58');
-INSERT INTO system_state VALUES('regime','{"classification": "NORMAL", "vix": 18.8, "volatility_regime": "normal", "trend_regime": "strong_trend", "hmm_regime": "unknown", "composite_regime": "RANGING"}','2026-07-20 06:13:04');
-INSERT INTO system_state VALUES('cumulative_pnl','33.95999999999185','2026-07-20 06:13:09');
-INSERT INTO system_state VALUES('max_drawdown','3.664245126568808','2026-07-20 06:13:09');
+INSERT INTO system_state VALUES('unfilled_opg_swept','{"date": "2026-07-21", "count": 0, "symbols": []}','2026-07-21 05:45:50');
+INSERT INTO system_state VALUES('peak_alpha_value','96960.28','2026-07-21 05:48:47');
+INSERT INTO system_state VALUES('regime','{"classification": "NORMAL", "vix": 18.6, "volatility_regime": "normal", "trend_regime": "strong_trend", "hmm_regime": "unknown", "composite_regime": "RANGING"}','2026-07-21 05:48:57');
+INSERT INTO system_state VALUES('cumulative_pnl','34.48999999999069','2026-07-21 05:49:01');
+INSERT INTO system_state VALUES('max_drawdown','3.664245126568808','2026-07-21 05:49:01');
 CREATE TABLE signal_funnel (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 run_id TEXT NOT NULL,
@@ -1577,6 +1585,13 @@ INSERT INTO signal_funnel VALUES(332,'20260720_061257_thyh',7,'MA Crossover',0,0
 INSERT INTO signal_funnel VALUES(333,'20260720_061257_thyh',8,'Volatility Breakout',0,0,0,0,0,'2026-07-20 06:13:07');
 INSERT INTO signal_funnel VALUES(334,'20260720_061257_thyh',10,'Sector Rotation',0,0,0,0,0,'2026-07-20 06:13:08');
 INSERT INTO signal_funnel VALUES(335,'20260720_061257_thyh',11,'Dual Momentum',5,4,4,4,0,'2026-07-20 06:13:09');
+INSERT INTO signal_funnel VALUES(336,'20260721_054846_2d74',1,'RSI Mean Reversion',0,0,0,0,0,'2026-07-21 05:48:58');
+INSERT INTO signal_funnel VALUES(337,'20260721_054846_2d74',3,'Earnings Drift',0,0,0,0,0,'2026-07-21 05:48:58');
+INSERT INTO signal_funnel VALUES(338,'20260721_054846_2d74',4,'Factor Momentum',0,0,0,0,0,'2026-07-21 05:48:59');
+INSERT INTO signal_funnel VALUES(339,'20260721_054846_2d74',7,'MA Crossover',0,0,0,0,0,'2026-07-21 05:48:59');
+INSERT INTO signal_funnel VALUES(340,'20260721_054846_2d74',8,'Volatility Breakout',0,0,0,0,0,'2026-07-21 05:48:59');
+INSERT INTO signal_funnel VALUES(341,'20260721_054846_2d74',10,'Sector Rotation',0,0,0,0,0,'2026-07-21 05:48:59');
+INSERT INTO signal_funnel VALUES(342,'20260721_054846_2d74',11,'Dual Momentum',5,4,4,4,0,'2026-07-21 05:49:00');
 CREATE TABLE signal_rejections (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 run_id TEXT NOT NULL,
@@ -2017,6 +2032,11 @@ INSERT INTO signal_rejections VALUES(424,'20260720_061257_thyh',NULL,11,'INTC','
 INSERT INTO signal_rejections VALUES(425,'20260720_061257_thyh',NULL,11,'LRCX','RISK','max_positions_reached',NULL,'2026-07-20 06:13:09');
 INSERT INTO signal_rejections VALUES(426,'20260720_061257_thyh',NULL,11,'AMD','RISK','max_positions_reached',NULL,'2026-07-20 06:13:09');
 INSERT INTO signal_rejections VALUES(427,'20260720_061257_thyh',NULL,11,'AMAT','RISK','max_positions_reached',NULL,'2026-07-20 06:13:09');
+INSERT INTO signal_rejections VALUES(428,'20260721_054846_2d74',NULL,11,'MU','CORRELATION','high_correlation','{"threshold": 0.8}','2026-07-21 05:49:00');
+INSERT INTO signal_rejections VALUES(429,'20260721_054846_2d74',NULL,11,'INTC','RISK','max_positions_reached',NULL,'2026-07-21 05:49:00');
+INSERT INTO signal_rejections VALUES(430,'20260721_054846_2d74',NULL,11,'LRCX','RISK','max_positions_reached',NULL,'2026-07-21 05:49:00');
+INSERT INTO signal_rejections VALUES(431,'20260721_054846_2d74',NULL,11,'AMD','RISK','max_positions_reached',NULL,'2026-07-21 05:49:00');
+INSERT INTO signal_rejections VALUES(432,'20260721_054846_2d74',NULL,11,'AMAT','RISK','max_positions_reached',NULL,'2026-07-21 05:49:00');
 CREATE TABLE order_intents (
                 intent_id TEXT PRIMARY KEY,
                 run_id TEXT NOT NULL,
@@ -2617,6 +2637,13 @@ INSERT INTO strategy_performance VALUES(329,'20260720_061257_thyh',7,'2026-07-20
 INSERT INTO strategy_performance VALUES(330,'20260720_061257_thyh',8,'2026-07-20',12147.0244499999989,12147.0244499999989,0.0,4.99999999999998578,0,0,'2026-07-20 06:13:07');
 INSERT INTO strategy_performance VALUES(331,'20260720_061257_thyh',10,'2026-07-20',7424.83157090464555,7424.83157090464555,0.0,-35.8190709046454784,0,0,'2026-07-20 06:13:08');
 INSERT INTO strategy_performance VALUES(332,'20260720_061257_thyh',11,'2026-07-20',17819.5957701711486,17819.5957701711486,0.0,54.0342298288508402,0,0,'2026-07-20 06:13:09');
+INSERT INTO strategy_performance VALUES(333,'20260721_054846_2d74',1,'2026-07-21',9527.12420537897196,8661.66420537897283,865.460000000000036,-17.8484107579462119,1,0,'2026-07-21 05:48:58');
+INSERT INTO strategy_performance VALUES(334,'20260721_054846_2d74',3,'2026-07-21',8782.81762683373926,7575.94762683373937,1206.87000000000011,-24.2665036674816718,1,0,'2026-07-21 05:48:58');
+INSERT INTO strategy_performance VALUES(335,'20260721_054846_2d74',4,'2026-07-21',17267.9126222493869,16424.8126222493883,843.100000000000022,48.8997555012224935,1,0,'2026-07-21 05:48:59');
+INSERT INTO strategy_performance VALUES(336,'20260721_054846_2d74',7,'2026-07-21',8117.90374999999949,6835.23374999999941,1282.67000000000007,-30.0,2,0,'2026-07-21 05:48:59');
+INSERT INTO strategy_performance VALUES(337,'20260721_054846_2d74',8,'2026-07-21',12176.8556249999983,12176.8556249999983,0.0,4.99999999999999467,0,0,'2026-07-21 05:48:59');
+INSERT INTO strategy_performance VALUES(338,'20260721_054846_2d74',10,'2026-07-21',7443.06578545232241,7443.06578545232241,0.0,-35.8190709046454713,0,0,'2026-07-21 05:48:59');
+INSERT INTO strategy_performance VALUES(339,'20260721_054846_2d74',11,'2026-07-21',17863.3578850855737,17863.3578850855737,0.0,54.0342298288508686,0,0,'2026-07-21 05:49:00');
 CREATE TABLE daily_portfolio_snapshot (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 run_id TEXT NOT NULL,
@@ -2712,6 +2739,7 @@ INSERT INTO daily_portfolio_snapshot VALUES(127,'snapshot','2026-07-17',95334.96
 INSERT INTO daily_portfolio_snapshot VALUES(130,'snapshot','2026-07-18',95269.5899999999965,15377.17,79892.4199999999982,0.0,-65.3700000000098953,-0.000685687600855026252,-2585.49000000000523,-0.0264216226689509142,97855.0800000000017,16,NULL,NULL,'{"CMG": 378.84, "CSCO": 895.52, "GIS": 1101.13, "HD": 338.87, "MA": 543.6, "MSFT": 1181.46, "PSX": 620.58, "QCOM": 858.9, "SPGI": 450.84, "SPY": 70612.55, "UBER": 217.38, "UNH": 852.18, "VZ": -1133.34, "WFC": 962.61, "WM": 239.31, "XLV": 1771.99}','2026-07-18 04:09:44');
 INSERT INTO daily_portfolio_snapshot VALUES(131,'snapshot','2026-07-19',95269.5700000000069,15377.1499999999996,79892.4200000000128,0.0,-0.019999999989522621,-2.09930576897860296e-07,-2585.50999999999476,-0.0264218270528213221,97855.0800000000017,16,NULL,NULL,'{"CMG": 378.84, "CSCO": 895.52, "GIS": 1101.13, "HD": 338.87, "MA": 543.6, "MSFT": 1181.46, "PSX": 620.58, "QCOM": 858.9, "SPGI": 450.84, "SPY": 70612.55, "UBER": 217.38, "UNH": 852.18, "VZ": -1133.34, "WFC": 962.61, "WM": 239.31, "XLV": 1771.99}','2026-07-19 04:29:30');
 INSERT INTO daily_portfolio_snapshot VALUES(132,'snapshot','2026-07-20',95270.7799999999988,15377.1499999999996,79893.6300000000046,83.8595317472996555,-164.580000000001746,-0.00172451804027356049,-2584.30000000000291,0.0264094618286552194,97855.0800000000017,16,18.8000000000000007,'normal/?','{"1": 8653.99, "3": 7579.84, "4": 16373.43, "7": 6796.54, "8": 12147.02, "10": 7424.83, "11": 17819.6}','2026-07-20 04:46:00');
+INSERT INTO daily_portfolio_snapshot VALUES(134,'snapshot','2026-07-21',95505.2799999999988,14516.4099999999998,80988.8658000000286,84.8004066372037499,77.2299999999959254,0.000809300829263470493,-2349.80000000000291,0.0240130609468614496,97855.0800000000017,17,18.6000000000000014,'normal/?','{"1": 8661.66, "3": 7575.95, "4": 16424.81, "7": 6835.23, "8": 12176.86, "10": 7443.07, "11": 17863.36}','2026-07-21 04:24:29');
 CREATE TABLE trade_pnl_detail (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 strategy_id INTEGER NOT NULL,
@@ -2853,6 +2881,7 @@ INSERT INTO run_state VALUES('20260716_054833_qat4','COMPLETE','SUCCESS',NULL,NU
 INSERT INTO run_state VALUES('20260717_054826_igi7','COMPLETE','SUCCESS',NULL,NULL,'2026-07-17T05:48:26.390003','2026-07-17T05:49:19.838445','2026-07-17T05:49:19.838445');
 INSERT INTO run_state VALUES('20260717_093414_0fl7','COMPLETE','SUCCESS',NULL,NULL,'2026-07-17T09:34:14.151844','2026-07-17T09:34:15.183074','2026-07-17T09:34:15.183074');
 INSERT INTO run_state VALUES('20260720_061257_thyh','COMPLETE','SUCCESS',NULL,NULL,'2026-07-20T06:12:57.718953','2026-07-20T06:13:09.716064','2026-07-20T06:13:09.716064');
+INSERT INTO run_state VALUES('20260721_054846_2d74','COMPLETE','SUCCESS',NULL,NULL,'2026-07-21T05:48:46.277735','2026-07-21T05:49:01.535798','2026-07-21T05:49:01.535798');
 CREATE TABLE notification_outbox (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 run_id TEXT,
@@ -3011,6 +3040,7 @@ INSERT INTO run_slo_metrics VALUES('20260716_054833_qat4','{"runtime_seconds": 1
 INSERT INTO run_slo_metrics VALUES('20260717_054826_igi7','{"runtime_seconds": 53.337, "signals_total": 17, "signals_terminalized": 17, "signals_terminalized_pct": 100.0, "executed_trades_count": 0, "confirmed_fills_count": 0, "rejected_orders_count": 0, "pending_orders_count": 0, "error_count": 1, "reconciliation_status": "PASS", "drawdown": 2.5852004821824273, "max_drawdown": 3.664245126568808, "daily_pnl": 32.070000000006985, "cumulative_pnl": 33.95999999999185, "run_id": "20260717_054826_igi7"}','2026-07-17T05:49:19.709688');
 INSERT INTO run_slo_metrics VALUES('20260717_093414_0fl7','{"runtime_seconds": 0.823, "signals_total": 0, "signals_terminalized": 0, "signals_terminalized_pct": 100.0, "executed_trades_count": 0, "confirmed_fills_count": 0, "rejected_orders_count": 0, "pending_orders_count": 0, "error_count": 0, "reconciliation_status": "UNKNOWN", "drawdown": 2.575359398817103, "max_drawdown": 3.664245126568808, "daily_pnl": 0.0, "cumulative_pnl": 33.95999999999185, "run_id": "20260717_093414_0fl7"}','2026-07-17T09:34:14.957855');
 INSERT INTO run_slo_metrics VALUES('20260720_061257_thyh','{"runtime_seconds": 11.738, "signals_total": 10, "signals_terminalized": 10, "signals_terminalized_pct": 100.0, "executed_trades_count": 1, "confirmed_fills_count": 1, "rejected_orders_count": 0, "pending_orders_count": 0, "error_count": 0, "reconciliation_status": "PASS", "drawdown": 2.640946182865522, "max_drawdown": 3.664245126568808, "daily_pnl": 0.0, "cumulative_pnl": 33.95999999999185, "run_id": "20260720_061257_thyh"}','2026-07-20T06:13:09.442818');
+INSERT INTO run_slo_metrics VALUES('20260721_054846_2d74','{"runtime_seconds": 14.989, "signals_total": 4, "signals_terminalized": 4, "signals_terminalized_pct": 100.0, "executed_trades_count": 0, "confirmed_fills_count": 0, "rejected_orders_count": 0, "pending_orders_count": 0, "error_count": 0, "reconciliation_status": "PASS", "drawdown": 2.401306094686145, "max_drawdown": 3.664245126568808, "daily_pnl": 0.5299999999988358, "cumulative_pnl": 34.48999999999069, "run_id": "20260721_054846_2d74"}','2026-07-21T05:49:01.248954');
 CREATE TABLE pending_signals (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 strategy_id INTEGER NOT NULL,
@@ -3205,6 +3235,7 @@ INSERT INTO fill_quality VALUES(165,'20260710_054852_pte6',4,'UNH','SELL',431.46
 INSERT INTO fill_quality VALUES(166,'20260710_054852_pte6',7,'WM','BUY',231.785834999999963,232.909999999999996,1.0,49,'2026-07-13 05:45:53');
 INSERT INTO fill_quality VALUES(167,'20260717_054826_igi7',4,'MU','SELL',853.200000000000045,827.659999999999968,1.0,-299,'2026-07-20 05:45:52');
 INSERT INTO fill_quality VALUES(168,'20260720_061257_thyh',1,'MU','BUY',848.950000000000045,849.374474999999961,1.0,5,'2026-07-20 06:13:06');
+INSERT INTO fill_quality VALUES(169,'20260720_061257_thyh',1,'MU','BUY',849.374474999999961,860.740000000000009,1.0,134,'2026-07-21 05:45:51');
 CREATE TABLE stop_loss_state (
                     symbol TEXT PRIMARY KEY,
                     stop_price REAL NOT NULL,
@@ -3224,11 +3255,11 @@ INSERT INTO stop_loss_state VALUES('GIS',33.3339474999999936,36.1380599999999958
 INSERT INTO stop_loss_state VALUES('SPGI',405.900808054494064,443.681729999999959,15.1123687782023701,'2026-07-08 05:49:06','long');
 INSERT INTO stop_loss_state VALUES('CMG',30.5904024999999961,33.4467149999999975,1.14252500000000112,'2026-07-09 05:59:18','long');
 INSERT INTO stop_loss_state VALUES('WM',219.865234999999984,231.785834999999963,4.76823999999999692,'2026-07-10 05:49:09','long');
-INSERT INTO stop_loss_state VALUES('UNH',354.173250000000052,382.890000000000043,11.4867000000000008,'2026-07-20 06:12:58','long');
-INSERT INTO stop_loss_state VALUES('HD',329.547101502177497,351.015419999999949,8.58732739912897713,'2026-07-20 06:12:58','long');
-INSERT INTO stop_loss_state VALUES('WFC',83.8819199999999938,83.8819199999999938,2.03582999999999714,'2026-07-20 06:12:58','long');
-INSERT INTO stop_loss_state VALUES('MSFT',368.754284999999981,368.754284999999981,13.7354950000000055,'2026-07-20 06:12:58','long');
-INSERT INTO stop_loss_state VALUES('MU',613.297000000000025,849.374474999999961,94.4309899999999942,'2026-07-20 06:13:06','long');
+INSERT INTO stop_loss_state VALUES('MU',613.297000000000025,849.374474999999961,94.4309899999999942,'2026-07-21 05:48:47','long');
+INSERT INTO stop_loss_state VALUES('UNH',354.173250000000052,382.890000000000043,11.4867000000000008,'2026-07-21 05:48:47','long');
+INSERT INTO stop_loss_state VALUES('HD',329.547101502177497,351.015419999999949,8.58732739912897713,'2026-07-21 05:48:47','long');
+INSERT INTO stop_loss_state VALUES('WFC',83.8819199999999938,83.8819199999999938,2.03582999999999714,'2026-07-21 05:48:47','long');
+INSERT INTO stop_loss_state VALUES('MSFT',382.489779999999996,368.754284999999981,13.7354950000000055,'2026-07-21 05:48:47','long');
 CREATE TABLE run_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     run_id TEXT NOT NULL UNIQUE,
@@ -3271,6 +3302,7 @@ INSERT INTO run_history VALUES(37,'20260715_093701_vldb','2026-07-15','YELLOW','
 INSERT INTO run_history VALUES(38,'20260716_054833_qat4','2026-07-16','GREEN','SUCCESS','[]',96386.1499999999941,0,0.0,'2026-07-16 05:48:54');
 INSERT INTO run_history VALUES(40,'20260717_054826_igi7','2026-07-17','RED','SUCCESS','["guardrails_clean"]',95325.3300000000017,1,0.0,'2026-07-17 09:34:23');
 INSERT INTO run_history VALUES(41,'20260720_061257_thyh','2026-07-20','GREEN','SUCCESS','[]',95270.7799999999988,1,0.400000000000000022,'2026-07-20 06:13:19');
+INSERT INTO run_history VALUES(42,'20260721_054846_2d74','2026-07-21','GREEN','SUCCESS','[]',95505.2799999999988,0,0.0,'2026-07-21 05:49:10');
 CREATE TABLE tax_lots (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     strategy_id INTEGER NOT NULL,
@@ -6231,22 +6263,156 @@ INSERT INTO sentiment_history VALUES('2026-07-20','XLB',0.517800000000000037,3,'
 INSERT INTO sentiment_history VALUES('2026-07-20','XLU',0.567400000000000015,3,'2026-07-20 06:13:18');
 INSERT INTO sentiment_history VALUES('2026-07-20','XLRE',0.549000000000000043,3,'2026-07-20 06:13:18');
 INSERT INTO sentiment_history VALUES('2026-07-20','XLC',0.511199999999999987,3,'2026-07-20 06:13:18');
+INSERT INTO sentiment_history VALUES('2026-07-21','AAPL',0.558300000000000018,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','MSFT',0.573999999999999954,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','GOOGL',0.507199999999999984,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','AMZN',0.637099999999999999,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','META',0.556100000000000038,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','TSLA',0.539699999999999957,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','NVDA',0.602600000000000024,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','NFLX',0.433499999999999996,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','ADBE',0.546900000000000052,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','AVGO',0.500399999999999955,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','CRM',0.474399999999999988,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','AMD',0.540599999999999969,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','COST',0.495499999999999996,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','MCD',0.583799999999999985,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','NKE',0.522700000000000053,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','WMT',0.510399999999999964,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','HD',0.5,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','DIS',0.552200000000000024,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','JNJ',0.511199999999999987,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','ABBV',0.554499999999999992,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','MRK',0.57779999999999998,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','TMO',0.508700000000000041,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','DHR',0.516700000000000048,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','ABT',0.605500000000000038,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','UNH',0.572699999999999986,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','LLY',0.584799999999999986,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','MA',0.633099999999999996,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','JPM',0.550000000000000044,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','V',0.520599999999999951,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','KO',0.523599999999999954,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','PEP',0.494999999999999995,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','PG',0.508199999999999985,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','XOM',0.541799999999999948,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','CVX',0.493099999999999982,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','VZ',0.455600000000000005,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','ACN',0.544100000000000028,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','ORCL',0.415300000000000002,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','CSCO',0.553300000000000014,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','INTC',0.575799999999999978,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','QCOM',0.519499999999999961,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','TXN',0.531900000000000039,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','IBM',0.446400000000000019,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','NOW',0.642800000000000038,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','INTU',0.546399999999999996,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','AMAT',0.558000000000000051,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','MU',0.466500000000000025,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','LRCX',0.576300000000000034,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','KLAC',0.530100000000000015,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','PANW',0.550100000000000033,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','ANET',0.557100000000000039,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','ADI',0.603600000000000025,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','BAC',0.584799999999999986,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','WFC',0.713099999999999956,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','GS',0.565999999999999947,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','MS',0.560000000000000053,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','C',0.551899999999999946,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','SCHW',0.64139999999999997,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','BLK',0.641599999999999948,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','AXP',0.632299999999999973,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','SPGI',0.613500000000000045,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','COF',0.567100000000000048,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','PFE',0.501299999999999967,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','BMY',0.557599999999999984,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','AMGN',0.617600000000000037,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','GILD',0.532800000000000051,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','CVS',0.569300000000000028,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','CI',0.590500000000000024,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','ISRG',0.490300000000000013,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','SYK',0.615500000000000047,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','BSX',0.423399999999999998,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','MDT',0.498699999999999976,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','REGN',0.605400000000000049,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','VRTX',0.561499999999999999,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','ZTS',0.646599999999999952,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','SBUX',0.555300000000000015,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','TGT',0.526599999999999957,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','LOW',0.456500000000000016,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','TJX',0.64800000000000002,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','BKNG',0.616600000000000036,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','CMG',0.501399999999999956,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','ORLY',0.485399999999999998,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','ROST',0.529699999999999948,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','GM',0.514700000000000046,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','UBER',0.662100000000000021,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','CL',0.609500000000000041,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','KMB',0.551799999999999957,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','MDLZ',0.561699999999999977,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','MO',0.595600000000000018,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','PM',0.605800000000000005,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','GIS',0.525399999999999978,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','CAT',0.519399999999999972,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','DE',0.604899999999999993,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','BA',0.571100000000000052,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','GE',0.527499999999999968,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','HON',0.559599999999999986,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','UNP',0.590600000000000013,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','UPS',0.618700000000000027,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','FDX',0.577200000000000046,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','LMT',0.609800000000000008,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','RTX',0.496499999999999996,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','ETN',0.561799999999999966,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','EMR',0.597099999999999964,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','CSX',0.559499999999999997,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','WM',0.387400000000000022,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','COP',0.528000000000000024,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','SLB',0.54049999999999998,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','EOG',0.613900000000000001,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','MPC',0.549100000000000032,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','PSX',0.465500000000000024,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','LIN',0.593899999999999983,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','APD',0.603700000000000014,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','SHW',0.510499999999999953,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','FCX',0.553799999999999959,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','NEE',0.6754,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','DUK',0.649499999999999966,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','SO',0.536200000000000009,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','T',0.515100000000000002,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','TMUS',0.53169999999999995,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','CMCSA',0.504499999999999948,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','PLD',0.665399999999999991,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','AMT',0.559899999999999953,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','SPY',0.505800000000000027,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','QQQ',0.567599999999999993,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','XLK',0.610800000000000009,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','XLF',0.529399999999999981,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','XLE',0.608099999999999973,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','XLV',0.646700000000000052,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','XLP',0.509700000000000041,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','XLY',0.498599999999999987,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','XLI',0.568799999999999972,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','XLB',0.503800000000000025,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','XLU',0.582999999999999962,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','XLRE',0.562999999999999944,3,'2026-07-21 05:49:08');
+INSERT INTO sentiment_history VALUES('2026-07-21','XLC',0.522900000000000031,3,'2026-07-21 05:49:08');
 DELETE FROM sqlite_sequence;
 INSERT INTO sqlite_sequence VALUES('strategies',12);
 INSERT INTO sqlite_sequence VALUES('notification_outbox',66);
-INSERT INTO sqlite_sequence VALUES('broker_state',317);
+INSERT INTO sqlite_sequence VALUES('broker_state',321);
 INSERT INTO sqlite_sequence VALUES('positions',297);
-INSERT INTO sqlite_sequence VALUES('signals',549);
+INSERT INTO sqlite_sequence VALUES('signals',553);
 INSERT INTO sqlite_sequence VALUES('trades',247);
-INSERT INTO sqlite_sequence VALUES('signal_funnel',335);
-INSERT INTO sqlite_sequence VALUES('strategy_performance',332);
-INSERT INTO sqlite_sequence VALUES('daily_portfolio_snapshot',133);
+INSERT INTO sqlite_sequence VALUES('signal_funnel',342);
+INSERT INTO sqlite_sequence VALUES('strategy_performance',339);
+INSERT INTO sqlite_sequence VALUES('daily_portfolio_snapshot',135);
 INSERT INTO sqlite_sequence VALUES('trade_pnl_detail',37);
-INSERT INTO sqlite_sequence VALUES('signal_rejections',427);
-INSERT INTO sqlite_sequence VALUES('fill_quality',168);
+INSERT INTO sqlite_sequence VALUES('signal_rejections',432);
+INSERT INTO sqlite_sequence VALUES('fill_quality',169);
 INSERT INTO sqlite_sequence VALUES('tax_lots',102);
 INSERT INTO sqlite_sequence VALUES('trade_audit_log',136);
-INSERT INTO sqlite_sequence VALUES('run_history',41);
+INSERT INTO sqlite_sequence VALUES('run_history',42);
 CREATE INDEX idx_signals_run_id ON signals(run_id);
 CREATE INDEX idx_signals_symbol ON signals(symbol);
 CREATE INDEX idx_signals_terminal_state ON signals(terminal_state);
