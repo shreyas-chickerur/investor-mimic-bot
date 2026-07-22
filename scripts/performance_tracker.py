@@ -122,7 +122,15 @@ def load_portfolio_snapshots(conn: sqlite3.Connection) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def compute_portfolio_metrics(db_path: str) -> dict:
+def compute_portfolio_metrics(db_path: str, since: str | None = None) -> dict:
+    """Compute portfolio + trade metrics.
+
+    ``since`` (an ISO date, e.g. '2026-07-02') restricts BOTH trade-level and
+    equity-curve metrics to on/after that date. Live-readiness callers pass the
+    date real order fills began so that pre-fix OPG-era phantom trades (which
+    almost never actually filled) don't inflate readiness. Default None keeps
+    the historical all-time behaviour for the standalone performance report.
+    """
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
@@ -130,6 +138,12 @@ def compute_portfolio_metrics(db_path: str) -> dict:
         trades = load_trades(conn)
     finally:
         conn.close()
+
+    if since:
+        # executed_at is an ISO timestamp and snapshot_date an ISO date, so
+        # lexical comparison against an ISO date is a correct date filter.
+        trades = [t for t in trades if (t.get("executed_at") or "") >= since]
+        snapshots = [s for s in snapshots if (s.get("snapshot_date") or "") >= since]
 
     result: dict = {
         "computed_at": datetime.now().isoformat(),

@@ -449,10 +449,25 @@ jobs:
       continue-on-error: true  # outcome feeds the final health gate; alerts go via outbox
       run: |
         echo "=== Post-run Expectation Check ==="
+        set +e
         python3 scripts/post_run_expect.py \
           --db trading.db \
           --out artifacts/diagnostics/expect_check.json
-        echo "Exit code: $?"
+        EXIT_CODE=$?
+        set -e
+        echo "Exit code: $EXIT_CODE"
+        # Exit code contract (post_run_expect.py): 0=all ok, 1=critical
+        # failure, 2=high-severity-only (critical passed). A high-only
+        # finding (e.g. fill rate reading low for a few days right after a
+        # fix deploys) already gets its own alert email via the
+        # notification outbox and shows up as YELLOW in run_health.json —
+        # it must not fail this step, or the final health gate below
+        # treats a known/expected finding as an infra failure, which also
+        # fools the backup-cron dedup gate (precheck job) into thinking the
+        # dispatched run never succeeded and re-running the whole pipeline.
+        if [ "$EXIT_CODE" -ne 0 ] && [ "$EXIT_CODE" -ne 2 ]; then
+          exit 1
+        fi
 
     # Runs AFTER the expectation check so alerts it queues (and anything the
     # engine queued during trading) are delivered in this same run.
@@ -1140,7 +1155,11 @@ jobs:
         # Diagnostic/publishing steps run with continue-on-error so the DB
         # upload and email always happen — but their failures must not pass
         # silently. Any failed outcome below fails the gate (and the
-        # failure-notification email fires).
+        # failure-notification email fires). expect_check's outcome here
+        # only reflects a *critical* expectation failure or a genuine crash
+        # of the script — high-severity-only findings exit 0 from that step
+        # (see the "Post-run expectation check" step above) and are still
+        # surfaced as YELLOW via the run_health overall check further down.
         FAILED_STEPS=""
         [ "${{ steps.expect_check.outcome }}" = "failure" ]          && FAILED_STEPS="$FAILED_STEPS expect_check"
         [ "${{ steps.check_reconciliation.outcome }}" = "failure" ] && FAILED_STEPS="$FAILED_STEPS check_reconciliation"

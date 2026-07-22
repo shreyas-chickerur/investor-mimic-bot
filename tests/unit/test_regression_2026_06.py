@@ -135,21 +135,29 @@ def test_exposure_pct_not_double_multiplied(tmp_path):
 
 def test_recon_rate_counts_distinct_runs(tmp_path):
     """A run with FAIL+RETRY-PASS counts as 1 passing run, not 1 fail + 1 pass."""
+    from datetime import datetime, timedelta
+
     from src.core.database import TradingDatabase
 
     TradingDatabase(str(tmp_path / "trading.db"))
 
+    # Relative dates: the query below filters on a rolling 30-day window, so
+    # hardcoded timestamps become a time bomb (this test silently expired on
+    # 2026-07-09 when its 2026-06-09 fixtures aged out of the window).
+    yesterday = datetime.now() - timedelta(days=1)
+    snap_date = yesterday.strftime("%Y-%m-%d")
+
     with sqlite3.connect(str(tmp_path / "trading.db")) as conn:
         # Run A: initial fail, then retry passes
         for snap_type, status, ts in [
-            ("RECONCILIATION", "FAIL", "2026-06-09T10:00:00"),
-            ("RECONCILIATION_RETRY", "PASS", "2026-06-09T10:01:00"),
+            ("RECONCILIATION", "FAIL", f"{snap_date}T10:00:00"),
+            ("RECONCILIATION_RETRY", "PASS", f"{snap_date}T10:01:00"),
         ]:
             conn.execute(
                 "INSERT INTO broker_state (run_id, snapshot_date, snapshot_type, cash, "
                 "portfolio_value, buying_power, positions_json, reconciliation_status, "
                 "discrepancies_json, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                ("RUN_A", "2026-06-09", snap_type, 0, 0, 0, "[]", status, "[]", ts),
+                ("RUN_A", snap_date, snap_type, 0, 0, 0, "[]", status, "[]", ts),
             )
         # Run B: clean pass
         conn.execute(
@@ -158,7 +166,7 @@ def test_recon_rate_counts_distinct_runs(tmp_path):
             "discrepancies_json, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
             (
                 "RUN_B",
-                "2026-06-09",
+                snap_date,
                 "RECONCILIATION",
                 0,
                 0,
@@ -166,7 +174,7 @@ def test_recon_rate_counts_distinct_runs(tmp_path):
                 "[]",
                 "PASS",
                 "[]",
-                "2026-06-09T11:00:00",
+                f"{snap_date}T11:00:00",
             ),
         )
         conn.commit()
