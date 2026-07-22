@@ -59,6 +59,61 @@ def _get_local_positions(cursor):
     return by_symbol
 
 
+#: How far back to look for an order intent that explains an untracked broker
+#: position. DAY marketable limits placed pre-market fill intraday the SAME
+#: day, so the originating intent is normally 1 trading day old at sync time;
+#: 5 calendar days covers long weekends + a missed run without matching
+#: ancient intents to a genuinely manual/unknown position.
+INTENT_ATTRIBUTION_LOOKBACK_DAYS = 5
+
+
+def _find_entry_intent(cursor, symbol, broker_qty, lookback_days=INTENT_ATTRIBUTION_LOOKBACK_DAYS):
+    """Find the order intent that explains an untracked broker position.
+
+    Since PR #60 entries are DAY marketable limits that fill intraday AFTER
+    the pre-market run ends. If the optimistic local position is lost before
+    the next sync (e.g. a same-day duplicate run's "not in broker" sweep ran
+    while the order was still resting), the fill shows up here as an
+    untracked broker position. Without this lookup it would be adopted under
+    BROKER_SYNC (orphaned from its strategy: no exit logic, and it eats a
+    max_positions slot forever). Matching against recent order_intents —
+    which carry strategy_id/symbol/side/target_qty — books it back under the
+    strategy that actually bought it.
+
+    Only long positions are attributed (side='BUY'); shorts don't record an
+    opening intent, so they keep the BROKER_SYNC fallback. Returns
+    (strategy_id, strategy_name, entry_date) or None.
+    """
+    if broker_qty <= 0:
+        return None
+    try:
+        cursor.execute(
+            """
+            SELECT oi.strategy_id, s.name,
+                   DATE(COALESCE(oi.filled_at, oi.submitted_at, oi.created_at)) AS entry_date
+            FROM order_intents oi
+            JOIN strategies s ON s.id = oi.strategy_id
+            WHERE oi.symbol = ?
+              AND oi.side = 'BUY'
+              AND oi.status IN ('SUBMITTED', 'ACKED', 'FILLED')
+              AND s.name != 'BROKER_SYNC'
+              AND oi.created_at >= datetime('now', ?)
+            ORDER BY (ABS(oi.target_qty - ?) < 0.001) DESC, oi.created_at DESC
+            LIMIT 1
+            """,
+            (symbol, f"-{int(lookback_days)} days", broker_qty),
+        )
+        row = cursor.fetchone()
+    except sqlite3.Error as exc:
+        # order_intents may not exist in older/partial DBs — fall back to
+        # BROKER_SYNC adoption rather than failing the whole sync.
+        logger.warning(f"  ⚠️  {symbol}: intent lookup failed ({exc}); using BROKER_SYNC")
+        return None
+    if not row:
+        return None
+    return row[0], row[1], row[2]
+
+
 def _get_or_create_broker_sync_strategy(cursor, portfolio_value):
     """Get or create the BROKER_SYNC strategy for untracked positions."""
     cursor.execute("SELECT id FROM strategies WHERE name = 'BROKER_SYNC' LIMIT 1")
@@ -210,9 +265,20 @@ def sync_broker_to_database(db_path="trading.db"):
                 local_info = None
 
             if local_total == 0:
-                # Entirely new position — add under BROKER_SYNC.
-                # Use today as entry_date fallback so time-based exits can fire.
-                today = datetime.now().strftime("%Y-%m-%d")
+                # Entirely new position. Before orphaning it under BROKER_SYNC,
+                # check whether a recent order intent explains it: DAY entries
+                # fill intraday after the run ends, and if the optimistic local
+                # row was lost the fill must go back to the strategy that
+                # bought it — not strategy BROKER_SYNC where no exit logic
+                # will ever manage it.
+                intent_match = _find_entry_intent(cursor, symbol, broker_qty)
+                if intent_match:
+                    target_sid, target_name, entry_date = intent_match
+                else:
+                    # Truly untracked — adopt under BROKER_SYNC.
+                    # Use today as entry_date fallback so time-based exits can fire.
+                    target_sid, target_name = sync_id, "BROKER_SYNC"
+                    entry_date = datetime.now().strftime("%Y-%m-%d")
                 cursor.execute(
                     """
                     INSERT INTO positions
@@ -229,18 +295,24 @@ def sync_broker_to_database(db_path="trading.db"):
                         last_updated = excluded.last_updated
                 """,
                     (
-                        sync_id,
+                        target_sid,
                         symbol,
                         broker_qty,
                         broker_avg,
                         broker_avg,
                         broker_qty * broker_avg,
                         0.0,
-                        today,
+                        entry_date,
                         datetime.now().isoformat(),
                     ),
                 )
-                logger.info(f"  🆕 {symbol}: added {broker_qty} shares under BROKER_SYNC")
+                if intent_match:
+                    logger.info(
+                        f"  🎯 {symbol}: added {broker_qty} shares under {target_name} "
+                        f"(matched order intent, entry_date={entry_date})"
+                    )
+                else:
+                    logger.info(f"  🆕 {symbol}: added {broker_qty} shares under BROKER_SYNC")
                 changes += 1
 
             elif diff > 0:
