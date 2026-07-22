@@ -83,6 +83,25 @@ def _seed_legacy_data(conn: sqlite3.Connection) -> None:
         "INSERT INTO stop_loss_state (symbol, stop_price, entry_price, entry_atr) "
         "VALUES ('UNH', 280.0, 295.50, 5.2)"
     )
+    # A BROKER_SYNC orphan with the order intent that actually bought it
+    # (the PR #60 DAY-fill adoption bug) — the 2026-07 one-off migration must
+    # re-attribute it to strategy 1 using the intent's fill date.
+    cur.execute(
+        "INSERT INTO strategies (id, name, status, capital_allocation, initial_capital) "
+        "VALUES (5, 'BROKER_SYNC', 'active', 0.0, 96115.72)"
+    )
+    cur.execute(
+        "INSERT INTO positions (strategy_id, symbol, shares, avg_price, current_price, "
+        " entry_date, last_updated) "
+        "VALUES (5, 'CSCO', 43.0, 68.42, 68.90, '2026-05-28', '2026-05-29T05:55:00')"
+    )
+    cur.execute(
+        "INSERT INTO order_intents (intent_id, run_id, strategy_id, symbol, side, "
+        " target_qty, status, created_at, submitted_at, filled_at) "
+        "VALUES ('legacy_csco_intent', '20260527_055001_test', 1, 'CSCO', 'BUY', 43.0, "
+        "        'FILLED', '2026-05-27 05:50:00', '2026-05-27 05:50:02', "
+        "        '2026-05-27T05:50:05')"
+    )
     conn.commit()
 
 
@@ -144,11 +163,26 @@ def test_migration_applies_cleanly_to_populated_legacy_db(legacy_db):
             == "long"
         )
 
-    # Pre-existing data preserved
-    assert _count(legacy_db, "SELECT COUNT(*) FROM positions") == 2
+    # Pre-existing data preserved (UNH long, BAC short, re-attributed CSCO)
+    assert _count(legacy_db, "SELECT COUNT(*) FROM positions") == 3
     assert (
         _count(legacy_db, "SELECT COUNT(*) FROM positions WHERE shares < 0") == 1
     ), "short position must survive migration"
+
+    # The BROKER_SYNC orphan is re-attributed to the strategy whose order
+    # intent bought it, with the intent's fill date restored as entry_date.
+    with sqlite3.connect(legacy_db) as conn:
+        row = conn.execute(
+            "SELECT strategy_id, entry_date FROM positions WHERE symbol='CSCO'"
+        ).fetchone()
+    assert row == (1, "2026-05-27"), "orphan must move to strategy 1 with intent fill date"
+    assert (
+        _count(
+            legacy_db,
+            "SELECT COUNT(*) FROM positions WHERE strategy_id = 5",
+        )
+        == 0
+    ), "no BROKER_SYNC orphans may remain"
     assert _count(legacy_db, "SELECT COUNT(*) FROM broker_state") == 1
     assert (
         _count(
@@ -194,4 +228,4 @@ def test_migration_is_idempotent(legacy_db):
     before = _count(legacy_db, "SELECT COUNT(*) FROM trade_pnl_detail")
     TradingDatabase(db_path=legacy_db)
     assert _count(legacy_db, "SELECT COUNT(*) FROM trade_pnl_detail") == before
-    assert _count(legacy_db, "SELECT COUNT(*) FROM positions") == 2
+    assert _count(legacy_db, "SELECT COUNT(*) FROM positions") == 3

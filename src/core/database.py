@@ -668,7 +668,160 @@ class TradingDatabase:
             # entry_price=0 is always a bug (real fills are never free).
             cursor.execute("DELETE FROM trade_pnl_detail WHERE entry_price <= 0")
 
+            # One-time data repair (flag-guarded): re-attribute BROKER_SYNC
+            # orphans created after PR #60 back to their originating strategy.
+            self._reattribute_broker_sync_orphans(cursor)
+
             conn.commit()
+
+    # How many days BEFORE a BROKER_SYNC adoption an order intent may have been
+    # created and still explain the position. Adoption happens on the morning
+    # after the intraday fill, so the real gap is 1 trading day; 5 calendar
+    # days covers long weekends and a missed run.
+    _ORPHAN_REATTRIBUTION_WINDOW_DAYS = 5
+    _ORPHAN_REATTRIBUTION_FLAG = "broker_sync_orphans_reattributed_2026_07"
+
+    def _reattribute_broker_sync_orphans(self, cursor):
+        """One-off repair: move BROKER_SYNC orphan positions back to the
+        strategy whose order intent bought them.
+
+        After PR #60 switched entries to DAY marketable limits, orders fill
+        intraday AFTER the pre-market run ends. When the optimistic local
+        position was lost before the next sync (same-day duplicate run's
+        "not in broker" sweep), the next morning's broker sync adopted the
+        fill under BROKER_SYNC — strategy exit logic never manages it and it
+        permanently consumes a max_positions slot (11/16 slots were orphans
+        by 2026-07-21, causing 129 max_positions_reached rejections).
+
+        For each BROKER_SYNC long, find the most recent active BUY intent for
+        that symbol created in the window before the position's entry_date
+        (exact-qty matches preferred) and move the row to that strategy,
+        merging into an existing row if the strategy already holds the symbol.
+        Keeps the broker fill price as cost basis; restores the intent's fill
+        date as entry_date so time-based exits see the true holding period.
+
+        Runs once: guarded by a system_state flag so re-inits are no-ops.
+        Idempotent by construction either way (a moved row is no longer under
+        BROKER_SYNC).
+        """
+        cursor.execute(
+            "SELECT value FROM system_state WHERE key = ?",
+            (self._ORPHAN_REATTRIBUTION_FLAG,),
+        )
+        if cursor.fetchone():
+            return
+
+        cursor.execute("SELECT id FROM strategies WHERE name = 'BROKER_SYNC' LIMIT 1")
+        sync_row = cursor.fetchone()
+        moves: list[dict] = []
+        if sync_row:
+            sync_id = sync_row[0]
+            cursor.execute(
+                "SELECT symbol, shares, avg_price, entry_date FROM positions "
+                "WHERE strategy_id = ? AND shares > 0",
+                (sync_id,),
+            )
+            orphans = cursor.fetchall()
+            for symbol, shares, avg_price, entry_date in orphans:
+                cursor.execute(
+                    """
+                    SELECT oi.strategy_id, s.name,
+                           DATE(COALESCE(oi.filled_at, oi.submitted_at, oi.created_at))
+                    FROM order_intents oi
+                    JOIN strategies s ON s.id = oi.strategy_id
+                    WHERE oi.symbol = ?
+                      AND oi.side = 'BUY'
+                      AND oi.status IN ('SUBMITTED', 'ACKED', 'FILLED')
+                      AND oi.strategy_id != ?
+                      AND DATE(oi.created_at) <= DATE(COALESCE(?, 'now'))
+                      AND DATE(oi.created_at) >= DATE(COALESCE(?, 'now'), ?)
+                    ORDER BY (ABS(oi.target_qty - ?) < 0.001) DESC, oi.created_at DESC
+                    LIMIT 1
+                    """,
+                    (
+                        symbol,
+                        sync_id,
+                        entry_date,
+                        entry_date,
+                        f"-{self._ORPHAN_REATTRIBUTION_WINDOW_DAYS} days",
+                        shares,
+                    ),
+                )
+                match = cursor.fetchone()
+                if not match:
+                    continue
+                target_sid, target_name, fill_date = match
+
+                cursor.execute(
+                    "SELECT shares, avg_price, entry_date FROM positions "
+                    "WHERE strategy_id = ? AND symbol = ?",
+                    (target_sid, symbol),
+                )
+                existing = cursor.fetchone()
+                if existing:
+                    # Strategy already holds some — merge shares with a
+                    # weighted cost basis, keep the earlier entry_date.
+                    ex_shares, ex_avg, ex_entry = existing
+                    new_shares = ex_shares + shares
+                    new_avg = (
+                        (ex_avg * ex_shares + avg_price * shares) / new_shares
+                        if new_shares
+                        else avg_price
+                    )
+                    new_entry = (
+                        min(d for d in (ex_entry, fill_date) if d)
+                        if (ex_entry or fill_date)
+                        else None
+                    )
+                    cursor.execute(
+                        "UPDATE positions SET shares = ?, avg_price = ?, entry_date = ?, "
+                        "last_updated = ? WHERE strategy_id = ? AND symbol = ?",
+                        (
+                            new_shares,
+                            new_avg,
+                            new_entry,
+                            datetime.now().isoformat(),
+                            target_sid,
+                            symbol,
+                        ),
+                    )
+                    cursor.execute(
+                        "DELETE FROM positions WHERE strategy_id = ? AND symbol = ?",
+                        (sync_id, symbol),
+                    )
+                else:
+                    cursor.execute(
+                        "UPDATE positions SET strategy_id = ?, entry_date = ?, "
+                        "last_updated = ? WHERE strategy_id = ? AND symbol = ?",
+                        (target_sid, fill_date, datetime.now().isoformat(), sync_id, symbol),
+                    )
+                moves.append(
+                    {
+                        "symbol": symbol,
+                        "shares": shares,
+                        "to_strategy": target_name,
+                        "entry_date": fill_date,
+                        "merged": bool(existing),
+                    }
+                )
+                logger.info(
+                    "Re-attributed BROKER_SYNC orphan %s (%.2f sh) → %s (entry %s%s)",
+                    symbol,
+                    shares,
+                    target_name,
+                    fill_date,
+                    ", merged" if existing else "",
+                )
+
+        cursor.execute(
+            "INSERT OR REPLACE INTO system_state (key, value) VALUES (?, ?)",
+            (
+                self._ORPHAN_REATTRIBUTION_FLAG,
+                json.dumps({"date": datetime.now().strftime("%Y-%m-%d"), "moves": moves}),
+            ),
+        )
+        if moves:
+            logger.info("BROKER_SYNC orphan re-attribution: %d position(s) moved", len(moves))
 
     def record_error(
         self,
