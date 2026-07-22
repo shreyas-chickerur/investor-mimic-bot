@@ -2203,10 +2203,20 @@ class MultiStrategyRunner:
 
                 try:
                     # Check if strategy is enabled (kill switch)
+                    # Both skip paths below must PERSIST their zero-count funnel
+                    # rows (save_to_database), not just record them in memory:
+                    # the post-run guardrail treats a missing signal_funnel row
+                    # as a critical failure, so a legitimate kill-switch/regime
+                    # skip without a persisted row turns the run RED (Sector
+                    # Rotation, 2026-07-17).
                     if not self.kill_switch.is_strategy_enabled(strategy.name):
                         logger.info(f"Skipping {strategy.name} - disabled by kill switch")
                         self.funnel_tracker.record_raw_signals(strategy.strategy_id, 0)
                         self.funnel_tracker.record_after_regime(strategy.strategy_id, 0)
+                        self.funnel_tracker.record_after_correlation(strategy.strategy_id, 0)
+                        self.funnel_tracker.record_after_risk(strategy.strategy_id, 0)
+                        self.funnel_tracker.record_executed(strategy.strategy_id, 0)
+                        self.funnel_tracker.save_to_database(strategy.strategy_id, strategy.name)
                         continue
 
                     if not self.regime_detector.should_enable_strategy(
@@ -2215,6 +2225,10 @@ class MultiStrategyRunner:
                         logger.info(f"Skipping {strategy.name} due to regime adjustments")
                         self.funnel_tracker.record_raw_signals(strategy.strategy_id, 0)
                         self.funnel_tracker.record_after_regime(strategy.strategy_id, 0)
+                        self.funnel_tracker.record_after_correlation(strategy.strategy_id, 0)
+                        self.funnel_tracker.record_after_risk(strategy.strategy_id, 0)
+                        self.funnel_tracker.record_executed(strategy.strategy_id, 0)
+                        self.funnel_tracker.save_to_database(strategy.strategy_id, strategy.name)
                         continue
 
                     if self._check_strategy_loss_limit(strategy, strategies):
@@ -4312,6 +4326,20 @@ class MultiStrategyRunner:
         whose strategy is not in the active set and is not BROKER_SYNC or the
         Cash Sweep sleeve. Without this, flipping `disabled: true` on a
         strategy strands its inventory forever (it never gets exit signals).
+
+        BROKER_SYNC is protected for longs (they are real inventory awaiting
+        attribution) but NOT for shorts: pairs trading is the only legitimate
+        short user and its book never lives under BROKER_SYNC, so a sync-adopted
+        short is always an accident (the June–July 2026 VZ over-sell left a real
+        -26 VZ short at the broker) and must be bought to cover.
+
+        Every order here is clamped to the BROKER-confirmed quantity. The VZ
+        incident's root cause was trusting the local DB row: expired/reversed
+        fills kept restoring a phantom position, so the same 25-share lot was
+        sold on ~12 consecutive runs — harmless while OPG orders expired
+        unfilled, but once PR #60's DAY orders actually filled, the over-sells
+        executed and flipped the account short. If the broker cannot be queried,
+        the whole wind-down is skipped for this run rather than trading blind.
         """
         import sqlite3 as _sqlite3
 
@@ -4332,9 +4360,35 @@ class MultiStrategyRunner:
         finally:
             conn.close()
 
-        orphans = [r for r in rows if r[0] not in active_ids and r[5] not in protected]
+        orphans = [
+            r
+            for r in rows
+            if (r[0] not in active_ids and r[5] not in protected)
+            # Accidental shorts adopted by the broker sync — always wind down.
+            or (r[5] == "BROKER_SYNC" and r[2] < 0)
+        ]
         if not orphans:
             return
+
+        # Broker truth: net quantity per symbol. Mandatory — without it we
+        # cannot size any wind-down order safely (see docstring).
+        try:
+            broker_qty: dict[str, float] = {
+                p.symbol: float(p.qty) for p in self.trading_client.get_all_positions()
+            }
+        except Exception as _bq_exc:
+            logger.error(
+                "Strategy wind-down skipped this run: cannot confirm broker positions (%s)",
+                _bq_exc,
+            )
+            return
+
+        # Shares of each symbol held by OTHER local rows (any strategy). The
+        # broker reports one net position per symbol; what this orphan may
+        # trade is the broker net minus everyone else's claim on it.
+        local_by_symbol: dict[str, float] = {}
+        for r in rows:
+            local_by_symbol[r[1]] = local_by_symbol.get(r[1], 0.0) + float(r[2])
 
         # Latest close per symbol from today's market data
         last_close: dict[str, float] = {}
@@ -4359,7 +4413,43 @@ class MultiStrategyRunner:
                 )
                 continue
             is_short = shares < 0
-            qty = abs(float(shares))
+
+            # Broker net minus the other local rows' claim = what THIS row may
+            # trade. A phantom row (DB says held, broker says flat/short — or
+            # vice versa) gets NO order; it is trued to reality instead, which
+            # breaks the restore-and-resell loop at its root.
+            attributable = broker_qty.get(symbol, 0.0) - (
+                local_by_symbol.get(symbol, 0.0) - float(shares)
+            )
+            if is_short:
+                qty = min(abs(float(shares)), max(0.0, -attributable))
+            else:
+                qty = min(float(shares), max(0.0, attributable))
+            if qty <= 0:
+                logger.error(
+                    "Wind-down PHANTOM detected: %s row %s %.1f shares but broker "
+                    "attributable %.1f — no order placed, truing DB row to broker.",
+                    strat_name,
+                    symbol,
+                    shares,
+                    attributable,
+                )
+                # Long phantom trues down toward flat; short phantom trues up
+                # toward flat. Never flip direction from here — if the broker is
+                # net the other way, sync adoption owns that inventory.
+                target = max(0.0, attributable) if not is_short else min(0.0, attributable)
+                self._update_position_record(sid, symbol, target - float(shares), price)
+                continue
+            if qty < abs(float(shares)):
+                logger.warning(
+                    "Wind-down clamped for %s (%s): DB %.1f but broker attributable %.1f "
+                    "— trading %.1f and truing the remainder.",
+                    symbol,
+                    strat_name,
+                    shares,
+                    attributable,
+                    qty,
+                )
             side = OrderSide.BUY if is_short else OrderSide.SELL
             side_str = "BUY" if is_short else "SELL"
 
@@ -4418,8 +4508,11 @@ class MultiStrategyRunner:
                 )
             except Exception as _pnl_exc:
                 logger.warning("Wind-down P&L logging failed for %s: %s", symbol, _pnl_exc)
-            # Positive delta covers a short; negative delta sells a long
-            self._update_position_record(sid, symbol, qty if is_short else -qty, price)
+            # Land the row on broker-attributable-after-trade, not merely
+            # DB-minus-qty: this simultaneously books the trade AND clears any
+            # residual phantom shares beyond what the broker actually held.
+            end_shares = (attributable + qty) if is_short else (attributable - qty)
+            self._update_position_record(sid, symbol, end_shares - float(shares), price)
             logger.info(
                 "Wind-down: %s %.0f %s MOO ~%.2f (%s, %s)",
                 side_str,

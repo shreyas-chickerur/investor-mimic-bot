@@ -5,7 +5,12 @@ Disabled-strategy wind-down tests.
 initialize_strategies() filters disabled strategies out entirely, so their
 open positions would never receive exit signals — only catastrophe stops.
 The engine must emit DAY SELL (longs) / BUY-to-cover (shorts) for every
-position whose strategy is inactive (excluding BROKER_SYNC and Cash Sweep).
+position whose strategy is inactive (excluding Cash Sweep, and BROKER_SYNC
+longs — BROKER_SYNC *shorts* are always accidental and are covered).
+
+Every wind-down order is clamped to the broker-confirmed quantity: the
+June–July 2026 VZ incident sold the same phantom DB lot on ~12 consecutive
+runs and left a real -26 short once DAY orders started filling.
 """
 import sys
 from pathlib import Path
@@ -77,6 +82,21 @@ def _create_strategy_row(engine, name):
     return sid
 
 
+def _broker_pos(symbol, qty):
+    p = MagicMock()
+    p.symbol = symbol
+    p.qty = str(qty)
+    p.market_value = "0"
+    return p
+
+
+def _set_broker_positions(engine, positions):
+    """positions: list of (symbol, qty) the broker actually holds."""
+    engine._test_client.get_all_positions.return_value = [
+        _broker_pos(sym, qty) for sym, qty in positions
+    ]
+
+
 def _market_data(symbols_prices: dict) -> pd.DataFrame:
     dates = pd.bdate_range("2026-06-01", periods=10)
     frames = []
@@ -97,6 +117,7 @@ class TestWinddown:
         engine.db.update_position(
             strategy_id=dead_sid, symbol="XYZ", shares=10.0, avg_price=90.0, current_price=100.0
         )
+        _set_broker_positions(engine, [("XYZ", 10)])
         engine._winddown_inactive_strategy_positions([], _market_data({"XYZ": 100.0}))
 
         req = engine._test_client.submit_order.call_args.args[0]
@@ -112,6 +133,7 @@ class TestWinddown:
         engine.db.update_position(
             strategy_id=dead_sid, symbol="SHRT", shares=-8.0, avg_price=50.0, current_price=45.0
         )
+        _set_broker_positions(engine, [("SHRT", -8)])
         engine._winddown_inactive_strategy_positions([], _market_data({"SHRT": 45.0}))
 
         req = engine._test_client.submit_order.call_args.args[0]
@@ -124,6 +146,7 @@ class TestWinddown:
         engine.db.update_position(
             strategy_id=dead_sid, symbol="SHRT", shares=-8.0, avg_price=50.0, current_price=45.0
         )
+        _set_broker_positions(engine, [("SHRT", -8)])
         engine._winddown_inactive_strategy_positions([], _market_data({"SHRT": 45.0}))
 
         import sqlite3
@@ -176,6 +199,7 @@ class TestWinddown:
             strategy_id=dead_sid, symbol="XYZ", shares=10.0, avg_price=90.0, current_price=100.0
         )
         md = _market_data({"XYZ": 100.0})
+        _set_broker_positions(engine, [("XYZ", 10)])
         engine._winddown_inactive_strategy_positions([], md)
         # restore the position row as if the fill hadn't trued up yet
         engine.db.update_position(
@@ -183,6 +207,112 @@ class TestWinddown:
         )
         engine._winddown_inactive_strategy_positions([], md)
         assert engine._test_client.submit_order.call_count == 1
+
+
+class TestWinddownBrokerClamp:
+    """Regression: the June–July 2026 VZ over-sell.
+
+    The wind-down sized orders from the LOCAL DB row. Expired/reversed fills
+    kept restoring a phantom position, so the same lot was re-sold on ~12
+    consecutive runs; once PR #60's DAY orders actually filled, the over-sells
+    executed and left a real -26 VZ short at the broker under BROKER_SYNC.
+    Every order must be clamped to broker-confirmed quantity, phantom rows
+    trued instead of traded, and accidental BROKER_SYNC shorts covered.
+    """
+
+    def test_phantom_long_places_no_order_and_trues_row(self, engine):
+        dead_sid = _create_strategy_row(engine, "Dead Strategy")
+        engine.db.update_position(
+            strategy_id=dead_sid, symbol="VZ", shares=25.0, avg_price=46.0, current_price=42.0
+        )
+        _set_broker_positions(engine, [])  # broker is flat — the row is phantom
+        engine._winddown_inactive_strategy_positions([], _market_data({"VZ": 42.0}))
+
+        assert engine._test_client.submit_order.call_count == 0
+        assert engine.db.get_position(dead_sid, "VZ") is None  # trued to broker (flat)
+
+    def test_phantom_restore_loop_never_resells(self, engine):
+        """The exact VZ failure: row restored each run, broker already flat."""
+        dead_sid = _create_strategy_row(engine, "Dead News Sentiment")
+        md = _market_data({"VZ": 42.0})
+        _set_broker_positions(engine, [])
+        for _run in range(3):
+            engine.db.update_position(
+                strategy_id=dead_sid, symbol="VZ", shares=25.0, avg_price=46.0, current_price=42.0
+            )
+            engine._winddown_inactive_strategy_positions([], md)
+        assert engine._test_client.submit_order.call_count == 0
+
+    def test_oversized_row_clamped_to_broker_qty(self, engine):
+        dead_sid = _create_strategy_row(engine, "Dead Strategy")
+        engine.db.update_position(
+            strategy_id=dead_sid, symbol="VZ", shares=25.0, avg_price=46.0, current_price=42.0
+        )
+        _set_broker_positions(engine, [("VZ", 13)])  # broker holds only 13
+        engine._winddown_inactive_strategy_positions([], _market_data({"VZ": 42.0}))
+
+        req = engine._test_client.submit_order.call_args.args[0]
+        assert req.symbol == "VZ"
+        assert float(req.qty) == 13.0  # clamped: never sell more than broker holds
+        assert engine.db.get_position(dead_sid, "VZ") is None  # residual phantom trued away
+
+    def test_broker_sync_short_is_covered(self, engine):
+        """An accidental short adopted by the sync must be bought to cover."""
+        bs_sid = _create_strategy_row(engine, "BROKER_SYNC")
+        engine.db.update_position(
+            strategy_id=bs_sid, symbol="VZ", shares=-26.0, avg_price=42.6, current_price=43.6
+        )
+        _set_broker_positions(engine, [("VZ", -26)])
+        engine._winddown_inactive_strategy_positions([], _market_data({"VZ": 43.6}))
+
+        req = engine._test_client.submit_order.call_args.args[0]
+        assert req.symbol == "VZ"
+        assert "buy" in str(req.side).lower()
+        assert float(req.qty) == 26.0
+        assert "DAY" in str(req.time_in_force).upper()
+        assert engine.db.get_position(bs_sid, "VZ") is None
+
+    def test_broker_sync_long_still_protected(self, engine):
+        bs_sid = _create_strategy_row(engine, "BROKER_SYNC")
+        engine.db.update_position(
+            strategy_id=bs_sid, symbol="CSCO", shares=8.0, avg_price=113.0, current_price=114.0
+        )
+        _set_broker_positions(engine, [("CSCO", 8)])
+        engine._winddown_inactive_strategy_positions([], _market_data({"CSCO": 114.0}))
+        assert engine._test_client.submit_order.call_count == 0
+        assert engine.db.get_position(bs_sid, "CSCO") is not None
+
+    def test_broker_unavailable_skips_winddown_entirely(self, engine):
+        dead_sid = _create_strategy_row(engine, "Dead Strategy")
+        engine.db.update_position(
+            strategy_id=dead_sid, symbol="XYZ", shares=10.0, avg_price=90.0, current_price=100.0
+        )
+        engine._test_client.get_all_positions.side_effect = RuntimeError("broker down")
+        engine._winddown_inactive_strategy_positions([], _market_data({"XYZ": 100.0}))
+        # Fail-safe: no blind orders, position untouched for a later run.
+        assert engine._test_client.submit_order.call_count == 0
+        assert engine.db.get_position(dead_sid, "XYZ") is not None
+
+    def test_other_local_rows_claim_subtracted(self, engine):
+        """Broker qty is net per symbol; another strategy's holding of the same
+        symbol must not be sellable by the orphan's wind-down."""
+        dead_sid = _create_strategy_row(engine, "Dead Strategy")
+        live_sid = _create_strategy_row(engine, "Live Strategy")
+        engine.db.update_position(
+            strategy_id=dead_sid, symbol="XYZ", shares=10.0, avg_price=90.0, current_price=100.0
+        )
+        engine.db.update_position(
+            strategy_id=live_sid, symbol="XYZ", shares=5.0, avg_price=95.0, current_price=100.0
+        )
+        # Broker net 10: 5 belong to the live strategy, so only 5 are the
+        # orphan's to sell.
+        _set_broker_positions(engine, [("XYZ", 10)])
+        engine._winddown_inactive_strategy_positions(
+            [_active_stub(live_sid)], _market_data({"XYZ": 100.0})
+        )
+        req = engine._test_client.submit_order.call_args.args[0]
+        assert float(req.qty) == 5.0
+        assert engine.db.get_position(live_sid, "XYZ") is not None
 
 
 class TestStaleOrderCancellationOrdering:
