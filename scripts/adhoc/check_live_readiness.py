@@ -24,8 +24,12 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
+# This file lives at scripts/adhoc/, so the repo root is three parents up.
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(REPO_ROOT / "scripts"))  # for performance_tracker
+sys.path.insert(0, str(REPO_ROOT))  # for `src.*` config import
+# Backwards-compat alias (older name referenced elsewhere/expectations)
+PROJECT_ROOT = REPO_ROOT
 
 # Reuse the shared portfolio metrics (Sharpe / drawdown / profit factor)
 from performance_tracker import compute_portfolio_metrics  # noqa: E402
@@ -79,8 +83,26 @@ def _check(label: str, value, target, ok: bool, fmt: str = "{}") -> dict:
     }
 
 
-def evaluate_readiness(db_path: str = "trading.db") -> dict:
-    metrics = compute_portfolio_metrics(db_path)
+def _default_track_since() -> str | None:
+    """The date real order fills began (config paper_trading.live_readiness_track_since).
+
+    Trades before it are pre-fix OPG-era phantoms and must not count toward the
+    live-readiness statistics. Returns None if the config can't be read, which
+    falls back to all-time (the historical behaviour).
+    """
+    try:
+        from src.utils.config_loader import get_config
+
+        val = str(get_config().get("paper_trading.live_readiness_track_since", "") or "")
+        return val or None
+    except Exception:
+        return None
+
+
+def evaluate_readiness(db_path: str = "trading.db", since: str | None = None) -> dict:
+    if since is None:
+        since = _default_track_since()
+    metrics = compute_portfolio_metrics(db_path, since=since)
 
     closed = metrics.get("total_trades") or 0
     win_rate = metrics.get("win_rate")

@@ -72,18 +72,22 @@ class VolatilityBreakoutStrategy(TradingStrategy):
         # Low VIX (<15): 1.8σ — bands are tight naturally; slightly narrower gate.
         # Normal (15-25): 2.0σ — standard setting.
         # High VIX (>25): 2.5σ — regime-corrected to prevent false breakouts.
-        _vix_row = None
-        if "symbol" in market_data.columns:
-            _vix_rows = market_data[market_data["symbol"] == "SPY"]
-            if not _vix_rows.empty and "vwap" in _vix_rows.columns:
-                pass  # VIX comes from the regime state, not market data columns
-        # Approximate VIX from recent SPY volatility if not available
-        _spy_vol = 18.0  # default
-        if "symbol" in market_data.columns:
-            _spy_d = market_data[market_data["symbol"] == "SPY"]["close"]
-            if len(_spy_d) >= 20:
-                _rets = _spy_d.pct_change().dropna().tail(20)
-                _spy_vol = float(_rets.std() * (252**0.5) * 100)
+        # The engine sets market_data.attrs["vix"] from the real, regime-detector-
+        # fetched VIX (VIXDataFetcher, Yahoo/Alpha Vantage) before calling
+        # generate_signals — use that. Realized SPY volatility is only a
+        # fallback for callers that don't set it (e.g. standalone backtests),
+        # since realized vol lags true implied-vol spikes (a Fed-day IV jump
+        # with markets not yet moved would otherwise be missed).
+        _spy_vol = market_data.attrs.get("vix")
+        if _spy_vol is None:
+            _spy_vol = 18.0  # default
+            if "symbol" in market_data.columns:
+                _spy_d = market_data[market_data["symbol"] == "SPY"]["close"]
+                if len(_spy_d) >= 20:
+                    _rets = _spy_d.pct_change().dropna().tail(20)
+                    _spy_vol = float(_rets.std() * (252**0.5) * 100)
+        else:
+            _spy_vol = float(_spy_vol)
 
         if _spy_vol < 15:
             _bb_mult = self.bb_mult_low_vix

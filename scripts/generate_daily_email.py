@@ -19,6 +19,8 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(PROJECT_ROOT / "scripts"))  # performance_tracker, etc.
+sys.path.insert(0, str(PROJECT_ROOT / "scripts" / "adhoc"))  # check_live_readiness
 
 # ── Exact color tokens from reference ────────────────────────────────────────
 PAGE_BG = "#0a0e14"
@@ -1907,29 +1909,10 @@ def build_system_status(recon_status: str, fill_summary: dict, db_path: str) -> 
         else f"{fill_count} fills · avg {float(avg_dev or 0):.0f} bps slippage"
     )
 
+    # Live-readiness criteria are rendered once, in the dedicated Live Readiness
+    # section (build_golive_section) — not duplicated here. This card is purely
+    # operational health (reconciliation, fill quality).
     readiness_rows = ""
-    try:
-        from check_live_readiness import evaluate_readiness
-
-        result = evaluate_readiness(db_path)
-        for c in result.get("checks", []):
-            ok = c.get("ok")
-            dot = GREEN if ok else RED
-            readiness_rows += f"""
-<div style="display:flex;justify-content:space-between;align-items:center;
-            padding:9px 0;border-top:1px solid {BORDER};">
-  <span style="font-family:{FONT};font-size:12px;color:{INK_DIM};
-               display:flex;align-items:center;gap:10px;">
-    <span style="display:inline-block;width:6px;height:6px;border-radius:50%;
-                 background:{dot};flex-shrink:0;"></span>
-    {html_lib.escape(c.get('label', ''))}
-  </span>
-  <span style="font-family:{MONO};font-size:11px;color:{INK_MUTE};">
-    {html_lib.escape(c.get('display', '—'))}
-  </span>
-</div>"""
-    except Exception:
-        pass
 
     def _row(label: str, detail: str, ok: bool) -> str:
         ic = GREEN if ok else AMBER
@@ -1979,6 +1962,19 @@ def build_golive_section(
     else:
         pipeline_stale = True
 
+    # Go-live readiness (closed-trade count, days-running) must be measured
+    # from when orders actually started filling, not from account inception —
+    # before this date ALL orders used OPG and ~87% expired unfilled, so
+    # trades/days before it are not evidence of a working system.
+    try:
+        from src.utils.config_loader import get_config
+
+        track_since = str(get_config().get("paper_trading.live_readiness_track_since", "") or "")
+    except Exception:
+        track_since = ""
+    if not track_since:
+        track_since = "1970-01-01"
+
     db = _conn(db_path)
     try:
         agg = _q1(
@@ -1986,28 +1982,19 @@ def build_golive_section(
             """
             SELECT COUNT(*) AS closed,
                    SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END) AS wins
-            FROM trades WHERE pnl IS NOT NULL
+            FROM trades WHERE pnl IS NOT NULL AND DATE(executed_at) >= ?
         """,
+            track_since,
         )
         closed = int(agg.get("closed") or 0)
         wins = int(agg.get("wins") or 0)
 
-        run_dates = _q1(
-            db,
-            """
-            SELECT MIN(DATE(created_at)) AS first_day,
-                   MAX(DATE(created_at)) AS last_day
-            FROM broker_state
-            WHERE run_id NOT IN ('AUTO_SYNC', '') AND run_id IS NOT NULL
-        """,
-        )
         days_running = 0
-        first_day = run_dates.get("first_day") or ""
-        if first_day:
-            try:
-                days_running = (_date.today() - _date.fromisoformat(first_day)).days
-            except Exception:
-                pass
+        first_day = track_since
+        try:
+            days_running = (_date.today() - _date.fromisoformat(track_since)).days
+        except Exception:
+            pass
 
         max_dd = 0.0
         try:
@@ -2044,8 +2031,11 @@ def build_golive_section(
         recon_status or ""
     ).upper()
 
-    # 5 go-live criteria
-    MIN_TRADES = 20
+    # Go-live criteria. The trade threshold matches the strict statistical
+    # gate (check_live_readiness.REQUIRED_TRADES) so the email and the CLI gate
+    # agree on one number — previously the email said 20 while the real gate
+    # required 30, so a reader thought they were 1 trade away when they weren't.
+    MIN_TRADES = 30
     MIN_DAYS = 30
     MAX_DD_THRESHOLD = 15.0  # percentage — max_drawdown stored as pct (e.g. 1.87 = 1.87%)
     MIN_RECON_RATE = 0.90
@@ -2079,25 +2069,31 @@ def build_golive_section(
             "label": f"≥ {MIN_DAYS} days paper-trading",
             "ok": days_running >= MIN_DAYS,
             "actual": f"{days_running}d since {first_day[:10] if first_day else '?'}",
-            "fix": f"Continue for {max(0, MIN_DAYS - days_running)} more days"
-            if days_running < MIN_DAYS
-            else None,
+            "fix": (
+                f"Continue for {max(0, MIN_DAYS - days_running)} more days"
+                if days_running < MIN_DAYS
+                else None
+            ),
         },
         {
             "label": f"Data pipeline current (<{PIPELINE_MAX_HOURS}h)",
             "ok": not pipeline_stale,
             "actual": "Fresh" if not pipeline_stale else "Stale",
-            "fix": "python3 scripts/update_daily_data.py  (or run the GHA workflow manually)"
-            if pipeline_stale
-            else None,
+            "fix": (
+                "python3 scripts/update_daily_data.py  (or run the GHA workflow manually)"
+                if pipeline_stale
+                else None
+            ),
         },
         {
             "label": f"Max drawdown < {MAX_DD_THRESHOLD:.0f}%",
             "ok": max_dd < MAX_DD_THRESHOLD,
             "actual": f"{max_dd:.2f}%",
-            "fix": "Review strategy risk limits and position sizing"
-            if max_dd >= MAX_DD_THRESHOLD
-            else None,
+            "fix": (
+                "Review strategy risk limits and position sizing"
+                if max_dd >= MAX_DD_THRESHOLD
+                else None
+            ),
         },
         {
             "label": f"Broker recon ≥ {int(MIN_RECON_RATE * 100)}% (30d)",
@@ -2111,6 +2107,61 @@ def build_golive_section(
             ),
         },
     ]
+
+    # Fold in the STRICT statistical gate (win rate, profit factor) so the one
+    # "READY TO GO LIVE" verdict reflects both operational reliability AND a
+    # demonstrated edge — a system can be perfectly reliable and still lose
+    # money. This is the same evaluate_readiness() the CLI gate uses, filtered
+    # to post-fix trades, so the email and CLI never disagree. Its checks carry
+    # value/target/ok/display; adapt them to this section's row shape.
+    try:
+        from check_live_readiness import (
+            MIN_PROFIT_FACTOR,
+            MIN_WIN_RATE,
+            evaluate_readiness,
+        )
+
+        strict = evaluate_readiness(db_path)
+        strict_by_label = {c.get("label"): c for c in strict.get("checks", [])}
+        _wr = strict_by_label.get("Win rate", {})
+        _pf = strict_by_label.get("Profit factor", {})
+        criteria.append(
+            {
+                "label": f"Win rate ≥ {int(MIN_WIN_RATE * 100)}%",
+                "ok": bool(_wr.get("ok")),
+                "actual": _wr.get("display", "—"),
+                "fix": (
+                    "Not enough winning trades yet — needs more post-fix history"
+                    if not _wr.get("ok")
+                    else None
+                ),
+            }
+        )
+        criteria.append(
+            {
+                "label": f"Profit factor ≥ {MIN_PROFIT_FACTOR}",
+                "ok": bool(_pf.get("ok")),
+                "actual": _pf.get("display", "—"),
+                "fix": (
+                    "Gross wins not yet covering gross losses by the required margin"
+                    if not _pf.get("ok")
+                    else None
+                ),
+            }
+        )
+    except Exception:
+        # A go-live gate must fail CLOSED: if the statistical edge can't be
+        # confirmed, the banner must NOT be allowed to read "READY". Add an
+        # explicit failing criterion rather than silently dropping the check.
+        criteria.append(
+            {
+                "label": "Statistical edge confirmed",
+                "ok": False,
+                "actual": "unavailable",
+                "fix": "Could not compute win rate / profit factor — investigate "
+                "check_live_readiness before trusting readiness",
+            }
+        )
 
     passed = sum(1 for c in criteria if c["ok"])
     total = len(criteria)

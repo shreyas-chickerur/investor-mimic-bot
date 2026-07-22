@@ -304,7 +304,8 @@ class MultiStrategyRunner:
         self._day_trades_today: list = []
         self._day_trade_count: int = 0
 
-        # Overnight exposure tracking: running total of OPG BUY notional queued this run
+        # Overnight exposure tracking: running total of DAY-marketable-limit BUY
+        # notional queued this run but not yet debited from broker cash
         self._pending_opg_value: float = 0.0
 
         # VIX-based sizing (populated from regime_adjustments in run_all_strategies)
@@ -464,9 +465,10 @@ class MultiStrategyRunner:
     def _reconcile_optimistic_fills(self):
         """Reconcile locally-recorded intents against actual broker status.
 
-        Paper-mode OPG submissions optimistically mark intents FILLED at
+        Paper-mode submissions optimistically mark intents FILLED at
         submission time and write a positions row, but Alpaca may
-        `expire`/`cancel` the order before the next market open. Without
+        `expire`/`cancel` the order (e.g. a DAY marketable limit that never
+        touches its price by the close) before this is caught. Without
         this sweep the bot accumulates **phantom positions** for orders
         that never actually filled at the broker (see PLATFORM_AUDIT
         2026-05-28 §16.2).
@@ -643,7 +645,7 @@ class MultiStrategyRunner:
     def _cancel_stale_orders(self):
         """Cancel all open orders left over from previous runs.
 
-        OPG orders placed during a prior run that did not fill (e.g. the run
+        Orders placed during a prior run that did not fill (e.g. the run
         happened twice in one session, or a position was closed since the order
         was created) must be removed before new orders are submitted.  Without
         this, duplicate BUY orders accumulate across days.
@@ -824,10 +826,11 @@ class MultiStrategyRunner:
     def verify_order_statuses(self):
         """Verify order status with Alpaca and track confirmed fills.
 
-        For paper-mode OPG orders: the fill was optimistically recorded at submission
-        time (intent already marked FILLED).  We treat those as confirmed fills without
-        re-polling Alpaca, which would always return 'new' since OPG executes at the
-        next morning's open — hours after this method runs.
+        For paper-mode orders: the fill was optimistically recorded at submission
+        time (intent already marked FILLED).  We treat those as confirmed fills
+        without re-polling Alpaca, since a DAY marketable limit resting through
+        the session may still legitimately show 'new' this soon after submission —
+        the broker sync on the next run trues up anything that didn't actually fill.
         """
         self.confirmed_fills = []
         self.pending_orders = []
@@ -841,7 +844,7 @@ class MultiStrategyRunner:
                 self.pending_orders.append({**trade, "status": "UNKNOWN"})
                 continue
 
-            # If we already marked this intent FILLED optimistically (paper OPG path),
+            # If we already marked this intent FILLED optimistically (paper-mode path),
             # trust that record rather than re-polling Alpaca and downgrading to ACKED.
             if intent_id and self.paper_mode:
                 existing = self.db.get_order_intent_by_id(intent_id)
@@ -1483,25 +1486,50 @@ class MultiStrategyRunner:
             logger.warning("Duplicate-run check failed (non-fatal): %s", exc)
             return None
 
+    def _run_defensive_stop_losses(self, market_data) -> None:
+        """Check and execute catastrophe stop losses. Must run unconditionally —
+        even when the kill switch, a drawdown halt, or the duplicate-run guard
+        would otherwise skip the rest of the trading body. A position that
+        gapped past its stop between the primary run's (pre-market) price check
+        and now is exactly the case this exists to catch; skipping it because
+        "trading is halted" or "a duplicate run" would compound losses instead
+        of containing them.
+        """
+        logger.info("=" * 80)
+        logger.info("CHECKING CATASTROPHE STOP LOSSES (pre-kill-switch)")
+        logger.info("=" * 80)
+        positions_to_close = self.check_stop_losses(market_data)
+        if positions_to_close:
+            logger.warning(f"Found {len(positions_to_close)} positions at stop loss")
+            self.execute_stop_loss_exits(positions_to_close)
+        else:
+            logger.info("No stop losses triggered")
+        logger.info("=" * 80)
+
     def run_all_strategies(self, market_data):
         """Run all strategies and execute trades"""
         # ── SAME-DAY IDEMPOTENCY GUARD ────────────────────────────────────────
         # If a different run already executed trades today, this is a duplicate
         # (e.g. the backup cron firing after the primary dispatch already traded).
-        # Doing ANY work here is net harmful: _cancel_stale_orders would cancel
-        # the primary run's pending OPG orders, and a duplicate firing after the
-        # 09:30 open would have its own OPG re-submissions rejected — together
-        # stranding the cash sweep. Skip the entire trading body. Defensive
-        # stop-losses set by the primary run remain in force; the next legitimate
-        # run reconciles everything.
+        # Cancelling stale orders or generating new entries here is net harmful:
+        # _cancel_stale_orders would cancel the primary run's pending OPG orders,
+        # and a duplicate firing after the 09:30 open would have its own OPG
+        # re-submissions rejected — together stranding the cash sweep. Skip that
+        # part of the trading body. Defensive stop-losses are the one exception:
+        # they must still run (see _run_defensive_stop_losses) because this may
+        # be the only pass today that sees a price move past a stop level that
+        # the primary run's pre-market check couldn't have seen. Reading current
+        # DB position state is safe here — a position the primary run already
+        # exited (via its own stop-loss or otherwise) simply won't reappear.
         prior_run = self._prior_trading_run_today()
         if prior_run:
             logger.warning(
                 "🛑 DUPLICATE RUN GUARD: trades were already executed today by run %s — "
-                "skipping all trading (no order cancellation, no new entries) to avoid "
-                "double-trading and cancelling pending OPG orders.",
+                "skipping order cancellation and new entries to avoid double-trading "
+                "and cancelling pending OPG orders. Stop-losses still run.",
                 prior_run,
             )
+            self._run_defensive_stop_losses(market_data)
             self._set_run_stage(
                 "DUPLICATE_SKIP",
                 "SUCCESS",
@@ -1540,16 +1568,7 @@ class MultiStrategyRunner:
         # kill switch is exactly the situation where protective exits matter
         # most. Skipping them because "trading is halted" would compound losses
         # rather than contain them.
-        logger.info("=" * 80)
-        logger.info("CHECKING CATASTROPHE STOP LOSSES (pre-kill-switch)")
-        logger.info("=" * 80)
-        positions_to_close = self.check_stop_losses(market_data)
-        if positions_to_close:
-            logger.warning(f"Found {len(positions_to_close)} positions at stop loss")
-            self.execute_stop_loss_exits(positions_to_close)
-        else:
-            logger.info("No stop losses triggered")
-        logger.info("=" * 80)
+        self._run_defensive_stop_losses(market_data)
 
         # Wind down positions stranded by disabled strategies. A disabled
         # strategy is filtered out of initialize_strategies() entirely, so its
@@ -1733,7 +1752,7 @@ class MultiStrategyRunner:
             current_prices=_current_prices_for_audit,
         )
 
-        # Reset overnight OPG value counter for this run
+        # Reset overnight pending-buy-value counter for this run
         self._pending_opg_value = 0.0
 
         # ── Survivorship / asset validation ───────────────────────────────────
@@ -2169,6 +2188,14 @@ class MultiStrategyRunner:
                     "These signals will go through normal correlation filter, risk checks, and sizing"
                 )
                 logger.info("=" * 80)
+
+            # Expose the real (regime-detector-fetched) VIX to strategies via
+            # market_data.attrs, so strategies that are VIX-adaptive (e.g.
+            # Volatility Breakout's BB-multiplier regime) don't need to
+            # reinvent a realized-vol proxy — generate_signals(market_data) is
+            # a fixed one-argument interface across all strategies, so attrs
+            # is the non-invasive way to pass this through.
+            market_data.attrs["vix"] = getattr(self, "_current_vix", 18.0)
 
             for strategy in strategies:
                 print(f"\n📈 {strategy.name}")
@@ -3277,17 +3304,20 @@ class MultiStrategyRunner:
                             )
                         else:
                             logger.info(
-                                f"Order {order.id} not filled yet: status={filled_order.status} (OPG fills at market open)"
+                                f"Order {order.id} not filled yet: status={filled_order.status} "
+                                "(DAY marketable limit — rests through the session, not "
+                                "confirmed at submission)"
                             )
-                            # OPG orders fill at next morning's open, not immediately.
                             # In paper mode we treat the submission as a confirmed fill
-                            # and mark FILLED now so the intent lifecycle completes this run.
+                            # and mark FILLED now so the intent lifecycle completes this
+                            # run; the next run's broker sync trues it up if it actually
+                            # expired unfilled.
                             if self.paper_mode:
                                 fill_verified = True
                                 self.db.update_order_intent_status(
                                     intent_id, "FILLED", broker_order_id=str(order.id)
                                 )
-                                logger.info("Paper mode: OPG order marked FILLED optimistically")
+                                logger.info("Paper mode: order marked FILLED optimistically")
                     except Exception as e:
                         logger.warning(f"Could not verify fill for {order.id}: {e}")
                         if self.paper_mode:
@@ -3296,7 +3326,7 @@ class MultiStrategyRunner:
                                 intent_id, "FILLED", broker_order_id=str(order.id)
                             )
                             logger.info(
-                                "Paper mode: OPG order marked FILLED despite status-check error"
+                                "Paper mode: order marked FILLED despite status-check error"
                             )
 
                     if not fill_verified:
@@ -3547,17 +3577,18 @@ class MultiStrategyRunner:
                             )
                         else:
                             logger.info(
-                                f"SELL Order {order.id} not filled yet: status={filled_order.status} (OPG fills at market open)"
+                                f"SELL Order {order.id} not filled yet: status={filled_order.status} "
+                                "(DAY market order — rests through the session)"
                             )
                             if self.paper_mode:
                                 fill_verified = True
-                                logger.info("Paper mode: SELL OPG order assumed filled")
+                                logger.info("Paper mode: SELL order assumed filled")
                     except Exception as e:
                         logger.warning(f"Could not verify SELL fill for {order.id}: {e}")
                         if self.paper_mode:
                             fill_verified = True
                             logger.info(
-                                "Paper mode: SELL OPG order assumed filled despite status-check error"
+                                "Paper mode: SELL order assumed filled despite status-check error"
                             )
 
                     if not fill_verified:
@@ -4094,9 +4125,9 @@ class MultiStrategyRunner:
 
         Idle cash earns 0%; with deployment averaging 4% in June 2026 that was
         ~$92k of dead capital. After all strategies have traded, cash above
-        the buffer is bought into the sweep symbol via OPG limit; when cash
-        falls below half the buffer, the sleeve is sold down to restore it so
-        strategy entries are never starved.
+        the buffer is bought into the sweep symbol via a DAY marketable limit;
+        when cash falls below half the buffer, the sleeve is sold down to
+        restore it so strategy entries are never starved.
 
         The sleeve is deliberately OUTSIDE the alpha machinery: it is not part
         of strategy capital, does not count toward portfolio heat (do NOT add
@@ -4132,7 +4163,7 @@ class MultiStrategyRunner:
         account = self.trading_client.get_account()
         cash = float(account.cash)
         equity = float(account.portfolio_value)
-        # OPG buys submitted this run haven't debited cash yet
+        # DAY marketable-limit buys submitted this run haven't debited cash yet
         projected_cash = cash - getattr(self, "_pending_opg_value", 0.0)
         buffer_value = equity * buffer_pct
 
@@ -4277,7 +4308,7 @@ class MultiStrategyRunner:
     def _winddown_inactive_strategy_positions(self, strategies, market_data) -> None:
         """Exit positions held by strategies that are no longer active.
 
-        Emits OPG SELL (longs) / BUY-to-cover (shorts) for every open position
+        Emits a DAY market SELL (longs) / BUY-to-cover (shorts) for every open position
         whose strategy is not in the active set and is not BROKER_SYNC or the
         Cash Sweep sleeve. Without this, flipping `disabled: true` on a
         strategy strands its inventory forever (it never gets exit signals).
