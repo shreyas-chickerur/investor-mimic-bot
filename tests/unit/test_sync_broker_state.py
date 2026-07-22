@@ -9,7 +9,7 @@ import os
 import sqlite3
 import sys
 import tempfile
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -18,6 +18,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from scripts.sync_broker_state import (
+    _find_entry_intent,
     _get_local_positions,
     _get_or_create_broker_sync_strategy,
     sync_broker_to_database,
@@ -56,6 +57,26 @@ def temp_db():
         last_updated TEXT,
         entry_date TEXT,
         UNIQUE(strategy_id, symbol),
+        FOREIGN KEY (strategy_id) REFERENCES strategies(id)
+    )"""
+    )
+
+    cursor.execute(
+        """CREATE TABLE order_intents (
+        intent_id TEXT PRIMARY KEY,
+        run_id TEXT NOT NULL,
+        strategy_id INTEGER NOT NULL,
+        symbol TEXT NOT NULL,
+        side TEXT NOT NULL,
+        target_qty REAL NOT NULL,
+        status TEXT NOT NULL,
+        broker_order_id TEXT,
+        error_code TEXT,
+        error_message TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        submitted_at TEXT,
+        acked_at TEXT,
+        filled_at TEXT,
         FOREIGN KEY (strategy_id) REFERENCES strategies(id)
     )"""
     )
@@ -107,6 +128,43 @@ def _seed_position(db_path, strategy_id, symbol, shares, avg_price):
     )
     conn.commit()
     conn.close()
+
+
+def _seed_intent(
+    db_path,
+    strategy_id,
+    symbol,
+    side="BUY",
+    target_qty=10.0,
+    status="FILLED",
+    days_ago=1,
+    intent_id=None,
+):
+    """Helper to insert an order intent created `days_ago` days ago (UTC)."""
+    created = (datetime.now(timezone.utc) - timedelta(days=days_ago)).strftime("%Y-%m-%d %H:%M:%S")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO order_intents (intent_id, run_id, strategy_id, symbol, side, "
+        " target_qty, status, broker_order_id, created_at, submitted_at, filled_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            intent_id or f"intent_{strategy_id}_{symbol}_{side}_{days_ago}",
+            "20260707_055001_test",
+            strategy_id,
+            symbol,
+            side,
+            target_qty,
+            status,
+            "broker-order-1",
+            created,
+            created,
+            created if status == "FILLED" else None,
+        ),
+    )
+    conn.commit()
+    conn.close()
+    return created[:10]  # the DATE() the sync should adopt as entry_date
 
 
 def _get_all_positions(db_path):
@@ -448,3 +506,142 @@ class TestSyncBrokerToDatabase:
         assert by_symbol.get("ADBE") == 12.0
         assert by_symbol.get("PG") == 13.0
         assert "MSFT" not in by_symbol  # removed
+
+
+# ---------------------------------------------------------------------------
+# Intent-based attribution of untracked broker positions
+# ---------------------------------------------------------------------------
+
+
+def _strategy_of(db_path, symbol):
+    """Return (strategy_name, entry_date) for the position holding `symbol`."""
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT s.name, p.entry_date FROM positions p "
+        "JOIN strategies s ON s.id = p.strategy_id WHERE p.symbol = ?",
+        (symbol,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return row
+
+
+class TestIntentAttribution:
+    """Regression tests for the PR #60 orphan-adoption bug.
+
+    DAY marketable-limit entries fill intraday AFTER the pre-market run ends.
+    If the optimistic local position is lost before the next morning's sync
+    (e.g. a same-day duplicate run's "not in broker" sweep), the fill used to
+    be adopted under BROKER_SYNC — orphaned from its strategy's exit logic and
+    permanently consuming a max_positions slot (11/16 slots by 2026-07-21,
+    129 max_positions_reached rejections in 2 weeks). The sync must instead
+    match the fill against the previous day's order_intents and book it under
+    the originating strategy.
+    """
+
+    @patch("scripts.sync_broker_state.BrokerReconciler")
+    def test_untracked_fill_attributed_to_intent_strategy(self, MockReconciler, temp_db):
+        """A broker position matching yesterday's BUY intent goes to that
+        strategy — not BROKER_SYNC — with the intent's fill date as entry_date."""
+        rsi = _seed_strategy(temp_db, "RSI Mean Reversion")
+        fill_date = _seed_intent(temp_db, rsi, "CSCO", target_qty=43, days_ago=1)
+
+        mock_rec = MockReconciler.return_value
+        mock_rec.get_broker_state.return_value = _mock_broker_state({"CSCO": (43, 68.42)})
+
+        assert sync_broker_to_database(temp_db) is True
+
+        name, entry_date = _strategy_of(temp_db, "CSCO")
+        assert name == "RSI Mean Reversion"
+        assert entry_date == fill_date
+
+    @patch("scripts.sync_broker_state.BrokerReconciler")
+    def test_stale_intent_falls_back_to_broker_sync(self, MockReconciler, temp_db):
+        """Intents older than the lookback window must not claim the position."""
+        rsi = _seed_strategy(temp_db, "RSI Mean Reversion")
+        _seed_intent(temp_db, rsi, "CSCO", target_qty=43, days_ago=10)
+
+        mock_rec = MockReconciler.return_value
+        mock_rec.get_broker_state.return_value = _mock_broker_state({"CSCO": (43, 68.42)})
+
+        assert sync_broker_to_database(temp_db) is True
+        assert _strategy_of(temp_db, "CSCO")[0] == "BROKER_SYNC"
+
+    @patch("scripts.sync_broker_state.BrokerReconciler")
+    def test_failed_intent_ignored(self, MockReconciler, temp_db):
+        """A FAILED (reversed-phantom) intent must not claim the position."""
+        rsi = _seed_strategy(temp_db, "RSI Mean Reversion")
+        _seed_intent(temp_db, rsi, "CSCO", target_qty=43, status="FAILED", days_ago=1)
+
+        mock_rec = MockReconciler.return_value
+        mock_rec.get_broker_state.return_value = _mock_broker_state({"CSCO": (43, 68.42)})
+
+        assert sync_broker_to_database(temp_db) is True
+        assert _strategy_of(temp_db, "CSCO")[0] == "BROKER_SYNC"
+
+    @patch("scripts.sync_broker_state.BrokerReconciler")
+    def test_sell_intent_not_matched_for_long(self, MockReconciler, temp_db):
+        """Only BUY intents explain a long broker position."""
+        rsi = _seed_strategy(temp_db, "RSI Mean Reversion")
+        _seed_intent(temp_db, rsi, "CSCO", side="SELL", target_qty=43, days_ago=1)
+
+        mock_rec = MockReconciler.return_value
+        mock_rec.get_broker_state.return_value = _mock_broker_state({"CSCO": (43, 68.42)})
+
+        assert sync_broker_to_database(temp_db) is True
+        assert _strategy_of(temp_db, "CSCO")[0] == "BROKER_SYNC"
+
+    @patch("scripts.sync_broker_state.BrokerReconciler")
+    def test_short_position_never_attributed(self, MockReconciler, temp_db):
+        """Shorts don't record an opening BUY intent — they keep the
+        BROKER_SYNC fallback (negative shares preserved)."""
+        rsi = _seed_strategy(temp_db, "RSI Mean Reversion")
+        _seed_intent(temp_db, rsi, "NFLX", side="BUY", target_qty=24, days_ago=1)
+
+        mock_rec = MockReconciler.return_value
+        mock_rec.get_broker_state.return_value = _mock_broker_state({"NFLX": (-24, 700.0)})
+
+        assert sync_broker_to_database(temp_db) is True
+        assert _strategy_of(temp_db, "NFLX")[0] == "BROKER_SYNC"
+        positions = _get_all_positions(temp_db)
+        assert positions[0]["shares"] == -24.0
+
+    @patch("scripts.sync_broker_state.BrokerReconciler")
+    def test_exact_qty_match_preferred_over_recency(self, MockReconciler, temp_db):
+        """When two strategies bought the same symbol recently, the intent
+        whose target_qty matches the broker position wins over a newer
+        different-qty intent."""
+        rsi = _seed_strategy(temp_db, "RSI Mean Reversion")
+        ma = _seed_strategy(temp_db, "MA Crossover")
+        _seed_intent(temp_db, ma, "GIS", target_qty=88, days_ago=2)  # exact match, older
+        _seed_intent(temp_db, rsi, "GIS", target_qty=30, days_ago=1)  # newer, wrong qty
+
+        mock_rec = MockReconciler.return_value
+        mock_rec.get_broker_state.return_value = _mock_broker_state({"GIS": (88, 55.10)})
+
+        assert sync_broker_to_database(temp_db) is True
+        assert _strategy_of(temp_db, "GIS")[0] == "MA Crossover"
+
+    @patch("scripts.sync_broker_state.BrokerReconciler")
+    def test_missing_order_intents_table_falls_back(self, MockReconciler, temp_db):
+        """Older DBs without order_intents must not crash the sync."""
+        conn = sqlite3.connect(temp_db)
+        conn.execute("DROP TABLE order_intents")
+        conn.commit()
+        conn.close()
+
+        mock_rec = MockReconciler.return_value
+        mock_rec.get_broker_state.return_value = _mock_broker_state({"CSCO": (43, 68.42)})
+
+        assert sync_broker_to_database(temp_db) is True
+        assert _strategy_of(temp_db, "CSCO")[0] == "BROKER_SYNC"
+
+    def test_find_entry_intent_rejects_short_qty(self, temp_db):
+        """_find_entry_intent never matches a non-positive broker qty."""
+        rsi = _seed_strategy(temp_db, "RSI Mean Reversion")
+        _seed_intent(temp_db, rsi, "CSCO", target_qty=43, days_ago=1)
+        conn = sqlite3.connect(temp_db)
+        assert _find_entry_intent(conn.cursor(), "CSCO", -43) is None
+        assert _find_entry_intent(conn.cursor(), "CSCO", 0) is None
+        conn.close()
