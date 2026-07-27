@@ -672,6 +672,11 @@ class TradingDatabase:
             # orphans created after PR #60 back to their originating strategy.
             self._reattribute_broker_sync_orphans(cursor)
 
+            # One-time data repair (flag-guarded): backfill trades.pnl for
+            # stop-loss exits that recorded NULL (PR #65). Makes the historical
+            # losses visible to the live-readiness gate + performance_tracker.
+            self._backfill_stop_loss_trade_pnl(cursor)
+
             conn.commit()
 
     # How many days BEFORE a BROKER_SYNC adoption an order intent may have been
@@ -822,6 +827,77 @@ class TradingDatabase:
         )
         if moves:
             logger.info("BROKER_SYNC orphan re-attribution: %d position(s) moved", len(moves))
+
+    _STOP_LOSS_PNL_BACKFILL_FLAG = "stop_loss_trade_pnl_backfilled_2026_07"
+
+    def _backfill_stop_loss_trade_pnl(self, cursor):
+        """One-off repair: populate trades.pnl for exits that recorded NULL.
+
+        Before PR #65 the stop-loss exit path wrote realized P&L into
+        trade_pnl_detail but called log_trade without pnl, leaving trades.pnl
+        NULL. performance_tracker and check_live_readiness.py read trades.pnl,
+        so every stop-loss LOSS was invisible to win-rate / profit-factor — the
+        readiness gate over-counted the record in the direction that green-lights
+        going live. PR #65 fixes new exits; this backfills the historical ones.
+
+        Each closed round-trip has exactly one trade_pnl_detail row keyed by
+        (sell_run_id, strategy_id, symbol); join the NULL-pnl exit trade to it
+        and copy gross_pnl. Exits with no matching detail row (sync-churn SELLs,
+        disabled-strategy wind-downs with no basis) are left NULL — they
+        represent no realized round-trip. Entries (BUY / SHORT_SELL) are
+        excluded so a legitimately-NULL entry is never touched.
+
+        Runs once: guarded by a system_state flag so re-inits are no-ops.
+        Idempotent by construction either way (only NULL rows are updated, and a
+        backfilled row is no longer NULL).
+        """
+        cursor.execute(
+            "SELECT value FROM system_state WHERE key = ?",
+            (self._STOP_LOSS_PNL_BACKFILL_FLAG,),
+        )
+        if cursor.fetchone():
+            return
+
+        # Only exit trades whose (run, strategy, symbol) maps to exactly one
+        # trade_pnl_detail row — a >1 match would be ambiguous, so skip it.
+        cursor.execute(
+            """
+            SELECT t.id, t.symbol, d.gross_pnl
+            FROM trades t
+            JOIN trade_pnl_detail d
+              ON d.sell_run_id = t.run_id
+             AND d.strategy_id = t.strategy_id
+             AND d.symbol = t.symbol
+            WHERE t.pnl IS NULL
+              AND t.action NOT IN ('BUY', 'SHORT_SELL')
+            GROUP BY t.id
+            HAVING COUNT(*) = 1
+            """
+        )
+        rows = cursor.fetchall()
+        backfilled = []
+        for trade_id, symbol, gross_pnl in rows:
+            cursor.execute(
+                "UPDATE trades SET pnl = ? WHERE id = ? AND pnl IS NULL",
+                (gross_pnl, trade_id),
+            )
+            backfilled.append({"symbol": symbol, "pnl": round(gross_pnl, 2)})
+            logger.info(
+                "Backfilled stop-loss trades.pnl for %s (id=%d): %.2f",
+                symbol,
+                trade_id,
+                gross_pnl,
+            )
+
+        cursor.execute(
+            "INSERT OR REPLACE INTO system_state (key, value) VALUES (?, ?)",
+            (
+                self._STOP_LOSS_PNL_BACKFILL_FLAG,
+                json.dumps({"date": datetime.now().strftime("%Y-%m-%d"), "backfilled": backfilled}),
+            ),
+        )
+        if backfilled:
+            logger.info("Stop-loss trades.pnl backfill: %d row(s) updated", len(backfilled))
 
     def record_error(
         self,
