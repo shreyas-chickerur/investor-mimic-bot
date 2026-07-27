@@ -174,6 +174,40 @@ class TestNoDuplicatePhantoms:
 
 
 # ---------------------------------------------------------------------------
+# 3b. send_alert=False suppresses the warning email (engine owns final-outcome
+#     notification after auto-sync-and-retry)
+# ---------------------------------------------------------------------------
+
+
+class TestSendAlertGate:
+    def _drifting_reconciler(self):
+        rec = _make_reconciler()
+        rec.email_notifier = MagicMock()
+        # Broker has a position local doesn't track -> guaranteed discrepancy.
+        rec.client.get_all_positions.return_value = [
+            _make_broker_position("NVDA", "8.0", 500.0),
+        ]
+        rec.client.get_account.return_value = _make_account(50_000.0)
+        return rec
+
+    def test_send_alert_false_suppresses_email(self):
+        rec = self._drifting_reconciler()
+        success, discrepancies = rec.reconcile_daily(
+            local_positions={},
+            local_cash=50_000.0,
+            send_alert=False,
+        )
+        assert not success and discrepancies  # discrepancy still detected
+        rec.email_notifier.send_alert.assert_not_called()  # but no email fired
+        assert rec.is_paused is True  # paused state still set for callers
+
+    def test_send_alert_default_true_still_emails(self):
+        rec = self._drifting_reconciler()
+        rec.reconcile_daily(local_positions={}, local_cash=50_000.0)
+        rec.email_notifier.send_alert.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
 # 4. Regime dict now includes 'vix'
 # ---------------------------------------------------------------------------
 

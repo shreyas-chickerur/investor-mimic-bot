@@ -198,6 +198,19 @@ class TestStopLossExits:
         submitted = engine._test_client.submit_order.call_args[0][0]
         assert submitted.side.name == "SELL"
         assert float(submitted.qty) == 10.0
+        # The stop-loss LOSS must land in the `trades` table with pnl populated
+        # (not NULL) — performance_tracker and the live-readiness gate read
+        # trades.pnl, so a NULL here would make stop-loss losses invisible to
+        # win-rate / profit-factor and over-count the go-live record.
+        # Losing long (100 -> 90) x 10 shares => -100.
+        import sqlite3
+
+        with sqlite3.connect(engine.db.db_path) as conn:
+            row = conn.execute(
+                "SELECT pnl FROM trades WHERE symbol='AAPL' AND action='SELL'"
+            ).fetchone()
+        assert row is not None and row[0] is not None, "stop-loss SELL must record pnl in trades"
+        assert row[0] == pytest.approx(-100.0)
 
     def test_short_stop_exit_buys_to_cover(self, engine):
         engine.db.update_position(
