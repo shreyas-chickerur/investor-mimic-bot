@@ -1372,6 +1372,27 @@ class MultiStrategyRunner:
 
                 exit_price = position["current_price"]
 
+                # Realized P&L for the stop-loss exit, computed up-front so it
+                # lands in BOTH ledgers: the `trades` table (read by
+                # performance_tracker AND the live-readiness gate) and
+                # trade_pnl_detail (below). Previously log_trade received no pnl
+                # (defaulting to NULL), so every stop-loss LOSS was invisible to
+                # win-rate / profit-factor and the readiness gate over-counted
+                # wins — over-optimistic in exactly the direction that matters
+                # for the go-live decision. A missing/zero basis yields None
+                # (unknown), matching the trade_pnl_detail guard below.
+                entry_price_sl = float(
+                    position.get("avg_price") or position.get("entry_price") or 0
+                )
+                if entry_price_sl > 0:
+                    stop_loss_pnl = (
+                        (entry_price_sl - exit_price) * shares
+                        if is_short
+                        else (exit_price - entry_price_sl) * shares
+                    )
+                else:
+                    stop_loss_pnl = None
+
                 # Record the trade
                 self.db.log_trade(
                     strategy_id=position["strategy_id"],
@@ -1384,6 +1405,7 @@ class MultiStrategyRunner:
                     slippage_cost=0.0,
                     commission_cost=0.0,
                     order_id=str(order.id),
+                    pnl=stop_loss_pnl,
                 )
 
                 # CRITICAL: Zero out the local DB position so reconciliation sees
@@ -1402,10 +1424,8 @@ class MultiStrategyRunner:
                     exit_proceeds = exit_price * shares
                     self.cash_manager.release_cash(position["strategy_id"], exit_proceeds)
 
-                # Record matched P&L so stop-loss exits appear in win-rate and profit-factor
-                entry_price_sl = float(
-                    position.get("avg_price") or position.get("entry_price") or 0
-                )
+                # Also record matched P&L in trade_pnl_detail (entry_price_sl and
+                # the >0 guard are computed above, alongside the trades-table pnl).
                 if entry_price_sl > 0:
                     try:
                         self.db.log_trade_pnl(
@@ -2032,8 +2052,17 @@ class MultiStrategyRunner:
                 return []
 
             local_positions = self._build_local_positions()
+            # send_alert=False: the engine owns notification based on the FINAL
+            # outcome after the auto-sync-and-retry below. Letting the reconciler
+            # email here fires on the transient initial failure (new entries land
+            # at the broker moments before the local positions table is written)
+            # even when the retry recovers and the run ends PASS — a daily false
+            # alarm that trains alert fatigue. The "Trading Blocked" critical
+            # email below covers genuine, unrecoverable drift.
             success, discrepancies = self.broker_reconciler.reconcile_daily(
-                local_positions=local_positions, local_cash=self.cash_available
+                local_positions=local_positions,
+                local_cash=self.cash_available,
+                send_alert=False,
             )
 
             self.reconciliation_status = "PASS" if success else "FAIL"
@@ -4020,6 +4049,7 @@ class MultiStrategyRunner:
             retry_success, retry_discrepancies = self.broker_reconciler.reconcile_daily(
                 local_positions=local_positions,
                 local_cash=self.cash_available,
+                send_alert=False,
             )
             return retry_success, retry_discrepancies
         except Exception as exc:

@@ -65,7 +65,11 @@ class BrokerReconciler:
         self.mismatch_details = []
 
     def reconcile_daily(
-        self, local_positions: dict, local_cash: float, local_orders: list | None = None
+        self,
+        local_positions: dict,
+        local_cash: float,
+        local_orders: list | None = None,
+        send_alert: bool = True,
     ) -> tuple[bool, list[str]]:
         logger.info("=" * 80)
         logger.info("BROKER RECONCILIATION - STARTING")
@@ -101,7 +105,7 @@ class BrokerReconciler:
                 for disc in discrepancies:
                     logger.error(f"  - {disc}")
 
-                self._enter_paused_state(discrepancies)
+                self._enter_paused_state(discrepancies, send_alert=send_alert)
                 return False, discrepancies
             else:
                 logger.info("✅ RECONCILIATION PASSED - All checks successful")
@@ -113,7 +117,7 @@ class BrokerReconciler:
             error_msg = f"Reconciliation error: {str(e)}"
             logger.error(error_msg)
             discrepancies.append(error_msg)
-            self._enter_paused_state(discrepancies)
+            self._enter_paused_state(discrepancies, send_alert=send_alert)
             return False, discrepancies
 
     def _reconcile_positions(self, local_positions: dict) -> list[str]:
@@ -264,17 +268,28 @@ class BrokerReconciler:
 
         return discrepancies
 
-    def _enter_paused_state(self, discrepancies: list[str]):
+    def _enter_paused_state(self, discrepancies: list[str], send_alert: bool = True):
         """
         Enter PAUSED state on reconciliation failure
 
         - Sets is_paused flag
         - Stores mismatch details
-        - Sends email alert
+        - Sends email alert (unless send_alert=False)
         - Blocks all trading
+
+        When called from the engine's reconciliation gate, send_alert is False:
+        the engine owns notification based on the FINAL outcome after its
+        auto-sync-and-retry. Emailing here would fire on the transient initial
+        failure even when the retry recovers (END=PASS) — a daily false alarm,
+        since new entries land at the broker moments before the local positions
+        table is written, so the first reconciliation always reports them as
+        "exists in broker but not locally" and the auto-sync then heals it.
         """
         self.is_paused = True
         self.mismatch_details = discrepancies
+
+        if not send_alert:
+            return
 
         logger.critical("=" * 80)
         logger.critical("⚠️  SYSTEM PAUSED - RECONCILIATION FAILURE")
