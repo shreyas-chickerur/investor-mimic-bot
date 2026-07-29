@@ -58,7 +58,7 @@ from src.strategies.strategy_sector_rotation import SectorRotationStrategy
 from src.strategies.strategy_volatility_breakout import VolatilityBreakoutStrategy
 from src.utils.config_loader import get_config
 
-# Import new modules for professional-grade system
+# Supporting modules
 from src.utils.email_notifier import EmailNotifier, _bullet_list, _kv_rows, build_alert_html
 from src.utils.execution_costs import ExecutionCostModel
 from src.utils.kill_switch_service import KillSwitchService
@@ -144,7 +144,7 @@ class MultiStrategyRunner:
             stage="INIT", status="RUNNING", metadata={"asof_date": self.asof_date}
         )
 
-        # CRITICAL: Log startup datetime for audit trail
+        # Log startup datetime for audit trail
         import time
 
         current_dt = datetime.now()
@@ -192,7 +192,7 @@ class MultiStrategyRunner:
             self.buying_power,
         )
 
-        # Initialize professional-grade modules with config
+        # Initialize supporting modules with config
         self.email_notifier = EmailNotifier(outbox_writer=self.db.enqueue_notification)
         self.data_validator = DataValidator()
         # Real equity only — buying_power is the 4x day-trade margin ceiling
@@ -1206,7 +1206,7 @@ class MultiStrategyRunner:
         df = pd.read_csv(data_file, index_col=0)
         df.index = pd.to_datetime(df.index)
 
-        # CRITICAL: Filter to last 150 days BEFORE quality checks
+        # Filter to last 150 days before quality checks
         # Provides 50+ days warmup for sma_100 and other long-period indicators
         # This prevents excessive NaN values that would block all symbols
         from datetime import timedelta
@@ -1408,7 +1408,7 @@ class MultiStrategyRunner:
                     pnl=stop_loss_pnl,
                 )
 
-                # CRITICAL: Zero out the local DB position so reconciliation sees
+                # Zero out the local DB position so reconciliation sees
                 # broker=0 and DB=0 (previously this was missing, causing every
                 # stop-loss to produce a guaranteed reconciliation mismatch).
                 # For a short the position is negative, so covering is a POSITIVE delta.
@@ -1600,7 +1600,7 @@ class MultiStrategyRunner:
         except Exception as _wd_exc:
             logger.error("Strategy wind-down failed (non-fatal): %s", _wd_exc)
 
-        # CRITICAL: Check kill switches BEFORE any new entries
+        # Check kill switches before any new entries
         logger.info("=" * 80)
         logger.info("CHECKING KILL SWITCHES")
         logger.info("=" * 80)
@@ -1663,7 +1663,7 @@ class MultiStrategyRunner:
         logger.info("✅ All kill switches passed")
         logger.info("=" * 80)
 
-        # CRITICAL: Check drawdown stop BEFORE trading
+        # Check drawdown stop before trading
         logger.info("=" * 80)
         logger.info("CHECKING DRAWDOWN STOP")
         logger.info("=" * 80)
@@ -1719,7 +1719,7 @@ class MultiStrategyRunner:
         # before the defensive-exit phase (see top of this method) so that the
         # stop-loss and wind-down orders placed there are not cancelled by it.
 
-        # CRITICAL: Check data quality BEFORE trading
+        # Check data quality before trading
         logger.info("=" * 80)
         logger.info("CHECKING DATA QUALITY")
         logger.info("=" * 80)
@@ -2037,7 +2037,7 @@ class MultiStrategyRunner:
                 discrepancies=[],
             )
 
-            # CRITICAL: Hard reconciliation gate (MANDATORY)
+            # Hard reconciliation gate
             logger.info("=" * 80)
             logger.info("BROKER RECONCILIATION (MANDATORY GATE)")
             logger.info("=" * 80)
@@ -3318,7 +3318,7 @@ class MultiStrategyRunner:
                         intent_id, str(order.id), strategy.strategy_id, symbol
                     )
 
-                    # CRITICAL FIX: Verify order fill before updating database
+                    # Verify order fill before updating database
                     # Wait for order to be filled (market orders typically fill immediately)
                     fill_verified = False
                     actual_filled_qty = adjusted_shares
@@ -3408,7 +3408,7 @@ class MultiStrategyRunner:
                         "BUY", symbol, actual_filled_qty, actual_fill_price, actual_trade_value
                     )
 
-                    # CRITICAL: Only update database AFTER verifying fill
+                    # Only update database after verifying fill
                     entry_date_str = (
                         entry_date.date().isoformat()
                         if hasattr(entry_date, "date")
@@ -3436,7 +3436,7 @@ class MultiStrategyRunner:
                     except Exception as _lot_exc:
                         logger.warning("Tax lot recording failed for %s: %s", symbol, _lot_exc)
 
-                    # CRITICAL: Set stop loss for new position (regime-aware multiplier)
+                    # Set stop loss for new position (regime-aware multiplier)
                     if atr > 0:
                         self.stop_loss_manager.set_stop_loss(
                             symbol,
@@ -3590,7 +3590,7 @@ class MultiStrategyRunner:
                         f"submit_order_sell_{symbol}", self.trading_client.submit_order, order_data
                     )
 
-                    # CRITICAL FIX: Verify order fill before updating database
+                    # Verify order fill before updating database
                     fill_verified = False
                     actual_filled_qty = shares
                     actual_fill_price = exec_price
@@ -3715,7 +3715,7 @@ class MultiStrategyRunner:
                                 deviation_bps,
                             )
 
-                    # CRITICAL FIX: Update strategy positions with actual filled quantities
+                    # Update strategy positions with actual filled quantities
                     entry_price_for_pnl = getattr(strategy, "entry_prices", {}).get(symbol)
                     entry_date_for_pnl = getattr(strategy, "entry_dates", {}).get(symbol)
                     if entry_date_for_pnl and hasattr(entry_date_for_pnl, "date"):
@@ -3774,7 +3774,7 @@ class MultiStrategyRunner:
                         except Exception as _pnl_exc:
                             logger.warning("log_trade_pnl failed for %s: %s", symbol, _pnl_exc)
 
-                    # CRITICAL: Only update database AFTER verifying fill
+                    # Only update database after verifying fill
                     self._update_position_record(
                         strategy.strategy_id, symbol, -actual_filled_qty, actual_fill_price
                     )

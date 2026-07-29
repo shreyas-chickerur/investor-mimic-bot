@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class PerformanceMetrics:
-    """Tracks comprehensive trading performance metrics"""
+    """Tracks trading performance metrics"""
 
     def __init__(self):
         self.trades = []
@@ -67,7 +67,7 @@ class PerformanceMetrics:
             self.daily_returns.append(daily_return)
 
     def calculate_metrics(self) -> dict:
-        """Calculate comprehensive performance metrics"""
+        """Calculate performance metrics"""
         if not self.trades:
             return self._empty_metrics()
 

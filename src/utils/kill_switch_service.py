@@ -176,7 +176,7 @@ class KillSwitchService:
         try:
             self.email_notifier.send_alert(subject, html)
         except Exception as e:
-            # CRITICAL: operator must know trading is halted even if email fails
+            # operator must know trading is halted even if email fails
             logger.critical(
                 "CRITICAL: kill switch fired but alert email FAILED to send — "
                 "manual check required. Reason: %s. Email error: %s",
